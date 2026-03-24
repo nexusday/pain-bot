@@ -235,7 +235,6 @@ let handler = async (m, { conn, usedPrefix }) => {
 ╭─╮  𓍯  𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂  𓍯  
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play <búsqueda/url>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play2 <búsqueda>
-│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <búsqueda>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}aptoide <app>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}git <url>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <link>
