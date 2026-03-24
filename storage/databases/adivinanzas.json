@@ -1,0 +1,482 @@
+[
+  {
+    "id": 1,
+    "pregunta": "¿Qué tiene dientes pero no puede morder?",
+    "respuesta": "peine",
+    "categoria": "objetos"
+  },
+  {
+    "id": 2,
+    "pregunta": "¿Qué sube y baja pero nunca se mueve?",
+    "respuesta": "escalera",
+    "categoria": "objetos"
+  },
+  {
+    "id": 3,
+    "pregunta": "¿Qué tiene llaves pero no abre puertas?",
+    "respuesta": "piano",
+    "categoria": "instrumentos"
+  },
+  {
+    "id": 4,
+    "pregunta": "¿Qué tiene hojas pero no es un árbol?",
+    "respuesta": "libro",
+    "categoria": "objetos"
+  },
+  {
+    "id": 5,
+    "pregunta": "¿Qué tiene agujas pero no cose?",
+    "respuesta": "reloj",
+    "categoria": "objetos"
+  },
+  {
+    "id": 6,
+    "pregunta": "¿Qué tiene ruedas pero no es un carro?",
+    "respuesta": "patineta",
+    "categoria": "transporte"
+  },
+  {
+    "id": 7,
+    "pregunta": "¿Qué tiene ojos pero no puede ver?",
+    "respuesta": "agujas",
+    "categoria": "objetos"
+  },
+  {
+    "id": 8,
+    "pregunta": "¿Qué tiene boca pero no puede hablar?",
+    "respuesta": "botella",
+    "categoria": "objetos"
+  },
+  {
+    "id": 9,
+    "pregunta": "¿Qué tiene patas pero no puede caminar?",
+    "respuesta": "mesa",
+    "categoria": "muebles"
+  },
+  {
+    "id": 10,
+    "pregunta": "¿Qué tiene cabeza pero no tiene cerebro?",
+    "respuesta": "clavo",
+    "categoria": "herramientas"
+  },
+  {
+    "id": 11,
+    "pregunta": "¿Qué tiene cuello pero no tiene cabeza?",
+    "respuesta": "botella",
+    "categoria": "objetos"
+  },
+  {
+    "id": 12,
+    "pregunta": "¿Qué tiene manos pero no puede aplaudir?",
+    "respuesta": "reloj",
+    "categoria": "objetos"
+  },
+  {
+    "id": 13,
+    "pregunta": "¿Qué tiene dientes pero no puede comer?",
+    "respuesta": "sierra",
+    "categoria": "herramientas"
+  },
+  {
+    "id": 14,
+    "pregunta": "¿Qué tiene alas pero no puede volar?",
+    "respuesta": "avion",
+    "categoria": "transporte"
+  },
+  {
+    "id": 15,
+    "pregunta": "¿Qué tiene raíz pero no es una planta?",
+    "respuesta": "diente",
+    "categoria": "cuerpo"
+  },
+  {
+    "id": 16,
+    "pregunta": "¿Qué tiene espalda pero no tiene frente?",
+    "respuesta": "silla",
+    "categoria": "muebles"
+  },
+  {
+    "id": 17,
+    "pregunta": "¿Qué tiene brazos pero no tiene cuerpo?",
+    "respuesta": "camisa",
+    "categoria": "ropa"
+  },
+  {
+    "id": 18,
+    "pregunta": "¿Qué tiene nariz pero no puede oler?",
+    "respuesta": "tetera",
+    "categoria": "objetos"
+  },
+  {
+    "id": 19,
+    "pregunta": "¿Qué tiene orejas pero no puede escuchar?",
+    "respuesta": "olla",
+    "categoria": "objetos"
+  },
+  {
+    "id": 20,
+    "pregunta": "¿Qué tiene lengua pero no puede hablar?",
+    "respuesta": "zapato",
+    "categoria": "ropa"
+  },
+  {
+    "id": 21,
+    "pregunta": "¿Qué tiene cara pero no es una persona?",
+    "respuesta": "reloj",
+    "categoria": "objetos"
+  },
+  {
+    "id": 22,
+    "pregunta": "¿Qué tiene venas pero no tiene sangre?",
+    "respuesta": "hoja",
+    "categoria": "naturaleza"
+  },
+  {
+    "id": 23,
+    "pregunta": "¿Qué tiene corazón pero no late?",
+    "respuesta": "arte",
+    "categoria": "arte"
+  },
+  {
+    "id": 24,
+    "pregunta": "¿Qué tiene dedos pero no puede tocar?",
+    "respuesta": "guante",
+    "categoria": "ropa"
+  },
+  {
+    "id": 25,
+    "pregunta": "¿Qué tiene pelo pero no es un animal?",
+    "respuesta": "cepillo",
+    "categoria": "objetos"
+  },
+  {
+    "id": 26,
+    "pregunta": "¿Qué tiene piel pero no es un animal?",
+    "respuesta": "platano",
+    "categoria": "comida"
+  },
+  {
+    "id": 27,
+    "pregunta": "¿Qué tiene cuello pero no es una persona?",
+    "respuesta": "camisa",
+    "categoria": "ropa"
+  },
+  {
+    "id": 28,
+    "pregunta": "¿Qué tiene ojos pero no puede llorar?",
+    "respuesta": "aguja",
+    "categoria": "herramientas"
+  },
+  {
+    "id": 29,
+    "pregunta": "¿Qué tiene pies pero no puede caminar?",
+    "respuesta": "calcetin",
+    "categoria": "ropa"
+  },
+  {
+    "id": 30,
+    "pregunta": "¿Qué tiene cola pero no es un animal?",
+    "respuesta": "avion",
+    "categoria": "transporte"
+  },
+  {
+    "id": 31,
+    "pregunta": "¿Qué tiene dientes pero no come?",
+    "respuesta": "peine",
+    "categoria": "objetos"
+  },
+  {
+    "id": 32,
+    "pregunta": "¿Qué tiene piernas pero no puede saltar?",
+    "respuesta": "pantalon",
+    "categoria": "ropa"
+  },
+  {
+    "id": 33,
+    "pregunta": "¿Qué tiene cabeza pero no piensa?",
+    "respuesta": "ajo",
+    "categoria": "comida"
+  },
+  {
+    "id": 34,
+    "pregunta": "¿Qué tiene espalda pero no se puede sentar?",
+    "respuesta": "camisa",
+    "categoria": "ropa"
+  },
+  {
+    "id": 35,
+    "pregunta": "¿Qué tiene brazos pero no abraza?",
+    "respuesta": "silla",
+    "categoria": "muebles"
+  },
+  {
+    "id": 36,
+    "pregunta": "¿Qué tiene uñas pero no puede rascar?",
+    "respuesta": "gato",
+    "categoria": "animales"
+  },
+  {
+    "id": 37,
+    "pregunta": "¿Qué tiene voz pero no puede cantar?",
+    "respuesta": "telefono",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 38,
+    "pregunta": "¿Qué tiene memoria pero no recuerda?",
+    "respuesta": "computadora",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 39,
+    "pregunta": "¿Qué tiene pantalla pero no es TV?",
+    "respuesta": "celular",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 40,
+    "pregunta": "¿Qué tiene batería pero no es auto?",
+    "respuesta": "telefono",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 41,
+    "pregunta": "¿Qué tiene antena pero no es insecto?",
+    "respuesta": "radio",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 42,
+    "pregunta": "¿Qué tiene botones pero no es camisa?",
+    "respuesta": "telefono",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 43,
+    "pregunta": "¿Qué tiene cable pero no es barco?",
+    "respuesta": "telefono",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 44,
+    "pregunta": "¿Qué tiene cámara pero no es fotógrafo?",
+    "respuesta": "celular",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 45,
+    "pregunta": "¿Qué tiene música pero no es banda?",
+    "respuesta": "radio",
+    "categoria": "tecnologia"
+  },
+  {
+    "id": 46,
+    "pregunta": "¿Qué tiene luz pero no es sol?",
+    "respuesta": "linterna",
+    "categoria": "objetos"
+  },
+  {
+    "id": 47,
+    "pregunta": "¿Qué tiene calor pero no es fuego?",
+    "respuesta": "sol",
+    "categoria": "naturaleza"
+  },
+  {
+    "id": 48,
+    "pregunta": "¿Qué tiene frío pero no es hielo?",
+    "respuesta": "nevera",
+    "categoria": "electrodomesticos"
+  },
+  {
+    "id": 49,
+    "pregunta": "¿Qué tiene agua pero no es río?",
+    "respuesta": "mar",
+    "categoria": "naturaleza"
+  },
+  {
+    "id": 50,
+    "pregunta": "¿Qué tiene viento pero no es huracán?",
+    "respuesta": "abanico",
+    "categoria": "objetos"
+  },
+  {
+    "id": 51,
+    "pregunta": "¿Qué tiene lluvia pero no moja?",
+    "respuesta": "paraguas",
+    "categoria": "objetos"
+  },
+  {
+    "id": 52,
+    "pregunta": "¿Qué tiene nieve pero no enfría?",
+    "respuesta": "nevera",
+    "categoria": "electrodomesticos"
+  },
+  {
+    "id": 53,
+    "pregunta": "¿Qué tiene sombra pero no es árbol?",
+    "respuesta": "sombrero",
+    "categoria": "ropa"
+  },
+  {
+    "id": 54,
+    "pregunta": "¿Qué tiene humo pero no es cigarro?",
+    "respuesta": "cocina",
+    "categoria": "electrodomesticos"
+  },
+  {
+    "id": 55,
+    "pregunta": "¿Qué tiene fuego pero no quema?",
+    "respuesta": "cocina",
+    "categoria": "electrodomesticos"
+  },
+  {
+    "id": 56,
+    "pregunta": "¿Qué tiene hielo pero no enfría?",
+    "respuesta": "bebida",
+    "categoria": "comida"
+  },
+  {
+    "id": 57,
+    "pregunta": "¿Qué tiene leche pero no es vaca?",
+    "respuesta": "tienda",
+    "categoria": "comercios"
+  },
+  {
+    "id": 58,
+    "pregunta": "¿Qué tiene pan pero no es panadería?",
+    "respuesta": "supermercado",
+    "categoria": "comercios"
+  },
+  {
+    "id": 59,
+    "pregunta": "¿Qué tiene carne pero no es carnicería?",
+    "respuesta": "nevera",
+    "categoria": "electrodomesticos"
+  },
+  {
+    "id": 60,
+    "pregunta": "¿Qué tiene fruta pero no es árbol?",
+    "respuesta": "mercado",
+    "categoria": "comercios"
+  },
+  {
+    "id": 61,
+    "pregunta": "¿Qué tiene pescado pero no es mar?",
+    "respuesta": "pescaderia",
+    "categoria": "comercios"
+  },
+  {
+    "id": 62,
+    "pregunta": "¿Qué tiene libro pero no es biblioteca?",
+    "respuesta": "libreria",
+    "categoria": "comercios"
+  },
+  {
+    "id": 63,
+    "pregunta": "¿Qué tiene medicina pero no es hospital?",
+    "respuesta": "farmacia",
+    "categoria": "comercios"
+  },
+  {
+    "id": 64,
+    "pregunta": "¿Qué tiene gasolina pero no es estación?",
+    "respuesta": "auto",
+    "categoria": "transporte"
+  },
+  {
+    "id": 65,
+    "pregunta": "¿Qué tiene motor pero no es auto?",
+    "respuesta": "avion",
+    "categoria": "transporte"
+  },
+  {
+    "id": 66,
+    "pregunta": "¿Qué tiene alas pero no vuela?",
+    "respuesta": "edificio",
+    "categoria": "construccion"
+  },
+  {
+    "id": 67,
+    "pregunta": "¿Qué tiene ventanas pero no es casa?",
+    "respuesta": "auto",
+    "categoria": "transporte"
+  },
+  {
+    "id": 68,
+    "pregunta": "¿Qué tiene puertas pero no es habitación?",
+    "respuesta": "auto",
+    "categoria": "transporte"
+  },
+  {
+    "id": 69,
+    "pregunta": "¿Qué tiene techo pero no es casa?",
+    "respuesta": "auto",
+    "categoria": "transporte"
+  },
+  {
+    "id": 70,
+    "pregunta": "¿Qué tiene llantas pero no es vehículo?",
+    "respuesta": "silla",
+    "categoria": "muebles"
+  },
+  {
+    "id": 71,
+    "pregunta": "¿Qué tiene manija pero no es puerta?",
+    "respuesta": "maleta",
+    "categoria": "objetos"
+  },
+  {
+    "id": 72,
+    "pregunta": "¿Qué tiene cerradura pero no es caja fuerte?",
+    "respuesta": "puerta",
+    "categoria": "construccion"
+  },
+  {
+    "id": 73,
+    "pregunta": "¿Qué tiene llave pero no abre?",
+    "respuesta": "guitarra",
+    "categoria": "instrumentos"
+  },
+  {
+    "id": 74,
+    "pregunta": "¿Qué tiene cuerdas pero no es instrumento?",
+    "respuesta": "raqueta",
+    "categoria": "deportes"
+  },
+  {
+    "id": 75,
+    "pregunta": "¿Qué tiene red pero no es pesca?",
+    "respuesta": "tenis",
+    "categoria": "deportes"
+  },
+  {
+    "id": 76,
+    "pregunta": "¿Qué tiene pelota pero no es fútbol?",
+    "respuesta": "basquetbol",
+    "categoria": "deportes"
+  },
+  {
+    "id": 77,
+    "pregunta": "¿Qué tiene arco pero no es flecha?",
+    "respuesta": "ceja",
+    "categoria": "cuerpo"
+  },
+  {
+    "id": 78,
+    "pregunta": "¿Qué tiene cejas pero no es persona?",
+    "respuesta": "cara",
+    "categoria": "cuerpo"
+  },
+  {
+    "id": 79,
+    "pregunta": "¿Qué tiene mejillas pero no es cara?",
+    "respuesta": "trasero",
+    "categoria": "cuerpo"
+  },
+  {
+    "id": 80,
+    "pregunta": "¿Qué tiene dedos pero no es mano?",
+    "respuesta": "pie",
+    "categoria": "cuerpo"
+  }
+]
