@@ -134,6 +134,24 @@ const isRAdmin = user?.admin == 'superadmin' || false
 const isAdmin = isRAdmin || user?.admin == 'admin' || false  
 const isBotAdmin = bot?.admin || false  
 
+  
+  try {
+    if (!global.db.data.muted) global.db.data.muted = {}
+    if (m.isGroup && global.db.data.muted[m.chat] && Array.isArray(global.db.data.muted[m.chat])) {
+      
+      if (!m.fromMe && global.db.data.muted[m.chat].includes(m.sender)) {
+        try {
+          await this.sendMessage(m.chat, { delete: m.key })
+        } catch (err) {
+          console.error('Error deleting message from muted user:', err)
+        }
+        return
+      }
+    }
+  } catch (err) {
+    console.error('Error processing muted list:', err)
+  }
+
 const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')  
 
 global.idcanal = ''  

@@ -9,7 +9,7 @@ global.owner = [
 
 global.ownerLid = [
   ['114263544885392', 'Sunkovv', true],
-  ['275878953148477', 'Fernando', true],
+  ['160155303968780', 'Jane', true],
 ]
 
 global.sessions = 'Sessions'
@@ -17,7 +17,7 @@ global.bot = 'Serbot'
 global.AFBots = true
 
 global.packname = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧'
-global.namebot = '𝙥𝙖𝙞𝙣 𝙗𝙤𝙩'
+global.namebot = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧'
 global.author = 'Sunkovv'
 global.moneda = 'USD'
 

@@ -11,20 +11,20 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
     
     const searchQuery = encodeURIComponent(text)
-    const apiUrl = `https://bytebazz-api.koyeb.app/api/ai/model/deepseek?texto=${searchQuery}&apikey=8jkh5icbf05`
-    
+    const apiUrl = `https://api.delirius.store/ia/chatgpt?q=${searchQuery}`
+
     const { data } = await axios.get(apiUrl)
-    
-    if (!data.status) {
+
+    if (!data?.status) {
       return conn.sendMessage(m.chat, {
-        text: '*[❗] No se pudo obtener una respuesta de la API de Deepseek.*',
+        text: '*[❗] No se pudo obtener una respuesta de la API.*',
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
     }
-    
-    const response = data.data?.trim() || 'No se obtuvo respuesta de Deepseek.'
+
+    const response = (typeof data.data === 'string' ? data.data.trim() : '') || 'No se obtuvo respuesta de la API.'
     
     
     let thought = ''
@@ -68,6 +68,6 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
 handler.help = ['#deep <texto>']
 handler.tags = ['inteligencia']
-handler.command = ['deepseek', 'deep', 'deepseekia']
+handler.command = ['gpt', 'chatgpt', 'ia']
 
 export default handler

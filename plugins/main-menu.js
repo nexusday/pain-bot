@@ -215,6 +215,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pinterest <busqueda>
+│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bsticker <busqueda>
 ╰─╯
 
 ╭─╮  𓍯  𝙾𝚂𝙸𝙽𝚃 - 𝙱𝙴𝚃𝙰  𓍯  
@@ -227,9 +228,8 @@ let handler = async (m, { conn, usedPrefix }) => {
 
 ╭─╮  𓍯  𝙸𝙽𝚃𝙴𝙻𝙸𝙶𝙴𝙽𝙲𝙸𝙰 𝙰.𝙸  𓍯  
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}gemini <texto>
-│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}deepseek <texto>
-│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}llama <texto>
-│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}exaone <texto>
+│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}chatgpt <texto>
+│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}animg <texto>
 ╰─╯
 
 ╭─╮  𓍯  𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂  𓍯  
@@ -240,6 +240,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <link>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}fb <link>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ig <link>
+│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <link>
 ╰─╯
 
 ╭─╮  𓍯  𝙰𝙳𝙸𝙲𝙸𝙾𝙽𝙰𝙻𝙴𝚂  𓍯  
@@ -248,6 +249,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}vernotas
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}id
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}infogrupo
+│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}traducir
 ╰─╯
 
 ╭─╮  𓍯  𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂  𓍯  
@@ -284,11 +286,10 @@ let handler = async (m, { conn, usedPrefix }) => {
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antimention on/off
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antidocument on/off
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}anticaracter on/off <limite>
+│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}mute @usuario
+│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmute @usuario
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}soloadmin on/off
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}welcome on/off
-│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}savep
-│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}publicg on/off
-│  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}publicg time <tiempo>
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoia on/off
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohot on/off
 │  𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off
