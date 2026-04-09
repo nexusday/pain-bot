@@ -78,10 +78,7 @@ const handler = async (m, { conn, text, usedPrefix, command, groupMetadata }) =>
     if (!msg) return conn.reply(m.chat, 'Debes incluir un mensaje. Ej: "Vamos a jugar" 10m', m)
 
     const delayStr = formatMs(durationMs)
-    const confirmText = `╭─「 ✦ ⏳ ᴛᴇᴍᴘᴏʀɪᴢᴀᴅᴏʀ ✦ 」─╮\n` +
-      `╰➺ ✧ *Mensaje:* ${msg}\n` +
-      `╰➺ ✧ *Tiempo:* ${delayStr}\n` +
-      `╰─\n\n> PAIN COMMUNITY`
+    const confirmText = `MENSAJE: ${msg}\n TIEMPO: ${delayStr}`
     await conn.sendMessage(m.chat, {
       text: confirmText,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) }
@@ -95,9 +92,7 @@ const handler = async (m, { conn, text, usedPrefix, command, groupMetadata }) =>
         const users = participants.map(u => conn.decodeJid(u.id))
 
         const finalText = (
-          `╭─「 ✦ ⏰ ᴛɪᴇᴍᴘᴏ ᴄᴜᴍᴘʟɪᴅᴏ ✦ 」─╮\n` +
-          `╰➺ ✧ ${msg}\n` +
-          `╰─\n\n> PAIN COMMUNITY`
+          `${msg}`
         ).trim()
 
       

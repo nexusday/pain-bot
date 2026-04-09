@@ -7,32 +7,23 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   }, { quoted: m })
 
   try {
-   
     const groupMetadata = await conn.groupMetadata(m.chat)
     const participants = groupMetadata.participants || []
-    
-    
-    const users = participants.filter(p => !p.admin && p.id !== conn.user.jid)
-    
-    
     const allParticipants = participants.filter(p => p.id !== conn.user.jid)
-    
-   
+
     const selectedUsers = []
     const maxUsers = Math.min(10, allParticipants.length)
-    
+
     for (let i = 0; i < maxUsers; i++) {
       const randomIndex = Math.floor(Math.random() * allParticipants.length)
       const user = allParticipants[randomIndex]
-      
-      
       if (!selectedUsers.find(u => u.id === user.id)) {
         selectedUsers.push(user)
       } else {
-        i-- 
+        i--
       }
     }
-    
+
     if (selectedUsers.length === 0) {
       return conn.sendMessage(m.chat, {
         text: '[❗] No hay suficientes usuarios en el grupo para crear el top.',
@@ -42,17 +33,16 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
       }, { quoted: m })
     }
 
-    let txt = `🤢 𝗧𝗼𝗽 𝗳𝗲𝗼𝘀 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼\n\n`
+    let txt = `⚧️ 𝗧𝗼𝗽 𝘁𝗿𝗮𝗻𝘀𝗲𝘅𝘂𝗮𝗹𝗲𝘀 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼\n\n`
 
     selectedUsers.forEach((user, index) => {
       const position = index + 1
-      const emoji = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '🤢'
+      const emoji = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '💖'
       txt += `*${position}.* @${user.id.split('@')[0]}\n`
     })
-    
-    
+
     const mentionedJid = selectedUsers.map(user => user.id)
-    
+
     return conn.sendMessage(m.chat, {
       text: txt,
       contextInfo: {
@@ -60,11 +50,11 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
         mentionedJid: mentionedJid
       }
     }, { quoted: m })
-    
+
   } catch (e) {
-    console.error('Error en top feos:', e)
+    console.error('Error en top transexuales:', e)
     return conn.sendMessage(m.chat, {
-      text: '《✧》Ocurrió un error al generar el top de feos del grupo.',
+      text: '[❌] Ocurrió un error al generar el top de transexuales del grupo.',
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -72,9 +62,9 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   }
 }
 
-handler.help = ['#topfeos']
+handler.help = ['#toptransexuales']
 handler.tags = ['fun', 'grupos']
-handler.command = ['topfeos', 'topfeo', 'feos', 'feotop']
+handler.command = ['toptransexuales', 'toptrans', 'transexuales', 'transexutop']
 handler.group = true
 
-export default handler 
+export default handler

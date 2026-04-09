@@ -134,11 +134,11 @@ const isRAdmin = user?.admin == 'superadmin' || false
 const isAdmin = isRAdmin || user?.admin == 'admin' || false  
 const isBotAdmin = bot?.admin || false  
 
-  
+  // Persistent group mutes: initialize structure if missing
   try {
     if (!global.db.data.muted) global.db.data.muted = {}
     if (m.isGroup && global.db.data.muted[m.chat] && Array.isArray(global.db.data.muted[m.chat])) {
-      
+      // If sender is muted in this chat, delete their message and stop processing
       if (!m.fromMe && global.db.data.muted[m.chat].includes(m.sender)) {
         try {
           await this.sendMessage(m.chat, { delete: m.key })
@@ -427,24 +427,27 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
     }
     
     const invite = global.pendingInvites[m.chat]
-    
-    
+
     if (m.sender !== invite.opponent) return
-    
+
     const message = m.text?.toLowerCase().trim()
-    
+
     if (message === 'si' || message === 'sí' || message === 'yes' || message === 'acepto') {
-      
       try {
-        const { acceptInvite } = await import(`./plugins/rpg-michi.js`)
+        let mod
+        if (invite.type === 'miner') mod = await import(`./lib/logic-miner.js`)
+        else mod = await import(`./plugins/rpg-michi.js`)
+        const { acceptInvite } = mod
         return acceptInvite.call(this, m, this, invite)
       } catch (e) {
         console.error('Error al aceptar invitación:', e)
       }
     } else if (message === 'no' || message === 'rechazo' || message === 'rechazar') {
-  
       try {
-        const { rejectInvite } = await import(`./plugins/rpg-michi.js`)
+        let mod
+        if (invite.type === 'miner') mod = await import(`./lib/logic-miner.js`)
+        else mod = await import(`./plugins/rpg-michi.js`)
+        const { rejectInvite } = mod
         return rejectInvite.call(this, m, this, invite)
       } catch (e) {
         console.error('Error al rechazar invitación:', e)
@@ -534,6 +537,30 @@ ${board}
           ...rcanal.contextInfo
         }
       }, { quoted: m })
+    }
+  }
+
+  // Miner game moves
+  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'miner' && !commandExecuted) {
+    if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
+      if (!isAdmin && !isOwner && !isROwner) {
+        return 
+      }
+    }
+
+    const gameData = global.games[m.chat]
+    const game = gameData.game
+    if (!gameData.players.includes(m.sender)) return
+
+    const message = m.text?.trim()
+    if (!message || !/^[0-9]+$/.test(message)) return
+
+    try {
+      const mod = await import(`./lib/logic-miner.js`)
+      await mod.handleMove.call(this, m, this, gameData)
+    } catch (e) {
+      console.error('Error procesando movimiento miner:', e)
+      return this.sendMessage(m.chat, { text: '[❌] Error al procesar el movimiento.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
     }
   }
 
