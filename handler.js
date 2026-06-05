@@ -134,11 +134,11 @@ const isRAdmin = user?.admin == 'superadmin' || false
 const isAdmin = isRAdmin || user?.admin == 'admin' || false  
 const isBotAdmin = bot?.admin || false  
 
-  // Persistent group mutes: initialize structure if missing
+  
   try {
     if (!global.db.data.muted) global.db.data.muted = {}
     if (m.isGroup && global.db.data.muted[m.chat] && Array.isArray(global.db.data.muted[m.chat])) {
-      // If sender is muted in this chat, delete their message and stop processing
+      
       if (!m.fromMe && global.db.data.muted[m.chat].includes(m.sender)) {
         try {
           await this.sendMessage(m.chat, { delete: m.key })

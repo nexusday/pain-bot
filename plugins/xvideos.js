@@ -5,7 +5,7 @@ import cheerio from "cheerio"
 const handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text) {
     return conn.sendMessage(m.chat, {
-      text: `╭─「 ✦ 𓆩🔞𓆪 xᴠɪᴅᴇᴏs ʙᴜsᴄᴀᴅᴏʀ ✦ 」─╮\n│\n╰➺ ✧ *Uso:* ${usedPrefix}xvideos <búsqueda>\n╰➺ ✧ *Ejemplo:* ${usedPrefix}xvideos amateur\n╰➺ ✧ *URL:* ${usedPrefix}xvideos <url>\n\n> PAIN COMMUNITY`,
+      text: `xᴠɪᴅᴇᴏs ʙᴜsᴄᴀᴅᴏʀ\n\n *Uso:* ${usedPrefix}xvideos <búsqueda>\n *Ejemplo:* ${usedPrefix}xvideos amateur\n *URL:* ${usedPrefix}xvideos <url>\n\n`,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -17,7 +17,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
   
   if (isUrl) {
     await conn.sendMessage(m.chat, {
-      text: `╭─「 ✦ 𓆩🕒𓆪 ᴘʀᴏᴄᴇsᴀɴᴅᴏ ✦ 」─╮\n│\n╰➺ ✧ *URL:* ${text}\n╰➺ ✧ *Estado:* Descargando...\n\n> PAIN COMMUNITY`,
+      text: `ᴘʀᴏᴄᴇsᴀɴᴅᴏ\n\n *URL:* ${text}\n *Estado:* Descargando...`,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -27,7 +27,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
        const videoInfo = await xvideosdl(text)
        if (!videoInfo || !videoInfo.result) {
          return conn.sendMessage(m.chat, {
-           text: `╭─「 ✦ 𓆩❌𓆪 ᴇʀʀᴏʀ ✦ 」─╮\n│\n╰➺ ✧ *Error:* No se encontró información del video\n╰➺ ✧ *Verifica la URL*\n\n> PAIN COMMUNITY`,
+           text: `[❌] *Error:* No se encontró información del video\n[❌] *Verifica la URL*`,
            contextInfo: {
              ...rcanal.contextInfo
            }
@@ -37,7 +37,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
        const videoUrl = videoInfo.result.url
        let peso = await size(videoInfo.result.url)
 
-       const cap = `╭─「 ✦ 𓆩🔞𓆪 ᴠɪᴅᴇᴏ xᴠɪᴅᴇᴏs ✦ 」─╮\n│\n╰➺ ✧ *Título:* ${videoInfo.result.title}\n╰➺ ✧ *Vistas:* ${videoInfo.result.views}\n╰➺ ✧ *Likes:* ${videoInfo.result.likes}\n╰➺ ✧ *Peso:* ${peso}\n╰➺ ✧ *Dislikes:* ${videoInfo.result.deslikes}\n╰➺ ✧ *Link:* ${text}\n\n> PAIN COMMUNITY`
+       const cap = `ᴠɪᴅᴇᴏ xᴠɪᴅᴇᴏs\n\n *Título:* ${videoInfo.result.title}\n *Vistas:* ${videoInfo.result.views}\n *Likes:* ${videoInfo.result.likes}\n *Peso:* ${peso}\n *Dislikes:* ${videoInfo.result.deslikes}\n *Link:* ${text}\n\n> PAIN COMMUNITY`
 
       await conn.sendMessage(m.chat, {
         video: { url: videoUrl },
@@ -50,7 +50,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     } catch (e) {
       console.error('Error en descarga XVideos:', e)
       await conn.sendMessage(m.chat, {
-        text: `╭─「 ✦ 𓆩❌𓆪 ᴇʀʀᴏʀ ✦ 」─╮\n│\n╰➺ ✧ *Error:* ${e.message}\n╰➺ ✧ *Verifica la URL*\n\n> PAIN COMMUNITY`,
+        text: `[❌] *Error:* ${e.message}\n[❌] *Verifica la URL*`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -61,7 +61,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
   
   await conn.sendMessage(m.chat, {
-    text: `╭─「 ✦ 𓆩🔥𓆪 ʙᴜsᴄᴀɴᴅᴏ ✦ 」─╮\n│\n╰➺ ✧ *Búsqueda:* ${text}\n╰➺ ✧ *Estado:* Procesando...\n\n> PAIN COMMUNITY`,
+    text: `ʙᴜsᴄᴀɴᴅᴏ\n\n *Búsqueda:* ${text}\n *Estado:* Procesando...`,
     contextInfo: {
       ...rcanal.contextInfo
     }
@@ -70,7 +70,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
   const results = await searchXvideos(text)
   if (!results || results.length === 0) {
     return conn.sendMessage(m.chat, {
-      text: `╭─「 ✦ 𓆩❌𓆪 ɴᴏ ʀᴇsᴜʟᴛᴀᴅᴏs ✦ 」─╮\n│\n╰➺ ✧ *Búsqueda:* ${text}\n╰➺ ✧ *Estado:* No se encontraron videos\n\n> PAIN COMMUNITY`,
+      text: `ɴᴏ ʀᴇsᴜʟᴛᴀᴅᴏs\n\n *Búsqueda:* ${text}\n *Estado:* No se encontraron videos\n`,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -78,10 +78,10 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 
   const list = results.slice(0, 10).map((res, i) => 
-    `*${i + 1}.*\n╰➺ ✧ *Título:* ${res.title}\n╰➺ ✧ *Link:* ${res.url}`
+    `*${i + 1}.*\n *Título:* ${res.title}\n *Link:* ${res.url}`
   ).join('\n\n')
 
-  const caption = `╭─「 ✦ 𓆩🔞𓆪 ʀᴇsᴜʟᴛᴀᴅᴏs ᴅᴇ ʙᴜsǫᴜᴇᴅᴀ ✦ 」─╮\n│\n╰➺ ✧ *Búsqueda:* ${text}\n╰➺ ✧ *Resultados:* ${results.length}\n│\n${list}\n│\n╰➺ ✧ *Escribe solo el número (1-10) para descargar*\n╰➺ ✧ *Ejemplo: 3, 7, 1*\n╰➺ ✧ *O usa directamente la URL*\n\n> PAIN COMMUNITY`
+  const caption = `ʀᴇsᴜʟᴛᴀᴅᴏs ᴅᴇ ʙᴜsǫᴜᴇᴅᴀ\n\n *Búsqueda:* ${text}\n *Resultados:* ${results.length}\n\n${list}\n│\n *Escribe solo el número (1-10) para descargar*\n *Ejemplo: 3, 7, 1*\n *O usa directamente la URL*\n\n`
 
   const { key } = await conn.sendMessage(m.chat, { 
     text: caption,
@@ -117,7 +117,7 @@ handler.before = async (m, { conn }) => {
   
   try {
     await conn.sendMessage(m.chat, {
-      text: `╭─「 ✦ 𓆩🕒𓆪 ᴘʀᴏᴄᴇsᴀɴᴅᴏ ✦ 」─╮\n│\n╰➺ ✧ *Video:* ${n}/${session.result.length}\n╰➺ ✧ *Estado:* Descargando...\n\n> PAIN COMMUNITY`,
+      text: `ᴘʀᴏᴄᴇsᴀɴᴅᴏ\n\n *Video:* ${n}/${session.result.length}\n *Estado:* Descargando...`,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -133,7 +133,7 @@ handler.before = async (m, { conn }) => {
      const videoUrl = videoInfo.result.url
      let peso = await size(videoInfo.result.url)
      
-     const cap = `╭─「 ✦ 𓆩🔞𓆪 ᴠɪᴅᴇᴏ xᴠɪᴅᴇᴏs ✦ 」─╮\n│\n╰➺ ✧ *Título:* ${videoInfo.result.title}\n╰➺ ✧ *Vistas:* ${videoInfo.result.views}\n╰➺ ✧ *Likes:* ${videoInfo.result.likes}\n╰➺ ✧ *Peso:* ${peso}\n╰➺ ✧ *Dislikes:* ${videoInfo.result.deslikes}\n╰➺ ✧ *Link:* ${link}\n\n> PAIN COMMUNITY`
+     const cap = `ᴠɪᴅᴇᴏ xᴠɪᴅᴇᴏs\n\n *Título:* ${videoInfo.result.title}\n *Vistas:* ${videoInfo.result.views}\n *Likes:* ${videoInfo.result.likes}\n *Peso:* ${peso}\n *Dislikes:* ${videoInfo.result.deslikes}\n *Link:* ${link}\n`
     
     await conn.sendMessage(m.chat, {
       video: { url: videoUrl },
@@ -146,7 +146,7 @@ handler.before = async (m, { conn }) => {
   } catch (e) {
     console.error('Error en descarga XVideos:', e)
     await conn.sendMessage(m.chat, {
-      text: `╭─「 ✦ 𓆩❌𓆪 ᴇʀʀᴏʀ ✦ 」─╮\n│\n╰➺ ✧ *Error:* ${e.message}\n╰➺ ✧ *Inténtalo más tarde*\n\n> PAIN COMMUNITY`,
+      text: `[❌] *Error:* ${e.message}\n *Inténtalo más tarde*`,
       contextInfo: {
         ...rcanal.contextInfo
       }
