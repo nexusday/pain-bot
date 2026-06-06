@@ -17,21 +17,15 @@ let handler = async (m, { conn, usedPrefix }) => {
     const botActual = conn.user?.jid?.split('@')[0]?.replace(/\D/g, '')
     const tipo = botActual === '+573180942941'.replace(/\D/g, '') ? 'Principal Bot' : 'Sub Bot'
     
-    
     if (tipo === 'Sub Bot') {
       const configGlobalPath = join('./Serbot', botActual, 'config.json')
       if (fs.existsSync(configGlobalPath)) {
         const globalConfig = JSON.parse(fs.readFileSync(configGlobalPath, 'utf8'))
-        if (globalConfig.img) {
-          mainImg = globalConfig.img
-        }
-        if (globalConfig.name) {
-          nombreBot = globalConfig.name
-        }
+        if (globalConfig.img) mainImg = globalConfig.img
+        if (globalConfig.name) nombreBot = globalConfig.name
       }
     }
     
-   
     const createOwnerIds = (number) => {
       const cleanNumber = number.replace(/[^0-9]/g, '')
       return [
@@ -52,7 +46,6 @@ let handler = async (m, { conn, usedPrefix }) => {
     const _user = global.db.data?.users?.[m.sender]
     const isPrems = isROwner || global.prems.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || _user?.prem == true
 
-    
     let isRAdmin = false
     let isAdmin = false
     let isGroupCreator = false
@@ -64,38 +57,24 @@ let handler = async (m, { conn, usedPrefix }) => {
           const user = participants.find(u => conn.decodeJid(u.id) === m.sender) || {}
           isRAdmin = user?.admin == 'superadmin' || false
           isAdmin = isRAdmin || user?.admin == 'admin' || false
-          
-         
           isGroupCreator = groupMetadata.owner === m.sender || 
-                          groupMetadata.subjectOwner === m.sender ||
-                          user?.admin === 'superadmin'
+                           groupMetadata.subjectOwner === m.sender ||
+                           user?.admin === 'superadmin'
         }
       } catch (error) {
         console.error('Error obteniendo metadata del grupo:', error)
       }
     }
 
-  
     let userRole = 'Miembro'
-    
     if (isROwner || isOwner) {
-     
-      if (isGroupCreator) {
-        userRole = '👑 Creador del Bot y Grupo'
-      } else if (isRAdmin || isAdmin) {
-        userRole = '👑 Creador del Bot y Admin'
-      } else {
-        userRole = '👑 Creador del Bot'
-      }
+      if (isGroupCreator) userRole = '👑 Creador del Bot y Grupo'
+      else if (isRAdmin || isAdmin) userRole = '👑 Creador del Bot y Admin'
+      else userRole = '👑 Creador del Bot'
     } else if (isMods) {
-      
-      if (isGroupCreator) {
-        userRole = 'Moderador del Bot y Creador'
-      } else if (isRAdmin || isAdmin) {
-        userRole = 'Moderador del Bot y Admin'
-      } else {
-        userRole = 'Moderador del Bot'
-      }
+      if (isGroupCreator) userRole = 'Moderador del Bot y Creador'
+      else if (isRAdmin || isAdmin) userRole = 'Moderador del Bot y Admin'
+      else userRole = 'Moderador del Bot'
     } else if (isGroupCreator) {
       userRole = '👑 Creador del Grupo'
     } else if (isRAdmin || isAdmin) {
@@ -103,23 +82,20 @@ let handler = async (m, { conn, usedPrefix }) => {
     }
     
     let botUptime = 0
-    if (conn.startTime) {
-      botUptime = Date.now() - conn.startTime
-    }
+    if (conn.startTime) botUptime = Date.now() - conn.startTime
     let botFormatUptime = clockString(botUptime)
     
-   
     let totalf = Object.values(global.plugins).filter(v => v.help && v.tags).length
-    
-    
     
     const totalRamMB = Math.round(os.totalmem() / 1024 / 1024)
     const processRamMB = Math.round(process.memoryUsage().rss / 1024 / 1024)
 
-    const text = `
+    // =
+    // SECCIONES DEL MENU
+    // =====
 
+    let menuHeader = `
 𓂃 ࣪ ִֶָ☾. 𝙱𝙸𝙴𝙽𝚅𝙴𝙽𝙸𝙳𝙾 𓂃 ࣪ ִֶָ☾.
-
 
    𓍯  𝙸𝙽𝙵𝙾 𝚄𝚂𝚄𝙰𝚁𝙸𝙾  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.split('@')[0]}
@@ -131,21 +107,17 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂:  ${totalf}
 > 𓂃 ࣪ ִֶָ☾.  𝙼𝙴𝙼𝙾𝚁𝙸𝙰: ${processRamMB}/${totalRamMB} MB
 
-
  𓂃 ࣪ ִֶָ☾. 𝙿𝚁𝙾𝙿𝙸𝙴𝚃𝙰𝚁𝙸𝙾𝚂𓂃 ࣪ ִֶָ☾.
-
-> 𓂃 ࣪ ִֶָ☾.  ⊹ +51901437507 ⊹ 𝚂𝚞𝚗𝚔𝚘𝚟𝚟
-
+> 𓂃 ࣪ ִֶָ☾.  ⊹ +51901437507 ⊹ *Sunkovv*
+> 𓂃 ࣪ ִֶָ☾.  ⊹ +584244309723 ⊹ *Clung*
+ 
 
  𓂃 ࣪ ִֶָ☾. 𝙲𝙰𝙽𝙰𝙻𝙴𝚂 𝙾𝙵𝙸𝙲𝙸𝙰𝙻𝙴𝚂 𓂃 ࣪ ִֶָ☾.
-
 > 𓂃 ࣪ ִֶָ☾.  ⟅ https://whatsapp.com/channel/0029Vb7Y87RLikgEutyMId1h ⟆
 
+𓂃 ࣪ ִֶָ☾. *𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂* 𓂃 ࣪ ִֶָ☾.\n\n`
 
-𓂃 ࣪ ִֶָ☾. 𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂 𓂃 ࣪ ִֶָ☾.
-
-
-   𓍯  ������  𓍯  
+    let sectionOwners = `   𓍯  *𝙾𝚆𝙽𝙴𝚁𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}verplugin <nombre.js>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}replugin <nombre.js>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}addplugin <nombre.js>
@@ -154,125 +126,9 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}restart
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}subme <mensaje>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}join <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}exit
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}exit\n\n`
 
-
-   𓍯  𝙲𝙼� ��� ���  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}qr
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}code
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bots
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}botinfo
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reconnect
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbotname
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbotimg
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setautoread
-
-
-   𓍯  �������𝙰 �𝙿𝙶  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}balance
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bal
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}coins
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}transf @usuario <cantidad>
-
-
-   𓍯  �����𝙻 ���  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}perfil
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbirth <fecha>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setdesc <descripción>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setfav <personaje>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setgenre <hombre/mujer>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}birthdays
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setname <nombre>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}owner
-
-
-   �  𝚃𝙾𝙿 𝚁𝙿𝙶  �  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topcoins
-
-
- 𓍯  �𝙰�� ���  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}dado
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}daily / dda
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}adivinanza
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pescar
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}michi @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}miner @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slot <cantidad>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}moneda <cara/sello> <cantidad>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}work
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}suerte
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}banco
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}deposit <cantidad/all>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}withdraw <cantidad/all>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}change <banco>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}unirsebank <banco>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}robar
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sorpresa
-
-
-   𓍯  𝙱𝚄𝚂𝚀𝚄𝙴𝙳𝙰𝚂  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}google <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}yt <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pinterest <busqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bsticker <busqueda>
-
-
-   𓍯  𝙾𝚂𝙸𝙽𝚃 - 𝙱𝙴𝚃𝙰  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ip <dirección IP>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ip2 <dirección IP>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sher <nombre/apodo>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}webinfo <URL>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tik <@usuario>
-
-
-   𓍯  𝙸𝙽𝚃𝙴𝙻𝙸𝙶𝙴𝙽𝙲𝙸𝙰 𝙰.𝙸  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}gemini <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}chatgpt <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}animg <texto>
-
-
-   𓍯  𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play <búsqueda/url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play2 <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}aptoide <app>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}git <url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}fb <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ig <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <link>
-
-
-   𓍯  𝚁𝙴𝙰𝙲𝙲𝙸𝙾𝙽𝙴𝚂  𓍯 
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reir
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}happy
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sad
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}angry
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slap @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kiss @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hug @usuario
-
-
-   𓍯  𝙰𝙳𝙸𝙲𝙸𝙾𝙽𝙰𝙻𝙴𝚂  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}nota <contenido>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delnota <numero>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}vernotas
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}id
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}infogrupo
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}traducir
-
-
-   𓍯  𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sticker
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toimg
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setmeta <autor> | <pack>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta
-
-
-   𓍯  𝙰𝙳𝙼𝙸𝙽𝚂  𓍯  
+    let sectionAdmins = `   𓍯  *𝙰𝙳𝙼𝙸𝙽𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ban @usuario
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}promote @usuario
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}demote @usuario
@@ -307,10 +163,115 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}welcome on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoia on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohot on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off\n\n`
 
+    let menuBody = `   𓍯  *𝙲𝙼𝙳 𝚂𝚄𝙱 𝙱𝙾𝚃*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}qr
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}code
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bots
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}botinfo
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reconnect
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbotname
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbotimg
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setautoread
 
-   𓍯  𝙳𝙸𝚅𝙴𝚁𝚂𝙸𝙾𝙽  𓍯  
+   𓍯  *𝙴𝙲𝙾𝙽𝙾𝙼𝙸𝙰 𝚁𝙿𝙶*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}balance
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bal
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}coins
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}transf @usuario <cantidad>
+
+   𓍯  *𝙿𝙴𝚁𝙵𝙸𝙻 𝚁𝙿𝙶*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}perfil
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbirth <fecha>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setdesc <descripción>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setfav <personaje>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setgenre <hombre/mujer>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}birthdays
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setname <nombre>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}owner
+
+   𓍯  *𝚃𝙾𝙿 𝚁𝙿𝙶*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topcoins
+
+   𓍯  *𝙶𝙰𝙼𝙴 𝚁𝙿𝙶*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}dado
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}daily / dda
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}adivinanza
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pescar
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}michi @usuario
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}miner @usuario
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slot <cantidad>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}moneda <cara/sello> <cantidad>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}work
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}suerte
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}banco
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}deposit <cantidad/all>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}withdraw <cantidad/all>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}change <banco>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}unirsebank <banco>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}robar
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sorpresa
+
+   𓍯  *𝙱𝚄𝚂𝚀𝚄𝙴𝙳𝙰𝚂*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}google <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}yt <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pinterest <busqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bsticker <busqueda>
+
+   𓍯  *𝙾𝚂𝙸𝙽𝚃 - 𝙱𝙴𝚃𝙰*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ip <dirección IP>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ip2 <dirección IP>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sher <nombre/apodo>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}webinfo <URL>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tik <@usuario>
+
+   𓍯  *𝙸𝙽𝚃𝙴𝙻𝙸𝙶𝙴𝙽𝙲𝙸𝙰 𝙰.𝙸*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}gemini <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}chatgpt <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}animg <texto>
+
+   𓍯  *𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play <búsqueda/url>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play2 <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}aptoide <app>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}git <url>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <link>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}fb <link>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ig <link>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <link>
+
+   𓍯  *𝚁𝙴𝙰𝙲𝙲𝙸𝙾𝙽𝙴𝚂*  𓍯 
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reir
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}happy
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sad
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}angry
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}dance
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slap @usuario
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kiss @usuario
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hug @usuario
+
+   𓍯  *𝙰𝙳𝙸𝙲𝙸𝙾𝙽𝙰𝙻𝙴𝚂*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}nota <contenido>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delnota <numero>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}vernotas
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}id
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}infogrupo
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}traducir
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}speed <audio>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slow <audio>
+
+   𓍯  *𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sticker
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toimg
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setmeta <autor> | <pack>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta
+
+   𓍯  *𝙳𝙸𝚅𝙴𝚁𝚂𝙸𝙾𝙽*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topgays
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topfeos
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toplindos
@@ -327,8 +288,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topfracasados
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topingenieros
 
-
-   𓍯  𝙽𝚂𝙵𝚆  𓍯  
+   𓍯  *𝙽𝚂𝙵𝚆*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu2
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}neko
@@ -337,25 +297,26 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hentai <url>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hentai <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xvideos <url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xvideos <búsqueda>
-
-`.trim()
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xvideos <búsqueda>`.trim()
 
     
-//    const externalAdReply = {
-//      title: `${nombreBot} | WhatsApp Bot\n`,
-//      body: `𝗖𝗼𝗺𝗮𝗻𝗱𝗼𝘀 𝗱𝗲 ${nombreBot} By @Sunkovv`,
-//      thumbnailUrl: imgBot,
-//      mediaType: 1,
-//      showAdAttribution: true,
-//      renderLargerThumbnail: true
-//    }
+    let text = menuHeader
+
+    if (isOwner) {
+      // Si es OWNER, ve todo
+      text += sectionOwners + sectionAdmins + menuBody
+    } else if (isAdmin) {
+      // Si es ADMIN, no ve owners pero sí admins y el resto
+      text += sectionAdmins + menuBody
+    } else {
+      // Si es MIEMBRO, solo ve los comandos generales
+      text += menuBody
+    }
 
     await conn.sendFile(m.chat, mainImg, 'thumbnail.jpg', text, m, null, { 
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: [m.sender],
-//        externalAdReply: externalAdReply
+        mentionedJid: [m.sender]
       }
     })
 
@@ -371,5 +332,5 @@ let handler = async (m, { conn, usedPrefix }) => {
   }
 }
 
-//handler.command = ['menu', 'help', 'menú']
+handler.command = ['menu', 'help', 'menú']
 export default handler

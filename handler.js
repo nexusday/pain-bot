@@ -279,12 +279,30 @@ for (let plugin of processedPlugins) {
         [[[], new RegExp]]
   ).find(p => p[1] && p[0])
 
-  if (!match) continue
-
-  const prefixMatch = match[0]
-  const noPrefix = m.text.slice(prefixMatch[0].length).trim()
-  const [commandText, ...args] = noPrefix.split(/\s+/)
-  const command = commandText?.toLowerCase()
+  // prefijo o sin 
+  let prefixMatch, noPrefix, commandText, args, command
+  if (!match) {
+    const groupAllowNoPrefix = m.isGroup && global.db?.data?.antiprefijo && global.db.data.antiprefijo[m.chat] === true
+    if (!isOwner && !isROwner && !groupAllowNoPrefix) continue
+    
+    noPrefix = (m.text || '').trim()
+    if (!noPrefix) continue
+    ;[commandText, ...args] = noPrefix.split(/\s+/)
+    command = commandText?.toLowerCase()
+    
+    const isMatchNoPrefix = plugin.command && plugin.command.some(cmd => {
+      if (typeof cmd === 'string') return command === cmd.toLowerCase()
+      if (cmd instanceof RegExp) return cmd.test(command)
+      return false
+    })
+    if (!isMatchNoPrefix) continue
+    prefixMatch = ['']
+  } else {
+    prefixMatch = match[0]
+    noPrefix = m.text.slice(prefixMatch[0].length).trim()
+    ;[commandText, ...args] = noPrefix.split(/\s+/)
+    command = commandText?.toLowerCase()
+  }
 
  
   const isMatchCommand = plugin.command && plugin.command.some(cmd => {
