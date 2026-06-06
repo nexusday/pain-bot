@@ -28,7 +28,7 @@ let handler = async (m, { conn }) => {
   let gifUrl = gifs[Math.floor(Math.random() * gifs.length)]
 
   // Download GIF to temp, convert to MP4 with ffmpeg, send MP4 buffer
-  const tmpName = `reir_${Date.now()}`
+  const tmpName = `sad_${Date.now()}`
   const gifPath = join(tmpdir(), `${tmpName}.gif`)
   const mp4Path = join(tmpdir(), `${tmpName}.mp4`)
 
