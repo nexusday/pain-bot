@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom"
 const handler = async (m, { conn, text, usedPrefix }) => {
   if (!text) {
     return conn.sendMessage(m.chat, {
-      text: `[?] Uso incorrecto\n> *Uso:* ${usedPrefix}hentai <b¨²squeda | url>`,
+      text: `[?] Uso incorrecto\n> *Uso:* ${usedPrefix}hentai <bï¿½ï¿½squeda | url>`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
@@ -28,7 +28,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
 
       const cap = `? HENTAI DOWNLOAD ?
 
-> *T¨ªtulo:* ${videoInfo.title}
+> *Tï¿½ï¿½tulo:* ${videoInfo.title}
 > *Vistas:* ${videoInfo.views}
 > *Likes:* ${videoInfo.likes}
 > *Dislikes:* ${videoInfo.dislikes}
@@ -52,16 +52,16 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     }
 
     const list = results.slice(0, 10).map((r, i) =>
-      `*${i + 1}.*\n> *T¨ªtulo:* ${r.titulo}\n> *Link:* ${r.url}`
+      `*${i + 1}.*\n> *Tï¿½ï¿½tulo:* ${r.titulo}\n> *Link:* ${r.url}`
     ).join('\n\n')
 
     const caption = `? RESULTADOS ?
-> *B¨²squeda:* ${text}
+> *Bï¿½ï¿½squeda:* ${text}
 > *Resultados:* ${results.length}
 
 ${list}
 
-> *Responde con un n¨²mero (1-10) para descargar*`
+> *Responde con un numero (1-10) para descargar*`
 
     const { key } = await conn.sendMessage(m.chat, {
       text: caption,
@@ -104,7 +104,7 @@ handler.before = async (m, { conn }) => {
     const peso = await size(videoInfo.videoUrl)
 
     const cap = `? HENTAI DOWNLOAD ?
-> *T¨ªtulo:* ${videoInfo.title}
+> *TÃ­tulo:* ${videoInfo.title}
 > *Vistas:* ${videoInfo.views}
 > *Likes:* ${videoInfo.likes}
 > *Dislikes:* ${videoInfo.dislikes}
@@ -128,7 +128,7 @@ handler.before = async (m, { conn }) => {
 
 handler.command = ['hentai', 'hent', 'hentaisearch']
 handler.tags = ['nsfw']
-handler.help = ['hentai <b¨²squeda | url>']
+handler.help = ['hentai <bsqueda | url>']
 
 export default handler
 
@@ -167,7 +167,7 @@ async function getInfo(url) {
 
     return {
       videoUrl: Buffer.from(match[1], 'base64').toString(),
-      title: doc.querySelector("h1")?.textContent.trim() || 'Sin t¨ªtulo',
+      title: doc.querySelector("h1")?.textContent.trim() || 'Sin tï¿½ï¿½tulo',
       views: doc.querySelector("h4")?.textContent.trim() || 'N/A',
       likes: doc.querySelector("#num-like")?.textContent.trim() || '0',
       dislikes: doc.querySelector("#num-dislike")?.textContent.trim() || '0'
