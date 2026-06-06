@@ -31,7 +31,7 @@ let handler = async (m, { conn }) => {
 
   let gifUrl = gifs[Math.floor(Math.random() * gifs.length)]
 
-  // Download GIF to temp, convert to MP4 with ffmpeg, send MP4 buffer
+
   const tmpName = `alegre_${Date.now()}`
   const gifPath = join(tmpdir(), `${tmpName}.gif`)
   const mp4Path = join(tmpdir(), `${tmpName}.mp4`)
@@ -42,7 +42,7 @@ let handler = async (m, { conn }) => {
     const buffer = await res.arrayBuffer()
     writeFileSync(gifPath, Buffer.from(buffer))
 
-    // Convert with ffmpeg: ensure dimensions even, optimize for streaming
+   
     await new Promise((resolve, reject) => {
       const ff = spawn('ffmpeg', ['-y', '-i', gifPath, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', "scale=trunc(iw/2)*2:trunc(ih/2)*2", mp4Path])
       let stderr = ''
@@ -59,7 +59,7 @@ let handler = async (m, { conn }) => {
 
   } catch (err) {
     console.error('reir plugin error:', err)
-    // fallback to sending original URL as image/video
+    
     try {
       await conn.sendMessage(m.chat, { video: { url: gifUrl }, gifPlayback: true, caption: text, contextInfo: { mentionedJid: mention } }, { quoted: m })
     } catch (err2) {

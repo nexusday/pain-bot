@@ -246,6 +246,12 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <link>
 
 
+   𓍯  𝚁𝙴𝙰𝙲𝙲𝙸𝙾𝙽𝙴𝚂  𓍯 
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reir
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}happy
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sad
+
+
    𓍯  𝙰𝙳𝙸𝙲𝙸𝙾𝙽𝙰𝙻𝙴𝚂  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}nota <contenido>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delnota <numero>
