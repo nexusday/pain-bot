@@ -24,7 +24,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
     let response = (typeof data.data === 'string' ? data.data.trim() : '') || ''
 
-    // Remove any <think> blocks
+    
     const thinkMatch = response.match(/<think>([\s\S]*?)<\/think>/)
     if (thinkMatch) {
       response = response.replace(/<think>[\s\S]*?<\/think>/, '').trim()

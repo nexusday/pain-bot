@@ -9,6 +9,7 @@ import fetch from 'node-fetch'
 import { handleAIModes } from './lib/eventHandlers.js'
 import { handleAntiSystems } from './lib/antiHandlers.js'
 import { handleGroupEvents } from './lib/event.js'
+import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -20,14 +21,19 @@ resolve()
 export async function handler(chatUpdate) {
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
-this.pushMessage(chatUpdate.messages).catch(console.error)
+if (global.db.data == null) await global.loadDatabase()
+await this.pushMessage(chatUpdate.messages).catch(console.error)
 let m = chatUpdate.messages[chatUpdate.messages.length - 1]
 if (!m) return
-if (global.db.data == null) await global.loadDatabase()
 
 try {
 m = smsg(this, m) || m
 if (!m) return
+
+if (!m.messageStubType && m.isGroup && !m.fromMe) {
+  await runAntiViewOnce(this, m)
+}
+
 if (m.messageStubType) return
 m.exp = 0
 m.limit = false
@@ -661,20 +667,23 @@ if (isSubBot) {
   }
 }
 
-if (shouldAutoRead) {
+const msgId = m.id || m.key?.id
+const skipAutoRead = isKnownViewOnce(msgId) || isViewOnceCandidate(m)
+
+if (shouldAutoRead && !skipAutoRead) {
   try {
     await this.readMessages([m.key])
-    
+
     if (m.isGroup) {
       await this.readMessages([m.key], { readEphemeral: true })
     }
   } catch (e) {
     console.error('Error al marcar como leído:', e)
   }
+}
 
-  
+if (shouldAutoRead) {
   await handleAIModes(m, this)
-
 }
 
 }

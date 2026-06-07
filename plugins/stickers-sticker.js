@@ -106,3 +106,5 @@ async function toWebp(buffer, opts = {}) {
 function isUrl(text) {
   return /^https?:\/\/\S+\.(jpg|jpeg|png|gif|webp|mp4|webm)$/i.test(text)
 }
+
+export { toWebp, isUrl }

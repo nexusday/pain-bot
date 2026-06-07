@@ -265,6 +265,8 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}traducir
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}speed <audio>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slow <audio>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sss <imagen/video ver una vez>
+
 
    𓍯  *𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sticker

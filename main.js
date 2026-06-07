@@ -15,6 +15,7 @@ import { format } from 'util'
 import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
+import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low, JSONFile } from 'lowdb'
 import lodash from 'lodash' 
 import readline from 'readline'
@@ -117,6 +118,7 @@ global.loadDatabase = async function loadDatabase() {
     settings: {},
     botGroups: {},
     antiImg: {},
+    antiVer: {},
     bienvenidas: {},
     publicaciones: {},
     ...(global.db.data || {}),
@@ -368,24 +370,25 @@ global.reloadHandler = async function (restartConn) {
   }
 
   if (!isInit) {
-    conn.ev.off('messages.upsert', conn.handler)
-    conn.ev.off('connection.update', conn.connectionUpdate)
-    conn.ev.off('creds.update', conn.credsUpdate)
+    global.conn.ev.off('messages.upsert', global.conn.handler)
+    global.conn.ev.off('connection.update', global.conn.connectionUpdate)
+    global.conn.ev.off('creds.update', global.conn.credsUpdate)
   }
 
-  conn.handler = handler.handler.bind(global.conn)
-  conn.connectionUpdate = connectionUpdate.bind(global.conn)
-  conn.credsUpdate = saveCreds.bind(global.conn, true)
+  global.conn.handler = handler.handler.bind(global.conn)
+  global.conn.connectionUpdate = connectionUpdate.bind(global.conn)
+  global.conn.credsUpdate = saveCreds.bind(global.conn, true)
 
-  conn.ev.on('messages.upsert', conn.handler)
-  conn.ev.on('connection.update', conn.connectionUpdate)
-  conn.ev.on('creds.update', conn.credsUpdate)
+  initViewOnceAntiListener(global.conn)
+  global.conn.ev.on('messages.upsert', global.conn.handler)
+  global.conn.ev.on('connection.update', global.conn.connectionUpdate)
+  global.conn.ev.on('creds.update', global.conn.credsUpdate)
 
   isInit = false
   return true
 }
 
-const pluginFolder = global.__dirname(join(__dirname, './plugins/index'))
+const pluginFolder = join(__dirname, 'plugins')
 const pluginFilter = (filename) => /\.js$/.test(filename)
 global.plugins = {}
 

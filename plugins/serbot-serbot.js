@@ -10,6 +10,7 @@ import * as ws from "ws"
 const { child, spawn, exec } = await import("child_process")
 const { CONNECTING } = ws
 import { makeWASocket } from "../lib/simple.js"
+import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { fileURLToPath } from "url"
 
 
@@ -382,6 +383,7 @@ export async function AYBot(options) {
       sock.connectionUpdate = connectionUpdate.bind(sock)
       sock.credsUpdate = saveCreds.bind(sock, true)
 
+      initViewOnceAntiListener(sock)
       sock.ev.on("messages.upsert", sock.handler)
       sock.ev.on("connection.update", sock.connectionUpdate)
       sock.ev.on("creds.update", sock.credsUpdate)
