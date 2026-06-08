@@ -117,13 +117,13 @@ global.loadDatabase = async function loadDatabase() {
     sticker: {},
     settings: {},
     botGroups: {},
-    alquiler: {},
-    alquilerNotify: {},
     antiImg: {},
     antiVer: {},
     bienvenidas: {},
     publicaciones: {},
     ...(global.db.data || {}),
+    alquiler: global.db.data?.alquiler || {},
+    alquilerNotify: global.db.data?.alquilerNotify || {},
   }
   global.db.chain = lodash.chain(global.db.data) 
 }
