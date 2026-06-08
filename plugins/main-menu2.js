@@ -69,9 +69,9 @@ let handler = async (m, { conn, usedPrefix }) => {
 
     let userRole = 'Miembro'
     if (isROwner || isOwner) {
-      if (isGroupCreator) userRole = '👑 Creador del Bot y Grupo'
-      else if (isRAdmin || isAdmin) userRole = '👑 Creador del Bot y Admin'
-      else userRole = '👑 Creador del Bot'
+      if (isGroupCreator) userRole = '👑 Staff Bot y Grupo'
+      else if (isRAdmin || isAdmin) userRole = '👑 Staff Bot y Admin'
+      else userRole = '👑 Staff Bot'
     } else if (isMods) {
       if (isGroupCreator) userRole = 'Moderador del Bot y Creador'
       else if (isRAdmin || isAdmin) userRole = 'Moderador del Bot y Admin'
