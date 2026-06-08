@@ -1,6 +1,7 @@
 import fs from 'fs'
 import { join } from 'path'
 import os from 'os'
+import { getMenuRentalLine } from '../lib/alquiler.js'
 
 function clockString(ms) {
   let h = Math.floor(ms / 3600000)
@@ -115,6 +116,9 @@ let handler = async (m, { conn, usedPrefix }) => {
     
     const totalRamMB = Math.round(os.totalmem() / 1024 / 1024)
     const processRamMB = Math.round(process.memoryUsage().rss / 1024 / 1024)
+    const rentalLine = m.isGroup
+      ? `> 𓂃 ࣪ ִֶָ☾.  𝙰𝙻𝚀𝚄𝙸𝙻𝙴𝚁:  ${getMenuRentalLine(m.chat)}\n`
+      : ''
 
     const text = `
 
@@ -122,7 +126,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 
 
    𓍯  𝙸𝙽𝙵𝙾 𝚄𝚂𝚄𝙰𝚁𝙸𝙾  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.split('@')[0]}
+${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.split('@')[0]}
 > 𓂃 ࣪ ִֶָ☾.  𝚁𝙾𝙻:  ${userRole}
 > 𓂃 ࣪ ִֶָ☾.  𝙱𝙾𝚃:  ${nombreBot}
 > 𓂃 ࣪ ִֶָ☾.  𝚃𝙸𝙿𝙾:  ${tipo}
@@ -155,6 +159,9 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}subme <mensaje>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}join <link>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}exit
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}one 1h
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}one infinito
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}one oficial
 
 
    𓍯  𝙲𝙼� ��� ���  𓍯  

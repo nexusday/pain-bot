@@ -117,6 +117,7 @@ global.loadDatabase = async function loadDatabase() {
     sticker: {},
     settings: {},
     botGroups: {},
+    alquiler: {},
     antiImg: {},
     antiVer: {},
     bienvenidas: {},

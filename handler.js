@@ -10,6 +10,7 @@ import { handleAIModes } from './lib/eventHandlers.js'
 import { handleAntiSystems } from './lib/antiHandlers.js'
 import { handleGroupEvents } from './lib/event.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
+import { checkGroupRental } from './lib/alquiler.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -139,6 +140,11 @@ const bot = (m.isGroup ? participants.find(u => conn.decodeJid(u.id) == this.use
 const isRAdmin = user?.admin == 'superadmin' || false  
 const isAdmin = isRAdmin || user?.admin == 'admin' || false  
 const isBotAdmin = bot?.admin || false  
+
+if (m.isGroup && !isOwner && !isROwner) {
+  const rentalBlocked = await checkGroupRental(m, this)
+  if (rentalBlocked) return
+}
 
   
   try {
