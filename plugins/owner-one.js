@@ -5,6 +5,7 @@ import {
   removeRental,
   buildRentalStatusText,
   formatDuration,
+  formatRemainingDetailed,
   resolvePermanentRentalType
 } from '../lib/alquiler.js'
 
@@ -68,7 +69,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     const rental = await saveRental(m.chat, durationMs, m.sender)
 
     return conn.sendMessage(m.chat, {
-      text: `✅ *Alquiler activado*\n\n> *Grupo:* ${groupName}\n> *Tiempo agregado:* ${formatDuration(durationMs)}\n> *Vence:* ${new Date(rental.expiresAt).toLocaleString('es-ES')}\n> *Por:* @${m.sender.split('@')[0]}`,
+      text: `✅ *Alquiler activado*\n\n> *Grupo:* ${groupName}\n> *Tiempo establecido:* ${formatDuration(durationMs)}\n> *Restante:* ${formatRemainingDetailed(rental.expiresAt)}\n> *Vence:* ${new Date(rental.expiresAt).toLocaleString('es-ES')}\n> *Por:* @${m.sender.split('@')[0]}`,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]
