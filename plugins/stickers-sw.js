@@ -1,5 +1,19 @@
 import sharp from 'sharp'
+import fetch from 'node-fetch'
+import { readFileSync, existsSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { addExif } from '../lib/sticker.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const FONTS_DIR = join(__dirname, '../lib/fonts')
+const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72'
+
+let notoRegularBase64 = null
+const emojiPngCache = new Map()
+const graphemeSegmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+  ? new Intl.Segmenter('und', { granularity: 'grapheme' })
+  : null
 
 const SIZE = 512
 const AVATAR_SIZE = 132
@@ -19,6 +33,159 @@ function escapeXml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
+}
+
+function loadNotoBase64() {
+  if (notoRegularBase64 !== null) return notoRegularBase64
+
+  const filePath = join(FONTS_DIR, 'NotoSans-Regular.ttf')
+  notoRegularBase64 = existsSync(filePath)
+    ? readFileSync(filePath).toString('base64')
+    : ''
+
+  return notoRegularBase64
+}
+
+function splitGraphemes(text) {
+  if (!text) return []
+  if (graphemeSegmenter) {
+    return [...graphemeSegmenter.segment(text)].map(s => s.segment)
+  }
+  return [...text]
+}
+
+function isEmojiCodePoint(cp) {
+  if (cp === 0xFE0F || cp === 0x200D) return true
+  return (
+    (cp >= 0x1F300 && cp <= 0x1FAFF) ||
+    (cp >= 0x1F600 && cp <= 0x1F64F) ||
+    (cp >= 0x1F680 && cp <= 0x1F6FF) ||
+    (cp >= 0x1F900 && cp <= 0x1F9FF) ||
+    (cp >= 0x2600 && cp <= 0x27BF) ||
+    (cp >= 0x2300 && cp <= 0x23FF)
+  )
+}
+
+function isEmojiGrapheme(segment) {
+  if (!segment) return false
+  return [...segment].some(char => isEmojiCodePoint(char.codePointAt(0)))
+}
+
+function emojiToTwemojiCode(emoji) {
+  return [...emoji]
+    .map(char => char.codePointAt(0).toString(16))
+    .filter(code => code !== 'fe0f')
+    .join('-')
+}
+
+async function getEmojiPng(emoji) {
+  if (emojiPngCache.has(emoji)) return emojiPngCache.get(emoji)
+
+  try {
+    const code = emojiToTwemojiCode(emoji)
+    const res = await fetch(`${TWEMOJI_BASE}/${code}.png`)
+    if (!res.ok) {
+      emojiPngCache.set(emoji, null)
+      return null
+    }
+    const buffer = Buffer.from(await res.arrayBuffer())
+    emojiPngCache.set(emoji, buffer)
+    return buffer
+  } catch {
+    emojiPngCache.set(emoji, null)
+    return null
+  }
+}
+
+async function prefetchEmojis(text) {
+  const tasks = []
+  for (const grapheme of splitGraphemes(text)) {
+    if (isEmojiGrapheme(grapheme)) tasks.push(getEmojiPng(grapheme))
+  }
+  await Promise.all(tasks)
+}
+
+async function parseLineRuns(line) {
+  const runs = []
+  let currentText = ''
+
+  for (const grapheme of splitGraphemes(line)) {
+    if (isEmojiGrapheme(grapheme)) {
+      if (currentText) {
+        runs.push({ type: 'text', text: currentText })
+        currentText = ''
+      }
+      runs.push({ type: 'emoji', text: grapheme, png: await getEmojiPng(grapheme) })
+    } else {
+      currentText += grapheme
+    }
+  }
+
+  if (currentText) runs.push({ type: 'text', text: currentText })
+  return runs
+}
+
+function estimateTextWidth(text, fontSize) {
+  return splitGraphemes(text).reduce((width, grapheme) => {
+    return width + (isEmojiGrapheme(grapheme) ? fontSize * 1.05 : fontSize * 0.56)
+  }, 0)
+}
+
+function buildTextRunSvg(text, fontSize) {
+  const width = Math.max(8, Math.ceil(estimateTextWidth(text, fontSize)) + 6)
+  const height = Math.ceil(fontSize * 1.35)
+  const noto = loadNotoBase64()
+  const fontFace = noto
+    ? `@font-face { font-family: 'NotoSans'; src: url(data:font/ttf;base64,${noto}) format('truetype'); }`
+    : ''
+  const family = noto ? 'NotoSans, Arial, sans-serif' : 'Segoe UI, Arial, sans-serif'
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <style>${fontFace}</style>
+  <text x="0" y="${fontSize * 0.9}" font-family="${family}" font-size="${fontSize}"
+    font-weight="500" fill="#111111">${escapeXml(text)}</text>
+</svg>`
+}
+
+function getMessageLayout(lines, msgFont) {
+  const lineHeight = msgFont * 1.28
+  const nameY = 168
+  const bubbleY = nameY + 18
+  const textStartY = bubbleY + BUBBLE_PAD_Y + msgFont * 0.85
+  return { lineHeight, textStartY }
+}
+
+async function buildMessageComposites(lines, msgFont) {
+  const { lineHeight, textStartY } = getMessageLayout(lines, msgFont)
+  const emojiSize = Math.round(msgFont * 1.05)
+  const composites = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const runs = await parseLineRuns(lines[i])
+    let x = TEXT_X + BUBBLE_PAD_X
+    const textTop = Math.round(textStartY + i * lineHeight - msgFont * 0.9)
+    const emojiTop = Math.round(textStartY + i * lineHeight - emojiSize * 0.82)
+
+    for (const run of runs) {
+      if (run.type === 'text' && run.text) {
+        const svg = buildTextRunSvg(run.text, msgFont)
+        const buffer = await sharp(Buffer.from(svg)).png().toBuffer()
+        composites.push({ input: buffer, left: Math.round(x), top: textTop })
+        x += estimateTextWidth(run.text, msgFont)
+        continue
+      }
+
+      if (run.type === 'emoji' && run.png) {
+        const buffer = await sharp(run.png).resize(emojiSize, emojiSize).png().toBuffer()
+        composites.push({ input: buffer, left: Math.round(x), top: emojiTop })
+      }
+
+      if (run.type === 'emoji') x += emojiSize * 0.95
+    }
+  }
+
+  return composites
 }
 
 function wrapParagraph(paragraph, maxChars) {
@@ -87,26 +254,18 @@ function calcLayout(text) {
 }
 
 function buildOverlaySvg(pushname, lines, msgFont) {
-  const lineHeight = msgFont * 1.28
+  const { lineHeight } = getMessageLayout(lines, msgFont)
   const nameFont = 28
   const bubbleWidth = BUBBLE_MAX_WIDTH
   const bubbleHeight = BUBBLE_PAD_Y * 2 + lines.length * lineHeight
   const nameY = 168
   const bubbleY = nameY + 18
-  const textStartY = bubbleY + BUBBLE_PAD_Y + msgFont * 0.85
-
-  const msgTexts = lines.map((line, i) => {
-    const y = textStartY + i * lineHeight
-    return `<text x="${TEXT_X + BUBBLE_PAD_X}" y="${y}" font-family="Segoe UI, Arial, sans-serif"
-      font-size="${msgFont}" font-weight="500" fill="#111111">${escapeXml(line)}</text>`
-  }).join('')
 
   return `<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
   <text x="${TEXT_X}" y="${nameY}" font-family="Segoe UI, Arial, sans-serif"
     font-size="${nameFont}" font-weight="700" fill="#25D366">${escapeXml(pushname)}</text>
   <rect x="${TEXT_X}" y="${bubbleY}" width="${bubbleWidth}" height="${bubbleHeight}"
     rx="20" ry="20" fill="#FFFFFF" stroke="#ECECEC" stroke-width="1"/>
-  ${msgTexts}
 </svg>`
 }
 
@@ -347,8 +506,11 @@ async function buildCircleAvatar(buffer) {
 
 async function buildSticker(pushname, message, profileBuffer) {
   const { lines, fontSize } = calcLayout(message)
+  await prefetchEmojis(message)
+
   const avatar = await buildCircleAvatar(profileBuffer)
   const overlay = Buffer.from(buildOverlaySvg(pushname, lines, fontSize))
+  const messageLayer = await buildMessageComposites(lines, fontSize)
   const avatarY = Math.round((SIZE - AVATAR_SIZE) / 2)
 
   return sharp({
@@ -361,7 +523,8 @@ async function buildSticker(pushname, message, profileBuffer) {
   })
     .composite([
       { input: avatar, left: AVATAR_X, top: avatarY },
-      { input: overlay, left: 0, top: 0 }
+      { input: overlay, left: 0, top: 0 },
+      ...messageLayer
     ])
     .webp({ quality: 92 })
     .toBuffer()
