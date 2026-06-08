@@ -301,6 +301,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toptrans
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topfracasados
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topingenieros
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}meme
 
    𓍯  *𝙽𝚂𝙵𝚆*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu
