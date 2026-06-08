@@ -245,6 +245,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
    𓍯  *𝙸𝙽𝚃𝙴𝙻𝙸𝙶𝙴𝙽𝙲𝙸𝙰 𝙰.𝙸*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}gemini <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}chatgpt <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kora <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}animg <texto>
 
    𓍯  *𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂*  𓍯  
