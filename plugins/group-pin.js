@@ -5,38 +5,6 @@ const PIN_DURATIONS = {
   '30d': 2592000
 }
 
-function resolveQuotedKey(m, conn) {
-  const quoted = m.getQuotedObj?.() || null
-  const messageId = m.msg?.contextInfo?.stanzaId || m.quoted?.id || quoted?.id || quoted?.key?.id
-
-  if (!messageId) return null
-
-  const fromMe = Boolean(
-    m.quoted?.fromMe ??
-    quoted?.key?.fromMe ??
-    quoted?.fromMe ??
-    false
-  )
-
-  let participant = m.msg?.contextInfo?.participant ||
-    m.quoted?.sender ||
-    quoted?.key?.participant ||
-    quoted?.sender ||
-    null
-
-  if (participant) participant = conn.decodeJid(participant)
-  if (!fromMe && !participant && m.isGroup) return null
-
-  const key = {
-    remoteJid: m.chat,
-    fromMe,
-    id: messageId
-  }
-
-  if (participant && !fromMe) key.participant = participant
-  return key
-}
-
 function parsePinDuration(args) {
   const value = (args[0] || '').toLowerCase().trim()
   return PIN_DURATIONS[value] || 604800
@@ -49,7 +17,7 @@ function formatDuration(seconds) {
   return `${Math.round(seconds / 3600)} horas`
 }
 
-let handler = async (m, { conn, args, isAdmin, isBotAdmin, usedPrefix, command }) => {
+let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner, isPrems, usedPrefix, command }) => {
   const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}
   const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []
   const user = (m.isGroup ? groupParticipants.find(u => conn.decodeJid(u.id) === m.sender) : {}) || {}
@@ -71,31 +39,37 @@ let handler = async (m, { conn, args, isAdmin, isBotAdmin, usedPrefix, command }
     }, { quoted: m })
   }
 
-  if (!isBotAdmin) {
-    return conn.sendMessage(m.chat, {
-      text: '[❗] Necesito ser *administradora* del grupo para fijar mensajes.',
-      contextInfo: { ...rcanal.contextInfo }
-    }, { quoted: m })
-  }
-
   if (!m.quoted) {
     return conn.sendMessage(m.chat, {
-      text: `[❗] Respondé al mensaje que quieres fijar.\n\n> Ejemplo: respondé un mensaje y escribe ${usedPrefix + command}`,
+      text: `[❗] Debes responder al mensaje que deseas fijar.\n\n> Ejemplo: Responde a un mensaje y escribe ${usedPrefix + command}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
-
-  const pinKey = resolveQuotedKey(m, conn)
-  if (!pinKey) {
-    return conn.sendMessage(m.chat, {
-      text: '[❌] No se pudo obtener la información del mensaje a fijar.',
-      contextInfo: { ...rcanal.contextInfo }
-    }, { quoted: m })
-  }
-
-  const time = parsePinDuration(args)
 
   try {
+    const messageId = m.msg?.contextInfo?.stanzaId || m.quoted?.id
+
+    if (!messageId) {
+      return conn.sendMessage(m.chat, {
+        text: '[❌] No se pudo obtener información del mensaje a fijar.',
+        contextInfo: { ...rcanal.contextInfo }
+      }, { quoted: m })
+    }
+
+    const participant = m.msg?.contextInfo?.participant || m.quoted?.sender || m.sender
+    const fromMe = Boolean(m.quoted?.fromMe)
+    const time = parsePinDuration(args)
+
+    const pinKey = {
+      remoteJid: m.chat,
+      fromMe,
+      id: messageId
+    }
+
+    if (!fromMe) {
+      pinKey.participant = conn.decodeJid(participant) || participant
+    }
+
     await conn.sendMessage(m.chat, {
       pin: pinKey,
       type: 1,
@@ -113,10 +87,6 @@ let handler = async (m, { conn, args, isAdmin, isBotAdmin, usedPrefix, command }
     }, { quoted: m })
   } catch (e) {
     console.error('Error al fijar mensaje:', e)
-    return conn.sendMessage(m.chat, {
-      text: '[❌] No se pudo fijar el mensaje. Verificá que el bot sea admin y que el mensaje sea válido.',
-      contextInfo: { ...rcanal.contextInfo }
-    }, { quoted: m })
   }
 }
 
