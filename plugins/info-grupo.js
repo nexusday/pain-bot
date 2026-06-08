@@ -45,7 +45,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
     
     let infoText = `
-╭───「 ✦ 𝙄𝙉𝙁𝙊 𝙂𝙍𝙐𝙋𝙊 ✦ 」
+╭───「  𝙄𝙉𝙁𝙊 𝙂𝙍𝙐𝙋𝙊  」
 │
 │  *Nombre:* ${name || 'Sin nombre'}
 │  *Creador:* @${owner ? owner.split('@')[0] : 'Desconocido'}

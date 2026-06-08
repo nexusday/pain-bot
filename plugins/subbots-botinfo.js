@@ -1,8 +1,36 @@
 import fs from 'fs'
-import { join } from 'path'
+import path, { join } from 'path'
+import { fileURLToPath } from 'url'
 import { sizeFormatter } from 'human-readable'
 import { performance } from 'perf_hooks'
 import ws from 'ws'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const ROOT_DIR = join(__dirname, '..')
+const IMG_DIR = join(ROOT_DIR, 'storage', 'img')
+const DEFAULT_IMG = 'https://files.catbox.moe/iomah1.jpg'
+
+function resolveBotImage(configPath) {
+  const candidates = ['menu2.jpg', 'menu.jpg', 'menu3.jpg']
+  let imgBot = candidates
+    .map(name => join(IMG_DIR, name))
+    .find(full => { try { return fs.existsSync(full) } catch { return false } })
+    || DEFAULT_IMG
+
+  if (!fs.existsSync(configPath)) return imgBot
+
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    if (config.img) {
+      const custom = config.img
+      const customAbs = path.isAbsolute(custom) ? custom : join(ROOT_DIR, custom)
+      if (fs.existsSync(customAbs)) imgBot = customAbs
+    }
+  } catch {}
+
+  return imgBot
+}
 
 const format = sizeFormatter({
   std: 'JEDEC',
@@ -34,18 +62,17 @@ let handler = async (m, { conn, usedPrefix }) => {
   let muptime = clockString(_muptime)
 
   const botActual = conn.user?.jid?.split('@')[0]?.replace(/\D/g, '')
-  const configPath = join('./Serbot', botActual, 'config.json')
+  const configPath = join(ROOT_DIR, 'Serbot', botActual, 'config.json')
 
   let nombreBot = global.namebot || 'PAIN BOT'
   let moneyName = 'Gats'
-  let imgBot = './storage/img/menu2.jpg'
+  let imgBot = resolveBotImage(configPath)
 
   if (fs.existsSync(configPath)) {
     try {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
       if (config.name) nombreBot = config.name
       if (config.moneyName) moneyName = config.moneyName
-      if (config.img) imgBot = config.img
     } catch {}
   }
 

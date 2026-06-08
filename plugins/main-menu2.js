@@ -266,10 +266,21 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}speed <audio>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slow <audio>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sss <imagen/video ver una vez>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}text <imagen/sticker>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pdf <imagen/sticker> nombre
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tepdf <responder texto/img> nombre
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}resize <imagen/sticker> 800x600
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ge o gr <texto/enlace/imagen>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}leerqr <imagen con QR>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hd <imagen/sticker>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tts <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}stt <nota de voz/audio>
 
 
    𓍯  *𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sticker
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}st <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sw <responder/@user> texto
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toimg
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setmeta <autor> | <pack>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta

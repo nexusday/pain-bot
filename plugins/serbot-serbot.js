@@ -72,7 +72,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
 
 handler.help = ['#qr', '#code']
 handler.tags = ['subbots']
-handler.command = ['qr', 'code']
+handler.command = ['qrr', 'code']
 export default handler
 
 export async function AYBot(options) {
@@ -80,13 +80,13 @@ export async function AYBot(options) {
   
  
   if (!fromCommand) {
-    command = 'qr'
+    command = 'qrr'
     args = []
     usedPrefix = '.'
   }
   
   if (command === 'code') {
-    command = 'qr'
+    command = 'qrr'
     args.unshift('code')
   }
 
