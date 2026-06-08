@@ -6,6 +6,9 @@ const AVATAR_SIZE = 132
 const AVATAR_X = 36
 const TEXT_X = 188
 const BUBBLE_MAX_WIDTH = 292
+const BUBBLE_PAD_X = 18
+const BUBBLE_PAD_Y = 14
+const TEXT_AREA_WIDTH = BUBBLE_MAX_WIDTH - BUBBLE_PAD_X * 2
 const MAX_MSG = 120
 const MAX_LINES = 6
 
@@ -46,8 +49,12 @@ function wrapParagraph(paragraph, maxChars) {
   return lines
 }
 
-function wrapMessage(text) {
-  const maxChars = 22
+function estimateMaxChars(fontSize) {
+  const avgCharWidth = fontSize * 0.56
+  return Math.max(6, Math.floor(TEXT_AREA_WIDTH / avgCharWidth))
+}
+
+function wrapText(text, maxChars) {
   const parts = text.split('\n').map(p => p.trim())
   const lines = []
 
@@ -56,36 +63,42 @@ function wrapMessage(text) {
     lines.push(...wrapParagraph(part, maxChars))
   }
 
-  if (lines.length > MAX_LINES) {
-    lines.length = MAX_LINES
-    lines[MAX_LINES - 1] = `${lines[MAX_LINES - 1].slice(0, 18)}…`
-  }
-
   return lines.length ? lines : [text.slice(0, maxChars)]
 }
 
-function calcMessageFont(lines) {
-  const count = lines.length
-  if (count <= 2) return 30
-  if (count <= 4) return 26
-  return 22
+function calcLayout(text) {
+  let fontSize = 30
+  let maxChars = estimateMaxChars(fontSize)
+  let lines = wrapText(text, maxChars)
+
+  while (lines.length > MAX_LINES && fontSize > 20) {
+    fontSize -= 4
+    maxChars = estimateMaxChars(fontSize)
+    lines = wrapText(text, maxChars)
+  }
+
+  if (lines.length > MAX_LINES) {
+    lines = lines.slice(0, MAX_LINES)
+    const last = lines[MAX_LINES - 1]
+    lines[MAX_LINES - 1] = last.length > 3 ? `${last.slice(0, -1)}…` : `${last}…`
+  }
+
+  return { lines, fontSize }
 }
 
-function buildOverlaySvg(pushname, lines) {
-  const msgFont = calcMessageFont(lines)
+function buildOverlaySvg(pushname, lines, msgFont) {
   const lineHeight = msgFont * 1.28
   const nameFont = 28
-  const bubblePadX = 18
-  const bubblePadY = 14
   const bubbleWidth = BUBBLE_MAX_WIDTH
-  const bubbleHeight = bubblePadY * 2 + lines.length * lineHeight
+  const bubbleHeight = BUBBLE_PAD_Y * 2 + lines.length * lineHeight
   const nameY = 168
   const bubbleY = nameY + 18
-  const textStartY = bubbleY + bubblePadY + msgFont * 0.85
+  const textStartY = bubbleY + BUBBLE_PAD_Y + msgFont * 0.85
 
-  const msgTspans = lines.map((line, i) => {
+  const msgTexts = lines.map((line, i) => {
     const y = textStartY + i * lineHeight
-    return `<tspan x="${TEXT_X + bubblePadX}" y="${y}">${escapeXml(line)}</tspan>`
+    return `<text x="${TEXT_X + BUBBLE_PAD_X}" y="${y}" font-family="Segoe UI, Arial, sans-serif"
+      font-size="${msgFont}" font-weight="500" fill="#111111">${escapeXml(line)}</text>`
   }).join('')
 
   return `<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
@@ -93,8 +106,7 @@ function buildOverlaySvg(pushname, lines) {
     font-size="${nameFont}" font-weight="700" fill="#25D366">${escapeXml(pushname)}</text>
   <rect x="${TEXT_X}" y="${bubbleY}" width="${bubbleWidth}" height="${bubbleHeight}"
     rx="20" ry="20" fill="#FFFFFF" stroke="#ECECEC" stroke-width="1"/>
-  <text font-family="Segoe UI, Arial, sans-serif" font-size="${msgFont}"
-    font-weight="500" fill="#111111">${msgTspans}</text>
+  ${msgTexts}
 </svg>`
 }
 
@@ -272,7 +284,7 @@ function resolveSwMessage(m, args) {
   return text
     .replace(/@\d{5,20}/g, '')
     .replace(/[\u200e\u200f\uFEFF]/g, '')
-    .replace(/\s+/g, ' ')
+    .replace(/[^\S\n]+/g, ' ')
     .trim()
 }
 
@@ -334,9 +346,9 @@ async function buildCircleAvatar(buffer) {
 }
 
 async function buildSticker(pushname, message, profileBuffer) {
-  const lines = wrapMessage(message)
+  const { lines, fontSize } = calcLayout(message)
   const avatar = await buildCircleAvatar(profileBuffer)
-  const overlay = Buffer.from(buildOverlaySvg(pushname, lines))
+  const overlay = Buffer.from(buildOverlaySvg(pushname, lines, fontSize))
   const avatarY = Math.round((SIZE - AVATAR_SIZE) / 2)
 
   return sharp({
