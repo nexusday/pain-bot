@@ -142,6 +142,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}close
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delete
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}fijar
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}desfijar
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}namegp <nombre>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}desgp <descripción>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}photogp
