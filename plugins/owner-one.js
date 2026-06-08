@@ -36,7 +36,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
   if (['del', 'delete', 'remove', 'quitar', 'off'].includes(action)) {
     await removeRental(m.chat)
     return conn.sendMessage(m.chat, {
-      text: `🗑️ *Alquiler eliminado*\n\n> *Grupo:* ${groupName}\n> El bot ya no tiene límite de tiempo en este grupo.`,
+      text: `🗑️ *Alquiler eliminado*\n\n> *Grupo:* ${groupName}\n> El bot quedó sin plan activo en este grupo.`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
