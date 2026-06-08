@@ -124,6 +124,7 @@ global.loadDatabase = async function loadDatabase() {
     ...(global.db.data || {}),
     alquiler: global.db.data?.alquiler || {},
     alquilerNotify: global.db.data?.alquilerNotify || {},
+    cmd18: global.db.data?.cmd18 || {},
   }
   global.db.chain = lodash.chain(global.db.data) 
 }

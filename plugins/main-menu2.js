@@ -173,7 +173,8 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}welcome on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoia on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohot on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off\n\n`
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off\n\n`
 
     let menuBody = `   𓍯  *𝙲𝙼𝙳 𝚂𝚄𝙱 𝙱𝙾𝚃*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}qr
@@ -313,6 +314,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}meme
 
    𓍯  *𝙽𝚂𝙵𝚆*  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu2
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}neko

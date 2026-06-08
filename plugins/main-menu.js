@@ -317,6 +317,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoia on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohot on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off
 
 
    𓍯  𝙳𝙸𝚅𝙴𝚁𝚂𝙸𝙾𝙽  𓍯  
@@ -338,6 +339,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 
 
    𓍯  𝙽𝚂𝙵𝚆  𓍯  
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu2
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}neko

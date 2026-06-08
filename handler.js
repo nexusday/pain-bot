@@ -11,6 +11,7 @@ import { handleAntiSystems } from './lib/antiHandlers.js'
 import { handleGroupEvents } from './lib/event.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
 import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
+import { checkCmd18Command } from './lib/cmd18.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -346,6 +347,10 @@ for (let plugin of processedPlugins) {
       if (!alwaysAllowedCommands.includes(command) && !isOwner) {
         return m.reply(`*[🪐] El bot está desactivado en este grupo.*\n\n> Pídele a un administrador que lo active.`)
       }
+    }
+
+    if (await checkCmd18Command(m, this, command, prefixMatch[0] || usedPrefix, isOwner, isROwner)) {
+      continue
     }
     
     commandExecuted = true
