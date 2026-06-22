@@ -53,6 +53,44 @@ function checkWin(bet, result) {
   return false
 }
 
+function getWinProbability(bet) {
+  if (bet.type === 'number') {
+    return 0.01 + Math.random() * 0.02
+  }
+  return 0.01 + Math.random() * 0.29
+}
+
+function pickWinningNumber(bet) {
+  if (bet.type === 'number') return bet.value
+
+  if (bet.type === 'color') {
+    const pool = bet.value === 'rojo' ? [...ROJO] : [...NEGRO]
+    return pool[Math.floor(Math.random() * pool.length)]
+  }
+
+  const pool = []
+  for (let n = 1; n <= 36; n++) {
+    const isEven = n % 2 === 0
+    if (bet.value === 'par' ? isEven : !isEven) pool.push(n)
+  }
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+function pickLosingNumber(bet) {
+  for (let i = 0; i < 60; i++) {
+    const n = spinRoulette()
+    if (!checkWin(bet, n)) return n
+  }
+  return bet.type === 'number' && bet.value === 0 ? 1 : 0
+}
+
+function resolveSpin(bet) {
+  const winChance = getWinProbability(bet)
+  const won = Math.random() < winChance
+  const result = won ? pickWinningNumber(bet) : pickLosingNumber(bet)
+  return { result, won }
+}
+
 function resultDisplay(num) {
   const c = colorOf(num)
   const emoji = c === 'verde' ? '🟢' : c === 'rojo' ? '🔴' : '⚫'
@@ -118,8 +156,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     user.lastRuleta = Date.now()
     user.coins -= amount
 
-    const result = spinRoulette()
-    const won = checkWin(betInfo, result)
+    const { result, won } = resolveSpin(betInfo)
     const winnings = won ? amount * betInfo.multiplier : 0
 
     if (winnings > 0) user.coins += winnings
