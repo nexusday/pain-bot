@@ -47,6 +47,18 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           }
         }, { quoted: m })
       }
+
+      if (global.db.data.modoHuman && global.db.data.modoHuman[m.chat] === true) {
+        let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗛𝘂𝗺𝗮𝗻𝗼\n\n> Para desactivarlo usa: ${usedPrefix}modohuman off`
+        
+        return conn.sendMessage(m.chat, {
+          text: txt,
+          contextInfo: {
+            ...rcanal.contextInfo,
+            mentionedJid: [m.sender]
+          }
+        }, { quoted: m })
+      }
       
       global.db.data.modoIA[m.chat] = true
       

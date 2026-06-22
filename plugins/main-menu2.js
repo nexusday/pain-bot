@@ -175,6 +175,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoia on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohot on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohuman on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}mododescargas on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off\n\n`
 
