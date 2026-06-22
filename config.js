@@ -9,7 +9,6 @@ global.owner = [
 
 global.ownerLid = [
   ['114263544885392', 'Sunkovv', true],
-  ['160155303968780', 'Jane', true],
   ['132929590181978', 'Clang', true],
   ['138079390183445', 'Javi', true]
 ]
