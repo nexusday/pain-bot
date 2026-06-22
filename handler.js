@@ -9,6 +9,7 @@ import fetch from 'node-fetch'
 import { handleAIModes } from './lib/eventHandlers.js'
 import { handleAntiSystems } from './lib/antiHandlers.js'
 import { handleGroupEvents } from './lib/event.js'
+import { handleModoDescargas } from './lib/Modos/modo-descargas.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
 import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
@@ -448,6 +449,7 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
 
 
   
+  await handleModoDescargas(m, this, commandExecuted)
   await handleAntiSystems(m, this, isAdmin, isOwner, isRAdmin, isBotAdmin, isPrems, commandExecuted)
 
   await handleGroupEvents(m, this, isAdmin, isBotAdmin, isOwner, participants)

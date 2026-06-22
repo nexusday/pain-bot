@@ -175,6 +175,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoia on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohot on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}mododescargas on/off
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off\n\n`
 
     let menuBody = `   𓍯  *𝙲𝙼𝙳 𝚂𝚄𝙱 𝙱𝙾𝚃*  𓍯  
@@ -256,6 +257,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <link>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}fb <link>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ig <link>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}igs <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <link>
 
    𓍯  *𝚁𝙴𝙰𝙲𝙲𝙸𝙾𝙽𝙴𝚂*  𓍯 
