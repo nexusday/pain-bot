@@ -1,4 +1,4 @@
-import { ensureModoDescargasDb } from '../lib/Modos/modo-descargas.js'
+import { isModeActive, setModeState, ensureModeMap } from '../lib/Modos/modo-utils.js'
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
@@ -10,10 +10,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     const action = args[0]?.toLowerCase()
-    ensureModoDescargasDb()
+    ensureModeMap('modoDescargas')
 
     if (action === 'on') {
-      global.db.data.modoDescargas[m.chat] = true
+      setModeState('modoDescargas', m.chat, true)
       await global.db.write()
 
       return conn.sendMessage(m.chat, {
@@ -30,7 +30,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     if (action === 'off') {
-      global.db.data.modoDescargas[m.chat] = false
+      setModeState('modoDescargas', m.chat, false)
       await global.db.write()
 
       return conn.sendMessage(m.chat, {
@@ -45,7 +45,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const estado = global.db.data.modoDescargas[m.chat] === true ? 'activado' : 'desactivado'
+    const estado = isModeActive('modoDescargas', m.chat) ? 'activado' : 'desactivado'
 
     return conn.sendMessage(m.chat, {
       text: `[❗] Uso: ${usedPrefix + command} on/off

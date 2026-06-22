@@ -1,3 +1,5 @@
+import { ensureModeMap, isModeActive, setModeState } from '../lib/Modos/modo-utils.js'
+
 let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }) => {
   try {
     if (!m.isGroup) {
@@ -19,12 +21,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     }
     
     const action = args[0]?.toLowerCase()
-    
-    if (!global.db.data.modoIA) global.db.data.modoIA = {}
+    ensureModeMap('modoIA')
     
     if (action === 'on') {
       
-      if (global.db.data.modoHot && global.db.data.modoHot[m.chat] === true) {
+      if (isModeActive('modoHot', m.chat)) {
         let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗛𝗼𝘁\n\n> Para desactivarlo usa: ${usedPrefix}modohot off`
         
         return conn.sendMessage(m.chat, {
@@ -36,7 +37,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         }, { quoted: m })
       }
       
-      if (global.db.data.modoIlegal && global.db.data.modoIlegal[m.chat] === true) {
+      if (isModeActive('modoIlegal', m.chat)) {
         let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹\n\n> Para desactivarlo usa: ${usedPrefix}modoilegal off`
         
         return conn.sendMessage(m.chat, {
@@ -48,7 +49,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         }, { quoted: m })
       }
 
-      if (global.db.data.modoHuman && global.db.data.modoHuman[m.chat] === true) {
+      if (isModeActive('modoHuman', m.chat)) {
         let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗛𝘂𝗺𝗮𝗻𝗼\n\n> Para desactivarlo usa: ${usedPrefix}modohuman off`
         
         return conn.sendMessage(m.chat, {
@@ -60,7 +61,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         }, { quoted: m })
       }
       
-      global.db.data.modoIA[m.chat] = true
+      setModeState('modoIA', m.chat, true)
+      await global.db.write()
       
       let txt = `🌀 𝗠𝗼𝗱𝗼 𝗜𝗔 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼.\n> *Por:* @${m.sender.split('@')[0]}`
       
@@ -73,7 +75,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }, { quoted: m })
       
     } else if (action === 'off') {
-      global.db.data.modoIA[m.chat] = false
+      setModeState('modoIA', m.chat, false)
+      await global.db.write()
       
      
       try {

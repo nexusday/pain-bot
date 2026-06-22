@@ -1,3 +1,5 @@
+import { isModeActive, setModeState, ensureModeMap } from '../lib/Modos/modo-utils.js'
+
 let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
   try {
     if (!m.isGroup) {
@@ -15,8 +17,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
     }
 
     const action = args[0]?.toLowerCase()
-
-    if (!global.db.data.modoHuman) global.db.data.modoHuman = {}
+    ensureModeMap('modoHuman')
 
     const activeMode = (name, cmd) => {
       return conn.sendMessage(m.chat, {
@@ -29,11 +30,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
     }
 
     if (action === 'on') {
-      if (global.db.data.modoIA?.[m.chat]) return activeMode('𝗠𝗼𝗱𝗼 𝗜𝗔', 'modoia')
-      if (global.db.data.modoHot?.[m.chat]) return activeMode('𝗠𝗼𝗱𝗼 𝗛𝗼𝘁', 'modohot')
-      if (global.db.data.modoIlegal?.[m.chat]) return activeMode('𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹', 'modoilegal')
+      if (isModeActive('modoIA', m.chat)) return activeMode('𝗠𝗼𝗱𝗼 𝗜𝗔', 'modoia')
+      if (isModeActive('modoHot', m.chat)) return activeMode('𝗠𝗼𝗱𝗼 𝗛𝗼𝘁', 'modohot')
+      if (isModeActive('modoIlegal', m.chat)) return activeMode('𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹', 'modoilegal')
 
-      global.db.data.modoHuman[m.chat] = true
+      setModeState('modoHuman', m.chat, true)
       await global.db.write()
 
       return conn.sendMessage(m.chat, {
@@ -50,7 +51,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
     }
 
     if (action === 'off') {
-      global.db.data.modoHuman[m.chat] = false
+      setModeState('modoHuman', m.chat, false)
       await global.db.write()
 
       try {
@@ -89,7 +90,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
       }
     }
 
-    const estado = global.db.data.modoHuman[m.chat] === true ? 'activado' : 'desactivado'
+    const estado = isModeActive('modoHuman', m.chat) ? 'activado' : 'desactivado'
 
     return conn.sendMessage(m.chat, {
       text: `[❗] Uso: ${usedPrefix + command} on/off/clear\n\n> *Estado:* ${estado}`,

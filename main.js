@@ -109,6 +109,8 @@ global.loadDatabase = async function loadDatabase() {
   global.db.READ = true
   await global.db.read().catch(console.error)
   global.db.READ = null
+  const normalizeModeMap = (value) =>
+    value && typeof value === 'object' && !Array.isArray(value) ? value : {}
   global.db.data = {
     users: {},
     chats: {},
@@ -125,8 +127,11 @@ global.loadDatabase = async function loadDatabase() {
     alquiler: global.db.data?.alquiler || {},
     alquilerNotify: global.db.data?.alquilerNotify || {},
     cmd18: global.db.data?.cmd18 || {},
-    modoDescargas: global.db.data?.modoDescargas || {},
-    modoHuman: global.db.data?.modoHuman || {},
+    modoDescargas: normalizeModeMap(global.db.data?.modoDescargas),
+    modoIA: normalizeModeMap(global.db.data?.modoIA),
+    modoHot: normalizeModeMap(global.db.data?.modoHot),
+    modoIlegal: normalizeModeMap(global.db.data?.modoIlegal),
+    modoHuman: normalizeModeMap(global.db.data?.modoHuman),
   }
   global.db.chain = lodash.chain(global.db.data) 
 }
