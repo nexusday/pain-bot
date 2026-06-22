@@ -17,7 +17,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       await global.db.write()
 
       return conn.sendMessage(m.chat, {
-        text: `📥 *Modo descargas activado*
+        text: `ִֶָ☾. *Modo descargas activado*
 
 > El bot descargará automáticamente links de *TikTok* e *Instagram* que envíen los miembros.
 > Con *antilink* activo, esos links no serán sancionados.
@@ -34,7 +34,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       await global.db.write()
 
       return conn.sendMessage(m.chat, {
-        text: `📥 *Modo descargas desactivado*
+        text: `ִֶָ☾. *Modo descargas desactivado*
 
 > Ya no se descargarán links automáticamente.
 > *Por:* @${m.sender.split('@')[0]}`,
