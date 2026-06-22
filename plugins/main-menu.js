@@ -205,6 +205,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}michi @usuario
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}miner @usuario
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slot <cantidad>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ruleta <rojo/negro/par/impar/0-36> <cantidad>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}moneda <cara/sello> <cantidad>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}work
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}suerte
