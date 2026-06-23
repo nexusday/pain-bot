@@ -250,6 +250,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
    𓍯  𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play <búsqueda/url>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ly <canción>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sc <búsqueda/url/número>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play2 <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}aptoide <app>
