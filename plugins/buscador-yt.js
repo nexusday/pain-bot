@@ -1,70 +1,111 @@
-import fs from 'fs'
-import { join } from 'path'
-import axios from 'axios'
+import fetch from 'node-fetch'
 
-let handler = async (m, { conn, text, usedPrefix, command }) => {
+const RESULTS_LIMIT = 5
 
-  if (!text) return m.reply(`[❗] Por favor, ingresa una busqueda.\n\n> *Ejemplo:* ${usedPrefix + command} its you`)
+function trimText(text = '', max = 100) {
+  const value = String(text).replace(/\s+/g, ' ').trim()
+  if (!value || value === '-') return ''
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+}
 
-  const botActual = conn.user?.jid?.split('@')[0]?.replace(/\D/g, '') || 'default'
+function formatViews(n) {
+  const v = Number(n) || 0
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`
+  return String(v || '—')
+}
 
-
-
-  const configPath = join('./Serbot', botActual, 'config.json')
-
-  let nombreBot = global.namebot || 'PAIN BOT'
-
-  if (fs.existsSync(configPath)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-      if (config.name) nombreBot = config.name
-    } catch {}
-  }
-  
-
+const handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
-    const searchQuery = encodeURIComponent(text)
-    const apiUrl = `https://bytebazz-api.koyeb.app/api/busqueda/youtube?query=${searchQuery}&apikey=8jkh5icbf05`
-    
-    const { data } = await axios.get(apiUrl)
-    
-    if (!data.status || !data.resultado || data.resultado.length === 0) {
-      return m.reply('[❗] No se encontraron resultados para tu búsqueda.')
+    if (!text?.trim()) {
+      return conn.sendMessage(m.chat, {
+        text: `ִֶָ☾. Ingresa qué buscar en YouTube.\n\n> *Ejemplo:*\n${usedPrefix + command} Twice`,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
     }
-    
-    const videos = data.resultado.slice(0, 5)
-    
-    let message = `*Resultados de: ${text}*\n\n`
-    
-    videos.forEach((video, index) => {
-      message += `*${index + 1}. ${video.title}*\n`
-      message += `• *Duración:* ${video.duration.timestamp}\n`
-      message += `• *Vistas:* ${video.views.toLocaleString()}\n`
-      message += `• *Subido:* ${video.ago}\n`
-      message += `• *Canal:* ${video.author.name}\n`
-      message += `• *Enlace:* ${video.url}\n\n`
+
+    const query = text.trim()
+    const searchUrl = `https://api.delirius.store/search/ytsearch?q=${encodeURIComponent(query)}`
+    const sres = await fetch(searchUrl).then(r => r.json())
+
+    if (!sres?.status || !Array.isArray(sres.data) || !sres.data.length) {
+      throw '[❗] No se encontraron resultados para tu búsqueda.'
+    }
+
+    const results = sres.data.slice(0, RESULTS_LIMIT)
+
+    let list = `ִֶָ☾. 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 ִֶָ☾.\n\n> *Búsqueda:* ${query}\n> *Encontrados:* ${results.length}\n\n`
+    results.forEach((item, i) => {
+      const channel = trimText(item.author?.name, 40) || 'YouTube'
+      list += `*${i + 1}.* ${trimText(item.title, 70)}\n`
+      list += ` 𓍯  *Canal:* ${channel}\n`
+      list += ` 𓍯  *Duración:* ${item.duration || '—'}\n`
+      list += ` 𓍯  *Vistas:* ${formatViews(item.views)}\n`
+      list += ` 𓍯  *Publicado:* ${item.publishedAt || '—'}\n`
+      list += ` 𓍯  *Enlace:* ${item.url}\n\n`
     })
-    
+    list += `> Descargar video:\n> ${usedPrefix}video <número>\n> ${usedPrefix}video <enlace>\n> ${usedPrefix}play <número>`
+
     await conn.sendMessage(m.chat, {
-      text: message.trim(),
-      contextInfo: {
-        externalAdReply: {
-          title: `${nombreBot}`,
-          body: `Busqueda: ${text}`,
-          thumbnailUrl: videos[0].thumbnail,
-          sourceUrl: `https://youtube.com`,
-          mediaType: 1,
-          renderLargerThumbnail: true
-        }
-      }
+      text: list.trim(),
+      contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
-    
-  } catch (error) {
-    console.error('Error en la búsqueda de YouTube:', error)
-    m.reply('[❗] Ocurrió un error al realizar la búsqueda. Por favor, inténtalo de nuevo más tarde.')
+
+    if (!global.lastYtSearch) global.lastYtSearch = {}
+    global.lastYtSearch[m.sender] = {
+      query,
+      results: results.map(r => ({
+        title: r.title,
+        url: r.url || `https://youtu.be/${r.videoId}`,
+        image: r.image || r.thumbnail,
+        duration: r.duration,
+        views: r.views,
+        author: r.author?.name
+      })),
+      at: Date.now()
+    }
+
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i]
+      const channel = trimText(item.author?.name, 40) || 'YouTube'
+      const caption = `*${i + 1}.* ${trimText(item.title, 90)}
+ 𓍯  *Canal:* ${channel}
+ 𓍯  *Duración:* ${item.duration || '—'}
+ 𓍯  *Vistas:* ${formatViews(item.views)}
+ 𓍯  *Enlace:* ${item.url}
+
+> ${usedPrefix}video ${i + 1}`
+
+      const thumb = item.image || item.thumbnail
+      if (thumb) {
+        try {
+          const image = (await conn.getFile(thumb)).data
+          await conn.sendMessage(m.chat, {
+            image,
+            caption,
+            contextInfo: { ...rcanal?.contextInfo }
+          }, { quoted: m })
+          continue
+        } catch {}
+      }
+
+      await conn.sendMessage(m.chat, {
+        text: caption,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
+    }
+  } catch (e) {
+    console.error('Error en búsqueda YouTube:', e)
+    return conn.sendMessage(m.chat, {
+      text: typeof e === 'string' ? e : `[❗] Ocurrió un error al buscar en YouTube.\n\n${e.message}`,
+      contextInfo: { ...rcanal?.contextInfo }
+    }, { quoted: m })
   }
 }
 
-handler.command = ['yt', 'youtube']
+handler.help = ['yt <búsqueda> → 5 resultados de YouTube']
+handler.command = ['yt', 'youtube', 'ytsearch']
+handler.tags = ['descargas', 'busqueda']
 
 export default handler
