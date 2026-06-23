@@ -115,7 +115,6 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ⊹ +51901437507 ⊹ *Sunkovv*
 > 𓂃 ࣪ ִֶָ☾.  ⊹ +584244309723 ⊹ *Clang*
 > 𓂃 ࣪ ִֶָ☾.  ⊹ +523326096518 ⊹ *Javi*
-> 𓂃 ࣪ ִֶָ☾.  ⊹ --------------- ⊹ *Jane*
  
 
  𓂃 ࣪ ִֶָ☾. 𝙲𝙰𝙽𝙰𝙻𝙴𝚂 𝙾𝙵𝙸𝙲𝙸𝙰𝙻𝙴𝚂 𓂃 ࣪ ִֶָ☾.
@@ -233,8 +232,10 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}yt <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wall <busqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pinterest <busqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bsticker <busqueda>
 
@@ -249,11 +250,12 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}gemini <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}chatgpt <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kora <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}replia <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}copilot <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}animg <texto>
 
    𓍯  *𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play <búsqueda/url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sc <búsqueda/url/número>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play2 <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}aptoide <app>
@@ -274,6 +276,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kiss @usuario
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hug @usuario
 
+
    𓍯  *𝙰𝙳𝙸𝙲𝙸𝙾𝙽𝙰𝙻𝙴𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}nota <contenido>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delnota <numero>
@@ -293,6 +296,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hd <imagen/sticker>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tts <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}stt <nota de voz/audio>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cat <texto>
 
 
    𓍯  *𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂*  𓍯  

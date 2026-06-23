@@ -48,7 +48,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       : apiData?.error || apiData?.message || e.message || 'Intenta de nuevo más tarde.'
 
     conn.sendMessage(m.chat, {
-      text: `*[❌] Error al consultar a Kora.*\n\n> ${detail}`,
+      text: `*[❌] Error al consultar a Kora.*`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }

@@ -225,6 +225,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wall <busqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pinterest <busqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bsticker <busqueda>
 
@@ -241,6 +242,8 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}gemini <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}chatgpt <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kora <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}replia <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}copilot <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}animg <texto>
 
 
@@ -266,6 +269,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slap @usuario
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kiss @usuario
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hug @usuario
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cat <texto>
 
 
    𓍯  𝙰𝙳𝙸𝙲𝙸𝙾𝙽𝙰𝙻𝙴𝚂  𓍯  
