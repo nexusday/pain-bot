@@ -19,7 +19,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       return conn.sendMessage(m.chat, {
         text: `ִֶָ☾. *Modo descargas activado*
 
-> El bot descargará automáticamente links de *TikTok* e *Instagram* que envíen los miembros.
+> El bot descargará automáticamente links de *TikTok*, *Instagram* y *YouTube* que envíen los miembros.
+> En YouTube preguntará si quieren *MP3* o *MP4*.
 > Con *antilink* activo, esos links no serán sancionados.
 > *Por:* @${m.sender.split('@')[0]}`,
         contextInfo: {
@@ -52,7 +53,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
 > *Estado actual:* ${estado}
 
-> *On:* descarga automática de TikTok e Instagram
+> *On:* descarga automática de TikTok, Instagram y YouTube
 > *Off:* sin descarga automática`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
