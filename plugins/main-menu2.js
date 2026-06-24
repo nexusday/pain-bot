@@ -234,8 +234,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ly <canción>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wtsearch <webtoon>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wt <enlace> _(PDF completo)_
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wtsearch <texto webtoon manga>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wall <busqueda>
@@ -268,6 +267,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ig <link>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}igs <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <link>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wt <enlace>/<text> _(PDF completo)_
 
    𓍯  *𝚁𝙴𝙰𝙲𝙲𝙸𝙾𝙽𝙴𝚂*  𓍯 
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reir
