@@ -234,6 +234,8 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ly <canción>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wtsearch <webtoon>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wt <enlace> _(PDF completo)_
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wall <busqueda>

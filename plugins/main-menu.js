@@ -251,6 +251,8 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play <búsqueda/url>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ly <canción>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wtsearch <webtoon>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wt <enlace> _(PDF completo)_
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sc <búsqueda/url/número>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play2 <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}aptoide <app>
