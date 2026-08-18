@@ -1,4 +1,6 @@
 /* By Sunkovv
+   Copia este archivo como config.js y edítalo:
+   cp config.example.js config.js
 */
 
 
@@ -16,9 +18,7 @@ global.owner = [
 //  ACA PON EL LID DEL OWNER DEL BOT PARA QUE TE HAGA CASO COMO OWNER EL BOT, USA EL COMANDO /ID EN TU 
 //PRIVADO PARA SACAR TU LID
 global.ownerLid = [
-  ['198119006412828', 'Sunkovv', true],
-  ['acaElLid', 'nombre', true],
-  ['acaElLiD', 'nombre', true]
+  ['acaElLid', 'Sunkovv', true],
 ]
 
 global.sessions = 'Sessions'
