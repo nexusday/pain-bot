@@ -3,6 +3,7 @@ import path, { join } from 'path'
 import { fileURLToPath } from 'url'
 import ws from 'ws'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
+import { formatBotUptime } from '../lib/bot-uptime.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -32,14 +33,6 @@ function resolveBotImage(configPath) {
   return imgBot
 }
 
-function clockString(ms) {
-  if (!ms || isNaN(ms)) return '00:00:00'
-  const h = Math.floor(ms / 3600000)
-  const m = Math.floor((ms % 3600000) / 60000)
-  const s = Math.floor((ms % 60000) / 1000)
-  return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':')
-}
-
 let handler = async (m, { conn, usedPrefix }) => {
   const botActual = cleanBotNum(conn.user?.jid || conn.user?.id)
   const configPath = join(ROOT_DIR, 'Serbot', botActual, 'config.json')
@@ -58,9 +51,7 @@ let handler = async (m, { conn, usedPrefix }) => {
   const tipo = isMain ? 'Principal' : 'Sub-Bot'
   const totalf = Object.values(global.plugins).filter(v => v.help && v.tags).length
 
-  let botUptime = 0
-  if (conn.startTime) botUptime = Date.now() - conn.startTime
-  const botFormatUptime = clockString(botUptime)
+  const botFormatUptime = formatBotUptime(conn)
 
   let subBotsActivos = 0
   if (global.conns && Array.isArray(global.conns)) {
@@ -86,7 +77,11 @@ let handler = async (m, { conn, usedPrefix }) => {
       if (!number || /tunumero|acael|xxx/i.test(String(number))) continue
       txt += ` *${name || 'Owner'}:* +${String(number).replace(/\D/g, '')}\n`
     }
+    txt += `\n`
   }
+
+  txt += `ʜᴏsᴛɪɴɢ ᴏғɪᴄɪᴀʟ\n\n`
+  txt += ` *URL:* https://nexcodea.com`
 
   await conn.sendFile(m.chat, imgBot, 'thumbnail.jpg', txt.trim(), m, null, {
     contextInfo: {

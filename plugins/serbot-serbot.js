@@ -391,8 +391,16 @@ export async function AYBot(options) {
 
         console.log(chalk.bold.cyanBright(`\n🟢 ${userName} (+${path.basename(pathAYBot)}) conectado exitosamente.`))
         sock.isInit = true
-        sock.startTime = Date.now() 
-        global.conns.push(sock)
+        try {
+          const { markBotStart } = await import('../lib/bot-uptime.js')
+          // No forzar: si el subbot se reconecta, conserva el tiempo anterior
+          markBotStart(path.basename(pathAYBot))
+          markBotStart(sock)
+        } catch {
+          if (!sock.startTime) sock.startTime = Date.now()
+        }
+        if (!Array.isArray(global.conns)) global.conns = []
+        if (!global.conns.includes(sock)) global.conns.push(sock)
         await joinChannels(sock)
         
        
@@ -469,11 +477,31 @@ export async function AYBot(options) {
       }
 
       if (restatConn) {
+        const oldSock = sock
         const oldChats = sock.chats
+        const oldStart = sock.startTime
+        const oldId = path.basename(pathAYBot)
         try { sock.ws.close() } catch { }
         sock.ev.removeAllListeners()
         sock = makeWASocket(connectionOptions, { chats: oldChats })
         isInit = true
+        try {
+          const { setBotStartTime, getBotStartTime, markBotStart } = await import('../lib/bot-uptime.js')
+          const kept = oldStart || getBotStartTime(oldId)
+          if (kept) {
+            setBotStartTime(oldId, kept)
+            setBotStartTime(sock, kept)
+          } else {
+            markBotStart(oldId)
+            markBotStart(sock)
+          }
+        } catch {
+          if (oldStart) sock.startTime = oldStart
+        }
+        if (Array.isArray(global.conns)) {
+          const idx = global.conns.indexOf(oldSock)
+          if (idx >= 0) global.conns[idx] = sock
+        }
       }
 
       if (!isInit) {

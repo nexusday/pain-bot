@@ -3,13 +3,7 @@ import { join } from 'path'
 import os from 'os'
 import { getMenuRentalLine } from '../lib/alquiler.js'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
-
-function clockString(ms) {
-  let h = Math.floor(ms / 3600000)
-  let m = Math.floor((ms % 3600000) / 60000)
-  let s = Math.floor((ms % 60000) / 1000)
-  return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':')
-}
+import { formatBotUptime } from '../lib/bot-uptime.js'
 
 let handler = async (m, { conn, usedPrefix }) => {
   try {
@@ -84,9 +78,7 @@ let handler = async (m, { conn, usedPrefix }) => {
       userRole = '𖢠 Admin del Grupo'
     }
     
-    let botUptime = 0
-    if (conn.startTime) botUptime = Date.now() - conn.startTime
-    let botFormatUptime = clockString(botUptime)
+    let botFormatUptime = formatBotUptime(conn)
     
     let totalf = Object.values(global.plugins).filter(v => v.help && v.tags).length
     
@@ -115,7 +107,9 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 
  𓂃 ࣪ ִֶָ☾. 𝙿𝚁𝙾𝙿𝙸𝙴𝚃𝙰𝚁𝙸𝙾𝚂𓂃 ࣪ ִֶָ☾.
 > 𓂃 ࣪ ִֶָ☾.  ⊹ +51927909197 ⊹ *Sunkovv*
- 
+
+ 𓂃 ࣪ ִֶָ☾. 𝙷𝙾𝚂𝚃𝙸𝙽𝙶 𝙾𝙵𝙸𝙲𝙸𝙰𝙻 𓂃 ࣪ ִֶָ☾.
+> 𓂃 ࣪ ִֶָ☾.  ⟅ https://nexcodea.com ⟆
 
  𓂃 ࣪ ִֶָ☾. 𝙲𝙰𝙽𝙰𝙻𝙴𝚂 𝙾𝙵𝙸𝙲𝙸𝙰𝙻𝙴𝚂 𓂃 ࣪ ִֶָ☾.
 > 𓂃 ࣪ ִֶָ☾.  ⟅ https://whatsapp.com/channel/0029Vb7Y87RLikgEutyMId1h ⟆

@@ -10,6 +10,7 @@ process.on('unhandledRejection', (reason) => {
 })
 
 import './config.js'
+import './lib/bot-uptime.js'
 import { createRequire } from 'module'
 import path, { join } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
@@ -191,7 +192,8 @@ const connectionOptions = {
 }
 
 global.conn = makeWASocket(connectionOptions)
-
+/** Alias vivo del socket principal (se actualiza en reloadHandler). */
+let conn = global.conn
 
 global.mainBotJid = null
 
@@ -302,22 +304,26 @@ setInterval(() => {
 }, 50000)
 
 async function connectionUpdate(update) {
+  const sock = this?.ev ? this : conn
   const { connection, lastDisconnect, isNewLogin } = update
   global.stopped = connection
-  if (isNewLogin) conn.isInit = true
+  if (isNewLogin) sock.isInit = true
   const code =
     lastDisconnect?.error?.output?.statusCode ||
     lastDisconnect?.error?.output?.payload?.statusCode
-  if (code && code !== DisconnectReason.loggedOut && conn?.ws.socket == null) {
+  if (code && code !== DisconnectReason.loggedOut && sock?.ws.socket == null) {
     await global.reloadHandler(true).catch(console.error)
     global.timestamp.connect = new Date()
   }
   if (global.db.data == null) await loadDatabase()
   if (connection === 'open') {
     console.log(chalk.yellow('Conectado correctamente.'))
-    global.mainBotJid = conn.user?.jid?.split('@')[0] || conn.user?.id?.split('@')[0]
-    if (!conn.startTime) {
-      conn.startTime = Date.now()
+    global.mainBotJid = sock.user?.jid?.split('@')[0] || sock.user?.id?.split('@')[0]
+    try {
+      const { markBotStart } = await import('./lib/bot-uptime.js')
+      markBotStart(sock) // no fuerza: conserva el tiempo si ya existía
+    } catch {
+      if (!sock.startTime) sock.startTime = Date.now()
     }
   }
   const reason = new Boom(lastDisconnect?.error)?.output?.statusCode
@@ -333,28 +339,28 @@ async function connectionUpdate(update) {
   if (connection === 'close') {
     switch (reason) {
       case DisconnectReason.badSession:
-        conn.logger.error(`Sesión incorrecta, elimina la carpeta ${global.authFile} y escanea nuevamente.`)
+        sock.logger.error(`Sesión incorrecta, elimina la carpeta ${global.authFile} y escanea nuevamente.`)
         break
       case DisconnectReason.connectionClosed:
       case DisconnectReason.connectionLost:
       case DisconnectReason.timedOut:
-        conn.logger.warn(`Conexión perdida o cerrada, reconectando...`)
+        sock.logger.warn(`Conexión perdida o cerrada, reconectando...`)
         await global.reloadHandler(true).catch(console.error)
         break
       case DisconnectReason.connectionReplaced:
-        conn.logger.error(
+        sock.logger.error(
           `Conexión reemplazada, se abrió otra sesión. Cierra esta sesión primero.`
         )
         break
       case DisconnectReason.loggedOut:
-        conn.logger.error(`Sesión cerrada, elimina la carpeta ${global.authFile} y escanea nuevamente.`)
+        sock.logger.error(`Sesión cerrada, elimina la carpeta ${global.authFile} y escanea nuevamente.`)
         break
       case DisconnectReason.restartRequired:
-        conn.logger.info(`Reinicio necesario, reinicia el servidor si hay problemas.`)
+        sock.logger.info(`Reinicio necesario, reinicia el servidor si hay problemas.`)
         await global.reloadHandler(true).catch(console.error)
         break
       default:
-        conn.logger.warn(`Desconexión desconocida: ${reason || ''} - Estado: ${connection || ''}`)
+        sock.logger.warn(`Desconexión desconocida: ${reason || ''} - Estado: ${connection || ''}`)
         await global.reloadHandler(true).catch(console.error)
         break
     }
@@ -381,14 +387,29 @@ global.reloadHandler = async function (restartConn) {
     
     
     const preservedStartTime = global.conn.startTime
+    let preservedBotId = ''
+    try {
+      preservedBotId = String(global.conn.user?.jid || '').split('@')[0].replace(/\D/g, '')
+    } catch {}
     
     global.conn = makeWASocket(connectionOptions)
+    conn = global.conn
     
    
     if (preservedStartTime) {
       global.conn.startTime = preservedStartTime
     }
-    
+    try {
+      const { setBotStartTime, getBotStartTime, markBotStart } = await import('./lib/bot-uptime.js')
+      const kept = preservedStartTime || (preservedBotId && getBotStartTime(preservedBotId))
+      if (kept) {
+        setBotStartTime(global.conn, kept)
+        if (preservedBotId) setBotStartTime(preservedBotId, kept)
+      } else {
+        markBotStart(global.conn)
+      }
+    } catch {}
+
     isInit = true
   }
 

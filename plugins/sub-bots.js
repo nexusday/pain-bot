@@ -3,19 +3,13 @@ import path, { join } from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
+import { formatBotUptime } from '../lib/bot-uptime.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const ROOT_DIR = path.join(__dirname, '..')
 const IMG_DIR = join(ROOT_DIR, 'storage', 'img')
 const DEFAULT_IMG = 'https://files.catbox.moe/iomah1.jpg'
-
-function clockString(ms) {
-  let h = Math.floor(ms / 3600000)
-  let m = Math.floor((ms % 3600000) / 60000)
-  let s = Math.floor((ms % 60000) / 1000)
-  return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':')
-}
 
 function resolveBotImage(configPath) {
   const candidates = ['menu.jpg', 'menu2.jpg', 'menu3.jpg']
@@ -93,8 +87,7 @@ let handler = async (m, { conn }) => {
 
     const mainNum = cleanBotNum(mainBotConn?.user?.jid || mainBotConn?.user?.id) || 'Desconocido'
     const mainBotStatus = mainBotConn?.user?.jid ? 'Conectado' : 'Desconectado'
-    const mainBotUptime = mainBotConn?.startTime ? Date.now() - mainBotConn.startTime : 0
-    const mainBotFormatUptime = clockString(mainBotUptime)
+    const mainBotFormatUptime = formatBotUptime(mainBotConn || mainNum)
 
     let txt = `ɪɴғᴏ ᴅᴇ ʙᴏᴛs\n\n`
     txt += ` *Bot actual:* ${nombreBot}\n`
@@ -132,11 +125,13 @@ let handler = async (m, { conn }) => {
         let userName = subConn.user?.name
           || subConn.authState?.creds?.me?.name
           || 'Anónimo'
+        const subUptime = formatBotUptime(subConn)
 
         txt += `*${i}.* ${subBotName}\n`
         txt += ` *Número:* +${subBotNumber}\n`
         txt += ` *Usuario:* ${userName}\n`
         txt += ` *Estado:* ${subBotStatus}\n`
+        txt += ` *Tiempo activo:* ${subUptime}\n`
         if (i < totalSubBots) txt += `\n`
         i++
       }
@@ -148,7 +143,10 @@ let handler = async (m, { conn }) => {
     }
 
     txt += `ʀᴇsᴜᴍᴇɴ\n\n`
-    txt += ` *Bots totales:* ${totalBots}`
+    txt += ` *Bots totales:* ${totalBots}\n\n`
+
+    txt += `ʜᴏsᴛɪɴɢ ᴏғɪᴄɪᴀʟ\n\n`
+    txt += ` *URL:* https://nexcodea.com`
 
     const imgBot = resolveBotImage(configPath)
     const sendOpts = {
