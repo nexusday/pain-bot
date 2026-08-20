@@ -13,6 +13,7 @@ import { handleModoDescargas } from './lib/Modos/modo-descargas.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
 import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
+import { findGroupParticipant, findBotParticipant } from './lib/group-participant.js'
 import { shouldSkipByModoSub } from './plugins/modo-sub.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
@@ -151,8 +152,8 @@ m.exp += Math.ceil(Math.random() * 10)
 
 const groupMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
 const participants = (m.isGroup ? groupMetadata.participants : []) || []  
-const user = (m.isGroup ? participants.find(u => conn.decodeJid(u.id) === m.sender) : {}) || {}  
-const bot = (m.isGroup ? participants.find(u => conn.decodeJid(u.id) == this.user.jid) : {}) || {}  
+const user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}  
+const bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}  
 const isRAdmin = user?.admin == 'superadmin' || false  
 const isAdmin = isRAdmin || user?.admin == 'admin' || false  
 const isBotAdmin = bot?.admin || false  

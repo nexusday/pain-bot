@@ -1,12 +1,13 @@
-import { generateWAMessageFromContent } from '@whiskeysockets/baileys'
+﻿import { generateWAMessageFromContent } from '@whiskeysockets/baileys'
+import { findGroupParticipant } from '../lib/group-participant.js'
 
-var handler = async (m, { conn, text, participants }) => {
+var handler = async (m, { conn, text, participants, isAdmin }) => {
   
-  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
   const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []  
-  const user = (m.isGroup ? groupParticipants.find(u => conn.decodeJid(u.id) === m.sender) : {}) || {}  
+  const user = (m.isGroup ? findGroupParticipant(groupParticipants, m, conn) : null) || {}  
   const isRAdmin = user?.admin == 'superadmin' || false  
-  const isAdminManual = isRAdmin || user?.admin == 'admin' || false  
+  const isAdminManual = Boolean(isAdmin) || isRAdmin || user?.admin == 'admin' || false  
   
   
   const isOwner = global.owner.some(([number]) => number.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 

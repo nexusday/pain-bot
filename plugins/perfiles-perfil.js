@@ -1,5 +1,6 @@
 import fs from 'fs'
 import { join } from 'path'
+import { findGroupParticipant } from '../lib/group-participant.js'
 
 let handler = async (m, { conn, usedPrefix, command }) => {
   
@@ -74,7 +75,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       if (groupMetadata) {
         const participants = groupMetadata.participants || []
       
-        const viewerData = participants.find(u => conn.decodeJid(u.id) === m.sender) || {}
+        const viewerData = findGroupParticipant(participants, m, conn) || {}
         isRAdmin = viewerData?.admin == 'superadmin' || false
         isAdmin = isRAdmin || viewerData?.admin == 'admin' || false
         isGroupCreator = groupMetadata.owner === m.sender ||
@@ -82,7 +83,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
                         viewerData?.admin === 'superadmin'
 
         
-        const targetData = participants.find(u => conn.decodeJid(u.id) === targetUser) || {}
+        const targetData = findGroupParticipant(participants, targetUser, conn) || {}
         targetIsRAdmin = targetData?.admin == 'superadmin' || false
         targetIsAdmin = targetIsRAdmin || targetData?.admin == 'admin' || false
         targetIsGroupCreator = groupMetadata.owner === targetUser ||

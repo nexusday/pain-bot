@@ -4,6 +4,7 @@ import os from 'os'
 import { getMenuRentalLine } from '../lib/alquiler.js'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 import { formatBotUptime } from '../lib/bot-uptime.js'
+import { findGroupParticipant } from '../lib/group-participant.js'
 
 let handler = async (m, { conn, usedPrefix }) => {
   try {
@@ -51,7 +52,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         const groupMetadata = conn.chats[m.chat]?.metadata || await conn.groupMetadata(m.chat).catch(_ => null)
         if (groupMetadata) {
           const participants = groupMetadata.participants || []
-          const user = participants.find(u => conn.decodeJid(u.id) === m.sender) || {}
+          const user = findGroupParticipant(participants, m, conn) || {}
           isRAdmin = user?.admin == 'superadmin' || false
           isAdmin = isRAdmin || user?.admin == 'admin' || false
           isGroupCreator = groupMetadata.owner === m.sender || 

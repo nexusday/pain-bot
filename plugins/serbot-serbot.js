@@ -267,8 +267,8 @@ export async function AYBot(options) {
 4. Elige *Vincular con número de teléfono*
 5. Ingresa el código de arriba
 
-✧ El código caduca en ~2 minutos
-✧ Solo funciona para *+${pairingPhone}*`)
+ El código caduca en 30 segundos
+ Solo funciona para *+${pairingPhone}*`)
 
         pairingInProgress = false
         return true
@@ -303,8 +303,8 @@ export async function AYBot(options) {
 > • Acción: Vincular nuevo dispositivo
 > • Método: Escanear código QR
 
- ✧ *Nota:*
-  ✧ Este código QR caduca en 30 segundos`
+  *Nota:*
+   Este código QR caduca en 30 segundos`
 
   let sendQR = await conn.sendFile(m.chat, await qrcode.toDataURL(qr, { scale: 8 }), "qrcode.png", txt, m, null, rcanal)
 
@@ -393,7 +393,7 @@ export async function AYBot(options) {
         sock.isInit = true
         try {
           const { markBotStart } = await import('../lib/bot-uptime.js')
-          // No forzar: si el subbot se reconecta, conserva el tiempo anterior
+       
           markBotStart(path.basename(pathAYBot))
           markBotStart(sock)
         } catch {

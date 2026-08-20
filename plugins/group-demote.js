@@ -1,10 +1,12 @@
+﻿import { findGroupParticipant } from '../lib/group-participant.js'
+
 let handler = async (m, { conn, args, participants, isAdmin, isOwner, isPrems, usedPrefix, command }) => {
 
-  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
   const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []  
-  const user = (m.isGroup ? groupParticipants.find(u => conn.decodeJid(u.id) === m.sender) : {}) || {}  
+  const user = (m.isGroup ? findGroupParticipant(groupParticipants, m, conn) : {}) || {}  
   const isRAdmin = user?.admin == 'superadmin' || false  
-  const isAdminManual = isRAdmin || user?.admin == 'admin' || false  
+  const isAdminManual = Boolean(isAdmin) || isRAdmin || user?.admin == 'admin' || false  
   
 
   const isOwnerManual = global.owner.some(([number]) => number.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
