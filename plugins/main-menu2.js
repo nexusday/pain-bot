@@ -2,6 +2,7 @@ import fs from 'fs'
 import { join } from 'path'
 import os from 'os'
 import { getMenuRentalLine } from '../lib/alquiler.js'
+import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 
 function clockString(ms) {
   let h = Math.floor(ms / 3600000)
@@ -15,10 +16,11 @@ let handler = async (m, { conn, usedPrefix }) => {
     let nombreBot = global.namebot || 'PAIN BOT'
     let imgBot = 'https://files.catbox.moe/iomah1.jpg'
     let mainImg = './storage/img/menu3.jpg'
-    const botActual = conn.user?.jid?.split('@')[0]?.replace(/\D/g, '')
-    const tipo = botActual === '+573180942941'.replace(/\D/g, '') ? 'Principal Bot' : 'Sub Bot'
+    const botActual = cleanBotNum(conn.user?.jid || conn.user?.id)
+    const isMain = isMainBotConn(conn)
+    const tipo = isMain ? 'Principal Bot' : 'Sub Bot'
     
-    if (tipo === 'Sub Bot') {
+    if (!isMain && botActual) {
       const configGlobalPath = join('./Serbot', botActual, 'config.json')
       if (fs.existsSync(configGlobalPath)) {
         const globalConfig = JSON.parse(fs.readFileSync(configGlobalPath, 'utf8'))

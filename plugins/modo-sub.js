@@ -2,8 +2,17 @@ import ws from 'ws'
 import fs from 'fs'
 import { join } from 'path'
 
-function cleanBotNum(jidOrNum = '') {
+export function cleanBotNum(jidOrNum = '') {
   return String(jidOrNum).split('@')[0].split(':')[0].replace(/\D/g, '')
+}
+
+/** Detecta bot principal real (igual que modosub), sin número hardcodeado */
+export function isMainBotConn(conn) {
+  if (!conn) return false
+  if (conn === global.conn) return true
+  const mine = cleanBotNum(conn.user?.jid || conn.user?.id)
+  const main = cleanBotNum(global.conn?.user?.jid || global.conn?.user?.id)
+  return Boolean(mine && main && mine === main)
 }
 
 function decodeJid(conn, jid) {

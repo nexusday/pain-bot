@@ -1,9 +1,8 @@
 import fs from 'fs'
 import path, { join } from 'path'
 import { fileURLToPath } from 'url'
-import { sizeFormatter } from 'human-readable'
-import { performance } from 'perf_hooks'
 import ws from 'ws'
+import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -15,8 +14,9 @@ function resolveBotImage(configPath) {
   const candidates = ['menu2.jpg', 'menu.jpg', 'menu3.jpg']
   let imgBot = candidates
     .map(name => join(IMG_DIR, name))
-    .find(full => { try { return fs.existsSync(full) } catch { return false } })
-    || DEFAULT_IMG
+    .find(full => {
+      try { return fs.existsSync(full) } catch { return false }
+    }) || DEFAULT_IMG
 
   if (!fs.existsSync(configPath)) return imgBot
 
@@ -32,120 +32,71 @@ function resolveBotImage(configPath) {
   return imgBot
 }
 
-const format = sizeFormatter({
-  std: 'JEDEC',
-  decimalPlaces: 2,
-  keepTrailingZeroes: false,
-  render: (literal, symbol) => `${literal} ${symbol}B`,
-})
+function clockString(ms) {
+  if (!ms || isNaN(ms)) return '00:00:00'
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':')
+}
 
 let handler = async (m, { conn, usedPrefix }) => {
-  let sockets = new Map()
-
-  global.conns.forEach(sock => {
-    if (sock.user && sock.ws?.socket?.readyState !== ws.CLOSED) {
-      sockets.set(sock.user.jid, sock)
-    }
-  })
-
-  let totalf = Object.values(global.plugins).filter(v => v.help && v.tags).length
-
-  let _muptime
-  if (process.send) {
-    process.send('uptime')
-    _muptime = await new Promise(resolve => {
-      process.once('message', resolve)
-      setTimeout(resolve, 1000)
-    }) * 1000
-  }
-
-  let muptime = clockString(_muptime)
-
-  const botActual = conn.user?.jid?.split('@')[0]?.replace(/\D/g, '')
+  const botActual = cleanBotNum(conn.user?.jid || conn.user?.id)
   const configPath = join(ROOT_DIR, 'Serbot', botActual, 'config.json')
+  const isMain = isMainBotConn(conn)
 
   let nombreBot = global.namebot || 'PAIN BOT'
-  let moneyName = 'Gats'
   let imgBot = resolveBotImage(configPath)
 
-  if (fs.existsSync(configPath)) {
+  if (!isMain && fs.existsSync(configPath)) {
     try {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
       if (config.name) nombreBot = config.name
-      if (config.moneyName) moneyName = config.moneyName
     } catch {}
   }
 
-  const tipo = botActual === '+573206534465'.replace(/\D/g, '')
-    ? 'Principal Bot'
-    : 'Sub Bot'
+  const tipo = isMain ? 'Principal' : 'Sub-Bot'
+  const totalf = Object.values(global.plugins).filter(v => v.help && v.tags).length
 
-  let t1 = performance.now()
-  let latensi = performance.now() - t1
-
- 
   let botUptime = 0
-  if (conn.startTime) {
-    botUptime = Date.now() - conn.startTime
-  }
-  let botFormatUptime = clockString(botUptime)
+  if (conn.startTime) botUptime = Date.now() - conn.startTime
+  const botFormatUptime = clockString(botUptime)
 
-  
   let subBotsActivos = 0
   if (global.conns && Array.isArray(global.conns)) {
-    subBotsActivos = global.conns.filter(subConn => 
-      subConn.user && 
+    subBotsActivos = global.conns.filter(subConn =>
+      subConn.user &&
       subConn.ws?.socket?.readyState !== ws.CLOSED
     ).length
   }
 
-  
-  let ownersText = ''
-  if (global.owner && Array.isArray(global.owner)) {
-    ownersText = global.owner.map(([number, name]) => `+${number} (${name})`).join('\n')
+  let txt = `ɪɴғᴏ ᴅᴇʟ ʙᴏᴛ\n\n`
+  txt += ` *Nombre:* ${nombreBot}\n`
+  txt += ` *Número:* +${botActual || 'Desconocido'}\n`
+  txt += ` *Tipo:* ${tipo}\n`
+  txt += ` *Librería:* Baileys MD\n`
+  txt += ` *Tiempo activo:* ${botFormatUptime}\n`
+  txt += ` *Sub-bots activos:* ${subBotsActivos}\n`
+  txt += ` *Plugins:* ${totalf}\n`
+  txt += ` *Prefijo:* ${usedPrefix}\n\n`
+
+  if (global.owner && Array.isArray(global.owner) && global.owner.length) {
+    txt += `ᴘʀᴏᴘɪᴇᴛᴀʀɪᴏs\n\n`
+    for (const [number, name] of global.owner) {
+      if (!number || /tunumero|acael|xxx/i.test(String(number))) continue
+      txt += ` *${name || 'Owner'}:* +${String(number).replace(/\D/g, '')}\n`
+    }
   }
 
- 
-  const botNumber = conn.user?.jid?.split('@')[0] || 'Desconocido'
-
-  let txt = `╭─「 ✦ 𓆩🤖𓆪 ɪɴғᴏ ᴅᴇʟ ʙᴏᴛ ✦ 」─╮\n`
-  txt += `│\n`
-  txt += `╰➺ ✧ *Nombre:* ${nombreBot}\n`
-  txt += `╰➺ ✧ *Número:* +${botNumber}\n`
-  txt += `╰➺ ✧ *Tipo:* ${tipo}\n`
-  txt += `╰➺ ✧ *Librería:* Baileys MD\n`
-  txt += `╰➺ ✧ *Tiempo Activo:* ${botFormatUptime}\n`
-  txt += `╰➺ ✧ *Sub-Bots Activos:* ${subBotsActivos}\n`
-  txt += `╰➺ ✧ *Plugins:* ${totalf}\n`
-  txt += `╰➺ ✧ *Prefijo:* ${usedPrefix}\n`
-  txt += `╰➺ ✧ *Speed:* ${latensi.toFixed(4)}ms\n`
-  txt += `│\n`
-
-  if (ownersText) {
-    txt += `╭─「 ✦ 𓆩👑𓆪 ᴄʀᴇᴀᴅᴏʀᴇs ✦ 」─╮\n`
-    txt += `│\n`
-    txt += `${ownersText.split('\n').map(owner => `╰➺ ✧ *${owner}*`).join('\n')}\n`
-
-  }
-
-
-  await conn.sendFile(m.chat, imgBot, 'thumbnail.jpg', txt, m, null, { 
+  await conn.sendFile(m.chat, imgBot, 'thumbnail.jpg', txt.trim(), m, null, {
     contextInfo: {
-      ...rcanal.contextInfo
+      ...(global.rcanal?.contextInfo || {})
     }
   })
 }
 
-handler.help = ['#botinfo • #infobot\n→ Obtener información única y original del bot']
+handler.help = ['info', 'infobot']
 handler.tags = ['subbots']
-handler.command = ['info', 'infobot']
+handler.command = ['info', 'infobot', 'botinfo']
 
 export default handler
-
-function clockString(ms) {
-  let d = isNaN(ms) ? '--' : Math.floor(ms / 86400000)
-  let h = isNaN(ms) ? '--' : Math.floor(ms / 3600000) % 24
-  let m = isNaN(ms) ? '--' : Math.floor(ms / 60000) % 60
-  let s = isNaN(ms) ? '--' : Math.floor(ms / 1000) % 60
-  return [d, ' D ', h, ' H ', m, ' M ', s, ' S'].map(v => v.toString().padStart(2, 0)).join('')
-}
