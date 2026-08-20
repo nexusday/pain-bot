@@ -304,8 +304,9 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}st <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sw <responder/@user> texto
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toimg
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setmeta <autor> | <pack>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta nombre|autor
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setmeta pack | autor
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delstickermeta
 
    𓍯  *𝙳𝙸𝚅𝙴𝚁𝚂𝙸𝙾𝙽*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topgays

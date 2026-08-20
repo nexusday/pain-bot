@@ -1,29 +1,54 @@
-let handler = async (m, { text }) => {
+let handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text || !text.trim()) {
-    return conn.reply(m.chat, `[❗] Por favor, escribe el *pack* y/o el *autor* que deseas usar por defecto para tus stickers.\n> Ejemplo: *Forger* | Stickers`, m, rcanal)
+    const user = global.db.data.users[m.sender] || {}
+    const actual = (user.packname || user.author)
+      ? `\n\nActual:\n> Pack: *${user.packname || '(defecto)'}*\n> Autor: *${user.author || '(defecto)'}*`
+      : '\n\nAhora usas el pack/autor por defecto del bot.'
+
+    return conn.reply(
+      m.chat,
+      `*[❗] Define el *pack* y/o el *autor* por defecto para tus stickers (.s, .st, .sw).*\n\n` +
+        `Formato:\n> ${usedPrefix + command} pack | autor\n` +
+        `Ejemplo:\n> ${usedPrefix + command} Pain Bot | Sunkovv\n` +
+        `Solo pack:\n> ${usedPrefix + command} Mi Pack\n` +
+        `Borrar: ${usedPrefix}delstickermeta` +
+        actual,
+      m,
+      global.rcanal
+    )
   }
 
-  let packname, author
-  let parts = text.split('|')
-
-  packname = parts[0]?.trim()
-  author = parts[1]?.trim()
+  const parts = text.split('|')
+  const packname = (parts[0] || '').trim()
+  const author = parts.length > 1 ? parts.slice(1).join('|').trim() : ''
 
   if (!packname && !author) {
-    return conn.reply(m.chat, `[❗] No se detectó ningún dato válido. Usa el formato:\n> *pack* | autor\n> Ejemplo: *Forger* | Stickers`, m, rcanal)
+    return conn.reply(
+      m.chat,
+      `*[❗] No se detectó ningún dato válido.*\n> Usa: *pack* | autor\n> Ejemplo: *Forger* | Stickers`,
+      m,
+      global.rcanal
+    )
   }
 
-  let user = global.db.data.users[m.sender]
+  const user = global.db.data.users[m.sender]
+  if (!user) return
 
-  if (typeof packname === 'string') user.packname = packname || user.packname
-  if (typeof author === 'string') user.author = author || user.author
+  if (packname) user.packname = packname
+  if (parts.length > 1) user.author = author
 
-  return conn.reply(m.chat, `✐ Se actualizó el *pack* y/o *autor* por defecto para tus stickers.${
-    packname ? `\n> Pack: *${user.packname}*` : ''
-  }${author ? `\n> Autor: *${user.author}*` : ''}`, m, rcanal)
+  return conn.reply(
+    m.chat,
+    `✐ Metadata por defecto actualizada para tus stickers.` +
+      `\n> Pack: *${user.packname || '(defecto del bot)'}*` +
+      `\n> Autor: *${user.author || '(defecto del bot)'}*` +
+      `\n\nPrueba con ${usedPrefix}s respondiendo a una imagen.`,
+    m,
+    global.rcanal
+  )
 }
 
-handler.help = ['#setstickermeta • #setmeta + [autor] | [pack]\n→ Define el autor y nombre del pack para tus stickers']
+handler.help = ['#setmeta • #setstickermeta + pack | autor\n→ Define pack y autor por defecto para /s']
 handler.tags = ['stickers']
 handler.command = ['setstickermeta', 'setmeta']
 

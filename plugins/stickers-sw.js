@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { addExif } from '../lib/sticker.js'
+import { resolveStickerMeta } from './stickers-sticker.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FONTS_DIR = join(__dirname, '../lib/fonts')
@@ -573,11 +574,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const profileBuffer = await fetchProfileBuffer(conn, jids.length ? jids : [primaryJid], pushname)
     const stickerData = await buildSticker(pushname, message, profileBuffer)
 
-    const senderName = await Promise.resolve(conn.getName(m.sender)) || 'Usuario'
-    const username = '@' + senderName
-    const nombreBot = global.namebot || 'PAIN BOT'
-    const packname = `👑 𝗢𝘄𝗻𝗲𝗿𝘀: \n✰ Sunkovv`
-    const author = `\n\n🪐 𝗕𝗼𝘁:\n↳${nombreBot}\n\n🍁 𝑼𝒔𝒖𝒂𝒓𝒊𝒐:\n↳${username}`
+    const { packname, author } = resolveStickerMeta(m, conn)
 
     const finalSticker = await addExif(stickerData, packname, author)
 

@@ -21,11 +21,7 @@ let handler = async (m, { conn, args }) => {
       return conn.reply(m.chat, '[❗] Por favor, responde a una imagen o video para crear un sticker.', m, rcanal)
     }
 
-    const username = '@' + (conn.getName(m.sender) || 'Usuario')
-    let nombreBot = global.namebot || 'PAIN BOT'
-    
-    const packname = `👑 𝗢𝘄𝗻𝗲𝗿𝘀: \n✰ Sunkovv`
-    const author = `\n\n🪐 𝗕𝗼𝘁:\n↳${nombreBot}\n\n🍁 𝑼𝒔𝒖𝒂𝒓𝒊𝒐:\n↳${username}`
+    const { packname, author } = resolveStickerMeta(m, conn)
 
     const stickerData = await toWebp(buffer)
     const finalSticker = await addExif(stickerData, packname, author)
@@ -42,6 +38,24 @@ handler.tags = ['stickers']
 handler.command = ['s', 'stickers', 'sticker']
 
 export default handler
+
+/** Usa pack/autor de .setmeta; si no hay, el diseño por defecto del bot. */
+export function resolveStickerMeta(m, conn) {
+  const user = global.db?.data?.users?.[m.sender] || {}
+  const username = m.pushName || conn?.getName?.(m.sender) || 'Usuario'
+  const nombreBot = global.namebot || 'PAIN BOT'
+
+  const defaultPack = `👑 𝗢𝘄𝗻𝗲𝗿𝘀: \n✰ Sunkovv`
+  const defaultAuthor = `\n\n🪐 𝗕𝗼𝘁:\n↳${nombreBot}\n\n🍁 𝑼𝒔𝒖𝒂𝒓𝒊𝒐:\n↳@${username}`
+
+  const customPack = String(user.packname || '').trim()
+  const customAuthor = String(user.author || '').trim()
+
+  return {
+    packname: customPack || defaultPack,
+    author: customAuthor || defaultAuthor
+  }
+}
 
 
 function cleanupTempFiles(...filePaths) {

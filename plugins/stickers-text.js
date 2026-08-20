@@ -3,6 +3,7 @@ import path from 'path'
 import fluent from 'fluent-ffmpeg'
 import sharp from '../lib/sharp.js'
 import { addExif } from '../lib/sticker.js'
+import { resolveStickerMeta } from './stickers-sticker.js'
 
 const SIZE = 512
 const FRAME_COUNT = 12
@@ -223,10 +224,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const username = '@' + (conn.getName(m.sender) || 'Usuario')
-    const nombreBot = global.namebot || 'PAIN BOT'
-    const packname = `👑 𝗢𝘄𝗻𝗲𝗿𝘀: \n✰ Sunkovv`
-    const author = `\n\n🪐 𝗕𝗼𝘁:\n↳${nombreBot}\n\n🍁 𝑼𝒔𝒖𝒂𝒓𝒊𝒐:\n↳${username}`
+    const { packname, author } = resolveStickerMeta(m, conn)
 
     const rendered = await renderFrames(text)
     tmpDir = rendered.tmpDir
