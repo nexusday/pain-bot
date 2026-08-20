@@ -100,7 +100,6 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  𝚁𝙾𝙻:  ${userRole}
 > 𓂃 ࣪ ִֶָ☾.  𝙱𝙾𝚃:  ${nombreBot}
 > 𓂃 ࣪ ִֶָ☾.  𝚃𝙸𝙿𝙾:  ${tipo}
-> 𓂃 ࣪ ִֶָ☾.  𝙻𝙸𝙱𝚁𝙴𝚁𝙸𝙰:  𝙱𝚊𝚒𝚕𝚎𝚢𝚜 𝙼𝙳
 > 𓂃 ࣪ ִֶָ☾.  𝚃𝙸𝙴𝙼𝙿𝙾 𝙰𝙲𝚃𝙸𝚅𝙾:  ${botFormatUptime}
 > 𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂:  ${totalf}
 > 𓂃 ࣪ ִֶָ☾.  𝙼𝙴𝙼𝙾𝚁𝙸𝙰: ${processRamMB}/${totalRamMB} MB
