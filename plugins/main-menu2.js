@@ -294,6 +294,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ge o gr <texto/enlace/imagen>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}leerqr <imagen con QR>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hd <imagen/sticker>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ssimg <foto> título|artista
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tts <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}stt <nota de voz/audio>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cat <texto>
