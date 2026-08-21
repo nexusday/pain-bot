@@ -302,6 +302,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
    𓍯  *𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sticker
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}st <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sp <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sw <responder/@user> texto
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toimg
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta nombre|autor
