@@ -229,8 +229,8 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
    𓍯  *𝙱𝚄𝚂𝚀𝚄𝙴𝙳𝙰𝚂*  𓍯  
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}google <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}yt <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok <búsqueda/link>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda/link>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ly <canción>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
