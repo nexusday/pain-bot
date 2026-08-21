@@ -5,7 +5,7 @@ import { webp2png } from '../lib/webp2mp4.js'
 
 
 const MAX_TEXT = 180
-const DEFAULT_TEXT = 'Lo suponia'
+const DEFAULT_TEXT = ''
 const FLAG_OPACITY = 0.41
 
 
