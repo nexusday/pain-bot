@@ -250,7 +250,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     if (!target) {
       return conn.reply(
         m.chat,
-        `*[❗] Responde a una *foto* (o envíala con el comando) y escribe el título.*\n\n` +
+        `*[❗] Responde a una foto* (o envíala con el comando) y escribe el título.*\n\n` +
           `Ejemplos:\n` +
           `> ${usedPrefix + command} Mi canción\n` +
           `> ${usedPrefix + command} Blinding Lights | The Weeknd\n` +
