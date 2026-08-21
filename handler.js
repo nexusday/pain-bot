@@ -166,9 +166,49 @@ if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
   
   try {
     if (!global.db.data.muted) global.db.data.muted = {}
-    if (m.isGroup && global.db.data.muted[m.chat] && Array.isArray(global.db.data.muted[m.chat])) {
-      
-      if (!m.fromMe && global.db.data.muted[m.chat].includes(m.sender)) {
+    const mutedList = m.isGroup ? global.db.data.muted[m.chat] : null
+    if (m.isGroup && Array.isArray(mutedList) && mutedList.length && !m.fromMe) {
+    
+      const senderIds = [
+        m.sender,
+        m.participant,
+        m.key?.participant,
+        m.key?.participantAlt,
+        m.senderPn,
+        m.participantPn,
+        m.participantAlt
+      ].filter(Boolean).map(String)
+
+      const digitSet = new Set(
+        mutedList.map(j => String(j).split('@')[0].split(':')[0].replace(/\D/g, '')).filter(d => d.length >= 6)
+      )
+      let mutedHit = senderIds.some(id => mutedList.includes(id))
+      if (!mutedHit) {
+        mutedHit = senderIds.some(id => {
+          const d = String(id).split('@')[0].split(':')[0].replace(/\D/g, '')
+          return d.length >= 6 && digitSet.has(d)
+        })
+      }
+      if (!mutedHit) {
+        const p = findGroupParticipant(participants, m, this)
+        if (p) {
+          const pIds = [p.id, p.jid, p.lid, p.phoneNumber]
+            .filter(Boolean)
+            .map(v => {
+              const s = String(v)
+              if (s.includes('@')) return s
+              if (String(p.lid) === s || /lid/i.test(s)) return `${s.replace(/\D/g, '')}@lid`
+              return `${s.replace(/\D/g, '')}@s.whatsapp.net`
+            })
+          mutedHit = pIds.some(id => mutedList.includes(id)) ||
+            pIds.some(id => {
+              const d = String(id).split('@')[0].split(':')[0].replace(/\D/g, '')
+              return d.length >= 6 && digitSet.has(d)
+            })
+        }
+      }
+
+      if (mutedHit) {
         try {
           await this.sendMessage(m.chat, { delete: m.key })
         } catch (err) {
