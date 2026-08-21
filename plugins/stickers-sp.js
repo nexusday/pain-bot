@@ -8,6 +8,9 @@ const SIZE = 512
 const PADDING = 40
 const MAX_WIDTH = SIZE - PADDING * 2
 const MAX_HEIGHT = SIZE - PADDING * 2
+
+const SAFE_INSET = 26
+const CONTENT_WIDTH = MAX_WIDTH - SAFE_INSET
 const MAX_TEXT = 320
 const LINE_RATIO = 1.25
 const BG = '#F0F0F0'
@@ -16,8 +19,8 @@ const FG = '#000000'
 const WA_EMOJI_CDN = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
 const WA_EMOJI_FALLBACK = 'https://emoji-cdn.mqrio.dev'
 
-
 const emojiPngCache = new Map()
+const textWidthCache = new Map()
 const graphemeSegmenter =
   typeof Intl !== 'undefined' && Intl.Segmenter
     ? new Intl.Segmenter('und', { granularity: 'grapheme' })
@@ -122,7 +125,6 @@ async function prefetchEmojis(text) {
   await Promise.all(tasks)
 }
 
-
 function tokenize(text) {
   const tokens = []
   let buf = ''
@@ -149,41 +151,81 @@ function tokenize(text) {
   return tokens
 }
 
-function measureTextWidth(text, fontSize) {
-  let w = 0
-  for (const ch of String(text)) {
-    if (ch === ' ') w += fontSize * 0.32
-    else if ('iljtfrI1'.includes(ch)) w += fontSize * 0.30
-    else if ('mwMW'.includes(ch)) w += fontSize * 0.82
-    else if (/[A-Z]/.test(ch)) w += fontSize * 0.64
-    else w += fontSize * 0.55
-  }
-  return w
+function fontAttrs(fontSize) {
+  return `font-family="Arial, Helvetica, DejaVu Sans, sans-serif" font-size="${fontSize}" font-weight="700" fill="${FG}"`
 }
 
-function tokenWidth(token, fontSize) {
-  if (token.type === 'emoji') return fontSize * 1.05
+
+async function measureTextWidth(text, fontSize) {
+  const key = `${fontSize}::${text}`
+  if (textWidthCache.has(key)) return textWidthCache.get(key)
+
+  const padX = 8
+  const height = Math.ceil(fontSize * 2.2)
+  const guess = Math.ceil(fontSize * Math.max(1, text.length) * 1.1 + padX * 2)
+  const width = Math.min(1200, Math.max(64, guess))
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="${padX}" y="${Math.round(fontSize * 1.35)}" ${fontAttrs(fontSize)}>${escapeXml(text)}</text>
+</svg>`
+
+  try {
+    const { data, info } = await sharp(Buffer.from(svg))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    let minX = info.width
+    let maxX = -1
+    for (let i = 0; i < data.length; i += 4) {
+      
+      if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) {
+        const x = (i / 4) % info.width
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+      }
+    }
+
+    
+    const measured = maxX >= minX ? maxX - minX + 1 + 4 : Math.ceil(fontSize * text.length * 0.55)
+    textWidthCache.set(key, measured)
+    return measured
+  } catch {
+    const fallback = Math.ceil(fontSize * text.length * 0.62)
+    textWidthCache.set(key, fallback)
+    return fallback
+  }
+}
+
+function emojiWidth(fontSize) {
+  return Math.round(fontSize * 1.05)
+}
+
+async function tokenWidth(token, fontSize) {
+  if (token.type === 'emoji') return emojiWidth(fontSize)
   return measureTextWidth(token.text, fontSize)
 }
 
-function lineWidth(tokens, fontSize) {
+async function lineWidth(tokens, fontSize, gap) {
   if (!tokens.length) return 0
-  const gap = fontSize * 0.28
   let w = 0
   for (let i = 0; i < tokens.length; i++) {
-    w += tokenWidth(tokens[i], fontSize)
+    w += await tokenWidth(tokens[i], fontSize)
     if (i < tokens.length - 1) w += gap
   }
   return w
 }
 
-function wrapTokens(tokens, fontSize) {
+async function wrapTokens(tokens, fontSize) {
+  const baseGap = Math.max(8, fontSize * 0.22)
   const lines = []
   let current = []
 
   for (const token of tokens) {
     const test = [...current, token]
-    if (lineWidth(test, fontSize) <= MAX_WIDTH || current.length === 0) {
+    const w = await lineWidth(test, fontSize, baseGap)
+    if (w <= CONTENT_WIDTH || current.length === 0) {
       current.push(token)
       continue
     }
@@ -194,7 +236,7 @@ function wrapTokens(tokens, fontSize) {
   return lines
 }
 
-function wrapText(text, fontSize) {
+async function wrapText(text, fontSize) {
   const lines = []
   for (const para of text.split('\n')) {
     const trimmed = para.trim()
@@ -202,56 +244,80 @@ function wrapText(text, fontSize) {
       if (lines.length) lines.push([])
       continue
     }
-    lines.push(...wrapTokens(tokenize(trimmed), fontSize))
+    lines.push(...(await wrapTokens(tokenize(trimmed), fontSize)))
   }
   return lines.length ? lines : [tokenize(text)]
 }
 
-function fitLayout(text) {
-  let fontSize = 110
+async function fitLayout(text) {
+
+  let fontSize = 108
   let lines = []
 
   while (fontSize >= 14) {
-    lines = wrapText(text, fontSize)
+    lines = await wrapText(text, fontSize)
     const blockHeight = Math.max(1, lines.length) * fontSize * LINE_RATIO
-    const widthOk = lines.every(line => lineWidth(line, fontSize) <= MAX_WIDTH * 1.03)
+    const baseGap = Math.max(8, fontSize * 0.22)
+    let widthOk = true
+    for (const line of lines) {
+      if ((await lineWidth(line, fontSize, baseGap)) > CONTENT_WIDTH) {
+        widthOk = false
+        break
+      }
+    }
     if (blockHeight <= MAX_HEIGHT && widthOk) break
-    fontSize -= 1
+    fontSize -= 2
   }
 
   if (fontSize < 14) {
     fontSize = 14
-    lines = wrapText(text, fontSize)
+    lines = await wrapText(text, fontSize)
   }
 
   return { lines, fontSize, lineHeight: fontSize * LINE_RATIO }
 }
 
-function fontAttrs(fontSize) {
-  return `font-family="Arial, Helvetica, DejaVu Sans, sans-serif" font-size="${fontSize}" font-weight="700" fill="${FG}"`
-}
-
 async function lineToSvg(tokens, fontSize, y) {
   if (!tokens.length) return ''
 
-  const emojiSize = Math.round(fontSize * 1.05)
+  const emojiSize = emojiWidth(fontSize)
   const emojiY = y - fontSize * 0.88
+  const widths = []
+  for (const token of tokens) widths.push(await tokenWidth(token, fontSize))
 
+  const natural = widths.reduce((a, b) => a + b, 0)
+  const gapsCount = Math.max(0, tokens.length - 1)
+  const minGap = Math.max(8, fontSize * 0.22)
   
-  const natural = tokens.reduce((sum, t) => sum + tokenWidth(t, fontSize), 0)
-  const gaps = Math.max(1, tokens.length - 1)
-  const baseGap = fontSize * 0.28
-  const extra =
-    tokens.length > 1
-      ? Math.max(0, (MAX_WIDTH - natural - baseGap * gaps) / gaps)
-      : 0
-  const gap = baseGap + extra
+  const maxGap = fontSize * 0.55
+
+  let gap = minGap
+  if (gapsCount > 0) {
+    const ideal = (CONTENT_WIDTH - natural) / gapsCount
+    gap = Math.min(maxGap, Math.max(minGap, ideal))
+  }
+
+ 
+  let total = natural + gap * gapsCount
+  if (total > CONTENT_WIDTH && gapsCount > 0) {
+    gap = Math.max(4, (CONTENT_WIDTH - natural) / gapsCount)
+    total = natural + gap * gapsCount
+  }
 
   let x = PADDING
   const parts = []
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]
+    const tw = widths[i]
+    const isLast = i === tokens.length - 1
+
+   
+    if (isLast) {
+      const maxStart = PADDING + CONTENT_WIDTH - tw
+      if (x > maxStart) x = Math.max(PADDING, maxStart)
+    }
+
     if (token.type === 'emoji') {
       const png = await getEmojiPng(token.text)
       if (png) {
@@ -263,14 +329,14 @@ async function lineToSvg(tokens, fontSize, y) {
             `xlink:href="data:image/png;base64,${b64}" />`
         )
       }
-      x += emojiSize
     } else {
       parts.push(
         `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" ${fontAttrs(fontSize)}>` +
           `${escapeXml(token.text)}</text>`
       )
-      x += measureTextWidth(token.text, fontSize)
     }
+
+    x += tw
     if (i < tokens.length - 1) x += gap
   }
 
@@ -304,13 +370,12 @@ function resolveText(m, args) {
 }
 
 async function textToLyricSticker(rawText) {
- 
   const text = splitGraphemes(normalizeInput(rawText))
     .map(g => (isEmojiGrapheme(g) ? g : g.toLowerCase()))
     .join('')
 
   await prefetchEmojis(text)
-  const { lines, fontSize, lineHeight } = fitLayout(text)
+  const { lines, fontSize, lineHeight } = await fitLayout(text)
   const svg = await buildSvg(lines, fontSize, lineHeight)
 
   return sharp(Buffer.from(svg))
@@ -328,7 +393,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         m.chat,
         `*[❗] Escribe el texto del sticker.*\n\n` +
           `Ejemplos:\n` +
-          `> ${usedPrefix + command} t juro q soy buena onda 😭\n` +
+          `> ${usedPrefix + command} hola es una chica\n` +
           `> ${usedPrefix + command} te quiero ❤️\n` +
           `> (responde un mensaje con ${usedPrefix + command})`,
         m,
@@ -361,7 +426,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   }
 }
 
-handler.help = ['#sp + {texto} → sticker con emojis estilo WhatsApp']
+handler.help = ['#sp + {texto} → sticker lyrics con emojis estilo WhatsApp']
 handler.tags = ['stickers']
 handler.command = ['sp', 'stickerplain', 'memetext']
 
