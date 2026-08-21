@@ -1,4 +1,4 @@
-const { useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion } = (await import("@whiskeysockets/baileys"))
+const { useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion, Browsers } = (await import("@whiskeysockets/baileys"))
 import qrcode from "qrcode"
 import NodeCache from "node-cache"
 import fs from "fs"
@@ -63,7 +63,6 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   const keyAlt = m.key?.participantAlt || m.key?.remoteJidAlt
   if (keyAlt) who = keyAlt
 
-  const wantsCode = command === 'code' || args.some(arg => /^(code|--code)$/i.test(String(arg || '').trim()))
   const explicitPhone = extractPhoneFromArgs(args)
 
  
@@ -112,13 +111,6 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   AYBotOptions.fromCommand = true
   AYBotOptions.phoneNumber = phoneNumber
   AYBotOptions.replyJid = replyJid
-
-  if (wantsCode) {
-    await conn.sendMessage(m.chat, {
-      text: `⏳ *Generando código de vinculación...*\n\n> *Número:* +${phoneNumber}\n> Espera unos segundos.`,
-      contextInfo: { ...rcanal.contextInfo }
-    }, { quoted: m })
-  }
 
   AYBot(AYBotOptions)
   global.db.data.users[m.sender].Subs = new Date * 1
@@ -213,7 +205,7 @@ export async function AYBot(options) {
       },
       msgRetry,
       msgRetryCache,
-      browser: mcode ? ['Ubuntu', 'Chrome', '110.0.5585.95'] : ['Pain Bot (Sub Bot)', 'Chrome', '2.0.0'],
+      browser: Browsers.ubuntu('Chrome'),
       version,
       generateHighQualityLinkPreview: true
     }
