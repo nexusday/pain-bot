@@ -295,6 +295,8 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}leerqr <imagen con QR>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hd <imagen/sticker>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ssimg <foto> título|artista
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sfimg <foto> texto
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imgay <foto> texto
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tts <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}stt <nota de voz/audio>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cat <texto>
@@ -304,6 +306,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sticker
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}st <texto>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sp <texto>
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sgay <foto> texto
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sw <responder/@user> texto
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toimg
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta nombre|autor
