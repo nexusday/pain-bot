@@ -338,6 +338,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}neko
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}corean
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tik18
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tetas
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xnxx <url>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xnxx <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hentai <url>
