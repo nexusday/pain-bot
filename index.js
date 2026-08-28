@@ -18,7 +18,7 @@ cfonts.say('PAIN\nBOT', {
   gradient: ['cyan', 'blue']
 })
 
-cfonts.say('WhatsApp Multi-Bot', {
+cfonts.say('WhatsApp Multi-Bot-Official', {
   font: 'simple',
   align: 'center',
   gradient: ['blue', 'white']
