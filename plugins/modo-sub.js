@@ -6,7 +6,7 @@ export function cleanBotNum(jidOrNum = '') {
   return String(jidOrNum).split('@')[0].split(':')[0].replace(/\D/g, '')
 }
 
-/** Detecta bot principal real (igual que modosub), sin número hardcodeado */
+
 export function isMainBotConn(conn) {
   if (!conn) return false
   if (conn === global.conn) return true

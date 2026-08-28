@@ -78,7 +78,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       return conn.reply(m.chat, '[❌] No se pudo descargar el sticker.', m, global.rcanal)
     }
 
-    // Solo EXIF: conserva animación / calidad del webp original
+   
     const finalSticker = await addExif(buffer, packname, author)
 
     await conn.sendFile(

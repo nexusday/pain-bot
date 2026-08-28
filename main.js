@@ -321,7 +321,7 @@ async function connectionUpdate(update) {
     global.mainBotJid = sock.user?.jid?.split('@')[0] || sock.user?.id?.split('@')[0]
     try {
       const { markBotStart } = await import('./lib/bot-uptime.js')
-      markBotStart(sock) // no fuerza: conserva el tiempo si ya existía
+      markBotStart(sock) 
     } catch {
       if (!sock.startTime) sock.startTime = Date.now()
     }

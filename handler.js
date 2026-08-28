@@ -401,7 +401,7 @@ for (let plugin of processedPlugins) {
     if (m.isGroup && global.db.data.botGroups && global.db.data.botGroups[m.chat] === false) {
       const alwaysAllowedCommands = ['grupo']
       if (!alwaysAllowedCommands.includes(command) && !isOwner && !isAdmin) {
-        return m.reply(`*[🪐] El bot está desactivado en este grupo.*\n\n> Pídele a un administrador que lo active.`)
+        return
       }
     }
 
