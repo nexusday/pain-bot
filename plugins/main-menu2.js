@@ -336,6 +336,7 @@ ${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.s
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu2
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}neko
+> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}corean
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xnxx <url>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xnxx <búsqueda>
 > 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hentai <url>
