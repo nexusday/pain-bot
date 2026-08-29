@@ -119,6 +119,76 @@ export function setActiveBotForGroup(chatId, botNumberOrAll) {
   return num
 }
 
+/** Texto del mensaje sin pasar por smsg (para filtro temprano). */
+export function extractRawMessageText(rawMsg) {
+  try {
+    const root = rawMsg?.message
+    if (!root) return ''
+
+    const unwrap = (msg) => {
+      if (!msg || typeof msg !== 'object') return msg
+      return (
+        msg.ephemeralMessage?.message ||
+        msg.viewOnceMessage?.message ||
+        msg.viewOnceMessageV2?.message ||
+        msg
+      )
+    }
+
+    const msg = unwrap(root)
+    if (typeof msg === 'string') return msg
+
+    const direct =
+      msg.conversation ||
+      msg.extendedTextMessage?.text ||
+      msg.imageMessage?.caption ||
+      msg.videoMessage?.caption ||
+      msg.documentMessage?.caption ||
+      msg.buttonsResponseMessage?.selectedButtonId ||
+      msg.listResponseMessage?.singleSelectReply?.selectedRowId ||
+      msg.templateButtonReplyMessage?.selectedId ||
+      ''
+
+    if (direct) return String(direct)
+
+    for (const value of Object.values(msg)) {
+      if (!value || typeof value !== 'object') continue
+      if (value.message) {
+        const nested = extractRawMessageText({ message: value.message })
+        if (nested) return nested
+      }
+      if (typeof value.text === 'string' && value.text) return value.text
+      if (typeof value.caption === 'string' && value.caption) return value.caption
+    }
+
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Filtro temprano: true = este socket no debe procesar nada en el grupo.
+ * Se usa ANTES de pushMessage, DB, plugins y finally.
+ */
+export function shouldSkipGroupMessageEarly(conn, rawMsg) {
+  if (!rawMsg?.key || rawMsg.key.fromMe) return false
+
+  const chatId = conn?.decodeJid?.(rawMsg.key.remoteJid) || rawMsg.key.remoteJid || ''
+  if (!String(chatId).endsWith('@g.us')) return false
+  if (!global.db?.data) return false
+
+  const active = getActiveBotForGroup(chatId)
+  if (!active) return false
+
+  const text = extractRawMessageText(rawMsg)
+  return shouldSkipByModoSub(conn, chatId, {
+    allowModoSubCommand: true,
+    text,
+    prefix: global.prefix
+  })
+}
+
 /**
  * true = este socket NO debe responder en el grupo (otro bot está elegido)
  */

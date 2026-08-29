@@ -14,7 +14,7 @@ import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/vie
 import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant } from './lib/group-participant.js'
-import { shouldSkipByModoSub } from './plugins/modo-sub.js'
+import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -26,10 +26,18 @@ resolve()
 export async function handler(chatUpdate) {
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
-if (global.db.data == null) await global.loadDatabase()
-await this.pushMessage(chatUpdate.messages).catch(console.error)
 let m = chatUpdate.messages[chatUpdate.messages.length - 1]
 if (!m) return
+
+// .modosub: los bots inactivos salen aquí (sin pushMessage, DB, plugins ni finally)
+try {
+  if (global.db.data == null) await global.loadDatabase()
+  if (shouldSkipGroupMessageEarly(this, m)) return
+} catch (e) {
+  console.error('Error modosub early:', e)
+}
+
+await this.pushMessage(chatUpdate.messages).catch(console.error)
 
 try {
 m = smsg(this, m) || m
@@ -101,18 +109,6 @@ try {
 if (opts['nyimak']) return  
 if (!m.fromMe && opts['self']) return  
 
-// Solo 1 bot activo por grupo (.modosub N). El resto ignora, excepto el propio .modosub
-if (m.isGroup && !m.fromMe) {
-  try {
-    if (shouldSkipByModoSub(this, m.chat, {
-      allowModoSubCommand: true,
-      text: m.text || m.msg?.text || m.message?.conversation || '',
-      prefix: global.prefix
-    })) return
-  } catch (e) {
-    console.error('Error modosub:', e)
-  }
-}
 if (opts['swonly'] && m.chat !== 'status@broadcast') return  
 if (typeof m.text !== 'string') m.text = ''  
 
@@ -150,7 +146,7 @@ if (opts['queque'] && m.text && !(isMods || isPrems)) {
 if (m.isBaileys) return  
 m.exp += Math.ceil(Math.random() * 10)  
 
-const groupMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+const groupMetadata = (m.isGroup ? ((this.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
 const participants = (m.isGroup ? groupMetadata.participants : []) || []  
 const user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}  
 const bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}  
