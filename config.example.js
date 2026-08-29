@@ -39,7 +39,7 @@ global.ch = {
 ch1: '',
 }
 
-// Canal para logs/anuncios de sub-bots. NO usar global.canal para esto
+// Canal para logs/anuncios de sub-bots (también se sigue al conectar junto con global.ch)
 global.logssubbots = ''
 
 global.mods =   []
