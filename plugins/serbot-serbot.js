@@ -399,7 +399,12 @@ export async function AYBot(options) {
         }
         if (!Array.isArray(global.conns)) global.conns = []
         if (!global.conns.includes(sock)) global.conns.push(sock)
-        await joinChannels(sock)
+        try {
+          const { followConfiguredChannels } = await import('../lib/newsletter-rcanal.js')
+          await followConfiguredChannels(sock)
+        } catch (err) {
+          console.error('[canal] Error al seguir canales (sub-bot):', err?.message || err)
+        }
         
        
                 try {
@@ -539,19 +544,4 @@ function msToTime(duration) {
   minutes = (minutes < 10) ? '0' + minutes : minutes
   seconds = (seconds < 10) ? '0' + seconds : seconds
   return minutes + ' m y ' + seconds + ' s '
-}
-
-async function joinChannels(conn) {
-  if (!global.ch) return
-  
-  for (const channelId of Object.values(global.ch)) {
-    try {
-
-      if (typeof conn.newsletterFollow === 'function') {
-        await conn.newsletterFollow(channelId).catch(console.error)
-      }
-    } catch (e) {
-      console.error('Error al seguir el canal:', channelId, e)
-    }
-  }
 }

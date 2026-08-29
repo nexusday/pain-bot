@@ -34,6 +34,7 @@ global.moneda = 'USD'
 // Etiqueta de canal en mensajes (rcanal). Obtén el JID con: .canalid <link del canal>
 global.canal = ''
 
+// Canales que el bot y sub-bots siguen al conectar (link, invite o JID @newsletter)
 global.ch = {
 ch1: '',
 }
