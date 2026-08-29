@@ -34,10 +34,10 @@ global.moneda = 'USD'
 // Etiqueta de canal en mensajes (rcanal). Obtén el JID con: .canalid <link del canal>
 // Ejemplo: global.canal = { jid: '120363423390538090@newsletter', name: 'Pain Community' }
 // También acepta link: global.canal = 'https://whatsapp.com/channel/XXXXXXXX'
-global.canal = ''
+global.canal = { jid: '120363405059433072@newsletter', name: 'Nexo Community' }
 
 global.ch = {
-ch1: '',
+ch1: 'https://whatsapp.com/channel/0029Vb7Y8RLikgEutyMId1h',
 }
 
 global.mods =   []
