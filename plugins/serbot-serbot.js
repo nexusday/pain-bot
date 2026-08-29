@@ -101,7 +101,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
       `*[❗] No hay plazas para nuevos Sub-Bots.*\n\n` +
       `> *En uso:* ${info.registered}/${info.max}\n` +
       `> *Conectados:* ${info.connected}\n\n` +
-      `> El dueño puede ampliar el límite con:\n> ${usedPrefix}maxsubs <número>`
+      `> El dueño puede poner ilimitado con:\n> ${usedPrefix}maxsubs 0`
     )
   }
 
