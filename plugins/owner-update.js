@@ -61,7 +61,7 @@ function getRemoteBranch() {
 
 /**
  * Actualiza igual que el repo remoto (sin merge conflictivo).
- * Evita que queden <<<<<<< en archivos por pulls a medias.
+ * Muestra salida similar a git pull (archivos y commits).
  */
 function gitPullHard() {
   runIgnore('git fetch origin')
@@ -69,20 +69,47 @@ function gitPullHard() {
   const { remote, branch } = getRemoteBranch()
   const ref = `${remote}/${branch}`
 
+  const before = run('git rev-parse HEAD').trim()
+  let remoteHash = ''
+  try {
+    remoteHash = run(`git rev-parse ${ref}`).trim()
+  } catch {
+    throw new Error(`No se encontró la rama remota ${ref}`)
+  }
+
+  if (before === remoteHash) {
+    return 'Already up to date.'
+  }
+
   for (const rel of PRESERVE_ON_UPDATE) {
     runIgnore(`git rm --cached -f "${rel}"`)
     runIgnore(`git update-index --assume-unchanged "${rel}"`)
   }
 
-  const resetOut = run(`git reset --hard ${ref}`)
-  const logOut = run('git log -1 --oneline')
+  run(`git reset --hard ${ref}`)
 
   for (const rel of PRESERVE_ON_UPDATE) {
     runIgnore(`git update-index --no-assume-unchanged "${rel}"`)
     runIgnore(`git rm --cached -f "${rel}"`)
   }
 
-  return `${resetOut.trim()}\n${logOut.trim()}`
+  const after = run('git rev-parse HEAD').trim()
+  const shortBefore = before.slice(0, 7)
+  const shortAfter = after.slice(0, 7)
+
+  let out = `Updating ${shortBefore}..${shortAfter}\nFast-forward\n`
+
+  try {
+    const stat = run(`git diff --stat ${before}..${after}`).trim()
+    if (stat) out += stat + '\n'
+  } catch {}
+
+  try {
+    const commits = run(`git log ${before}..${after} --oneline`).trim()
+    if (commits) out += '\n' + commits
+  } catch {}
+
+  return out.trim()
 }
 
 let handler = async (m, { conn, text, isOwner }) => {
