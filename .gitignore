@@ -2,6 +2,7 @@ sessions/
 yarn.lock
 Serbot/
 storage/databases/database.json
+storage/maxsubs.json
 package-lock.json
 tmp/
 

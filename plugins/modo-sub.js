@@ -211,7 +211,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
   await global.db.write?.()
 
   const tag = selected.type === 'principal' ? 'Bot Principal' : 'Sub-Bot'
-  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${index}.* ${tag} — ${selected.name}\n> +${selected.number}\n\n> Los demás bots ignorarán comandos aquí.\n> Para volver a todos: *${usedPrefix}modosub all*`)
+  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${index}.* ${tag} — ${selected.name}\n> +${selected.number}\n\n> Los demás bots ignorarán comandos y bienvenidas aquí.\n> Para volver a todos: *${usedPrefix}modosub all*`)
 }
 
 handler.command = ['modosub', 'modobot', 'botactivo', 'onlybot']
