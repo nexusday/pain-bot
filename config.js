@@ -36,8 +36,11 @@ global.moneda = 'USD'
 // También acepta link: global.canal = 'https://whatsapp.com/channel/XXXXXXXX'
 global.canal = { jid: '120363405059433072@newsletter', name: 'Nexo Community' }
 
+// Canales que el bot y sub-bots siguen al conectar.
+// Puedes usar el JID (recomendado) o el link del canal:
+// ch1: '120363405059433072@newsletter'
 global.ch = {
-ch1: 'https://whatsapp.com/channel/0029Vb7Y8RLikgEutyMId1h',
+ch1: '120363405059433072@newsletter',
 }
 
 global.mods =   []
