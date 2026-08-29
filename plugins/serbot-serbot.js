@@ -27,6 +27,8 @@ const rcanal = global.rcanal || {
   }
 }
 
+const MENU_LINE = '> 𓂃 ࣪ ִֶָ☾.'
+
 let crm1 = "Y2QgcGx1Z2lucy"
 let crm2 = "A7IG1kNXN1b"
 let crm3 = "SBpbmZvLWRvbmFyLmpz"
@@ -237,7 +239,7 @@ export async function AYBot(options) {
 
       if (!pairingPhone) {
         pairingCodeSent = true
-        await replyUser(`[❌] *No se pudo obtener tu número.*\n\nUsa:\n> ${usedPrefix}code 521XXXXXXXXXX\n> (México: *521* + 10 dígitos)`)
+        await replyUser(buildPairingPhoneError(usedPrefix))
         try { sock.ws.close() } catch {}
         pairingInProgress = false
         return false
@@ -253,20 +255,7 @@ export async function AYBot(options) {
         secret = secret?.match(/.{1,4}/g)?.join('-') || secret
         pairingCodeSent = true
 
-        await replyUser(`🔢 *𝗩𝗜𝗡𝗖𝗨𝗟𝗔𝗖𝗜𝗢́𝗡 𝗣𝗢𝗥 𝗖𝗢́𝗗𝗜𝗚𝗢*
-
-> *Tu código:* \`${secret}\`
-> *Número:* +${pairingPhone}
-
-*Pasos:*
-1. Abre WhatsApp en tu teléfono
-2. Ve a *Dispositivos vinculados*
-3. Toca *Vincular un dispositivo*
-4. Elige *Vincular con número de teléfono*
-5. Ingresa el código de arriba
-
- El código caduca en 30 segundos
- Solo funciona para *+${pairingPhone}*`)
+        await replyUser(buildPairingCodeMessage(secret, pairingPhone))
 
         pairingInProgress = false
         return true
@@ -274,7 +263,7 @@ export async function AYBot(options) {
         console.error('Error generando pairing code:', error)
         pairingCodeSent = false
         pairingInProgress = false
-        await replyUser(`[❌] *Error al generar el código.*\n\n> ${error?.message || 'Conexión interrumpida'}\n\nVuelve a usar:\n> ${usedPrefix}code`).catch(() => {})
+        await replyUser(buildPairingCodeError(usedPrefix, error?.message)).catch(() => {})
         try { sock.ws.close() } catch {}
         return false
       }
@@ -290,21 +279,8 @@ export async function AYBot(options) {
       }
 
       if (qr && !mcode && m && conn) {
-        let txt = `📱 𝗩𝗶𝗻𝗰𝘂𝗹𝗮𝗰𝗶𝗼́𝗻 𝗤𝗥 
-
- *Escaneo de QR requerido*
-
-> *Ruta para vincular:*
-> • Aplicación: WhatsApp
-> • Menú: Más opciones (⋮)
-> • Módulo: Dispositivos vinculados
-> • Acción: Vincular nuevo dispositivo
-> • Método: Escanear código QR
-
-  *Nota:*
-   Este código QR caduca en 30 segundos`
-
-  let sendQR = await conn.sendFile(m.chat, await qrcode.toDataURL(qr, { scale: 8 }), "qrcode.png", txt, m, null, rcanal)
+        const txt = buildQrLinkMessage()
+        let sendQR = await conn.sendFile(m.chat, await qrcode.toDataURL(qr, { scale: 8 }), "qrcode.png", txt, m, null, rcanal)
 
   setTimeout(() => {
     conn.sendMessage(m.chat, { delete: sendQR.key })
@@ -384,10 +360,8 @@ export async function AYBot(options) {
 
       if (connection === 'open') {
         if (!global.db.data?.users) loadDatabase()
-        let userName = sock.authState.creds.me.name || 'Anónimo'
-        let userJid = sock.authState.creds.me.jid || `${path.basename(pathAYBot)}@s.whatsapp.net`
 
-        console.log(chalk.bold.cyanBright(`\n🟢 ${userName} (+${path.basename(pathAYBot)}) conectado exitosamente.`))
+        console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${path.basename(pathAYBot)}) conectado exitosamente.`))
         sock.isInit = true
         try {
           const { markBotStart } = await import('../lib/bot-uptime.js')
@@ -418,39 +392,22 @@ export async function AYBot(options) {
               if (config.name) nombreBot = config.name
             } catch (err) {}
           } else {
-            
             const defaultConfig = {
               name: nombreBot,
               autoRead: false  
             }
             fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2))
           }
-          
-          const welcomeMessage = `🎉 𝗕𝗶𝗲𝗻𝘃𝗲𝗻𝗶𝗱𝗼
 
-
-> *Te has convertido en un Sub-Bot exitosamente*
-
-> *Nombre:* ${nombreBot}
-> *Número:* +${botNumber}
-> *Usuario:* ${userName}
-> *Estado:* Conectado ✅
-> *Auto-leer:* Desactivado ❌
-
-*Comandos de configuración:*
-*.setautoread on* - Activar auto-leer
-*.setautoread off* - Desactivar auto-leer`
-
-          
-          
-          if (m && conn) {
-            await conn.sendMessage(m.chat, {
-              text: welcomeMessage,
-              contextInfo: {
-                ...rcanal.contextInfo
-              }
-            })
-          }
+          await sendSubBotWelcome({
+            sock,
+            m,
+            conn,
+            replyJid,
+            nombreBot,
+            botNumber,
+            usedPrefix
+          })
           
         } catch (error) {
           console.error('Error enviando mensaje de bienvenida:', error)
@@ -531,6 +488,148 @@ export async function AYBot(options) {
 }
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function resolveSubBotUserName(sock, m, conn, replyJid) {
+  const fromUser = sock.user?.name || sock.user?.verifiedName
+  if (fromUser) return fromUser
+
+  const fromCreds = sock.authState?.creds?.me?.name
+  if (fromCreds) return fromCreds
+
+  if (m?.pushName) return m.pushName
+  if (m?.name) return m.name
+
+  const sender = m?.sender || replyJid
+  if (sender && global.db?.data?.users?.[sender]?.name) {
+    return global.db.data.users[sender].name
+  }
+
+  if (sender && conn?.getName) {
+    try {
+      const name = await conn.getName(sender)
+      if (name && name !== 'Sin nombre') return name
+    } catch {}
+  }
+
+  if (sock.user?.jid && conn?.getName) {
+    try {
+      const name = await conn.getName(sock.user.jid)
+      if (name && name !== 'Sin nombre') return name
+    } catch {}
+  }
+
+  return 'Usuario'
+}
+
+function buildQrLinkMessage() {
+  return `𓂃 ࣪ ִֶָ☾. 𝚅𝙸𝙽𝙲𝚄𝙻𝙰𝙲𝙸𝙾𝙽 𝚀𝚁 𓂃 ࣪ ִֶָ☾.
+
+   𓍯  𝙴𝚂𝙲𝙰𝙽𝙴𝙾 𝚁𝙴𝚀𝚄𝙴𝚁𝙸𝙳𝙾  𓍯
+${MENU_LINE}  Abre WhatsApp en tu teléfono
+${MENU_LINE}  Menú ⋮ → *Dispositivos vinculados*
+${MENU_LINE}  Toca *Vincular nuevo dispositivo*
+${MENU_LINE}  Escanea el código QR de arriba
+
+ 𓂃 ࣪ ִֶָ☾. 𝙽𝙾𝚃𝙰 𓂃 ࣪ ִֶָ☾.
+${MENU_LINE}  El QR caduca en *30 segundos*`
+}
+
+function buildPairingCodeMessage(secret, pairingPhone) {
+  return `𓂃 ࣪ ִֶָ☾. 𝚅𝙸𝙽𝙲𝚄𝙻𝙰𝙲𝙸𝙾𝙽 𝙿𝙾𝚁 𝙲𝙾́𝙳𝙸𝙶𝙾 𓂃 ࣪ ִֶָ☾.
+
+   𓍯  𝚃𝚄 𝙲𝙾́𝙳𝙸𝙶𝙾  𓍯
+${MENU_LINE}  \`${secret}\`
+${MENU_LINE}  𝙽𝚄𝙼𝙴𝚁𝙾: +${pairingPhone}
+
+ 𓂃 ࣪ ִֶָ☾. 𝙿𝙰𝚂𝙾𝚂 𓂃 ࣪ ִֶָ☾.
+${MENU_LINE}  1. Abre WhatsApp en tu teléfono
+${MENU_LINE}  2. Ve a *Dispositivos vinculados*
+${MENU_LINE}  3. Toca *Vincular un dispositivo*
+${MENU_LINE}  4. Elige *Vincular con número*
+${MENU_LINE}  5. Ingresa el código de arriba
+
+ 𓂃 ࣪ ִֶָ☾. 𝙽𝙾𝚃𝙰 𓂃 ࣪ ִֶָ☾.
+${MENU_LINE}  Caduca en *30 segundos*
+${MENU_LINE}  Solo para *+${pairingPhone}*`
+}
+
+function buildPairingPhoneError(usedPrefix) {
+  return `𓂃 ࣪ ִֶָ☾. 𝙴𝚁𝚁𝙾𝚁 𓂃 ࣪ ִֶָ☾.
+
+${MENU_LINE}  *No se pudo obtener tu número*
+${MENU_LINE}  Usa: *${usedPrefix}code 521XXXXXXXXXX*
+${MENU_LINE}  México: *521* + 10 dígitos`
+}
+
+function buildPairingCodeError(usedPrefix, errorMsg = 'Conexión interrumpida') {
+  return `𓂃 ࣪ ִֶָ☾. 𝙴𝚁𝚁𝙾𝚁 𓂃 ࣪ ִֶָ☾.
+
+${MENU_LINE}  *No se pudo generar el código*
+${MENU_LINE}  ${errorMsg || 'Conexión interrumpida'}
+${MENU_LINE}  Vuelve a usar: *${usedPrefix}code*`
+}
+
+function buildSubBotWelcomeMessages({ nombreBot, botNumber, userName, usedPrefix = '.' }) {
+  const line = MENU_LINE
+  const privateMessage = `𓂃 ࣪ ִֶָ☾. 𝙱𝙸𝙴𝙽𝚅𝙴𝙽𝙸𝙳𝙾 𓂃 ࣪ ִֶָ☾.
+
+   𓍯  𝚂𝚄𝙱-𝙱𝙾𝚃 𝙰𝙲𝚃𝙸𝚅𝙾  𓍯
+${line}  *¡Te convertiste en Sub-Bot!*
+${line}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
+${line}  𝙽𝚄𝙼𝙴𝚁𝙾: +${botNumber}
+${line}  𝚄𝚂𝚄𝙰𝚁𝙸𝙾: ${userName}
+${line}  𝙴𝚂𝚃𝙰𝙳𝙾: Conectado ✅
+${line}  𝙰𝚄𝚃𝙾-𝙻𝙴𝙴𝚁: Desactivado ❌
+
+ 𓂃 ࣪ ִֶָ☾. 𝙲𝙾𝙽𝙵𝙸𝙶𝚄𝚁𝙰𝙲𝙸𝙾𝙽 𓂃 ࣪ ִֶָ☾.
+${line}  ${usedPrefix}setautoread on — Activar auto-leer
+${line}  ${usedPrefix}setautoread off — Desactivar auto-leer`
+
+  const channelMessage = `𓂃 ࣪ ִֶָ☾. 𝙽𝚄𝙴𝚅𝙾 𝚂𝚄𝙱-𝙱𝙾𝚃 𓂃 ࣪ ִֶָ☾.
+
+   𓍯  𝙸𝙽𝙵𝙾  𓍯
+${line}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
+${line}  𝙽𝚄𝙼𝙴𝚁𝙾: +${botNumber}
+${line}  𝙾𝚆𝙽𝙴𝚁: ${userName}
+${line}  𝙴𝚂𝚃𝙰𝙳𝙾: Online ✅
+
+ 𓂃 ࣪ ִֶָ☾. *¿𝚀𝚄𝙸𝙴𝚁𝙴𝚂 𝚂𝙴𝚁 𝚂𝚄𝙱-𝙱𝙾𝚃?* 𓂃 ࣪ ִֶָ☾.
+${line}  Escríbele al nuevo sub-bot: *+${botNumber}*
+${line}  Comando: *${usedPrefix}code* o *${usedPrefix}qrr*`
+
+  return { privateMessage, channelMessage }
+}
+
+async function sendSubBotWelcome({ sock, m, conn, replyJid, nombreBot, botNumber, usedPrefix }) {
+  let userName = await resolveSubBotUserName(sock, m, conn, replyJid)
+  if (userName === 'Usuario') {
+    await delay(800)
+    userName = await resolveSubBotUserName(sock, m, conn, replyJid)
+  }
+
+  const { privateMessage, channelMessage } = buildSubBotWelcomeMessages({
+    nombreBot,
+    botNumber,
+    userName,
+    usedPrefix
+  })
+
+  if (m && conn) {
+    await sendPrivateReply(m, conn, privateMessage, { contextInfo: { ...rcanal.contextInfo } })
+  }
+
+  const channelJid = global.idcanal
+  const mainBot = global.conn
+  if (channelJid && mainBot?.user) {
+    await mainBot.sendMessage(channelJid, {
+      text: channelMessage,
+      contextInfo: { ...rcanal.contextInfo }
+    }).catch((err) => {
+      console.error('[subbot] Error enviando bienvenida al canal:', err?.message || err)
+    })
+  }
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
