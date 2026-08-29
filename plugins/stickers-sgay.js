@@ -1,6 +1,4 @@
-import sharp from '../lib/sharp.js'
 import { addExif } from '../lib/sticker.js'
-import { decodeImageToPng } from '../lib/image-buffer.js'
 import { toWebp, resolveStickerMeta } from './stickers-sticker.js'
 import {
   applyGayFilter,
@@ -10,8 +8,6 @@ import {
   DEFAULT_TEXT,
   MAX_TEXT
 } from './img-imgay.js'
-
-
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
@@ -49,14 +45,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     await conn.sendMessage(m.chat, { react: { text: '', key: m.key } }).catch(() => {})
 
     const filtered = await applyGayFilter(photo, finalText)
-
-    let png
-    try {
-      png = await sharp(filtered).png().toBuffer()
-    } catch {
-      png = await decodeImageToPng(filtered, 'image/jpeg')
-    }
-    const webp = await toWebp(png)
+    const webp = await toWebp(filtered)
     const { packname, author } = resolveStickerMeta(m, conn)
     const finalSticker = await addExif(webp, packname, author)
 

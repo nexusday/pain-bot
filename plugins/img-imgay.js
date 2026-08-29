@@ -395,7 +395,50 @@ async function buildTextOverlay(width, height, lines, fontSize, strokeW, lineHei
   )
 }
 
-export async function applyGayFilter(photoBuffer, rawText) {
+export async function applyGayFilterRaster(photoBuffer, rawText) {
+  const { Jimp } = await import('jimp')
+  const { Resvg } = await import('@resvg/resvg-js')
+
+  const text = normalizeInput(rawText) || DEFAULT_TEXT
+  await prefetchEmojis(text)
+
+  const decoded = await decodeImageToPng(photoBuffer)
+  let img = await Jimp.read(decoded)
+
+  const maxSide = 1600
+  const w0 = img.bitmap.width
+  const h0 = img.bitmap.height
+  if (w0 > maxSide || h0 > maxSide) {
+    const scale = Math.min(maxSide / w0, maxSide / h0)
+    img.resize({
+      w: Math.max(1, Math.round(w0 * scale)),
+      h: Math.max(1, Math.round(h0 * scale))
+    })
+  }
+
+  const width = img.bitmap.width
+  const height = img.bitmap.height
+
+  const renderSvg = (svgBuf) => {
+    const resvg = new Resvg(svgBuf.toString('utf8'), {
+      fitTo: { mode: 'width', value: width },
+      font: { loadSystemFonts: true }
+    })
+    return Buffer.from(resvg.render().asPng())
+  }
+
+  const prideLayer = await Jimp.read(renderSvg(buildPrideOverlay(width, height)))
+  img.composite(prideLayer, 0, 0)
+
+  const { lines, fontSize, strokeW, lineHeight } = await fitFont(text, width)
+  const textSvg = await buildTextOverlay(width, height, lines, fontSize, strokeW, lineHeight)
+  const textLayer = await Jimp.read(renderSvg(textSvg))
+  img.composite(textLayer, 0, 0)
+
+  return img.getBuffer('image/jpeg', { quality: 92 })
+}
+
+async function applyGayFilterSharp(photoBuffer, rawText) {
   const text = normalizeInput(rawText) || DEFAULT_TEXT
   await prefetchEmojis(text)
 
@@ -420,23 +463,21 @@ export async function applyGayFilter(photoBuffer, rawText) {
   const { lines, fontSize, strokeW, lineHeight } = await fitFont(text, width)
   const textSvg = await buildTextOverlay(width, height, lines, fontSize, strokeW, lineHeight)
 
+  return sharp(resized)
+    .composite([
+      { input: pride, top: 0, left: 0 },
+      { input: textSvg, top: 0, left: 0 }
+    ])
+    .jpeg({ quality: 92 })
+    .toBuffer()
+}
+
+export async function applyGayFilter(photoBuffer, rawText) {
   try {
-    return await sharp(resized)
-      .composite([
-        { input: pride, top: 0, left: 0 },
-        { input: textSvg, top: 0, left: 0 }
-      ])
-      .jpeg({ quality: 92 })
-      .toBuffer()
+    return await applyGayFilterRaster(photoBuffer, rawText)
   } catch (e) {
-    const base = await decodeImageToPng(resized)
-    return sharp(base)
-      .composite([
-        { input: pride, top: 0, left: 0 },
-        { input: textSvg, top: 0, left: 0 }
-      ])
-      .jpeg({ quality: 92 })
-      .toBuffer()
+    console.warn('[imgay] jimp+resvg falló, probando sharp:', e?.message || e)
+    return applyGayFilterSharp(photoBuffer, rawText)
   }
 }
 
