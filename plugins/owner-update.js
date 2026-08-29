@@ -2,7 +2,7 @@ import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
-/** Config local del servidor: no debe bloquear git pull */
+/** Config local del servidor: no se pierde al actualizar */
 const PRESERVE_ON_UPDATE = ['storage/maxsubs.json']
 
 function run(cmd) {
@@ -39,71 +39,50 @@ function restorePreserveFiles(data) {
   }
 }
 
-/** Limpia el estado de git para archivos de config antes del pull */
-function unblockPreserveFilesForPull(backed) {
-  for (const rel of PRESERVE_ON_UPDATE) {
-    const full = path.join(process.cwd(), rel)
-    const bak = full + '.updatebak'
-
-    if (backed[rel]) {
-      try {
-        fs.mkdirSync(path.dirname(full), { recursive: true })
-        fs.writeFileSync(bak, backed[rel])
-      } catch {}
+function getRemoteBranch() {
+  try {
+    const upstream = run('git rev-parse --abbrev-ref @{u}').trim()
+    const slash = upstream.indexOf('/')
+    if (slash > 0) {
+      return {
+        remote: upstream.slice(0, slash),
+        branch: upstream.slice(slash + 1)
+      }
     }
+  } catch {}
 
-    // 1) Sacar del índice (sigue en disco)
-    runIgnore(`git rm --cached -f "${rel}"`)
+  let branch = 'main'
+  try {
+    branch = run('git rev-parse --abbrev-ref HEAD').trim() || 'main'
+  } catch {}
 
-    // 2) Stash si git lo tiene trackeado con cambios
-    runIgnore(`git stash push -m "pain-update-${path.basename(rel)}" -- "${rel}"`)
-
-    // 3) Volver al estado del último commit de git
-    runIgnore(`git restore --staged --worktree "${rel}"`)
-    runIgnore(`git checkout -f HEAD -- "${rel}"`)
-
-    // 4) Quitar del disco un momento (ya está guardado en memoria y .updatebak)
-    if (fs.existsSync(full)) {
-      try { fs.unlinkSync(full) } catch {}
-    }
-
-    // 5) Ignorar restos en el índice
-    runIgnore(`git update-index --assume-unchanged "${rel}"`)
-  }
+  return { remote: 'origin', branch }
 }
 
-function afterPullPreserveFiles(backed) {
+/**
+ * Actualiza igual que el repo remoto (sin merge conflictivo).
+ * Evita que queden <<<<<<< en archivos por pulls a medias.
+ */
+function gitPullHard() {
+  runIgnore('git fetch origin')
+
+  const { remote, branch } = getRemoteBranch()
+  const ref = `${remote}/${branch}`
+
+  for (const rel of PRESERVE_ON_UPDATE) {
+    runIgnore(`git rm --cached -f "${rel}"`)
+    runIgnore(`git update-index --assume-unchanged "${rel}"`)
+  }
+
+  const resetOut = run(`git reset --hard ${ref}`)
+  const logOut = run('git log -1 --oneline')
+
   for (const rel of PRESERVE_ON_UPDATE) {
     runIgnore(`git update-index --no-assume-unchanged "${rel}"`)
     runIgnore(`git rm --cached -f "${rel}"`)
-    runIgnore(`git reset HEAD -- "${rel}"`)
-
-    const full = path.join(process.cwd(), rel)
-    const bak = full + '.updatebak'
-    try {
-      if (fs.existsSync(bak)) fs.unlinkSync(bak)
-    } catch {}
   }
 
-  restorePreserveFiles(backed)
-}
-
-function gitPull(extraArgs = '') {
-  const tries = [
-    `git pull --autostash${extraArgs}`,
-    `git fetch origin && git pull --autostash${extraArgs}`,
-    `git fetch origin && git merge --no-edit -X ours origin/HEAD${extraArgs}`
-  ]
-
-  let lastError
-  for (const cmd of tries) {
-    try {
-      return run(cmd)
-    } catch (e) {
-      lastError = e
-    }
-  }
-  throw lastError
+  return `${resetOut.trim()}\n${logOut.trim()}`
 }
 
 let handler = async (m, { conn, text, isOwner }) => {
@@ -120,14 +99,12 @@ let handler = async (m, { conn, text, isOwner }) => {
   await m.react('🕓')
 
   const backed = backupPreserveFiles()
-  unblockPreserveFilesForPull(backed)
 
   try {
-    const pullArgs = m.fromMe && text ? ' ' + text : ''
-    const stdout = gitPull(pullArgs)
-    afterPullPreserveFiles(backed)
+    const stdout = gitPullHard()
+    restorePreserveFiles(backed)
 
-    let reply = stdout.toString().trim()
+    let reply = stdout.trim()
     if (Object.keys(backed).length) {
       reply += '\n\n> ✅ Config local preservada (`maxsubs.json`).'
     }
@@ -135,7 +112,7 @@ let handler = async (m, { conn, text, isOwner }) => {
     await conn.reply(m.chat, reply || '[✅] Actualización completada.', m, rcanal)
     await m.react('✅')
   } catch (error) {
-    afterPullPreserveFiles(backed)
+    restorePreserveFiles(backed)
     console.error('Error ejecutando plugin owner-update.js:', error)
     const msg = error?.stderr?.toString?.() || error?.stdout?.toString?.() || error?.message || String(error)
     await m.reply(`*[❌] Error al actualizar.*\n\n\`\`\`${msg.slice(0, 1500)}\`\`\``)
