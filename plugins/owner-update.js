@@ -32,8 +32,12 @@ function restorePreserveFiles(data) {
 /** Evita que cambios locales en config bloqueen el merge del pull */
 function clearGitConflictsForPreserve() {
   for (const rel of PRESERVE_ON_UPDATE) {
+    const full = path.join(process.cwd(), rel)
     try {
       execSync(`git rm --cached -f "${rel}"`, { stdio: 'ignore' })
+    } catch {}
+    try {
+      execSync(`git reset HEAD -- "${rel}"`, { stdio: 'ignore' })
     } catch {}
     try {
       execSync(`git restore --staged --worktree "${rel}"`, { stdio: 'ignore' })
@@ -42,6 +46,10 @@ function clearGitConflictsForPreserve() {
         execSync(`git checkout -f -- "${rel}"`, { stdio: 'ignore' })
       } catch {}
     }
+    // Quitar del disco temporalmente (ya está en backup) para que pull no falle
+    try {
+      if (fs.existsSync(full)) fs.unlinkSync(full)
+    } catch {}
   }
 }
 
