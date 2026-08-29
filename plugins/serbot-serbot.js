@@ -12,6 +12,7 @@ const { CONNECTING } = ws
 import { makeWASocket } from "../lib/simple.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
+import { canRegisterSubBot, getSubBotSlotsInfo } from "../lib/max-subs.js"
 import { fileURLToPath } from "url"
 
 
@@ -51,12 +52,6 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   if (!global.db.data.users[m.sender]) global.db.data.users[m.sender] = {}
 
   let time = global.db.data.users[m.sender].Subs + 120000
-  const subBots = [...new Set([...global.conns.filter((conn) => conn.user && conn.ws.socket && conn.ws.socket.readyState !== ws.CLOSED).map((conn) => conn)])]
-  const subBotsCount = subBots.length
-
-  if (subBotsCount === 3) {
-    return m.reply(`No se han encontrado espacios para *Sub-Bots* disponibles.`)
-  }
 
   let who = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
  
@@ -94,6 +89,17 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
       text: `[❗] *No se pudo obtener tu número real de WhatsApp.*\n\nWhatsApp envía un @lid interno (${lidHint}) y el código de vinculación necesita tu número con código de país.\n\n> *Opción 1:* ${usedPrefix}code <número>\n> *Ejemplo Perú:* ${usedPrefix}code 51901437507\n> *Ejemplo México:* ${usedPrefix}code 5215551234567${mxHint}\n\n> *Opción 2:* ${usedPrefix}qrr para vincular con QR`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
+  }
+
+  const slot = canRegisterSubBot(phoneNumber)
+  if (!slot.ok) {
+    const info = getSubBotSlotsInfo(ws)
+    return m.reply(
+      `*[❗] No hay plazas para nuevos Sub-Bots.*\n\n` +
+      `> *En uso:* ${info.registered}/${info.max}\n` +
+      `> *Conectados:* ${info.connected}\n\n` +
+      `> El dueño puede ampliar el límite con:\n> ${usedPrefix}maxsubs <número>`
+    )
   }
 
   let id = phoneNumber
