@@ -31,6 +31,9 @@ global.author = 'Sunkovv'
 global.moneda = 'USD'
 
 
+// Etiqueta de canal en mensajes (rcanal). Obtén el JID con: .canalid <link del canal>
+// Ejemplo: global.canal = { jid: '120363423390538090@newsletter', name: 'Pain Community' }
+// También acepta link: global.canal = 'https://whatsapp.com/channel/XXXXXXXX'
 global.canal = ''
 
 global.ch = {
@@ -50,6 +53,9 @@ delirius: { url: "https://api.delirius.online", key: null },
 zenzxz: { url: "https://api.zenzxz.my.id", key: null },
 siputzx: { url: "https://api.siputzx.my.id", key: null }
 }
+
+import { syncRcanalFromConfig } from './lib/newsletter-rcanal.js'
+syncRcanalFromConfig()
 
 let file = fileURLToPath(import.meta.url)
 watchFile(file, () => {

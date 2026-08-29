@@ -325,6 +325,12 @@ async function connectionUpdate(update) {
     } catch {
       if (!sock.startTime) sock.startTime = Date.now()
     }
+    try {
+      const { resolveCanalConfig } = await import('./lib/newsletter-rcanal.js')
+      await resolveCanalConfig(sock)
+    } catch (err) {
+      console.error('[canal] Error al resolver config:', err?.message || err)
+    }
   }
   const reason = new Boom(lastDisconnect?.error)?.output?.statusCode
   if (reason === 405) {

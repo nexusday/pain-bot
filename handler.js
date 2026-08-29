@@ -219,19 +219,6 @@ if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
 
 const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')  
 
-global.idcanal = ''  
-global.namecanal = ''  
-global.rcanal = {  
-  contextInfo: {  
-    isForwarded: true,  
-    forwardedNewsletterMessageInfo: {  
-      newsletterJid: idcanal,  
-      serverMessageId: 100,  
-      newsletterName: namecanal  
-    }  
-  }  
-}  
-
 let usedPrefix = '.'  
 
 
