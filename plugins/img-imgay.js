@@ -1,5 +1,6 @@
 import sharp from '../lib/sharp.js'
 import fetch from 'node-fetch'
+import { fileTypeFromBuffer } from 'file-type'
 import { webp2png } from '../lib/webp2mp4.js'
 
 
@@ -53,20 +54,44 @@ function resolveMediaTarget(m) {
   return null
 }
 
-async function loadImageBuffer(media, mime) {
-  if (/webp/i.test(mime)) {
+async function bufferToPng(input, { rotate = true } = {}) {
+  const opts = { failOn: 'none', limitInputPixels: 16777216 }
+  if (rotate) {
     try {
-      return await sharp(media).rotate().toBuffer()
+      return await sharp(input, opts).rotate().png().toBuffer()
     } catch {
-      const url = await webp2png(media)
-      if (!url) throw new Error('No se pudo convertir el sticker')
-      const res = await fetch(url)
-      return Buffer.from(await res.arrayBuffer())
+      return await sharp(input, opts).png().toBuffer()
     }
   }
-  if (/image\//i.test(mime)) {
-    return sharp(media).rotate().toBuffer()
+  return sharp(input, opts).png().toBuffer()
+}
+
+async function loadImageBuffer(media, mime) {
+  let input = Buffer.isBuffer(media) ? media : Buffer.from(media || [])
+  if (!input.length) throw new Error('Imagen vacía o no válida')
+
+  let type = String(mime || '')
+  try {
+    const detected = await fileTypeFromBuffer(input)
+    if (detected?.mime) type = detected.mime
+  } catch {}
+
+  if (/webp/i.test(type)) {
+    try {
+      return await bufferToPng(input)
+    } catch {
+      const url = await webp2png(input)
+      if (!url) throw new Error('No se pudo convertir el sticker')
+      const res = await fetch(url)
+      input = Buffer.from(await res.arrayBuffer())
+      return bufferToPng(input, { rotate: false })
+    }
   }
+
+  if (/image\//i.test(type) || type === 'application/octet-stream') {
+    return bufferToPng(input)
+  }
+
   throw new Error('El archivo no es una imagen')
 }
 
@@ -423,9 +448,9 @@ export async function applyGayFilter(photoBuffer, rawText) {
     height = Math.round(height * scale)
   }
 
-  const resized = await sharp(photoBuffer)
+  const resized = await sharp(photoBuffer, { failOn: 'none' })
     .rotate()
-    .resize(width, height, { fit: 'inside', withoutEnlargement: false })
+    .resize(width, height, { fit: 'inside' })
     .png()
     .toBuffer()
 
