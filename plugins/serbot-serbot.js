@@ -377,8 +377,8 @@ export async function AYBot(options) {
         if (!Array.isArray(global.conns)) global.conns = []
         if (!global.conns.includes(sock)) global.conns.push(sock)
         try {
-          const { followConfiguredChannels } = await import('../lib/newsletter-rcanal.js')
-          await followConfiguredChannels(sock)
+          const { resolveCanalConfig } = await import('../lib/newsletter-rcanal.js')
+          await resolveCanalConfig(sock)
         } catch (err) {
           console.error('[canal] Error al seguir canales (sub-bot):', err?.message || err)
         }
