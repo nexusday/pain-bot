@@ -1,7 +1,6 @@
 import sharp from '../lib/sharp.js'
 import fetch from 'node-fetch'
-import { fileTypeFromBuffer } from 'file-type'
-import { webp2png } from '../lib/webp2mp4.js'
+import { decodeImageToPng, sharpMetadata, sharpResizePng } from '../lib/image-buffer.js'
 
 
 
@@ -54,45 +53,8 @@ function resolveMediaTarget(m) {
   return null
 }
 
-async function bufferToPng(input, { rotate = true } = {}) {
-  const opts = { failOn: 'none', limitInputPixels: 16777216 }
-  if (rotate) {
-    try {
-      return await sharp(input, opts).rotate().png().toBuffer()
-    } catch {
-      return await sharp(input, opts).png().toBuffer()
-    }
-  }
-  return sharp(input, opts).png().toBuffer()
-}
-
 async function loadImageBuffer(media, mime) {
-  let input = Buffer.isBuffer(media) ? media : Buffer.from(media || [])
-  if (!input.length) throw new Error('Imagen vacía o no válida')
-
-  let type = String(mime || '')
-  try {
-    const detected = await fileTypeFromBuffer(input)
-    if (detected?.mime) type = detected.mime
-  } catch {}
-
-  if (/webp/i.test(type)) {
-    try {
-      return await bufferToPng(input)
-    } catch {
-      const url = await webp2png(input)
-      if (!url) throw new Error('No se pudo convertir el sticker')
-      const res = await fetch(url)
-      input = Buffer.from(await res.arrayBuffer())
-      return bufferToPng(input, { rotate: false })
-    }
-  }
-
-  if (/image\//i.test(type) || type === 'application/octet-stream') {
-    return bufferToPng(input)
-  }
-
-  throw new Error('El archivo no es una imagen')
+  return decodeImageToPng(media, mime)
 }
 
 function splitGraphemes(text) {
@@ -437,7 +399,7 @@ export async function applyGayFilter(photoBuffer, rawText) {
   const text = normalizeInput(rawText) || DEFAULT_TEXT
   await prefetchEmojis(text)
 
-  const meta = await sharp(photoBuffer).rotate().metadata()
+  const meta = await sharpMetadata(photoBuffer)
   let width = meta.width || 1080
   let height = meta.height || 1080
 
@@ -448,11 +410,7 @@ export async function applyGayFilter(photoBuffer, rawText) {
     height = Math.round(height * scale)
   }
 
-  const resized = await sharp(photoBuffer, { failOn: 'none' })
-    .rotate()
-    .resize(width, height, { fit: 'inside' })
-    .png()
-    .toBuffer()
+  const resized = await sharpResizePng(photoBuffer, width, height)
 
   const info = await sharp(resized).metadata()
   width = info.width
@@ -462,13 +420,24 @@ export async function applyGayFilter(photoBuffer, rawText) {
   const { lines, fontSize, strokeW, lineHeight } = await fitFont(text, width)
   const textSvg = await buildTextOverlay(width, height, lines, fontSize, strokeW, lineHeight)
 
-  return sharp(resized)
-    .composite([
-      { input: pride, top: 0, left: 0 },
-      { input: textSvg, top: 0, left: 0 }
-    ])
-    .jpeg({ quality: 92 })
-    .toBuffer()
+  try {
+    return await sharp(resized)
+      .composite([
+        { input: pride, top: 0, left: 0 },
+        { input: textSvg, top: 0, left: 0 }
+      ])
+      .jpeg({ quality: 92 })
+      .toBuffer()
+  } catch (e) {
+    const base = await decodeImageToPng(resized)
+    return sharp(base)
+      .composite([
+        { input: pride, top: 0, left: 0 },
+        { input: textSvg, top: 0, left: 0 }
+      ])
+      .jpeg({ quality: 92 })
+      .toBuffer()
+  }
 }
 
 function resolveText(m, text, usedPrefix, command) {
