@@ -104,10 +104,7 @@ let handler = async (m, { conn, text, isOwner }) => {
     const stdout = gitPullHard()
     restorePreserveFiles(backed)
 
-    let reply = stdout.trim()
-    if (Object.keys(backed).length) {
-      reply += '\n\n> ✅ Config local preservada (`maxsubs.json`).'
-    }
+    const reply = stdout.trim()
 
     await conn.reply(m.chat, reply || '[✅] Actualización completada.', m, rcanal)
     await m.react('✅')
