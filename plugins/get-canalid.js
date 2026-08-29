@@ -2,6 +2,7 @@ import {
   extractNewsletterFromMessage,
   resolveNewsletter,
   formatCanalConfig,
+  formatLogsSubbotsConfig,
   isNewsletterJid
 } from '../lib/newsletter-rcanal.js'
 
@@ -80,7 +81,12 @@ let handler = async (m, { conn, args, usedPrefix, isOwner }) => {
     formatCanalConfig(jid, name || 'Canal'),
     '```',
     '',
-    '_Reinicia el bot o guarda config.js para aplicar la etiqueta en los mensajes._'
+    '*Para logs de sub-bots (anuncios):*',
+    '```',
+    formatLogsSubbotsConfig(jid, name || 'Logs Sub-Bots'),
+    '```',
+    '',
+    '_global.canal = etiqueta en mensajes | global.logssubbots = anuncios de sub-bots_'
   ].filter(Boolean)
 
   await conn.sendMessage(m.chat, {

@@ -12,6 +12,7 @@ const { CONNECTING } = ws
 import { makeWASocket } from "../lib/simple.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
+import { getSubBotsLogsJid } from '../lib/newsletter-rcanal.js'
 import { canRegisterSubBot, getSubBotSlotsInfo } from "../lib/max-subs.js"
 import { fileURLToPath } from "url"
 
@@ -223,6 +224,7 @@ export async function AYBot(options) {
     let isInit = true
     let pairingCodeSent = false
     let pairingInProgress = false
+    let hadNewLogin = false
     const pairingPhone = phoneNumber
 
     const replyUser = async (text) => {
@@ -271,6 +273,7 @@ export async function AYBot(options) {
 
     async function connectionUpdate(update) {
       const { connection, lastDisconnect, isNewLogin, qr } = update
+      if (isNewLogin) hadNewLogin = true
       if (isNewLogin) sock.isInit = false
 
       if (qr && mcode && m && conn) {
@@ -385,29 +388,33 @@ export async function AYBot(options) {
           const botNumber = path.basename(pathAYBot)
           const configPath = path.join(pathAYBot, 'config.json')
           let nombreBot = global.namebot || 'PAIN BOT'
+          let subConfig = { name: nombreBot, autoRead: false }
           
           if (fs.existsSync(configPath)) {
             try {
-              const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-              if (config.name) nombreBot = config.name
+              subConfig = { ...subConfig, ...JSON.parse(fs.readFileSync(configPath, 'utf-8')) }
+              if (subConfig.name) nombreBot = subConfig.name
             } catch (err) {}
           } else {
-            const defaultConfig = {
-              name: nombreBot,
-              autoRead: false  
-            }
-            fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2))
+            fs.writeFileSync(configPath, JSON.stringify(subConfig, null, 2))
           }
 
-          await sendSubBotWelcome({
-            sock,
-            m,
-            conn,
-            replyJid,
-            nombreBot,
-            botNumber,
-            usedPrefix
-          })
+          const isFreshSubBot = fromCommand && m && hadNewLogin
+          hadNewLogin = false
+
+          if (isFreshSubBot) {
+            await sendSubBotWelcome({
+              sock,
+              m,
+              conn,
+              replyJid,
+              nombreBot,
+              botNumber,
+              usedPrefix,
+              configPath,
+              subConfig
+            })
+          }
           
         } catch (error) {
           console.error('Error enviando mensaje de bienvenida:', error)
@@ -600,7 +607,7 @@ ${line}  Comando: *${usedPrefix}code* o *${usedPrefix}qrr*`
   return { privateMessage, channelMessage }
 }
 
-async function sendSubBotWelcome({ sock, m, conn, replyJid, nombreBot, botNumber, usedPrefix }) {
+async function sendSubBotWelcome({ sock, m, conn, replyJid, nombreBot, botNumber, usedPrefix, configPath, subConfig = {} }) {
   let userName = await resolveSubBotUserName(sock, m, conn, replyJid)
   if (userName === 'Usuario') {
     await delay(800)
@@ -618,15 +625,24 @@ async function sendSubBotWelcome({ sock, m, conn, replyJid, nombreBot, botNumber
     await sendPrivateReply(m, conn, privateMessage, { contextInfo: { ...rcanal.contextInfo } })
   }
 
-  const channelJid = global.idcanal
+  const channelJid = getSubBotsLogsJid()
   const mainBot = global.conn
-  if (channelJid && mainBot?.user) {
+  if (!subConfig.channelAnnounced && channelJid && mainBot?.user) {
     await mainBot.sendMessage(channelJid, {
       text: channelMessage,
       contextInfo: { ...rcanal.contextInfo }
     }).catch((err) => {
-      console.error('[subbot] Error enviando bienvenida al canal:', err?.message || err)
+      console.error('[subbot] Error enviando bienvenida al canal de logs:', err?.message || err)
     })
+
+    if (configPath) {
+      try {
+        const nextConfig = { ...subConfig, channelAnnounced: true }
+        fs.writeFileSync(configPath, JSON.stringify(nextConfig, null, 2))
+      } catch (err) {
+        console.error('[subbot] No se pudo guardar channelAnnounced:', err?.message || err)
+      }
+    }
   }
 }
 

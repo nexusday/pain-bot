@@ -39,6 +39,9 @@ global.ch = {
 ch1: '',
 }
 
+// Canal para logs/anuncios de sub-bots. NO usar global.canal para esto
+global.logssubbots = ''
+
 global.mods =   []
 global.prems = []
 

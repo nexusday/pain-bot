@@ -43,6 +43,10 @@ global.ch = {
 ch1: '120363405059433072@newsletter',
 }
 
+// Canal para logs/anuncios de sub-bots (nuevo sub-bot, etc.). NO es global.canal
+// Obtén el JID con: .canalid <link>  |  Ejemplo: '120363405059433072@newsletter'
+global.logssubbots = ''
+
 global.mods =   []
 global.prems = []
 
