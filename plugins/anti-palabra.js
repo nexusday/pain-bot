@@ -1,5 +1,7 @@
 const KNOWN_SUBS = ['on', 'off', 'add', 'del', 'remove', 'list', 'clear', 'action']
 
+import { normalizeAntiText } from '../lib/Antis/anti-palabra.js'
+
 async function saveAntiPalabra() {
   try {
     if (global.db?.data) await global.db.write()
@@ -7,11 +9,14 @@ async function saveAntiPalabra() {
 }
 
 async function addBannedWord(cfg, palabra, m) {
-  if (!palabra) return m.reply('Palabra vacía.')
-  if (cfg.words.includes(palabra)) return m.reply('La palabra ya está en la lista.')
-  cfg.words.push(palabra)
+  const normalized = normalizeAntiText(palabra)
+  if (!normalized) return m.reply('Palabra vacía.')
+  if (cfg.words.some(w => normalizeAntiText(w) === normalized)) {
+    return m.reply('La palabra ya está en la lista.')
+  }
+  cfg.words.push(normalized)
   await saveAntiPalabra()
-  return m.reply(`Palabra añadida: *${palabra}*\n\n> Activa con *${m.usedPrefix || '.'}antipalabra on* si aún no lo hiciste.`)
+  return m.reply(`Palabra añadida: *${normalized}*\n\n> Activa con *${m.usedPrefix || '.'}antipalabra on* si aún no lo hiciste.`)
 }
 
 let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwner }) => {
@@ -57,7 +62,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
           contextInfo: { ...rcanal.contextInfo },
         }, { quoted: m })
       }
-      return addBannedWord(cfg, arg.slice(1).join(' ').toLowerCase().trim(), m)
+      return addBannedWord(cfg, (text || arg.join(' ')).trim(), m)
     case 'del':
     case 'remove':
       if (!arg[1]) {
@@ -114,7 +119,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
       }
     default:
       if (sub && !KNOWN_SUBS.includes(sub)) {
-        return addBannedWord(cfg, arg.join(' ').toLowerCase().trim(), m)
+        return addBannedWord(cfg, arg.join(' ').trim(), m)
       }
       return conn.sendMessage(m.chat, {
         text: `[❗] Uso de *antipalabra*\n\n` +
