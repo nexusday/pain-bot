@@ -17,15 +17,33 @@ function clearPendingInvite(chat, invite) {
   if (global.pendingInvites?.[chat]) delete global.pendingInvites[chat]
 }
 
-function parseBet(args) {
+const BOMBA_MAX_BET = 10_000_000
+
+function parseBet(args, text = '') {
+  const candidates = []
+
   for (const a of args || []) {
-    const n = parseInt(String(a).replace(/\D/g, ''), 10)
-    if (!isNaN(n) && n >= BOMBA_MIN_COINS) return normalizeBet(n)
+    const raw = String(a).trim()
+    if (!raw || raw.startsWith('@')) continue
+    if (!/^\d+$/.test(raw)) continue
+    candidates.push(parseInt(raw, 10))
+  }
+
+  if (!candidates.length && text) {
+    const stripped = String(text)
+      .replace(/@[\w\-\.~\d]+/g, ' ')
+      .replace(/\s+/g, ' ')
+    const nums = stripped.match(/\b(\d+)\b/g) || []
+    for (const n of nums) candidates.push(parseInt(n, 10))
+  }
+
+  for (const n of candidates) {
+    if (n >= BOMBA_MIN_COINS && n <= BOMBA_MAX_BET) return normalizeBet(n)
   }
   return BOMBA_DEFAULT_BET
 }
 
-let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
+let handler = async (m, { conn, args, usedPrefix, command, participants, text }) => {
   try {
     if (!m.isGroup) {
       return conn.sendMessage(m.chat, {
@@ -50,13 +68,13 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
 
     if (!m.mentionedJid?.length) {
       return conn.sendMessage(m.chat, {
-        text: `[❗] Menciona al rival y opcionalmente la apuesta.\nEjemplo: ${usedPrefix + command} @usuario\n${usedPrefix + command} @usuario 500`,
+        text: `[❗] Menciona al rival y opcionalmente la apuesta.\nEjemplo: ${usedPrefix + command} @usuario 250\n${usedPrefix + command} 250 @usuario`,
         contextInfo: { ...rcanal.contextInfo },
       }, { quoted: m })
     }
 
     const groupParts = participants || []
-    const bet = parseBet(args)
+    const bet = parseBet(args, text || m.text)
     const opponentRaw = m.mentionedJid[0]
     const challengerData = resolveDbUser(m.sender, conn, groupParts)
     const opponentData = resolveDbUser(opponentRaw, conn, groupParts)
@@ -143,7 +161,7 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
   }
 }
 
-handler.help = ['bomba @usuario [apuesta]']
+handler.help = ['bomba @usuario [apuesta]', 'bomba [apuesta] @usuario']
 handler.tags = ['juegos', 'multijugador']
 handler.command = ['bomba']
 handler.group = true
