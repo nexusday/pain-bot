@@ -513,6 +513,7 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
       try {
         let mod
         if (invite.type === 'miner') mod = await import(`./lib/logic-miner.js`)
+        else if (invite.type === 'bomba') mod = await import(`./lib/logic-bomba.js`)
         else mod = await import(`./plugins/rpg-michi.js`)
         const { acceptInvite } = mod
         return acceptInvite.call(this, m, this, invite, participants)
@@ -523,6 +524,7 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
       try {
         let mod
         if (invite.type === 'miner') mod = await import(`./lib/logic-miner.js`)
+        else if (invite.type === 'bomba') mod = await import(`./lib/logic-bomba.js`)
         else mod = await import(`./plugins/rpg-michi.js`)
         const { rejectInvite } = mod
         return rejectInvite.call(this, m, this, invite)
@@ -629,6 +631,20 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
     } catch (e) {
       console.error('Error procesando movimiento miner:', e)
       return this.sendMessage(m.chat, { text: '[❌] Error al procesar el movimiento.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
+    }
+  }
+
+  // Bomba game moves (botones interactivos o numero 1-10)
+  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'bomba' && !commandExecuted) {
+    if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
+      if (!isAdmin && !isOwner && !isROwner) return
+    }
+
+    try {
+      const mod = await import(`./lib/logic-bomba.js`)
+      await mod.handleMove(m, this, global.games[m.chat], participants)
+    } catch (e) {
+      console.error('Error procesando movimiento bomba:', e)
     }
   }
 
