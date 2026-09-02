@@ -704,17 +704,26 @@ if (isSubBot) {
   try {
     const botNumber = this.user.jid.split('@')[0].replace(/\D/g, '')
     const configPath = `./Serbot/${botNumber}/config.json`
-    
+
     if (existsSync(configPath)) {
       const config = JSON.parse(readFileSync(configPath, 'utf-8'))
-     
+
       if (config.autoRead === false) {
         shouldAutoRead = false
       }
     }
   } catch (error) {
-   
     console.error('Error leyendo configuración de auto-leer:', error)
+  }
+} else {
+  try {
+    const botKey = this.user?.jid || this.decodeJid(this.user?.id)
+    const settings = botKey && global.db?.data?.settings?.[botKey]
+    if (settings?.autoread === false) {
+      shouldAutoRead = false
+    }
+  } catch (error) {
+    console.error('Error leyendo visto del bot principal:', error)
   }
 }
 
