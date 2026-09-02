@@ -15,6 +15,7 @@ import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant } from './lib/group-participant.js'
 import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
+import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -153,6 +154,8 @@ const bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}
 const isRAdmin = user?.admin == 'superadmin' || false  
 const isAdmin = isRAdmin || user?.admin == 'admin' || false  
 const isBotAdmin = bot?.admin || false  
+
+if (shouldBlockByGrupoOff(m, this)) return
 
 if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
   const rentalBlocked = await checkGroupRental(m, this)
@@ -382,10 +385,7 @@ for (let plugin of processedPlugins) {
     }
     
     if (m.isGroup && global.db.data.botGroups && global.db.data.botGroups[m.chat] === false) {
-      const alwaysAllowedCommands = ['grupo']
-      if (!alwaysAllowedCommands.includes(command) && !isOwner && !isAdmin) {
-        return
-      }
+      if (command !== 'grupo') return
     }
 
     if (await checkCmd18Command(m, this, command, prefixMatch[0] || usedPrefix, isOwner, isROwner)) {
