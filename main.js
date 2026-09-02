@@ -9,6 +9,7 @@ process.on('unhandledRejection', (reason) => {
   console.error('unhandledRejection', reason)
 })
 
+import { PROJECT_TMP, cleanupTmpFiles, startTmpCleanupInterval } from './lib/tmp-cleanup.js'
 import './config.js'
 import './lib/bot-uptime.js'
 import { createRequire } from 'module'
@@ -20,7 +21,6 @@ import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, watch, mkd
 import yargs from 'yargs'
 import chalk from 'chalk'
 import syntaxerror from 'syntax-error'
-import { tmpdir } from 'os'
 import { format } from 'util'
 import pino from 'pino'
 import { Boom } from '@hapi/boom'
@@ -59,20 +59,7 @@ global.__require = function require(dir = import.meta.url) {
 
 
 global.ensureTmpDir = function() {
-  const tmpDir = join(global.__dirname(import.meta.url), './tmp')
-  if (!existsSync(tmpDir)) {
-    mkdirSync(tmpDir, { recursive: true })
-  }
-  return tmpDir
-}
-
-
-function ensureTmpDir() {
-  const tmpDir = join(global.__dirname(import.meta.url), './tmp')
-  if (!existsSync(tmpDir)) {
-    mkdirSync(tmpDir, { recursive: true })
-    console.log(chalk.green('Carpeta TMP creado exitosamente'))
-  }
+  return PROJECT_TMP
 }
 
 global.API = (name, path = '/', query = {}, apikeyqueryname) =>
@@ -91,9 +78,6 @@ global.API = (name, path = '/', query = {}, apikeyqueryname) =>
 global.timestamp = { start: new Date() }
 
 const __dirname = global.__dirname(import.meta.url)
-
-
-ensureTmpDir()
 
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse())
 global.prefix = new RegExp(
@@ -256,52 +240,13 @@ if (!opts['test']) {
     setInterval(async () => {
       if (global.db.data) await global.db.write()
       if (opts['autocleartmp']) {
-        const tmp = [tmpdir(), 'tmp', 'serbot']
-        tmp.forEach((filename) => {
-          spawn('find', [filename, '-amin', '3', '-type', 'f', '-delete'])
-        })
+        cleanupTmpFiles({ maxAgeMs: 3 * 60 * 1000 })
       }
     }, 30 * 1000)
   }
 }
 
-function clearTmp() {
-  const tmp = [join(global.__dirname(import.meta.url), './tmp')]
-  let cleanedCount = 0
-  tmp.forEach((dirname) => {
-  
-    if (!existsSync(dirname)) {
-      mkdirSync(dirname, { recursive: true })
-      return 
-    }
-    try {
-      const files = readdirSync(dirname)
-      files.forEach((file) => {
-        const filePath = join(dirname, file)
-        try {
-          const stats = statSync(filePath)
-          if (stats.isFile()) {
-            unlinkSync(filePath)
-            cleanedCount++
-          }
-        } catch (error) {
-          
-          console.error('Error processing tmp file:', error.message)
-        }
-      })
-    } catch (error) {
-      
-      console.error('Error reading tmp directory:', error.message)
-    }
-  })
-  return cleanedCount
-}
-
-setInterval(() => {
-  if (global.stopped === 'close' || !conn || !conn.user) return
-  const cleanedCount = clearTmp()
-  console.log(chalk.gray(`Limpieza TMP ejecutada - ${cleanedCount} archivo(s) eliminado(s).`))
-}, 50000)
+startTmpCleanupInterval({ verbose: true })
 
 async function connectionUpdate(update) {
   const sock = this?.ev ? this : conn

@@ -56,6 +56,7 @@ let handler = async (m, { conn, text, usedPrefix }) => {
 
 > 𓂃 ࣪ ִֶָ☾.  *${usedPrefix}top coneros*
 > 𓂃 ࣪ ִֶָ☾.  *${usedPrefix}top coneros|🪙*
+> 𓂃 ࣪ ִֶָ☾.  *${usedPrefix}top los mas malos|😈*
 
 ⊹ Muestra 10 miembros del grupo ⊹`,
       contextInfo: { ...rcanal.contextInfo },
