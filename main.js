@@ -116,6 +116,7 @@ global.loadDatabase = async function loadDatabase() {
     modoSub: {},
     antiImg: {},
     antiVer: {},
+    antiPalabra: global.db.data?.antiPalabra || {},
     bienvenidas: {},
     publicaciones: {},
     ...(global.db.data || {}),

@@ -1,6 +1,6 @@
 const KNOWN_SUBS = ['on', 'off', 'add', 'del', 'remove', 'list', 'clear', 'action']
 
-import { normalizeAntiText } from '../lib/Antis/anti-palabra.js'
+import { normalizeAntiText, sanitizeAntiPalabraWords, ensureAntiPalabraStore } from '../lib/Antis/anti-palabra.js'
 
 async function saveAntiPalabra() {
   try {
@@ -33,12 +33,13 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
   const sub = (arg[0] || '').toLowerCase()
 
   if (!global.db) global.db = { data: {} }
-  if (!global.db.data.antiPalabra) global.db.data.antiPalabra = {}
+  ensureAntiPalabraStore()
   if (!global.db.data.antiPalabra[chat]) {
     global.db.data.antiPalabra[chat] = { enabled: false, words: [], action: 'delete' }
   }
 
   const cfg = global.db.data.antiPalabra[chat]
+  cfg.words = sanitizeAntiPalabraWords(cfg.words)
 
   switch (sub) {
     case 'on':
@@ -62,7 +63,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
           contextInfo: { ...rcanal.contextInfo },
         }, { quoted: m })
       }
-      return addBannedWord(cfg, (text || arg.join(' ')).trim(), m)
+      return addBannedWord(cfg, arg.slice(1).join(' ').trim(), m)
     case 'del':
     case 'remove':
       if (!arg[1]) {
@@ -72,8 +73,8 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
         }, { quoted: m })
       }
       {
-        const target = arg.slice(1).join(' ').toLowerCase().trim()
-        let idx = parseInt(target)
+        const target = normalizeAntiText(arg.slice(1).join(' '))
+        let idx = parseInt(arg[1])
         if (!isNaN(idx)) {
           idx -= 1
           if (idx < 0 || idx >= cfg.words.length) return m.reply('Índice inválido.')
@@ -81,7 +82,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
           await saveAntiPalabra()
           return m.reply(`Eliminado: ${removed[0]}`)
         }
-        const i = cfg.words.indexOf(target)
+        const i = cfg.words.findIndex(w => normalizeAntiText(w) === target)
         if (i === -1) return m.reply('Palabra no encontrada.')
         cfg.words.splice(i, 1)
         await saveAntiPalabra()
