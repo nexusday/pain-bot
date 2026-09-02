@@ -17,6 +17,7 @@ import { findGroupParticipant, findBotParticipant } from './lib/group-participan
 import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
+import { isInviteOpponent } from './lib/michi-users.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -504,7 +505,7 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
     
     const invite = global.pendingInvites[m.chat]
 
-    if (m.sender !== invite.opponent) return
+    if (!isInviteOpponent(m, invite, this, participants)) return
 
     const message = m.text?.toLowerCase().trim()
 
@@ -514,7 +515,7 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
         if (invite.type === 'miner') mod = await import(`./lib/logic-miner.js`)
         else mod = await import(`./plugins/rpg-michi.js`)
         const { acceptInvite } = mod
-        return acceptInvite.call(this, m, this, invite)
+        return acceptInvite.call(this, m, this, invite, participants)
       } catch (e) {
         console.error('Error al aceptar invitación:', e)
       }
@@ -617,6 +618,7 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
     const gameData = global.games[m.chat]
     const game = gameData.game
     if (!gameData.players.includes(m.sender)) return
+    if (!game?.gameActive) return
 
     const message = m.text?.trim()
     if (!message || !/^[0-9]+$/.test(message)) return

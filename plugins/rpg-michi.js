@@ -1,7 +1,20 @@
 import { TicTacToe, getRandomReward, getInactivityPenalty } from '../lib/3enraya.js'
 import { sendMichiBoard, sendMichiInvite } from '../lib/michi-board.js'
+import { resolveTargetJids } from '../lib/group-participant.js'
+import {
+  MICHI_MIN_COINS,
+  resolveDbUser,
+  canPlayMichi,
+  isSamePlayer,
+  formatMichiBalance,
+} from '../lib/michi-users.js'
 
-let handler = async (m, { conn, args, usedPrefix, command }) => {
+function clearPendingInvite(chat, invite) {
+  if (invite?.timeout) clearTimeout(invite.timeout)
+  if (global.pendingInvites?.[chat]) delete global.pendingInvites[chat]
+}
+
+let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
   try {
     
     if (!m.isGroup) {
@@ -43,69 +56,63 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const opponent = m.mentionedJid[0]
+    const opponentRaw = m.mentionedJid[0]
+    const groupParts = participants || []
 
-    
-    if (opponent === m.sender) {
+    const challengerData = resolveDbUser(m.sender, conn, groupParts)
+    const opponentData = resolveDbUser(opponentRaw, conn, groupParts)
+
+    if (isSamePlayer(opponentRaw, m.sender, conn, groupParts)) {
       return conn.sendMessage(m.chat, {
         text: '[❌] No puedes jugar contra ti mismo.',
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+        contextInfo: { ...rcanal.contextInfo },
       }, { quoted: m })
     }
 
-    
-    if (opponent === conn.user.jid) {
+    if (isSamePlayer(opponentRaw, conn.user?.jid || conn.user?.id, conn, groupParts)) {
       return conn.sendMessage(m.chat, {
         text: '[❌] No puedes jugar contra el bot.',
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+        contextInfo: { ...rcanal.contextInfo },
       }, { quoted: m })
     }
 
-    
-    if (!global.db.data.users[opponent]) {
+    if (!opponentData.user) {
       return conn.sendMessage(m.chat, {
         text: '[❌] El usuario mencionado no está registrado en el bot.',
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+        contextInfo: { ...rcanal.contextInfo },
       }, { quoted: m })
     }
 
-    
-    const player1Coins = global.db.data.users[m.sender]?.coins || 0
-    const player2Coins = global.db.data.users[opponent]?.coins || 0
-
-    if (player1Coins < 20) {
+    if (!canPlayMichi(challengerData.jid, conn, groupParts)) {
       return conn.sendMessage(m.chat, {
-        text: '[❌] No tienes suficientes monedas para jugar. Necesitas al menos 20 monedas.',
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+        text: `[❌] No tienes suficientes monedas para jugar.\n> Tienes: ${formatMichiBalance(challengerData.jid, conn, groupParts)}\n> Mínimo: ${MICHI_MIN_COINS} ${global.moneda}`,
+        contextInfo: { ...rcanal.contextInfo },
       }, { quoted: m })
     }
 
-    if (player2Coins < 20) {
+    if (!canPlayMichi(opponentData.jid, conn, groupParts)) {
       return conn.sendMessage(m.chat, {
-        text: `[❗] @${opponent.split('@')[0]} no tiene suficientes monedas para jugar.`,
+        text: `[❌] @${opponentData.jid.split('@')[0]} no tiene suficientes monedas para jugar.\n> Tiene: ${formatMichiBalance(opponentData.jid, conn, groupParts)}\n> Mínimo: ${MICHI_MIN_COINS} ${global.moneda}`,
         contextInfo: {
           ...rcanal.contextInfo,
-          mentionedJid: [opponent]
-        }
+          mentionedJid: [opponentData.jid],
+        },
       }, { quoted: m })
     }
+
+    const challenger = challengerData.jid
+    const opponent = opponentData.jid
 
     
     if (!global.pendingInvites) global.pendingInvites = {}
 
     global.pendingInvites[m.chat] = {
-      challenger: m.sender,
-      opponent: opponent,
+      challenger,
+      opponent,
+      challengerJids: resolveTargetJids(challenger, groupParts, conn),
+      opponentJids: resolveTargetJids(opponent, groupParts, conn),
       timestamp: Date.now(),
-      timeout: null
+      timeout: null,
     }
 
     
@@ -126,11 +133,11 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const caption = `@${opponent.split('@')[0]} responde en *20 segundos*\n\n> *si* — Aceptar\n> *no* — Rechazar`
 
     return sendMichiInvite(conn, m.chat, {
-      challenger: m.sender,
+      challenger,
       opponent,
       quoted: m,
       caption,
-      mentionedJid: [m.sender, opponent],
+      mentionedJid: [challenger, opponent],
     })
 
   } catch (e) {
@@ -145,14 +152,32 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 }
 
 
-export async function acceptInvite(m, conn, invite) {
+export async function acceptInvite(m, conn, invite, participants = []) {
   try {
-    
-    if (invite.timeout) {
-      clearTimeout(invite.timeout)
+    const groupParts = participants?.length
+      ? participants
+      : await conn.groupMetadata(m.chat).then(g => g.participants).catch(() => [])
+
+    const challenger = invite.challenger
+    const opponent = invite.opponent
+
+    if (!canPlayMichi(challenger, conn, groupParts)) {
+      clearPendingInvite(m.chat, invite)
+      return conn.sendMessage(m.chat, {
+        text: `[❌] @${challenger.split('@')[0]} ya no tiene monedas suficientes.\n> Mínimo: ${MICHI_MIN_COINS} ${global.moneda}`,
+        contextInfo: { ...rcanal.contextInfo, mentionedJid: [challenger] },
+      }, { quoted: m })
     }
 
-    
+    if (!canPlayMichi(opponent, conn, groupParts)) {
+      clearPendingInvite(m.chat, invite)
+      return conn.sendMessage(m.chat, {
+        text: `[❌] No tienes monedas suficientes para jugar.\n> Tienes: ${formatMichiBalance(opponent, conn, groupParts)}\n> Mínimo: ${MICHI_MIN_COINS} ${global.moneda}`,
+        contextInfo: { ...rcanal.contextInfo, mentionedJid: [opponent] },
+      }, { quoted: m })
+    }
+
+    if (invite.timeout) clearTimeout(invite.timeout)
     delete global.pendingInvites[m.chat]
 
     
