@@ -46,6 +46,9 @@ ch1: '120363405059433072@newsletter',
 // Canal para logs/anuncios de sub-bots. El bot y sub-bots también lo siguen al conectar.
 global.logssubbots = '120363430965244922@newsletter'
 
+// true = botones/listas con @itsliaaa/baileys | false = solo @whiskeysockets/baileys
+global.baileysInteractive = true
+
 global.mods =   []
 global.prems = []
 

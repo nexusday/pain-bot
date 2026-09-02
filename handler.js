@@ -237,8 +237,8 @@ for (let name in global.plugins) {
     command: plugin.command || [],
     tags: plugin.tags || [],
     help: plugin.help || [],
-    all: plugin.all,
-    customPrefix: plugin.customPrefix
+    all: plugin.all || plugin.handler?.all,
+    customPrefix: plugin.customPrefix || plugin.handler?.customPrefix
   }
   
   

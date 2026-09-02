@@ -42,6 +42,9 @@ ch1: '',
 // Canal para logs/anuncios de sub-bots (también se sigue al conectar junto con global.ch)
 global.logssubbots = ''
 
+// Botones/listas interactivas con @itsliaaa/baileys (conexión sigue con @whiskeysockets/baileys)
+global.baileysInteractive = true
+
 global.mods =   []
 global.prems = []
 

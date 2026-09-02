@@ -440,6 +440,26 @@ global.reloadHandler = async function (restartConn) {
 
 const pluginFolder = join(__dirname, 'plugins')
 const pluginFilter = (filename) => /\.js$/.test(filename)
+
+function normalizePlugin(plugin) {
+  if (typeof plugin === 'function') {
+    return {
+      handler: plugin,
+      command: plugin.command || [],
+      tags: plugin.tags || [],
+      help: plugin.help || [],
+      all: plugin.all,
+      before: plugin.before,
+      customPrefix: plugin.customPrefix,
+      disabled: false,
+    }
+  }
+  if (plugin.command && typeof plugin.command === 'string') {
+    plugin.command = [plugin.command]
+  }
+  return plugin
+}
+
 global.plugins = {}
 
 async function filesInit() {
@@ -447,29 +467,7 @@ async function filesInit() {
     try {
       const file = global.__filename(join(pluginFolder, filename))
       const module = await import(file)
-      
-     
-      let plugin = module.default || module
-      
-     
-      if (typeof plugin === 'function') {
-       
-        plugin = {
-          handler: plugin,
-          command: plugin.command || [],
-          tags: plugin.tags || [],
-          help: plugin.help || [],
-          disabled: false
-        }
-      }
-      
-      
-      if (plugin.command && typeof plugin.command === 'string') {
-        plugin.command = [plugin.command]
-      }
-      
-      global.plugins[filename] = plugin
-      
+      global.plugins[filename] = normalizePlugin(module.default || module)
     } catch (e) {
       conn.logger.error(`Error cargando plugin ${filename}:`, e)
       delete global.plugins[filename]
@@ -497,7 +495,7 @@ global.reload = async (_ev, filename) => {
     else {
       try {
         const module = await import(`${global.__filename(dir)}?update=${Date.now()}`)
-        global.plugins[filename] = module.default || module
+        global.plugins[filename] = normalizePlugin(module.default || module)
       } catch (e) {
         conn.logger.error(`Error requiring plugin '${filename}':\n${format(e)}`)
       } finally {

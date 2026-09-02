@@ -78,6 +78,20 @@ Reader.create = create();
 
 Reader.prototype._slice = util.Array.prototype.subarray || /* istanbul ignore next */ util.Array.prototype.slice;
 
+function readVarint32NearEnd(reader) {
+    // Safely read up to four bytes of a varint32 near the reader limit
+    var value = 0;
+    for (var i = 0; i < 4; ++i) {
+        if (reader.pos >= reader.len)
+            throw indexOutOfRange(reader);
+        var b = reader.buf[reader.pos++];
+        value = (value | (b & 127) << i * 7) >>> 0;
+        if (b < 128)
+            return value;
+    }
+    throw indexOutOfRange(reader);
+}
+
 /**
  * Reads a varint as an unsigned 32 bit value.
  * @function
@@ -86,6 +100,12 @@ Reader.prototype._slice = util.Array.prototype.subarray || /* istanbul ignore ne
 Reader.prototype.uint32 = (function read_uint32_setup() {
     var value = 4294967295; // optimizer type-hint, tends to deopt otherwise (?!)
     return function read_uint32() {
+        if (this.len - this.pos < 5) {
+            if (this.pos >= this.len)
+                throw indexOutOfRange(this);
+            if (this.buf[this.pos] >= 128)
+                return readVarint32NearEnd(this);
+        }
         value = (         this.buf[this.pos] & 127       ) >>> 0; if (this.buf[this.pos++] < 128) return value;
         value = (value | (this.buf[this.pos] & 127) <<  7) >>> 0; if (this.buf[this.pos++] < 128) return value;
         value = (value | (this.buf[this.pos] & 127) << 14) >>> 0; if (this.buf[this.pos++] < 128) return value;
@@ -353,11 +373,21 @@ Reader.prototype.skip = function skip(length) {
 };
 
 /**
+ * Recursion limit.
+ * @type {number}
+ */
+Reader.recursionLimit = util.recursionLimit;
+
+/**
  * Skips the next element of the specified wire type.
  * @param {number} wireType Wire type received
+ * @param {number} [depth] Depth of recursion to control nested calls; 0 if omitted
  * @returns {Reader} `this`
  */
-Reader.prototype.skipType = function(wireType) {
+Reader.prototype.skipType = function(wireType, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > Reader.recursionLimit)
+        throw Error("maximum nesting depth exceeded");
     switch (wireType) {
         case 0:
             this.skip();
@@ -370,7 +400,7 @@ Reader.prototype.skipType = function(wireType) {
             break;
         case 3:
             while ((wireType = this.uint32() & 7) !== 4) {
-                this.skipType(wireType);
+                this.skipType(wireType, depth + 1);
             }
             break;
         case 5:

@@ -1,383 +1,172 @@
-import fs from 'fs'
-import { join } from 'path'
-import os from 'os'
-import { getMenuRentalLine } from '../lib/alquiler.js'
-import { isMainBotConn, cleanBotNum } from './modo-sub.js'
-import { formatBotUptime } from '../lib/bot-uptime.js'
-import { findGroupParticipant } from '../lib/group-participant.js'
+import { isInteractiveBaileysEnabled } from '../lib/baileys-dual.js'
+import {
+  buildFullMenuText,
+  buildInteractiveMenuContent,
+  buildCategoryInteractiveContent,
+  buildListSections,
+  buildMenuCategories,
+  buildMenuHeader,
+  buildCategoryResponse,
+  buildNativeFlowPickerContent,
+  extractMenuSelectionId,
+  findMenuCategoryFromMessage,
+  getMenuCategoryId,
+  MENU_BUTTON_TEXT,
+  resolveMenuContext,
+} from '../lib/menu-categories.js'
 
-let handler = async (m, { conn, usedPrefix }) => {
+async function resolveMenuImage(conn, mainImg) {
   try {
-    let nombreBot = global.namebot || 'PAIN BOT'
-    let imgBot = 'https://files.catbox.moe/iomah1.jpg'
-    let mainImg = './storage/img/menu3.jpg'
-    const botActual = cleanBotNum(conn.user?.jid || conn.user?.id)
-    const isMain = isMainBotConn(conn)
-    const tipo = isMain ? 'Principal Bot' : 'Sub Bot'
-    
-    if (!isMain && botActual) {
-      const configGlobalPath = join('./Serbot', botActual, 'config.json')
-      if (fs.existsSync(configGlobalPath)) {
-        const globalConfig = JSON.parse(fs.readFileSync(configGlobalPath, 'utf8'))
-        if (globalConfig.img) mainImg = globalConfig.img
-        if (globalConfig.name) nombreBot = globalConfig.name
-      }
+    const type = await conn.getFile(mainImg, true)
+    const { res, data: file, filename: pathFile, mime } = type
+    if ((res && res.status !== 200) || !file || file.length <= 65536) {
+      return { image: { url: mainImg } }
     }
-    
-    const createOwnerIds = (number) => {
-      const cleanNumber = number.replace(/[^0-9]/g, '')
-      return [
-        cleanNumber + '@s.whatsapp.net',
-        cleanNumber + '@lid'
-      ]
-    }
+    return { image: { url: pathFile }, mimetype: mime || 'image/jpeg' }
+  } catch {
+    return { image: { url: mainImg } }
+  }
+}
 
-    const allOwnerIds = [
-      conn.decodeJid(conn.user.id),
-      ...global.owner.flatMap(([number]) => createOwnerIds(number)),
-      ...(global.ownerLid || []).flatMap(([number]) => createOwnerIds(number))
-    ]
+async function sendInteractiveMenu(conn, m, ctx, categories, header) {
+  const media = await resolveMenuImage(conn, ctx.mainImg)
+  const content = buildInteractiveMenuContent(ctx, categories, header, media, m.sender)
+  await conn.sendMessageLia(m.chat, content, { quoted: m })
+}
 
-    const isROwner = allOwnerIds.includes(m.sender)
-    const isOwner = isROwner || m.fromMe
-    const isMods = isOwner || global.mods.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)
-    const _user = global.db.data?.users?.[m.sender]
-    const isPrems = isROwner || global.prems.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || _user?.prem == true
+async function sendCategoryResponse(conn, m, ctx, categories, category) {
+  const caption = buildCategoryResponse(category, ctx, { interactive: isInteractiveBaileysEnabled() })
 
-    let isRAdmin = false
-    let isAdmin = false
-    let isGroupCreator = false
-    if (m.isGroup) {
-      try {
-        const groupMetadata = conn.chats[m.chat]?.metadata || await conn.groupMetadata(m.chat).catch(_ => null)
-        if (groupMetadata) {
-          const participants = groupMetadata.participants || []
-          const user = findGroupParticipant(participants, m, conn) || {}
-          isRAdmin = user?.admin == 'superadmin' || false
-          isAdmin = isRAdmin || user?.admin == 'admin' || false
-          isGroupCreator = groupMetadata.owner === m.sender || 
-                           groupMetadata.subjectOwner === m.sender ||
-                           user?.admin === 'superadmin'
-        }
-      } catch (error) {
-        console.error('Error obteniendo metadata del grupo:', error)
-      }
-    }
-
-    let userRole = 'Miembro'
-    if (isROwner || isOwner) {
-      if (isGroupCreator) userRole = '👑 Staff Bot y Grupo'
-      else if (isRAdmin || isAdmin) userRole = '👑 Staff Bot y Admin'
-      else userRole = '👑 Staff Bot'
-    } else if (isMods) {
-      if (isGroupCreator) userRole = 'Moderador del Bot y Creador'
-      else if (isRAdmin || isAdmin) userRole = 'Moderador del Bot y Admin'
-      else userRole = 'Moderador del Bot'
-    } else if (isGroupCreator) {
-      userRole = '👑 Creador del Grupo'
-    } else if (isRAdmin || isAdmin) {
-      userRole = '𖢠 Admin del Grupo'
-    }
-    
-    let botFormatUptime = formatBotUptime(conn)
-    
-    let totalf = Object.values(global.plugins).filter(v => v.help && v.tags).length
-    
-    const totalRamMB = Math.round(os.totalmem() / 1024 / 1024)
-    const processRamMB = Math.round(process.memoryUsage().rss / 1024 / 1024)
-    const rentalLine = m.isGroup
-      ? `> 𓂃 ࣪ ִֶָ☾.  𝙰𝙻𝚀𝚄𝙸𝙻𝙴𝚁:  ${getMenuRentalLine(m.chat)}\n`
-      : ''
-
-    // =
-    // SECCIONES DEL MENU
-    // =====
-
-    let menuHeader = `
-𓂃 ࣪ ִֶָ☾. 𝙱𝙸𝙴𝙽𝚅𝙴𝙽𝙸𝙳𝙾 𓂃 ࣪ ִֶָ☾.
-
-   𓍯  𝙸𝙽𝙵𝙾 𝚄𝚂𝚄𝙰𝚁𝙸𝙾  𓍯  
-${rentalLine}> 𓂃 ࣪ ִֶָ☾.  𝚄𝚂𝚄𝙰𝚁𝙸𝙾:  @${m.sender.split('@')[0]}
-> 𓂃 ࣪ ִֶָ☾.  𝚁𝙾𝙻:  ${userRole}
-> 𓂃 ࣪ ִֶָ☾.  𝙱𝙾𝚃:  ${nombreBot}
-> 𓂃 ࣪ ִֶָ☾.  𝚃𝙸𝙿𝙾:  ${tipo}
-> 𓂃 ࣪ ִֶָ☾.  𝚃𝙸𝙴𝙼𝙿𝙾 𝙰𝙲𝚃𝙸𝚅𝙾:  ${botFormatUptime}
-> 𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂:  ${totalf}
-> 𓂃 ࣪ ִֶָ☾.  𝙼𝙴𝙼𝙾𝚁𝙸𝙰: ${processRamMB}/${totalRamMB} MB
-
- 𓂃 ࣪ ִֶָ☾. 𝙿𝚁𝙾𝙿𝙸𝙴𝚃𝙰𝚁𝙸𝙾𝚂𓂃 ࣪ ִֶָ☾.
-> 𓂃 ࣪ ִֶָ☾.  ⊹ +51927909197 ⊹ *Sunkovv*
-> 𓂃 ࣪ ִֶָ☾.  ⊹ +18098433234 ⊹ *Zafiro(Mod)*
-
- 𓂃 ࣪ ִֶָ☾. 𝙷𝙾𝚂𝚃𝙸𝙽𝙶 𝙾𝙵𝙸𝙲𝙸𝙰𝙻 𓂃 ࣪ ִֶָ☾.
-> 𓂃 ࣪ ִֶָ☾.  ⟅ https://nexcodea.com ⟆
-
- 𓂃 ࣪ ִֶָ☾. 𝙲𝙰𝙽𝙰𝙻𝙴𝚂 𝙾𝙵𝙸𝙲𝙸𝙰𝙻𝙴𝚂 𓂃 ࣪ ִֶָ☾.
-> 𓂃 ࣪ ִֶָ☾.  ⟅ https://whatsapp.com/channel/0029Vb7Y87RLikgEutyMId1h ⟆
-
-𓂃 ࣪ ִֶָ☾. *𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂* 𓂃 ࣪ ִֶָ☾.\n\n`
-
-    let sectionOwners = `   𓍯  *𝙾𝚆𝙽𝙴𝚁𝚂*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}verplugin <nombre.js>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}replugin <nombre.js>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}addplugin <nombre.js>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}nameplugins <archivo.js> > <nuevo.js>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}update
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}restart
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}subme <mensaje>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}join <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}exit
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}one 1h
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}one infinito
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}one oficial\n\n`
-
-    let sectionAdmins = `   𓍯  *𝙰𝙳𝙼𝙸𝙽𝚂*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ban @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}promote @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}demote @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}warn @usuario <motivo>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delwarn @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}warnings @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tag
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}temp <mensaje> <tiempo>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}open
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}close
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delete
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}fijar
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}desfijar
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}namegp <nombre>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}desgp <descripción>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}photogp
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}adg <numero>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}grupo on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modosub
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modosub <n>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modosub all
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antilink on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antiimg on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antiaudio on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antivideo on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antisticker on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antispam on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}anticontact on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antimention on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antidocument on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antipalabra on/off > action|add
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}anticaracter on/off <limite>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}antiprefijo on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}mute @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmute @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}soloadmin on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}welcome on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoia on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohot on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modoilegal on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modohuman on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modosad on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}modospico on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}mododescargas on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off\n\n`
-
-    let menuBody = `   𓍯  *𝙲𝙼𝙳 𝚂𝚄𝙱 𝙱𝙾𝚃*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}qr
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}code
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bots
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}botinfo
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reconnect
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbotname
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbotimg
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setautoread
-
-   𓍯  *𝙴𝙲𝙾𝙽𝙾𝙼𝙸𝙰 𝚁𝙿𝙶*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}balance
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bal
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}coins
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}transf @usuario <cantidad>
-
-   𓍯  *𝙿𝙴𝚁𝙵𝙸𝙻 𝚁𝙿𝙶*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}perfil
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setbirth <fecha>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setdesc <descripción>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setfav <personaje>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setgenre <hombre/mujer>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}birthdays
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setname <nombre>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}owner
-
-   𓍯  *𝚃𝙾𝙿 𝚁𝙿𝙶*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topcoins
-
-   𓍯  *𝙶𝙰𝙼𝙴 𝚁𝙿𝙶*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}dado
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}daily / dda
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}adivinanza
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pescar
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}michi @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}miner @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slot <cantidad>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ruleta <rojo/negro/par/impar/0-36> <cantidad USD>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}moneda <cara/sello> <cantidad>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}work
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}suerte
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}banco
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}deposit <cantidad/all>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}withdraw <cantidad/all>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}change <banco>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}unirsebank <banco>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}robar
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sorpresa
-
-   𓍯  *𝙱𝚄𝚂𝚀𝚄𝙴𝙳𝙰𝚂*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}google <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}yt <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok <búsqueda/link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <búsqueda/link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}scsearch <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ly <canción>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}onlyfans <username>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imagen <busqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}wall <busqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pinterest <busqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}bsticker <busqueda>
-
-   𓍯  *𝙾𝚂𝙸𝙽𝚃 - 𝙱𝙴𝚃𝙰*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ip <dirección IP>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ip2 <dirección IP>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sher <nombre/apodo>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}webinfo <URL>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tik <@usuario>
-
-   𓍯  *𝙸𝙽𝚃𝙴𝙻𝙸𝙶𝙴𝙽𝙲𝙸𝙰 𝙰.𝙸*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}gemini <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}chatgpt <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kora <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}replia <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}copilot <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}animg <texto>
-
-   𓍯  *𝙳𝙴𝚂𝙲𝙰𝚁𝙶𝙰𝚂*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play <búsqueda/url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sc <búsqueda/url/número>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}play2 <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}aptoide <app>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}git <url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tiktok2 <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}fb <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ig <link>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}igs <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ytvideo <link>
-
-   𓍯  *𝚁𝙴𝙰𝙲𝙲𝙸𝙾𝙽𝙴𝚂*  𓍯 
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}reir
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}happy
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sad
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}angry
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}dance
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slap @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}kiss @usuario
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hug @usuario
-
-
-   𓍯  *𝙰𝙳𝙸𝙲𝙸𝙾𝙽𝙰𝙻𝙴𝚂*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}nota <contenido>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delnota <numero>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}vernotas
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}id
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}infogrupo
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}traducir
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}speed <audio>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}slow <audio>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sss <imagen/video ver una vez>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}text <imagen/sticker>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}pdf <imagen/sticker> nombre
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tepdf <responder texto/img> nombre
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}resize <imagen/sticker> 800x600
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ge o gr <texto/enlace/imagen>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}leerqr <imagen con QR>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hd <imagen/sticker>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}ssimg <foto> título|artista
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sfimg <foto> texto
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}imgay <foto> texto
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tts <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}stt <nota de voz/audio>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cat <texto>
-
-
-   𓍯  *𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sticker
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}st <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sp <texto>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sgay <foto> texto
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}sw <responder/@user> texto
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toimg
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delmeta nombre|autor
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}setmeta pack | autor
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}delstickermeta
-
-   𓍯  *𝙳𝙸𝚅𝙴𝚁𝚂𝙸𝙾𝙽*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topgays
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topfeos
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toplindos
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topburros
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topmachos
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topparejas
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toppajeros
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topmancos
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topinfieles
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topfieles
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topotakus
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topfemboys
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}toptrans
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topfracasados
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}topingenieros
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}meme
-
-   𓍯  *𝙽𝚂𝙵𝚆*  𓍯  
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}cmd18 on/off
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}waifu2
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}neko
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}corean
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tik18
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}tetas
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}girls
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xnxx <url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xnxx <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hentai <url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}hentai <búsqueda>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xvideos <url>
-> 𓂃 ࣪ ִֶָ☾.  ${usedPrefix}xvideos <búsqueda>`.trim()
-
-    
-    let text = menuHeader
-
-    if (isOwner) {
-      // Si es OWNER, ve todo
-      text += sectionOwners + sectionAdmins + menuBody
-    } else if (isAdmin) {
-      // Si es ADMIN, no ve owners pero sí admins y el resto
-      text += sectionAdmins + menuBody
-    } else {
-      // Si es MIEMBRO, solo ve los comandos generales
-      text += menuBody
-    }
-
-    await conn.sendFile(m.chat, mainImg, 'thumbnail.jpg', text, m, null, { 
+  if (!isInteractiveBaileysEnabled()) {
+    await conn.sendFile(m.chat, category.img, 'menu-cat.jpg', caption, m, null, {
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: [m.sender]
-      }
+        mentionedJid: [m.sender],
+      },
     })
+    return
+  }
 
+  try {
+    const media = await resolveMenuImage(conn, category.img)
+    const content = buildCategoryInteractiveContent(ctx, categories, caption, media, m.sender)
+    await conn.sendMessageLia(m.chat, content, { quoted: m })
+  } catch (interactiveError) {
+    console.error('Categoría interactiva falló:', interactiveError)
+    await conn.sendFile(m.chat, category.img, 'menu-cat.jpg', caption, m, null, {
+      contextInfo: {
+        ...rcanal.contextInfo,
+        mentionedJid: [m.sender],
+      },
+    })
+    try {
+      await conn.sendMessageLia(
+        m.chat,
+        buildNativeFlowPickerContent(ctx, categories),
+        { quoted: m },
+      )
+    } catch (pickerError) {
+      console.error('Selector categorías (fallback) falló:', pickerError)
+    }
+  }
+}
+
+const handler = async (m, { conn, usedPrefix }) => {
+  try {
+    const ctx = await resolveMenuContext(m, conn, usedPrefix)
+    const categories = buildMenuCategories(ctx)
+    const header = buildMenuHeader(m, ctx)
+
+    if (!isInteractiveBaileysEnabled()) {
+      const text = buildFullMenuText(m, ctx, categories)
+      await conn.sendFile(m.chat, ctx.mainImg, 'thumbnail.jpg', text, m, null, {
+        contextInfo: {
+          ...rcanal.contextInfo,
+          mentionedJid: [m.sender],
+        },
+      })
+      return
+    }
+
+    try {
+      await sendInteractiveMenu(conn, m, ctx, categories, header)
+    } catch (interactiveError) {
+      console.error('Menú interactivo (imagen+botón) falló:', interactiveError)
+
+      await conn.sendFile(m.chat, ctx.mainImg, 'thumbnail.jpg', header, m, null, {
+        contextInfo: {
+          ...rcanal.contextInfo,
+          mentionedJid: [m.sender],
+        },
+      })
+
+      try {
+        await conn.sendMessageLia(
+          m.chat,
+          buildNativeFlowPickerContent(ctx, categories),
+          { quoted: m },
+        )
+      } catch (pickerError) {
+        console.error('Selector nativeFlow falló:', pickerError)
+        if (!m.isGroup) {
+          await conn.sendListLia(
+            m.chat,
+            '𓂃 ࣪ ִֶָ☾. 𝙼𝙴𝙽𝚄',
+            '𓂃 ࣪ ִֶָ☾. 𝙴𝙻𝙸𝙶𝙴 𝚄𝙽𝙰 𝙲𝙰𝚃𝙴𝙶𝙾𝚁Í𝙰 𝚙𝚊𝚛𝚊 𝚟𝚎𝚛 𝚜𝚞𝚜 𝚌𝚘𝚖𝚊𝚗𝚍𝚘𝚜.',
+            MENU_BUTTON_TEXT,
+            buildListSections(categories),
+            m,
+            { footer: ctx.nombreBot },
+          )
+        }
+      }
+    }
   } catch (e) {
     console.error('Error en menú:', e)
     conn.sendMessage(m.chat, {
       text: 'Hubo un error al mostrar el menú.',
       contextInfo: {
-        ...rcanal.contextInfo
-      }
+        ...rcanal.contextInfo,
+      },
     }, { quoted: m })
     throw e
+  }
+}
+
+async function handleMenuCategorySelection(m, { conn, usedPrefix }) {
+  if (m.fromMe) return false
+
+  const rowId = extractMenuSelectionId(m)
+  const isInteractiveReply = [
+    'listResponseMessage',
+    'interactiveResponseMessage',
+    'buttonsResponseMessage',
+  ].includes(m.mtype)
+
+  if (!rowId && !isInteractiveReply) return false
+  if (!rowId && isInteractiveReply) {
+    const label = [m?.msg?.title, m?.text].filter(Boolean).join(' ')
+    if (!label) return false
+  } else if (!getMenuCategoryId(rowId)) {
+    return false
+  }
+
+  const ctx = await resolveMenuContext(m, conn, usedPrefix)
+  const categories = buildMenuCategories(ctx)
+  const category = findMenuCategoryFromMessage(m, categories)
+  if (!category) return false
+
+  await sendCategoryResponse(conn, m, ctx, categories, category)
+
+  m.commandExecuted = true
+  return true
+}
+
+handler.all = async function (m, data) {
+  try {
+    await handleMenuCategorySelection(m, data)
+  } catch (e) {
+    console.error('Error en selección de menú:', e)
   }
 }
 
