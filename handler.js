@@ -16,6 +16,7 @@ import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant } from './lib/group-participant.js'
 import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
+import { sendMichiBoard } from './lib/michi-board.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -582,26 +583,16 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
         
         return handleGameEnd(m, this, game, result.winner ? 'finished' : 'draw')
       } else {
-        
-        const board = game.getBoard()
-        const nextPlayerName = game.currentPlayer === game.player1 ? '𝙅𝙪𝙜𝙖𝙖𝙙𝙤𝙧 1 (❌)' : '𝙅𝙪𝙜𝙖𝙖𝙙𝙤𝙧 2 (⭕)'
         const nextPlayer = game.currentPlayer
+        const nextSymbol = game.currentPlayer === game.player1 ? '❌' : '⭕'
+        const caption = `Movimiento realizado\n\nTurno de @${nextPlayer.split('@')[0]} (${nextSymbol})\nResponde con el numero 1-9`
 
-        const message = `𝗠𝗼𝘃𝗶𝗺𝗶𝗲𝗻𝘁𝗼 𝗿𝗲𝗮𝗹𝗶𝘇𝗮𝗱𝗼  
-
-${board}
-
-  𓂃 ࣪ ִֶָ☾.  🎯 𝙏𝙐𝙍𝙉𝙊 𝘿𝙀: @${nextPlayer.split('@')[0]} (${nextPlayerName})
-
-`.trim()
-
-        return this.sendMessage(m.chat, {
-          text: message,
-          contextInfo: {
-            ...rcanal.contextInfo,
-            mentionedJid: [nextPlayer]
-          }
-        }, { quoted: m })
+        return sendMichiBoard(this, m.chat, game, {
+          quoted: m,
+          caption,
+          mentionedJid: [nextPlayer],
+          status: 'playing',
+        })
       }
 
     } catch (e) {

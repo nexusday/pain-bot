@@ -1,4 +1,5 @@
 import { TicTacToe, getRandomReward, getInactivityPenalty } from '../lib/3enraya.js'
+import { sendMichiBoard, sendMichiInvite } from '../lib/michi-board.js'
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
@@ -122,28 +123,15 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }, 20000) 
 
     
-    const message = `╭─╮  𓍯  𝙄𝙉𝙑𝙄𝙏𝘼𝘾𝙄𝙊𝙉 𝘼 𝙅𝙐𝙀𝙂𝙊  𓍯  
-│  𓂃 ࣪ ִֶָ☾.  @${m.sender.split('@')[0]} 𝘲𝘶𝘪𝘦𝘳𝘦 𝘫𝘶𝘨𝘢𝘳 3 𝘦𝘯 𝘳𝘢𝘺𝘢 𝘤𝘰𝘯𝘵𝘪𝘨𝘰
-│  𓂃 ࣪ ִֶָ☾.  @${opponent.split('@')[0]} 𝘳𝘦𝘴𝘱𝘰𝘯𝘥𝘦 𝘦𝘯 20 𝘴𝘦𝘨𝘶𝘯𝘥𝘰𝘴
-│
-│  𓂃 ࣪ ִֶָ☾.  𝙋𝙍𝙀𝙈𝙄𝙊: 450-700 ${global.moneda}
-│  𓂃 ࣪ ִֶָ☾.  𝙀𝙈𝙋𝘼𝙏𝙀: 150 ${global.moneda} 𝙘𝙖𝙙𝙖
-│  𓂃 ࣪ ִֶָ☾.  𝙍𝙄𝙀𝙎𝙂𝙊: 150 ${global.moneda} 𝙥𝙤𝙧 𝙞𝙣𝙖𝙘𝙩𝙞𝙫𝙞𝙙𝙖𝙙
-│
-│  𓂃 ࣪ ִֶָ☾.  𝙍𝙀𝙎𝙋𝙊𝙉𝘿𝙀:
-│  𓂃 ࣪ ִֶָ☾.  ✅ 𝘴𝘪 - 𝘈𝘤𝘦𝘱𝘵𝘢𝘳
-│  𓂃 ࣪ ִֶָ☾.  ❌ 𝘯𝘰 - 𝘙𝘦𝘤𝘩𝘢𝘻𝘢𝘳
-│
-│  𓂃 ࣪ ִֶָ☾.  𝙏𝙄𝙀𝙈𝙋𝙊: 20𝘴
-╰─╯`.trim()
+    const caption = `@${opponent.split('@')[0]} responde en *20 segundos*\n\n> *si* — Aceptar\n> *no* — Rechazar`
 
-    return conn.sendMessage(m.chat, {
-      text: message,
-      contextInfo: {
-        ...rcanal.contextInfo,
-        mentionedJid: [m.sender, opponent]
-      }
-    }, { quoted: m })
+    return sendMichiInvite(conn, m.chat, {
+      challenger: m.sender,
+      opponent,
+      quoted: m,
+      caption,
+      mentionedJid: [m.sender, opponent],
+    })
 
   } catch (e) {
     console.error('Error en comando michi:', e)
@@ -209,34 +197,20 @@ export async function acceptInvite(m, conn, invite) {
     game.startInactivityTimeout()
 
     
-    const board = game.getBoard()
-    const message = `╭─╮  𓍯  3 𝙀𝙉 𝙍𝘼𝙔𝘼 𝙄𝙉𝙄𝘾𝙄𝘼𝘿𝙊  𓍯  
-│  𓂃 ࣪ ִֶָ☾.  ❌ @${invite.challenger.split('@')[0]} (𝙅𝙪𝙜𝙖𝙖𝙙𝙤𝙧 1)
-│  𓂃 ࣪ ִֶָ☾.  ⭕ @${invite.opponent.split('@')[0]} (𝙅𝙪𝙜𝙖𝙖𝙙𝙤𝙧 2)
+    const caption = `╭─╮  𓍯  3 EN RAYA INICIADO  𓍯
+│  ❌ @${invite.challenger.split('@')[0]}
+│  ⭕ @${invite.opponent.split('@')[0]}
 │
-│  𓂃 ࣪ ִֶָ☾.  𝙄𝙉𝙎𝙏𝙍𝙐𝘾𝘾𝙄𝙊𝙉𝙀𝙎:
-│  𓂃 ࣪ ִֶָ☾.  𝙍𝙚𝙨𝙥𝙤𝙣𝙙𝙚 𝙘𝙤𝙣 𝙚𝙡 𝙣ú𝙢𝙚𝙧𝙤 (1-9)
-│  𓂃 ࣪ ִֶָ☾.  ❌ = 𝙅𝙪𝙜𝙖𝙖𝙙𝙤𝙧 1, ⭕ = 𝙅𝙪𝙜𝙖𝙖𝙙𝙤𝙧 2
-│  𓂃 ࣪ ִֶָ☾.  𝙂𝙖𝙣𝙖 𝙦𝙪𝙞𝙚𝙣 𝙛𝙤𝙧𝙢𝙚 𝙡í𝙣𝙚𝙖 𝙙𝙚 3
-│  𓂃 ࣪ ִֶָ☾.  1 𝙢𝙞𝙣𝙪𝙩𝙤 𝙥𝙤𝙧 𝙩𝙪𝙧𝙣𝙤 𝙤 𝙨𝙚 𝙘𝙖𝙣𝙘𝙚𝙡𝙖
-│
-│  𓂃 ࣪ ִֶָ☾.  𝙋𝙍𝙀𝙈𝙄𝙊: 450-700 ${global.moneda}
-│  𓂃 ࣪ ִֶָ☾.  𝙀𝙈𝙋𝘼𝙏𝙀: 150 ${global.moneda} 𝙘𝙖𝙙𝙖
-│  𓂃 ࣪ ִֶָ☾.  𝙍𝙄𝙀𝙎𝙂𝙊: 150 ${global.moneda} 𝙥𝙤𝙧 𝙞𝙣𝙖𝙘𝙩𝙞𝙫𝙞𝙙𝙖𝙙
-│
-${board}
-│
-│  𓂃 ࣪ ִֶָ☾.  🎯 𝙏𝙐𝙍𝙉𝙊 𝘿𝙀: @${invite.challenger.split('@')[0]} (❌)
+│  Responde con el número *1-9*
+│  Premio: 450-700 ${global.moneda}
 ╰─╯`.trim()
 
-    return conn.sendMessage(m.chat, {
-      text: message,
-      contextInfo: {
-        ...rcanal.contextInfo,
-        mentionedJid: [invite.challenger, invite.opponent]
-      }
-    }, { quoted: m })
-
+    return sendMichiBoard(conn, m.chat, game, {
+      quoted: m,
+      caption,
+      mentionedJid: [invite.challenger, invite.opponent],
+      status: 'playing',
+    })
   } catch (e) {
     console.error('Error al aceptar invitación:', e)
     return conn.sendMessage(m.chat, {
@@ -291,6 +265,10 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
     }
 
     let message = ''
+    let boardStatus = 'playing'
+    let boardStatusText = ''
+    let highlightCells = null
+    let playersToMention = []
 
     if (reason === 'timeout') {
       
@@ -306,6 +284,8 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
       const player2 = game.player2
 
       message = `𝙅𝙐𝙀𝙂𝙊 𝘾𝘼𝙉𝘾𝙀𝙇𝘼𝘿𝙊\n> 𓂃 ࣪ ִֶָ☾.   𝙅𝙪𝙜𝙖𝙙𝙤𝙧 𝙥𝙚𝙣𝙖𝙡𝙞𝙯𝙖𝙙𝙤:  𓂃 ࣪ ִֶָ☾.   @${inactivePlayer.split('@')[0]} (-${penalty} ${global.moneda})\n> 𓂃 ࣪ ִֶָ☾.  📝 𝙈𝙤𝙩𝙞𝙫𝙤: 𝙉𝙤 𝙝𝙪𝙗𝙤 𝙖𝙘𝙩𝙞𝙫𝙞𝙙𝙖𝙙 𝙙𝙪𝙧𝙖𝙣𝙩𝙚 1 𝙢𝙞𝙣𝙪𝙩𝙤`.trim()
+      boardStatus = 'timeout'
+      boardStatusText = 'Juego cancelado por inactividad'
 
     } else if (game.winner) {
       
@@ -327,6 +307,9 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
 │  𓂃 ࣪ ִֶָ☾.  𝙋𝙧𝙚𝙢𝙞𝙤: +${reward} ${global.moneda}
 │  𓂃 ࣪ ִֶָ☾.  𝙏𝙤𝙩𝙖𝙡: ${global.db.data.users[game.winner]?.coins || 0} ${global.moneda}
 ╰─╯`.trim()
+      boardStatus = 'win'
+      boardStatusText = `Ganador: ${game.winner.split('@')[0]}`
+      highlightCells = game.getWinningCells?.() || null
 
     } else {
       
@@ -340,19 +323,18 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
       }
 
       message = `╭─╮  𓍯  𝙅𝙐𝙀𝙂𝙊 𝙀𝙈𝙋𝘼𝙏𝘼𝘿𝙊  𓍯
-│  𓂃 ࣪ ִֶָ☾.  👥 𝙅𝙪𝙜𝙖𝙙𝙤𝙧𝙚𝙨:
+│  𓂃 ࣪ ִֶָ☾.   𝙅𝙪𝙜𝙖𝙙𝙤𝙧𝙚𝙨:
 │  𓂃 ࣪ ִֶָ☾.  ❌ @${game.player1.split('@')[0]} (+${drawReward} ${global.moneda})
 │  𓂃 ࣪ ִֶָ☾.  ⭕ @${game.player2.split('@')[0]} (+${drawReward} ${global.moneda})
 │
-│  𓂃 ࣪ ִֶָ☾.  📝 𝙍𝙚𝙨𝙪𝙡𝙩𝙖𝙙𝙤: 𝙉𝙖𝙙𝙞𝙚 𝙜𝙖𝙣ó
-│  𓂃 ࣪ ִֶָ☾.  💰 𝙍𝙚𝙘𝙤𝙢𝙥𝙚𝙣𝙨𝙖: +${drawReward} ${global.moneda} cada uno
+│  𓂃 ࣪ ִֶָ☾.   𝙍𝙚𝙨𝙪𝙡𝙩𝙖𝙙𝙤: 𝙉𝙖𝙙𝙞𝙚 𝙜𝙖𝙣ó
+│  𓂃 ࣪ ִֶָ☾.  𝙍𝙚𝙘𝙤𝙢𝙥𝙚𝙣𝙨𝙖: +${drawReward} ${global.moneda} cada uno
 ╰─╯`.trim()
+      boardStatus = 'draw'
+      boardStatusText = 'Empate — nadie ganó'
     }
 
-    
-    let playersToMention = []
     if (reason === 'timeout') {
-      
       playersToMention = [game.player1, game.player2]
     } else if (game.winner) {
       const loser = game.winner === game.player1 ? game.player2 : game.player1
@@ -361,13 +343,15 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
       playersToMention = [game.player1, game.player2]
     }
 
-    return conn.sendMessage(chatId, {
-      text: message,
-      contextInfo: {
-        ...rcanal.contextInfo,
-        mentionedJid: playersToMention
-      }
-    }, { quoted: m })
+    return sendMichiBoard(conn, chatId, game, {
+      quoted: m,
+      caption: message,
+      mentionedJid: playersToMention,
+      status: boardStatus,
+      statusText: boardStatusText,
+      highlightCells,
+      winnerJid: game.winner || null,
+    })
 
   } catch (e) {
     console.error('Error al finalizar juego:', e)
