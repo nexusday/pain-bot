@@ -18,7 +18,7 @@ import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
 import { isInviteOpponent } from './lib/michi-users.js'
-import { ensureRpgUser, awardCommandProgress } from './lib/rpg-level.js'
+import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker } from './lib/rpg-level.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -147,6 +147,11 @@ if (opts['queque'] && m.text && !(isMods || isPrems)) {
 }  
 
 if (m.isBaileys) return  
+
+if (!m.fromMe && isStickerMessage(m)) {
+  const dbUser = global.db.data.users[m.sender]
+  if (dbUser) trackSentSticker(dbUser)
+}
 
 const groupMetadata = (m.isGroup ? ((this.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
 const participants = (m.isGroup ? groupMetadata.participants : []) || []  
