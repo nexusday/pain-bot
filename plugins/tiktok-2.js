@@ -14,34 +14,69 @@ function absMedia(url = '') {
   return `${TIKWM}${u.startsWith('/') ? u : `/${u}`}`
 }
 
+export function sanitizeTikTokUrl(input = '') {
+  let url = String(input || '')
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
+    .trim()
+
+  const matched = url.match(TT_URL_RE)?.[0]
+  if (matched) url = matched
+
+  url = url
+    .replace(/^[\s<'"(\[]+/, '')
+    .replace(/[\s>'"\)\],]+$/g, '')
+    .replace(/[)\]}>.,;:!?]+$/g, '')
+    .trim()
+
+  if (!url) return ''
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`
+  return url
+}
+
 function extractVideoId(text = '') {
   const s = String(text)
   return (
     s.match(/\/video\/(\d{8,})/)?.[1] ||
+    s.match(/\/photo\/(\d{8,})/)?.[1] ||
     s.match(/\/v\/(\d{8,})/)?.[1] ||
-    s.match(/(?:photo|photo\/)(\d{8,})/)?.[1] ||
+    s.match(/[?&](?:item_id|aweme_id|share_item_id)=(\d{8,})/i)?.[1] ||
     s.match(/(?:^|[^\d])(\d{15,20})(?:[^\d]|$)/)?.[1] ||
     null
   )
 }
 
 async function resolveInputUrl(input) {
-  let url = String(input || '').trim()
+  let url = sanitizeTikTokUrl(input)
   if (!url) return { url: '', id: null }
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`
 
   let id = extractVideoId(url)
   if (id) return { url, id }
 
- 
+  // Short links (vm/vt): seguir redirect y también Location manual
+  try {
+    const res = await fetch(url, {
+      redirect: 'manual',
+      headers: {
+        'User-Agent': UA,
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    })
+    const location = res.headers?.get?.('location') || res.headers?.get?.('Location')
+    if (location) {
+      const next = sanitizeTikTokUrl(location.startsWith('http') ? location : new URL(location, url).href)
+      id = extractVideoId(next)
+      if (id || next) return { url: next || url, id }
+    }
+  } catch {}
+
   try {
     const res = await fetch(url, {
       redirect: 'follow',
-      headers: { 'User-Agent': UA, Accept: 'text/html' }
+      headers: { 'User-Agent': UA, Accept: 'text/html' },
     })
-    const finalUrl = res.url || url
+    const finalUrl = sanitizeTikTokUrl(res.url || url)
     id = extractVideoId(finalUrl)
-    return { url: finalUrl, id }
+    return { url: finalUrl || url, id }
   } catch {
     return { url, id: null }
   }
@@ -97,11 +132,21 @@ async function downloadFromTikmate(url) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'User-Agent': UA
+      'User-Agent': UA,
+      Accept: 'application/json',
     },
     body: `url=${encodeURIComponent(url)}`
   })
-  const data = await res.json()
+  const raw = await res.text()
+  if (raw.trim().startsWith('<')) {
+    throw new Error('TikMate bloqueó la petición')
+  }
+  let data
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    throw new Error('TikMate no devolvió JSON válido')
+  }
   if (!data?.success || !data?.token || !data?.id) {
     throw new Error(data?.message || 'TikMate falló')
   }
@@ -121,14 +166,64 @@ async function downloadFromTikmate(url) {
   }
 }
 
+async function downloadFromDelirius(url) {
+  const base = (global.APIs?.delirius?.url || 'https://api.delirius.online').replace(/\/$/, '')
+  const res = await fetch(`${base}/download/tiktok?url=${encodeURIComponent(url)}`, {
+    headers: { 'User-Agent': UA, Accept: 'application/json' },
+  })
+  const raw = await res.text()
+  if (raw.trim().startsWith('<')) throw new Error('Delirius bloqueó la petición')
+  let data
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    throw new Error('Delirius no devolvió JSON válido')
+  }
+  if (!data?.status && data?.status !== true) {
+    throw new Error(data?.message || data?.msg || 'Delirius falló')
+  }
+  const media = data.data || data.result || data
+  const play =
+    media?.video ||
+    media?.play ||
+    media?.hdplay ||
+    media?.url ||
+    media?.media ||
+    (Array.isArray(media?.media) ? media.media.find(x => x?.url)?.url : '') ||
+    ''
+  const images = Array.isArray(media?.images)
+    ? media.images
+    : Array.isArray(media?.media)
+      ? media.media.filter(x => x?.type === 'image').map(x => x.url).filter(Boolean)
+      : []
+  if (!play && !images.length) throw new Error('Delirius sin media')
+  return {
+    title: media?.title || media?.description || 'TikTok',
+    author: {
+      nickname: media?.author || media?.author?.nickname || media?.nickname,
+      unique_id: media?.unique_id || media?.author?.unique_id,
+    },
+    duration: media?.duration,
+    cover: media?.cover || media?.thumbnail,
+    play: absMedia(play),
+    music: absMedia(media?.music || media?.audio || ''),
+    images: images.map(absMedia),
+    type: images.length && !play ? 'image' : 'video',
+  }
+}
+
 async function downloadTikTok(inputUrl) {
-  const { url, id } = await resolveInputUrl(inputUrl)
+  const clean = sanitizeTikTokUrl(inputUrl)
+  if (!clean) throw new Error('Enlace de TikTok inválido')
+
+  const { url, id } = await resolveInputUrl(clean)
   const attempts = []
   if (id) attempts.push(id)
   if (url) attempts.push(url)
+  if (clean) attempts.push(clean)
 
   let lastErr
-  for (const target of [...new Set(attempts)]) {
+  for (const target of [...new Set(attempts.filter(Boolean))]) {
     try {
       return await downloadFromTikwm(target)
     } catch (e) {
@@ -136,10 +231,17 @@ async function downloadTikTok(inputUrl) {
     }
   }
 
-  try {
-    return await downloadFromTikmate(url || inputUrl)
-  } catch (e) {
-    lastErr = e
+  for (const target of [...new Set([url, clean].filter(Boolean))]) {
+    try {
+      return await downloadFromTikmate(target)
+    } catch (e) {
+      lastErr = e
+    }
+    try {
+      return await downloadFromDelirius(target)
+    } catch (e) {
+      lastErr = e
+    }
   }
 
   throw lastErr || new Error('No se pudo descargar el TikTok')
