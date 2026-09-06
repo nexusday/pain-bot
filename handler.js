@@ -18,7 +18,7 @@ import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
 import { isInviteOpponent } from './lib/michi-users.js'
-import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker } from './lib/rpg-level.js'
+import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker, formatLevelUpMessage } from './lib/rpg-level.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -443,7 +443,7 @@ for (let plugin of processedPlugins) {
 if (m.rpgProgress?.leveled) {
   const rpg = m.rpgProgress
   await this.sendMessage(m.chat, {
-    text: `☾ *¡Subiste de nivel!*\n\n> Nivel *${rpg.before}* → *${rpg.level}*\n> EXP: *${rpg.exp}/${rpg.required}*`,
+    text: formatLevelUpMessage(rpg),
     contextInfo: { ...(global.rcanal?.contextInfo || {}) }
   }, { quoted: m }).catch(() => {})
 }
