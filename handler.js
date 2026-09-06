@@ -18,6 +18,7 @@ import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
 import { isInviteOpponent } from './lib/michi-users.js'
+import { ensureRpgUser, awardCommandProgress } from './lib/rpg-level.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -56,31 +57,30 @@ m.limit = false
 
 try {  
   let user = global.db.data.users[m.sender] ||= {}  
-  if (!isNumber(user.exp)) user.exp = 0  
   if (!isNumber(user.limit)) user.limit = 10  
   if (!('registered' in user)) user.registered = false  
-  if (!user.registered) {  
-
+  if (!user.registered) {
     user.registered = true
     user.name = m.name || m.pushName || 'Usuario'
     user.regTime = Date.now()
     user.age = -1
-    user.level = 0
-    user.coins = 100 
+    user.level = 1
+    user.coins = 100
     user.exp = 0
+    user.commandCount = 0
+    user.stickerCount = 0
     user.genre = 'No establecido'
     user.birth = 'No registrado'
     user.desc = 'Sin descripción'
     user.favourite = 'No establecido'
     user.partner = ''
     user.banned = false
-    user.prem = false    
-    
-
-  }  
-  if (!('banned' in user)) user.banned = false  
-  if (!isNumber(user.level)) user.level = 0  
-  if (!isNumber(user.coins)) user.coins = 0  
+    user.prem = false
+    user.rpgV2 = true
+  }
+  if (!('banned' in user)) user.banned = false
+  if (!isNumber(user.coins)) user.coins = 0
+  ensureRpgUser(user)  
 
   let chat = global.db.data.chats[m.chat] ||= {}  
   if (!('isBanned' in chat)) chat.isBanned = false  
@@ -147,7 +147,6 @@ if (opts['queque'] && m.text && !(isMods || isPrems)) {
 }  
 
 if (m.isBaileys) return  
-m.exp += Math.ceil(Math.random() * 10)  
 
 const groupMetadata = (m.isGroup ? ((this.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
 const participants = (m.isGroup ? groupMetadata.participants : []) || []  
@@ -420,11 +419,28 @@ for (let plugin of processedPlugins) {
       m.plugin = plugin.name
       m.command = command
       m.args = args
+
+      if (m.error == null && !m.rpgAwarded) {
+        const dbUser = global.db.data.users[m.sender]
+        if (dbUser) {
+          const isSticker = Array.isArray(plugin.tags) && plugin.tags.includes('stickers')
+          m.rpgProgress = awardCommandProgress(dbUser, { isSticker })
+          m.rpgAwarded = true
+        }
+      }
     } catch (e) {
       m.error = e
       console.error(`Error ejecutando plugin ${plugin.name}:`, e)
     }
   }
+}
+
+if (m.rpgProgress?.leveled) {
+  const rpg = m.rpgProgress
+  await this.sendMessage(m.chat, {
+    text: `☾ *¡Subiste de nivel!*\n\n> Nivel *${rpg.before}* → *${rpg.level}*\n> EXP: *${rpg.exp}/${rpg.required}*`,
+    contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+  }, { quoted: m }).catch(() => {})
 }
 
 
@@ -675,8 +691,7 @@ if (quequeIndex !== -1) this.msgqueque.splice(quequeIndex, 1)
 let user, stats = global.db.data.stats  
 if (m) {  
   if (m.sender && (user = global.db.data.users[m.sender])) {  
-    user.exp += m.exp  
-    user.limit -= m.limit * 1  
+    if (m.limit) user.limit -= m.limit * 1  
   }  
 
   let stat  

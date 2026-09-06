@@ -1,45 +1,39 @@
 import fs from 'fs'
 import { join } from 'path'
 import { findGroupParticipant } from '../lib/group-participant.js'
+import { getRpgSnapshot, formatNumber } from '../lib/rpg-level.js'
 
 let handler = async (m, { conn, usedPrefix, command }) => {
-  
   let targetUser = m.sender
 
-  
   if (m.mentionedJid && m.mentionedJid.length > 0) {
     targetUser = m.mentionedJid[0]
   }
 
-  const data = global.db.data.users[targetUser]
-
-
-  if (!data || !data.registered) {
-    
-    if (!global.db.data.users[targetUser]) {
-      global.db.data.users[targetUser] = {
-        registered: true,
-        name: 'Usuario', 
-        regTime: Date.now(),
-        age: -1,
-        level: 0,
-        coins: 0,
-        exp: 0,
-        genre: 'No establecido',
-        birth: 'No registrado',
-        desc: 'Sin descripción',
-        favourite: 'No establecido',
-        partner: '',
-        banned: false,
-        prem: false
-      }
-      console.log(`✅ Usuario registrado automáticamente desde perfil: ${targetUser}`)
+  if (!global.db.data.users[targetUser]) {
+    global.db.data.users[targetUser] = {
+      registered: true,
+      name: 'Usuario',
+      regTime: Date.now(),
+      age: -1,
+      level: 1,
+      coins: 0,
+      exp: 0,
+      commandCount: 0,
+      stickerCount: 0,
+      genre: 'No establecido',
+      birth: 'No registrado',
+      desc: 'Sin descripción',
+      favourite: 'No establecido',
+      partner: '',
+      banned: false,
+      prem: false,
+      rpgV2: true,
     }
   }
 
   const userData = global.db.data.users[targetUser]
-
-
+  const rpg = getRpgSnapshot(userData)
 
   const createOwnerIds = (number) => {
     const cleanNumber = number.replace(/[^0-9]/g, '')
@@ -64,17 +58,17 @@ let handler = async (m, { conn, usedPrefix, command }) => {
   let isRAdmin = false
   let isAdmin = false
   let isGroupCreator = false
-  
+
   let targetIsRAdmin = false
   let targetIsAdmin = false
   let targetIsGroupCreator = false
-  
+
   if (m.isGroup) {
     try {
       const groupMetadata = conn.chats[m.chat]?.metadata || await conn.groupMetadata(m.chat).catch(_ => null)
       if (groupMetadata) {
         const participants = groupMetadata.participants || []
-      
+
         const viewerData = findGroupParticipant(participants, m, conn) || {}
         isRAdmin = viewerData?.admin == 'superadmin' || false
         isAdmin = isRAdmin || viewerData?.admin == 'admin' || false
@@ -82,21 +76,18 @@ let handler = async (m, { conn, usedPrefix, command }) => {
                         groupMetadata.subjectOwner === m.sender ||
                         viewerData?.admin === 'superadmin'
 
-        
         const targetData = findGroupParticipant(participants, targetUser, conn) || {}
         targetIsRAdmin = targetData?.admin == 'superadmin' || false
         targetIsAdmin = targetIsRAdmin || targetData?.admin == 'admin' || false
         targetIsGroupCreator = groupMetadata.owner === targetUser ||
                                groupMetadata.subjectOwner === targetUser ||
                                targetData?.admin === 'superadmin'
-
       }
     } catch (error) {
       console.error('Error obteniendo metadata del grupo:', error)
     }
   }
 
-  
   let userRole = 'Miembro'
   if (isROwner || isOwner) {
     if (targetIsGroupCreator) {
@@ -120,7 +111,6 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     userRole = 'Admin del Grupo'
   }
 
-  
   let bancoInfo = 'Sin banco'
   let totalCoins = userData.coins || 0
   if (userData.banco && global.bancos && global.bancos[userData.banco]) {
@@ -142,10 +132,13 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 ╰─╯
 
 ╭─╮  𓍯  𝙴𝚂𝚃𝙰𝙳𝙸𝚂𝚃𝙸𝙲𝙰𝚂  𓍯  
-│  𓂃 ࣪ ִֶָ☾.  𝙽𝙸𝚅𝙴𝙻:  ${userData.level || 0}
-│  𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙸𝙽𝚂:  ${totalCoins} ${global.moneda}
-│  𓂃 ࣪ ִֶָ☾.  𝙴𝚇𝙿𝙴𝚁𝙸𝙴𝙽𝙲𝙸𝙰:  ${userData.exp || 0}
+│  𓂃 ࣪ ִֶָ☾.  𝙽𝙸𝚅𝙴𝙻:  ${rpg.level}
+│  𓂃 ࣪ ִֶָ☾.  𝙴𝚇𝙿:  ${rpg.ratio}
+│  𓂃 ࣪ ִֶָ☾.  ${rpg.bar}
+│  𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙸𝙽𝚂:  ${formatNumber(totalCoins)} ${global.moneda}
 │  𓂃 ࣪ ִֶָ☾.  𝙱𝙰𝙽𝙲𝙾:  ${bancoInfo}
+│  𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂:  ${formatNumber(rpg.commandCount)}
+│  𓂃 ࣪ ִֶָ☾.  𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂:  ${formatNumber(rpg.stickerCount)}
 ╰─╯
 
 ╭─╮  𓍯  𝙸𝙽𝙵𝙾 𝙶𝙴𝙽𝙴𝚁𝙰𝙻  𓍯  
