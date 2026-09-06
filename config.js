@@ -8,9 +8,14 @@ import chalk from 'chalk'
 import { fileURLToPath } from 'url'
 
 
-// CAMBIA POR EL NUMERO QUE VA SER OWNER DEL BOT
+// CAMBIA POR EL NUMERO O TU wa.me/@usuario DEL OWNER
+// Ejemplos válidos:
+//   ['51999999999', 'Sunkovv', true]
+//   ['wa.me/@Sunkovv', 'Sunkovv', true]
+//   ['@Sunkovv', 'Sunkovv', true]
 global.owner = [
-  ['tunumero', 'Sunkovv', true],
+  ['wa.me/@Sunkovv', 'Sunkovv', true],
+  ['wa.me/@14x.zafiro', 'Zafiro(Mod)', true],
 ]
 
 //  ACA PON EL LID DEL OWNER DEL BOT PARA QUE TE HAGA CASO COMO OWNER EL BOT, USA EL COMANDO /ID EN TU 
