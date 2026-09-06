@@ -119,6 +119,60 @@ export function setActiveBotForGroup(chatId, botNumberOrAll) {
   return num
 }
 
+/** Números de principal + subbots conectados. */
+export function listKnownBotNumbers() {
+  const nums = new Set()
+  const push = (jid) => {
+    const n = cleanBotNum(jid)
+    if (n && n.length >= 6) nums.add(n)
+  }
+  push(global.conn?.user?.jid || global.conn?.user?.id)
+  for (const c of global.conns || []) {
+    push(c?.user?.jid || c?.user?.id)
+  }
+  return nums
+}
+
+export function isKnownBotNumber(jidOrNum) {
+  const n = cleanBotNum(jidOrNum)
+  if (!n || n.length < 6) return false
+  return listKnownBotNumbers().has(n)
+}
+
+function extractGroupSenderNum(conn, rawMsg) {
+  const key = rawMsg?.key || {}
+  if (key.fromMe) {
+    return cleanBotNum(conn?.user?.jid || conn?.user?.id)
+  }
+  const candidates = [
+    key.participantPn,
+    key.participant,
+    key.participantAlt,
+    rawMsg?.participant,
+  ].filter(Boolean)
+
+  for (const raw of candidates) {
+    const decoded = decodeJid(conn, raw)
+    const n = cleanBotNum(decoded)
+    if (n.length >= 6) return n
+  }
+  return ''
+}
+
+function isModoSubCommandText(text = '', prefix = '.') {
+  if (!text) return false
+  const str2Regex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
+  const prefixes = Array.isArray(global.prefix) ? global.prefix : [global.prefix || prefix]
+  for (const p of prefixes) {
+    const re = p instanceof RegExp ? p : new RegExp('^' + str2Regex(String(p)))
+    if (!re.test(text)) continue
+    const body = text.replace(re, '').trim()
+    const cmd = body.split(/\s+/)[0]?.toLowerCase() || ''
+    if (['modosub', 'modobot', 'botactivo', 'onlybot'].includes(cmd)) return true
+  }
+  return false
+}
+
 /** Texto del mensaje sin pasar por smsg (para filtro temprano). */
 export function extractRawMessageText(rawMsg) {
   try {
@@ -170,23 +224,41 @@ export function extractRawMessageText(rawMsg) {
 /**
  * Filtro temprano: true = este socket no debe procesar nada en el grupo.
  * Se usa ANTES de pushMessage, DB, plugins y finally.
+ *
+ * Reglas:
+ * 1) Si hay bot activo (/modosub N): SOLO ese bot procesa (también si escribe desde su propio número).
+ * 2) Si está en "all": un mensaje escrito desde un bot lo atiende solo ese bot (fromMe),
+ *    los demás ignoran para no duplicar /rw, menús, etc.
+ * 3) /modosub siempre se deja pasar en todos (para poder cambiar el activo).
  */
 export function shouldSkipGroupMessageEarly(conn, rawMsg) {
-  if (!rawMsg?.key || rawMsg.key.fromMe) return false
+  if (!rawMsg?.key) return false
 
   const chatId = conn?.decodeJid?.(rawMsg.key.remoteJid) || rawMsg.key.remoteJid || ''
   if (!String(chatId).endsWith('@g.us')) return false
   if (!global.db?.data) return false
 
-  const active = getActiveBotForGroup(chatId)
-  if (!active) return false
+  const myNum = cleanBotNum(conn?.user?.jid || conn?.user?.id)
+  if (!myNum) return false
 
   const text = extractRawMessageText(rawMsg)
-  return shouldSkipByModoSub(conn, chatId, {
-    allowModoSubCommand: true,
-    text,
-    prefix: global.prefix
-  })
+  if (isModoSubCommandText(text)) return false
+
+  const active = getActiveBotForGroup(chatId)
+  const fromMe = Boolean(rawMsg.key.fromMe)
+
+  // Bot único elegido: los demás (incluido fromMe de otro subbot) no ejecutan nada
+  if (active) {
+    return myNum !== active
+  }
+
+  // Modo all: evita que principal + sub ejecuten el mismo comando escrito desde un bot
+  if (!fromMe) {
+    const senderNum = extractGroupSenderNum(conn, rawMsg)
+    if (senderNum && isKnownBotNumber(senderNum)) return true
+  }
+
+  return false
 }
 
 /**
@@ -201,17 +273,7 @@ export function shouldSkipByModoSub(conn, chatId, { allowModoSubCommand = false,
   const myNum = cleanBotNum(conn?.user?.jid || conn?.user?.id)
   if (myNum && myNum === active) return false
 
-  if (allowModoSubCommand && text) {
-    const str2Regex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
-    const prefixes = Array.isArray(global.prefix) ? global.prefix : [global.prefix || prefix]
-    for (const p of prefixes) {
-      const re = p instanceof RegExp ? p : new RegExp('^' + str2Regex(String(p)))
-      if (!re.test(text)) continue
-      const body = text.replace(re, '').trim()
-      const cmd = body.split(/\s+/)[0]?.toLowerCase() || ''
-      if (['modosub', 'modobot', 'botactivo', 'onlybot'].includes(cmd)) return false
-    }
-  }
+  if (allowModoSubCommand && isModoSubCommandText(text, prefix)) return false
 
   return true
 }
@@ -281,7 +343,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
   await global.db.write?.()
 
   const tag = selected.type === 'principal' ? 'Bot Principal' : 'Sub-Bot'
-  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${index}.* ${tag} — ${selected.name}\n> +${selected.number}\n\n> Los demás bots ignorarán comandos y bienvenidas aquí.\n> Para volver a todos: *${usedPrefix}modosub all*`)
+  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${index}.* ${tag} — ${selected.name}\n> +${selected.number}\n\n> Los demás bots ignoran comandos aquí (también si escriben desde su propio número).\n> Para volver a todos: *${usedPrefix}modosub all*`)
 }
 
 handler.command = ['modosub', 'modobot', 'botactivo', 'onlybot']
