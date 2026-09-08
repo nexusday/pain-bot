@@ -15,7 +15,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 
 handler.help = ['w', 'rw', 'personaje']
 handler.tags = ['rpg', 'gacha']
-handler.command = ['w', 'rw', 'personaje', 'rollchar', 'gacha']
+handler.command = ['w', 'rw', 'personaje', 'rollchar']
 handler.group = true
 
 export default handler

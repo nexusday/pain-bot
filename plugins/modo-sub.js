@@ -173,7 +173,7 @@ function isModoSubCommandText(text = '', prefix = '.') {
   return false
 }
 
-/** Texto del mensaje sin pasar por smsg (para filtro temprano). */
+
 export function extractRawMessageText(rawMsg) {
   try {
     const root = rawMsg?.message
