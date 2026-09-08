@@ -19,6 +19,7 @@ import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
 import { isInviteOpponent } from './lib/michi-users.js'
 import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker, formatLevelUpMessage } from './lib/rpg-level.js'
+import { trackUserMessage } from './lib/msg-activity.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -69,6 +70,8 @@ try {
     user.exp = 0
     user.commandCount = 0
     user.stickerCount = 0
+    user.msgCount = 0
+    user.msgByChat = {}
     user.genre = 'No establecido'
     user.birth = 'No registrado'
     user.desc = 'Sin descripción'
@@ -147,6 +150,12 @@ if (opts['queque'] && m.text && !(isMods || isPrems)) {
 }  
 
 if (m.isBaileys) return  
+
+try {
+  trackUserMessage(m, this)
+} catch (e) {
+  console.error('msg-activity:', e?.message || e)
+}
 
 if (!m.fromMe && isStickerMessage(m)) {
   const dbUser = global.db.data.users[m.sender]

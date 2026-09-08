@@ -15,7 +15,8 @@
     "fix:sharp": "node scripts/ensure-sharp.js",
     "sync:chars": "node scripts/sync-characters-catalog.js --batch 200 --concurrency 5 --delay 200",
     "sync:chars:fast": "node scripts/sync-characters-catalog.js --batch 400 --concurrency 8 --delay 120",
-    "sync:chars:reset": "node scripts/sync-characters-catalog.js --reset --batch 200 --concurrency 5 --delay 200"
+    "sync:chars:reset": "node scripts/sync-characters-catalog.js --reset --batch 200 --concurrency 5 --delay 200",
+    "enrich:chars:combat": "node scripts/enrich-characters-combat.js"
   },
   "homepage": "https://github.com/nexusday/Pain-Bot",
   "author": {

@@ -2,6 +2,8 @@ import fs from 'fs'
 import { join } from 'path'
 import { findGroupParticipant } from '../lib/group-participant.js'
 import { getRpgSnapshot, formatNumber } from '../lib/rpg-level.js'
+import { ensureMsgStats, getChatMsgCount, getTotalMsgCount } from '../lib/msg-activity.js'
+import { resolveDbUser } from '../lib/michi-users.js'
 
 let handler = async (m, { conn, usedPrefix, command }) => {
   let targetUser = m.sender
@@ -9,6 +11,9 @@ let handler = async (m, { conn, usedPrefix, command }) => {
   if (m.mentionedJid && m.mentionedJid.length > 0) {
     targetUser = m.mentionedJid[0]
   }
+
+  const resolved = resolveDbUser(targetUser, conn)
+  targetUser = resolved.jid || targetUser
 
   if (!global.db.data.users[targetUser]) {
     global.db.data.users[targetUser] = {
@@ -21,6 +26,8 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       exp: 0,
       commandCount: 0,
       stickerCount: 0,
+      msgCount: 0,
+      msgByChat: {},
       genre: 'No establecido',
       birth: 'No registrado',
       desc: 'Sin descripción',
@@ -33,7 +40,10 @@ let handler = async (m, { conn, usedPrefix, command }) => {
   }
 
   const userData = global.db.data.users[targetUser]
+  ensureMsgStats(userData)
   const rpg = getRpgSnapshot(userData)
+  const msgTotal = getTotalMsgCount(userData)
+  const msgGroup = m.isGroup ? getChatMsgCount(userData, m.chat, conn) : 0
 
   const createOwnerIds = (number) => {
     const cleanNumber = number.replace(/[^0-9]/g, '')
@@ -139,6 +149,8 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 │  𓂃 ࣪ ִֶָ☾.  𝙱𝙰𝙽𝙲𝙾:  ${bancoInfo}
 │  𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂:  ${formatNumber(rpg.commandCount)}
 │  𓂃 ࣪ ִֶָ☾.  𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂:  ${formatNumber(rpg.stickerCount)}
+│  𓂃 ࣪ ִֶָ☾.  𝙼𝚂𝙶 𝙶𝚁𝚄𝙿𝙾:  ${m.isGroup ? formatNumber(msgGroup) : '—'}
+│  𓂃 ࣪ ִֶָ☾.  𝙼𝚂𝙶 𝚃𝙾𝚃𝙰𝙻:  ${formatNumber(msgTotal)}
 ╰─╯
 
 ╭─╮  𓍯  𝙸𝙽𝙵𝙾 𝙶𝙴𝙽𝙴𝚁𝙰𝙻  𓍯  
