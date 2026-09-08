@@ -1,42 +1,5 @@
 import { listInactiveInGroup } from '../lib/msg-activity.js'
 
-const MAX_CHARS = 3500
-
-function buildBlocks(inactive) {
-  return inactive.map((row, i) => {
-    const pos = i + 1
-    return [
-      `*#${pos}* @${String(row.jid).split('@')[0]}`,
-      `> 𓂃 ࣪ ִֶָ☾.  ${row.name}`,
-      `> 𓂃 ࣪ ִֶָ☾.  Mensajes en este grupo: *0*`,
-    ].join('\n')
-  })
-}
-
-function chunkBlocks(blocks, headerLines, footerLines) {
-  const header = headerLines.join('\n')
-  const footer = footerLines.filter(Boolean).join('\n')
-  const chunks = []
-  let current = []
-  let size = header.length + footer.length + 4
-
-  for (const block of blocks) {
-    const add = block.length + 2
-    if (current.length && size + add > MAX_CHARS) {
-      chunks.push([header, '', ...current, '', footer].filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n'))
-      current = []
-      size = header.length + footer.length + 4
-    }
-    current.push(block)
-    size += add
-  }
-
-  if (current.length) {
-    chunks.push([header, '', ...current, '', footer].filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n'))
-  }
-  return chunks
-}
-
 let handler = async (m, { conn, usedPrefix }) => {
   if (!m.isGroup) {
     return conn.sendMessage(m.chat, {
@@ -46,12 +9,16 @@ let handler = async (m, { conn, usedPrefix }) => {
   }
 
   try {
-    let participants = []
-    try {
-      const meta = await conn.groupMetadata(m.chat)
-      participants = meta?.participants || []
-    } catch {
-      participants = conn.chats?.[m.chat]?.metadata?.participants || []
+    // Cache local primero (evita groupMetadata lento)
+    let participants = conn.chats?.[m.chat]?.metadata?.participants || []
+    if (!participants.length) {
+      try {
+        const meta = await conn.groupMetadata(m.chat)
+        participants = meta?.participants || []
+        if (conn.chats?.[m.chat]) {
+          conn.chats[m.chat].metadata = meta
+        }
+      } catch {}
     }
 
     const inactive = listInactiveInGroup(conn, m.chat, participants)
@@ -63,29 +30,25 @@ let handler = async (m, { conn, usedPrefix }) => {
     }
 
     const mentions = inactive.map(x => x.jid)
-    const blocks = buildBlocks(inactive)
-    const header = [
+    // Formato compacto: 1 línea por persona (mensaje único y rápido)
+    const list = inactive
+      .map((row, i) => `*#${i + 1}* @${String(row.jid).split('@')[0]}`)
+      .join('\n')
+
+    const text = [
       `👻 *TOP INACTIVOS*`,
-      `> Miembros sin mensajes en *este grupo*`,
-      `> Total: *${inactive.length}*`,
-    ]
-    const footer = [
+      `> Sin mensajes en *este grupo* · Total: *${inactive.length}*`,
+      ``,
+      list,
+      ``,
       `> Perfil: *${usedPrefix || '.'}perfil @user*`,
-    ]
+    ].join('\n')
 
-    const parts = chunkBlocks(blocks, header, footer)
-
-    for (let i = 0; i < parts.length; i++) {
-      const text = parts.length > 1
-        ? `${parts[i]}\n> Parte *${i + 1}/${parts.length}*`
-        : parts[i]
-
-      await conn.sendMessage(m.chat, {
-        text,
-        mentions,
-        contextInfo: { ...(global.rcanal?.contextInfo || {}) },
-      }, { quoted: i === 0 ? m : undefined })
-    }
+    await conn.sendMessage(m.chat, {
+      text,
+      mentions,
+      contextInfo: { ...(global.rcanal?.contextInfo || {}) },
+    }, { quoted: m })
   } catch (e) {
     console.error('topinactivos:', e)
     await conn.sendMessage(m.chat, {
