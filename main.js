@@ -17,6 +17,7 @@ import path, { join } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { platform } from 'process'
 import * as ws from 'ws'
+const { CONNECTING } = ws
 import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, watch, mkdirSync } from 'fs'
 import yargs from 'yargs'
 import chalk from 'chalk'
@@ -490,14 +491,36 @@ global.reconnectSubBots = async function() {
       }
 
      
-      const isAlreadyConnected = global.conns.some(conn => 
-        conn.user && conn.user.jid && conn.user.jid.includes(folder)
-      )
+      const isSubBotAlive = (c) => {
+        if (!c?.user?.jid) return false
+        try {
+          if (c.ws?.isOpen === true) return true
+          const st = c.ws?.socket?.readyState
+          return st === 1 || st === CONNECTING
+        } catch {
+          return false
+        }
+      }
+
+      const folderDigits = String(folder).replace(/\D/g, '')
+      const isAlreadyConnected = global.conns.some(c => {
+        if (!isSubBotAlive(c)) return false
+        const jidDigits = String(c.user.jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+        return jidDigits && folderDigits && jidDigits === folderDigits
+      })
 
       if (isAlreadyConnected) {
         console.log(chalk.green(`Sub-bot ${folder} ya está conectado`))
         continue
       }
+
+      // Quitar entradas muertas del mismo número antes de reconectar
+      global.conns = global.conns.filter(c => {
+        if (!c?.user?.jid) return isSubBotAlive(c)
+        const jidDigits = String(c.user.jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+        if (jidDigits === folderDigits && !isSubBotAlive(c)) return false
+        return true
+      })
 
       
       const serbotModule = await import('./plugins/serbot-serbot.js')

@@ -225,14 +225,59 @@ export async function AYBot(options) {
     let pairingCodeSent = false
     let pairingInProgress = false
     let hadNewLogin = false
+    let reconnecting = false
+    let lastSeenUserAt = Date.now()
+    let watchdogTimer = null
     const pairingPhone = phoneNumber
+    const botFolderId = path.basename(pathAYBot)
 
     const replyUser = async (text) => {
       return sendPrivateReply(m, conn, text, { contextInfo: { ...rcanal.contextInfo } })
     }
 
     function isSocketOpen() {
-      return sock?.ws?.isOpen === true
+      try {
+        if (sock?.ws?.isOpen === true) return true
+        const st = sock?.ws?.socket?.readyState
+        return st === ws.OPEN || st === CONNECTING
+      } catch {
+        return false
+      }
+    }
+
+    function removeSockFromConns(target = sock) {
+      if (!Array.isArray(global.conns)) return
+      const i = global.conns.indexOf(target)
+      if (i >= 0) {
+        global.conns.splice(i, 1)
+      }
+    }
+
+    function stopWatchdog() {
+      if (watchdogTimer) {
+        clearInterval(watchdogTimer)
+        watchdogTimer = null
+      }
+    }
+
+    function isFatalSessionReason(reason) {
+      return (
+        reason === DisconnectReason.loggedOut || // 401
+        reason === 405 ||
+        reason === DisconnectReason.connectionReplaced || // 440
+        reason === DisconnectReason.forbidden || // 403
+        reason === DisconnectReason.multideviceMismatch // 411
+      )
+    }
+
+    async function wipeSubBotFolder() {
+      try {
+        if (fs.existsSync(pathAYBot)) {
+          fs.rmSync(pathAYBot, { recursive: true, force: true })
+        }
+      } catch (error) {
+        console.log(chalk.bold.redBright(`\n┆ Error eliminando carpeta ${pathAYBot}: ${error.message}\n`))
+      }
     }
 
     async function sendPairingCode() {
@@ -296,11 +341,8 @@ export async function AYBot(options) {
         if (!loaded) {
           try { sock.ws.close() } catch { }
           sock.ev.removeAllListeners()
-          let i = global.conns.indexOf(sock)
-          if (i >= 0) {
-            delete global.conns[i]
-            global.conns.splice(i, 1)
-          }
+          removeSockFromConns(sock)
+          stopWatchdog()
         }
       }
 
@@ -310,66 +352,65 @@ export async function AYBot(options) {
         const isPairingFlow = mcode && !state.creds.registered
 
         if (pairingInProgress) {
-          console.log(chalk.bold.yellow(`\n┆ Pairing en curso (+${path.basename(pathAYBot)}) esperando código...\n`))
+          console.log(chalk.bold.yellow(`\n┆ Pairing en curso (+${botFolderId}) esperando código...\n`))
           return
         }
 
-        if ([428, 408, 515].includes(reason)) {
-          if (mcode && !state.creds.registered && !pairingCodeSent) {
-            console.log(chalk.bold.yellow(`\n┆ Pairing (+${path.basename(pathAYBot)}) esperando vinculación (${reason})\n`))
-            return
-          }
-          console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${path.basename(pathAYBot)}) desconectado (${reason}). Intentando reconectar...\n`))
-          await creloadHandler(true).catch(console.error)
-        }
-
-        if ([405, 401].includes(reason)) {
-          console.log(chalk.bold.magentaBright(`\n┆ Sesión inválida o cerrada manualmente. (+${path.basename(pathAYBot)})\n`))
+        // Cierre fatal de sesión (logout / reemplazo / prohibido): no reconectar en bucle
+        if (isFatalSessionReason(reason)) {
+          console.log(chalk.bold.magentaBright(`\n┆ Sesión fatal (+${botFolderId}) código ${reason}. Limpiando...\n`))
           if (mcode && !state.creds.registered) {
             clearSubBotAuth(pathAYBot)
           } else {
-            try {
-              if (fs.existsSync(pathAYBot)) {
-                fs.rmSync(pathAYBot, { recursive: true, force: true })
-              }
-            } catch (error) {
-              console.log(chalk.bold.redBright(`\n┆ Error eliminando carpeta ${pathAYBot}: ${error.message}\n`))
-            }
+            await wipeSubBotFolder()
           }
+          try { sock.ws.close() } catch {}
+          removeSockFromConns(sock)
+          stopWatchdog()
+          return
         }
 
-        if (reason === 440 || reason === 403) {
-          console.log(chalk.bold.magentaBright(`\n┆ Sesión reemplazada o en soporte. Eliminando carpeta...\n`))
-          try {
-            if (fs.existsSync(pathAYBot)) {
-          fs.rmSync(pathAYBot, { recursive: true, force: true })
-            }
-          } catch (error) {
-            console.log(chalk.bold.redBright(`\n┆ Error eliminando carpeta ${pathAYBot}: ${error.message}\n`))
-          }
+        // Desconexión temporal (red, 503, timeout, restart, sin código…): reconectar
+        if (isPairingFlow && !pairingCodeSent) {
+          console.log(chalk.bold.yellow(`\n┆ Pairing (+${botFolderId}) esperando vinculación (${reason})\n`))
+          return
         }
-
-        if (reason === 500) {
-          if (mcode && !state.creds.registered) {
-            console.log(chalk.bold.yellow(`\n┆ Pairing (+${path.basename(pathAYBot)}) conexión interrumpida, esperando...\n`))
-            return
-          }
-          console.log(chalk.bold.magentaBright(`\n┆ Conexión perdida. Eliminando sesión...\n`))
-          return creloadHandler(true).catch(console.error)
+        if (isPairingFlow && !state.creds.registered) {
+          console.log(chalk.bold.yellow(`\n┆ Pairing (+${botFolderId}) conexión interrumpida (${reason}), esperando...\n`))
+          return
         }
+        if (reconnecting) {
+          console.log(chalk.bold.yellow(`\n┆ Subbot (+${botFolderId}) ya reconectando, se omite duplicado (${reason})\n`))
+          return
+        }
+        reconnecting = true
+        console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${botFolderId}) desconectado (${reason ?? 'sin código'}). Reconectando...\n`))
+        try {
+          await creloadHandler(true)
+          // Si no abre en 45s, permitir otro intento
+          setTimeout(() => {
+            if (reconnecting && !sock?.user) reconnecting = false
+          }, 45000)
+        } catch (e) {
+          console.error(`Error reconectando subbot ${botFolderId}:`, e?.message || e)
+          reconnecting = false
+        }
+        return
       }
 
       if (global.db.data == null) loadDatabase()
 
       if (connection === 'open') {
+        reconnecting = false
+        lastSeenUserAt = Date.now()
         if (!global.db.data?.users) loadDatabase()
 
-        console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${path.basename(pathAYBot)}) conectado exitosamente.`))
+        console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${botFolderId}) conectado exitosamente.`))
         sock.isInit = true
         try {
           const { markBotStart } = await import('../lib/bot-uptime.js')
        
-          markBotStart(path.basename(pathAYBot))
+          markBotStart(botFolderId)
           markBotStart(sock)
         } catch {
           if (!sock.startTime) sock.startTime = Date.now()
@@ -385,7 +426,7 @@ export async function AYBot(options) {
         
        
                 try {
-          const botNumber = path.basename(pathAYBot)
+          const botNumber = botFolderId
           const configPath = path.join(pathAYBot, 'config.json')
           let nombreBot = global.namebot || 'PAIN BOT'
           let subConfig = { name: nombreBot, autoRead: false }
@@ -422,16 +463,24 @@ export async function AYBot(options) {
       }
     }
 
-    setInterval(async () => {
-      if (!sock.user) {
-        try { sock.ws.close() } catch (e) { }
-        sock.ev.removeAllListeners()
-        let i = global.conns.indexOf(sock)
-        if (i >= 0) {
-          delete global.conns[i]
-          global.conns.splice(i, 1)
+    // Antes: cerraba el socket si !sock.user a los 60s (mata reconexiones a medias).
+    // Ahora solo limpia sockets realmente muertos tras varios minutos sin user y sin WS abierto.
+    stopWatchdog()
+    watchdogTimer = setInterval(() => {
+      try {
+        if (sock?.user) {
+          lastSeenUserAt = Date.now()
+          return
         }
-      }
+        if (reconnecting || pairingInProgress || isSocketOpen()) return
+        if (Date.now() - lastSeenUserAt < 3 * 60 * 1000) return
+
+        console.log(chalk.bold.yellow(`\n┆ Watchdog: subbot (+${botFolderId}) muerto sin user. Limpiando...\n`))
+        try { sock.ws.close() } catch (e) { }
+        try { sock.ev.removeAllListeners() } catch {}
+        removeSockFromConns(sock)
+        stopWatchdog()
+      } catch {}
     }, 60000)
 
     let handler = await import('../handler.js')
