@@ -155,7 +155,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   }
 }
 
-handler.command = ['adg', 'addgroup', 'addgp']
+//handler.command = ['adg', 'addgroup', 'addgp']
 handler.group = true
 handler.admin = true
 handler.botAdmin = true
