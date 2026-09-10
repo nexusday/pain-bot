@@ -20,8 +20,7 @@ global.owner = [
 //  ACA PON EL LID DEL OWNER DEL BOT PARA QUE TE HAGA CASO COMO OWNER EL BOT, USA EL COMANDO /ID EN TU 
 //PRIVADO PARA SACAR TU LID
 global.ownerLid = [
-  ['198119006412828', 'Sunkovv', true]
-  ['acaElLiD', 'nombre', true],
+  ['198119006412828', 'Sunkovv', true],
 ]
 
 global.sessions = 'Sessions'

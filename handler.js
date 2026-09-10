@@ -121,23 +121,35 @@ if (typeof m.text !== 'string') m.text = ''
 let _user = global.db.data?.users?.[m.sender]  
 
 const createOwnerIds = (number) => {
-  const cleanNumber = number.replace(/[^0-9]/g, '')
+  const cleanNumber = String(number || '').replace(/[^0-9]/g, '')
+  if (!cleanNumber) return []
   return [
     cleanNumber + '@s.whatsapp.net',
     cleanNumber + '@lid'
   ]
 }
 
+const ownerList = Array.isArray(global.owner) ? global.owner : []
+const ownerLidList = Array.isArray(global.ownerLid) ? global.ownerLid : []
+const modsList = Array.isArray(global.mods) ? global.mods : []
+const premsList = Array.isArray(global.prems) ? global.prems : []
+
 const allOwnerIds = [
   conn.decodeJid(global.conn.user.id),
-  ...global.owner.flatMap(([number]) => createOwnerIds(number)),
-  ...(global.ownerLid || []).flatMap(([number]) => createOwnerIds(number))
+  ...ownerList.flatMap((entry) => {
+    const number = Array.isArray(entry) ? entry[0] : entry
+    return createOwnerIds(number)
+  }),
+  ...ownerLidList.flatMap((entry) => {
+    const number = Array.isArray(entry) ? entry[0] : entry
+    return createOwnerIds(number)
+  })
 ]
 
 const isROwner = allOwnerIds.includes(m.sender)
 const isOwner = isROwner || m.fromMe  
-const isMods = isOwner || global.mods.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)  
-const isPrems = isROwner || global.prems.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || _user?.prem == true  
+const isMods = isOwner || modsList.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)  
+const isPrems = isROwner || premsList.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || _user?.prem == true  
 
 if (opts['queque'] && m.text && !(isMods || isPrems)) {  
   let queque = this.msgqueque, time = 1000 * 5  
