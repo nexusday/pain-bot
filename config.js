@@ -22,7 +22,6 @@ global.owner = [
 //PRIVADO PARA SACAR TU LID
 global.ownerLid = [
   ['198119006412828', 'Sunkovv', true],
-  ['120298544349272', 'Zafiro(Mod)', true],
   ['acaElLiD', 'nombre', true]
 ]
 
