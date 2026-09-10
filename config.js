@@ -15,14 +15,13 @@ import { fileURLToPath } from 'url'
 //   ['@Sunkovv', 'Sunkovv', true]
 global.owner = [
   ['wa.me/@Sunkovv', 'Sunkovv', true],
-  ['wa.me/@14x.zafiro', 'Zafiro(Mod)', true],
 ]
 
 //  ACA PON EL LID DEL OWNER DEL BOT PARA QUE TE HAGA CASO COMO OWNER EL BOT, USA EL COMANDO /ID EN TU 
 //PRIVADO PARA SACAR TU LID
 global.ownerLid = [
-  ['198119006412828', 'Sunkovv', true],
-  ['acaElLiD', 'nombre', true]
+  ['198119006412828', 'Sunkovv', true]
+  ['acaElLiD', 'nombre', true],
 ]
 
 global.sessions = 'Sessions'
