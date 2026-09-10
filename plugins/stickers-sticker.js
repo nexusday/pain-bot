@@ -25,8 +25,18 @@ let handler = async (m, { conn, args }) => {
 
     const stickerData = await toWebp(buffer)
     const finalSticker = await addExif(stickerData, packname, author)
+    const animated = isAnimatedWebP(finalSticker)
 
-    await conn.sendFile(m.chat, finalSticker, 'sticker.webp', '', m, null, rcanal)
+    
+    await conn.sendMessage(
+      m.chat,
+      {
+        sticker: finalSticker,
+        ...(animated ? { isAnimated: true } : {}),
+        contextInfo: rcanal?.contextInfo
+      },
+      { quoted: m }
+    )
   } catch (e) {
     console.error(e)
     conn.reply(m.chat, '[❌] Error al crear el sticker.', m, rcanal)
@@ -70,51 +80,111 @@ function cleanupTempFiles(...filePaths) {
   })
 }
 
-async function toWebp(buffer, opts = {}) {
-  const { ext } = await fromBuffer(buffer)
-  if (!/(png|jpg|jpeg|mp4|mkv|m4p|gif|webp|webm)/i.test(ext)) throw '[❌] Archivo no compatible.'
+/** Detecta WebP animado (ANIM/ANMF o flag VP8X). */
+export function isAnimatedWebP(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 20) return false
+  if (buffer[0] !== 0x52 || buffer[1] !== 0x49 || buffer[2] !== 0x46 || buffer[3] !== 0x46) return false
+  if (buffer.toString('ascii', 8, 12) !== 'WEBP') return false
 
-  
-  const tempDir = path.join(process.cwd(), 'tmp')
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true })
+  let offset = 12
+  while (offset + 8 <= buffer.length) {
+    const chunkFourCC = buffer.toString('ascii', offset, offset + 4)
+    const chunkSize = buffer.readUInt32LE(offset + 4)
+    if (chunkFourCC === 'ANIM' || chunkFourCC === 'ANMF') return true
+    if (chunkFourCC === 'VP8X' && offset + 8 < buffer.length) {
+      if (buffer[offset + 8] & 0x02) return true
+    }
+    offset += 8 + chunkSize + (chunkSize % 2)
+    if (chunkSize < 0) break
   }
-  const input = path.join(tempDir, `${Date.now()}.${ext}`)
-  const output = path.join(tempDir, `${Date.now()}.webp`)
+  return false
+}
 
+/**
+ * Imagen → webp estático.
+ * Video/GIF → webp animado (máx ~7s, peso controlado) para WhatsApp.
+ */
+async function toWebp(buffer) {
+  const type = await fromBuffer(buffer)
+  if (!type?.ext) throw '[❌] Archivo no compatible.'
+  const { ext, mime } = type
+  if (!/(png|jpe?g|mp4|mkv|m4p|gif|webp|webm)/i.test(ext)) throw '[❌] Archivo no compatible.'
+
+  // Ya es webp animado: no re-encodificar (rompe frames a veces)
+  if (ext === 'webp' && isAnimatedWebP(buffer)) return buffer
+
+  const isAnimInput =
+    /(mp4|mkv|m4p|gif|webm)/i.test(ext) ||
+    /video\//i.test(mime || '') ||
+    /gif/i.test(mime || '')
+
+  const tempDir = path.join(process.cwd(), 'tmp')
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+
+  const stamp = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  const input = path.join(tempDir, `${stamp}.${ext}`)
+  const output = path.join(tempDir, `${stamp}.webp`)
   fs.writeFileSync(input, buffer)
 
-  const options = [
-    '-vcodec', 'libwebp',
-    '-vf', `scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,fps=15,split[a][b];[a]palettegen=reserve_transparent=on:transparency_color=ffffff[p];[b][p]paletteuse`,
-    ...(ext.match(/(mp4|mkv|m4p|gif|webm)/)
-      ? ['-loop', '0', '-preset', 'default', '-an', '-vsync', '0']
-      : []
-    )
-  ]
+  const runFfmpeg = (quality = 50, durationSec = 7) =>
+    new Promise((resolve, reject) => {
+      const options = isAnimInput
+        ? [
+            '-vcodec', 'libwebp',
+            // Sin palettegen: más fiable para animación en WA. Pad con -1:-1.
+            '-vf',
+            'scale=512:512:force_original_aspect_ratio=decrease,fps=15,pad=512:512:-1:-1:color=white@0.0,setsar=1',
+            '-loop', '0',
+            '-ss', '0',
+            '-t', String(durationSec),
+            '-preset', 'default',
+            '-an',
+            '-vsync', '0',
+            '-q:v', String(quality)
+          ]
+        : [
+            '-vcodec', 'libwebp',
+            '-vf',
+            'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:-1:-1:color=0x00000000,setsar=1',
+            '-frames:v', '1',
+            '-lossless', '0',
+            '-compression_level', '6',
+            '-q:v', '60'
+          ]
 
-  return new Promise((resolve, reject) => {
-    fluent(input)
-      .addOutputOptions(options)
-      .toFormat('webp')
-      .save(output)
-      .on('end', () => {
-        try {
-          const result = fs.readFileSync(output)
-          
-          cleanupTempFiles(input, output)
-          resolve(result)
-        } catch (error) {
-          cleanupTempFiles(input, output)
-          reject(error)
-        }
-      })
-      .on('error', (err) => {
-        
-        cleanupTempFiles(input)
-        reject(err)
-      })
-  })
+      fluent(input)
+        .addOutputOptions(options)
+        .toFormat('webp')
+        .save(output)
+        .on('end', () => {
+          try {
+            resolve(fs.readFileSync(output))
+          } catch (err) {
+            reject(err)
+          }
+        })
+        .on('error', reject)
+    })
+
+  try {
+    let result = await runFfmpeg(50, 7)
+
+    // WhatsApp anima bien bajo ~1MB; si pesa mucho, recomprimir / acortar
+    if (isAnimInput && result.length > 900 * 1024) {
+      result = await runFfmpeg(35, 6)
+    }
+    if (isAnimInput && result.length > 900 * 1024) {
+      result = await runFfmpeg(25, 5)
+    }
+
+    if (isAnimInput && !isAnimatedWebP(result)) {
+      throw new Error('FFmpeg generó un webp sin animación')
+    }
+
+    return result
+  } finally {
+    cleanupTempFiles(input, output)
+  }
 }
 
 function isUrl(text) {
