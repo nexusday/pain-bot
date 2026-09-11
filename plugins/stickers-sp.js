@@ -1,7 +1,14 @@
 import sharp from '../lib/sharp.js'
 import fetch from 'node-fetch'
+import { readFileSync, existsSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import fontkit from '@pdf-lib/fontkit'
 import { addExif } from '../lib/sticker.js'
 import { resolveStickerMeta } from './stickers-sticker.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const RUTA_FUENTE = join(__dirname, '../lib/fonts/NotoSans-Bold.ttf')
 
 const SIZE = 512
 const PADDING = 36
@@ -14,18 +21,28 @@ const LINE_RATIO = 1.05
 const BG = '#FFFFFF'
 const FG = '#000000'
 const BLUR_BRAT = 2.4
-const FAMILIA =
-  'Arial, Helvetica, DejaVu Sans, Liberation Sans, FreeSans, Nimbus Sans L, sans-serif'
+const TRACKING = -0.035
 
 const WA_EMOJI_CDN = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
 const WA_EMOJI_FALLBACK = 'https://emoji-cdn.mqrio.dev'
 
 const cachePngEmoji = new Map()
 const cacheAnchoTexto = new Map()
+let fuenteBrat = null
+
 const segmentadorGrafemas =
   typeof Intl !== 'undefined' && Intl.Segmenter
     ? new Intl.Segmenter('und', { granularity: 'grapheme' })
     : null
+
+function obtenerFuente() {
+  if (fuenteBrat) return fuenteBrat
+  if (!existsSync(RUTA_FUENTE)) {
+    throw new Error('Falta lib/fonts/NotoSans-Bold.ttf')
+  }
+  fuenteBrat = fontkit.create(readFileSync(RUTA_FUENTE))
+  return fuenteBrat
+}
 
 function escaparXml(texto) {
   return String(texto)
@@ -152,80 +169,80 @@ function tokenizar(texto) {
   return tokens
 }
 
-function atributosFuente(tamanoFuente) {
-  return (
-    `font-family="${FAMILIA}" font-size="${tamanoFuente}" font-weight="700" fill="${FG}"`
-  )
+function escalaFuente(tamanoFuente) {
+  return tamanoFuente / obtenerFuente().unitsPerEm
 }
 
-async function medirAnchoTexto(texto, tamanoFuente) {
+function trackingPx(tamanoFuente) {
+  return Math.max(-4, tamanoFuente * TRACKING)
+}
+
+function medirAnchoTexto(texto, tamanoFuente) {
   const clave = `${tamanoFuente}::${texto}`
   if (cacheAnchoTexto.has(clave)) return cacheAnchoTexto.get(clave)
 
-  const rellenoX = 8
-  const altura = Math.ceil(tamanoFuente * 2.2)
-  const estimacion = Math.ceil(tamanoFuente * Math.max(1, texto.length) * 1.1 + rellenoX * 2)
-  const ancho = Math.min(1200, Math.max(64, estimacion))
+  const fuente = obtenerFuente()
+  const escala = escalaFuente(tamanoFuente)
+  const run = fuente.layout(texto)
+  const tracking = trackingPx(tamanoFuente)
+  const extras = Math.max(0, run.glyphs.length - 1) * tracking
+  const medido = Math.max(1, Math.ceil(run.advanceWidth * escala + extras))
+  cacheAnchoTexto.set(clave, medido)
+  return medido
+}
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${altura}">
-  <rect width="100%" height="100%" fill="#ffffff"/>
-  <text x="${rellenoX}" y="${Math.round(tamanoFuente * 1.35)}" ${atributosFuente(tamanoFuente)}>${escaparXml(texto)}</text>
-</svg>`
+function textoAPathsSvg(texto, x, y, tamanoFuente) {
+  const fuente = obtenerFuente()
+  const escala = escalaFuente(tamanoFuente)
+  const tracking = trackingPx(tamanoFuente)
+  const run = fuente.layout(texto)
+  const partes = []
+  let pen = 0
 
-  try {
-    const { data, info } = await sharp(Buffer.from(svg))
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-
-    let minX = info.width
-    let maxX = -1
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) {
-        const x = (i / 4) % info.width
-        if (x < minX) minX = x
-        if (x > maxX) maxX = x
-      }
+  for (let i = 0; i < run.glyphs.length; i++) {
+    const glyph = run.glyphs[i]
+    const pos = run.positions[i]
+    const d = glyph.path?.toSVG?.() || ''
+    if (d) {
+      const px = x + (pen + (pos.xOffset || 0)) * escala + i * tracking
+      const py = y - (pos.yOffset || 0) * escala
+      partes.push(
+        `<path d="${d}" transform="translate(${px.toFixed(2)},${py.toFixed(2)}) scale(${escala},${-escala})" fill="${FG}"/>`
+      )
     }
-
-    const medido =
-      maxX >= minX ? maxX - minX + 1 + 4 : Math.ceil(tamanoFuente * texto.length * 0.55)
-    cacheAnchoTexto.set(clave, medido)
-    return medido
-  } catch {
-    const alternativa = Math.ceil(tamanoFuente * texto.length * 0.62)
-    cacheAnchoTexto.set(clave, alternativa)
-    return alternativa
+    pen += pos.xAdvance
   }
+
+  return partes.join('')
 }
 
 function anchoEmoji(tamanoFuente) {
   return Math.round(tamanoFuente * 1.05)
 }
 
-async function anchoToken(token, tamanoFuente) {
+function anchoToken(token, tamanoFuente) {
   if (token.type === 'emoji') return anchoEmoji(tamanoFuente)
   return medirAnchoTexto(token.text, tamanoFuente)
 }
 
-async function anchoLinea(tokens, tamanoFuente, espacio) {
+function anchoLinea(tokens, tamanoFuente, espacio) {
   if (!tokens.length) return 0
   let anchoCalc = 0
   for (let i = 0; i < tokens.length; i++) {
-    anchoCalc += await anchoToken(tokens[i], tamanoFuente)
+    anchoCalc += anchoToken(tokens[i], tamanoFuente)
     if (i < tokens.length - 1) anchoCalc += espacio
   }
   return anchoCalc
 }
 
-async function envolverTokens(tokens, tamanoFuente) {
+function envolverTokens(tokens, tamanoFuente) {
   const espacioBase = Math.max(8, tamanoFuente * 0.22)
   const lineas = []
   let actual = []
 
   for (const token of tokens) {
     const prueba = [...actual, token]
-    const anchoCalc = await anchoLinea(prueba, tamanoFuente, espacioBase)
+    const anchoCalc = anchoLinea(prueba, tamanoFuente, espacioBase)
     if (anchoCalc <= CONTENT_WIDTH || actual.length === 0) {
       actual.push(token)
       continue
@@ -237,7 +254,7 @@ async function envolverTokens(tokens, tamanoFuente) {
   return lineas
 }
 
-async function envolverTexto(texto, tamanoFuente) {
+function envolverTexto(texto, tamanoFuente) {
   const lineas = []
   for (const parrafo of texto.split('\n')) {
     const recortado = parrafo.trim()
@@ -245,22 +262,22 @@ async function envolverTexto(texto, tamanoFuente) {
       if (lineas.length) lineas.push([])
       continue
     }
-    lineas.push(...(await envolverTokens(tokenizar(recortado), tamanoFuente)))
+    lineas.push(...envolverTokens(tokenizar(recortado), tamanoFuente))
   }
   return lineas.length ? lineas : [tokenizar(texto)]
 }
 
-async function ajustarDiseno(texto) {
+function ajustarDiseno(texto) {
   let tamanoFuente = 108
   let lineas = []
 
   while (tamanoFuente >= 14) {
-    lineas = await envolverTexto(texto, tamanoFuente)
+    lineas = envolverTexto(texto, tamanoFuente)
     const alturaBloque = Math.max(1, lineas.length) * tamanoFuente * LINE_RATIO
     const espacioBase = Math.max(8, tamanoFuente * 0.22)
     let anchoOk = true
     for (const linea of lineas) {
-      if ((await anchoLinea(linea, tamanoFuente, espacioBase)) > CONTENT_WIDTH) {
+      if (anchoLinea(linea, tamanoFuente, espacioBase) > CONTENT_WIDTH) {
         anchoOk = false
         break
       }
@@ -271,7 +288,7 @@ async function ajustarDiseno(texto) {
 
   if (tamanoFuente < 14) {
     tamanoFuente = 14
-    lineas = await envolverTexto(texto, tamanoFuente)
+    lineas = envolverTexto(texto, tamanoFuente)
   }
 
   return { lineas, tamanoFuente, alturaLinea: tamanoFuente * LINE_RATIO }
@@ -282,8 +299,7 @@ async function lineaASvg(tokens, tamanoFuente, y) {
 
   const tamanoEmoji = anchoEmoji(tamanoFuente)
   const emojiY = y - tamanoFuente * 0.88
-  const anchos = []
-  for (const token of tokens) anchos.push(await anchoToken(token, tamanoFuente))
+  const anchos = tokens.map(token => anchoToken(token, tamanoFuente))
 
   const natural = anchos.reduce((a, b) => a + b, 0)
   const cantidadEspacios = Math.max(0, tokens.length - 1)
@@ -299,7 +315,6 @@ async function lineaASvg(tokens, tamanoFuente, y) {
   let total = natural + espacio * cantidadEspacios
   if (total > CONTENT_WIDTH && cantidadEspacios > 0) {
     espacio = Math.max(4, (CONTENT_WIDTH - natural) / cantidadEspacios)
-    total = natural + espacio * cantidadEspacios
   }
 
   let x = PADDING
@@ -327,10 +342,7 @@ async function lineaASvg(tokens, tamanoFuente, y) {
         )
       }
     } else {
-      partes.push(
-        `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" ${atributosFuente(tamanoFuente)}>` +
-          `${escaparXml(token.text)}</text>`
-      )
+      partes.push(textoAPathsSvg(token.text, x, y, tamanoFuente))
     }
 
     x += anchoT
@@ -367,12 +379,14 @@ function resolverTexto(m, args) {
 }
 
 async function textoAStickerBrat(textoCrudo) {
+  obtenerFuente()
+
   const texto = dividirGrafemas(normalizarEntrada(textoCrudo))
     .map(g => (esGrafemaEmoji(g) ? g : g.toLowerCase()))
     .join('')
 
   await precargarEmojis(texto)
-  const { lineas, tamanoFuente, alturaLinea } = await ajustarDiseno(texto)
+  const { lineas, tamanoFuente, alturaLinea } = ajustarDiseno(texto)
   const svg = await construirSvg(lineas, tamanoFuente, alturaLinea)
 
   return sharp(Buffer.from(svg))
