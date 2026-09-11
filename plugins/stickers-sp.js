@@ -1,8 +1,13 @@
 import sharp from '../lib/sharp.js'
 import fetch from 'node-fetch'
+import { readFileSync, existsSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { addExif } from '../lib/sticker.js'
 import { resolveStickerMeta } from './stickers-sticker.js'
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const FONTS_DIR = join(__dirname, '../lib/fonts')
 
 const SIZE = 512
 const PADDING = 36
@@ -17,6 +22,30 @@ const LINE_RATIO = 1.05
 const BG = '#FFFFFF'
 const FG = '#000000'
 const BLUR_BRAT = 2.4
+
+
+let bratFuenteBase64 = null
+function cargarFuenteBrat() {
+  if (bratFuenteBase64 !== null) return bratFuenteBase64
+  const ruta = join(FONTS_DIR, 'NotoSans-Bold.ttf')
+  bratFuenteBase64 = existsSync(ruta) ? readFileSync(ruta).toString('base64') : ''
+  return bratFuenteBase64
+}
+
+function cssFuenteBrat() {
+  const b64 = cargarFuenteBrat()
+  if (!b64) return ''
+  return (
+    `@font-face{font-family:'BratSans';src:url(data:font/ttf;base64,${b64}) format('truetype');` +
+    `font-weight:700;font-style:normal}`
+  )
+}
+
+function familiaFuenteBrat() {
+  return cargarFuenteBrat()
+    ? 'BratSans, DejaVu Sans, Liberation Sans, Arial, sans-serif'
+    : 'DejaVu Sans, Liberation Sans, Arial Narrow, Arial, Helvetica, sans-serif'
+}
 
 const WA_EMOJI_CDN = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
 const WA_EMOJI_FALLBACK = 'https://emoji-cdn.mqrio.dev'
@@ -154,19 +183,52 @@ function tokenizar(texto) {
 }
 
 function atributosFuente(tamanoFuente, { medir = false } = {}) {
-  
   const relleno = medir ? '#000000' : FG
   return (
-    `font-family="Arial Narrow, Arial, Helvetica Neue, Helvetica, sans-serif" ` +
+    `font-family="${familiaFuenteBrat()}" ` +
     `font-size="${tamanoFuente}" font-weight="700" fill="${relleno}" ` +
     `letter-spacing="${Math.max(-4, -tamanoFuente * 0.035).toFixed(2)}"`
   )
 }
 
 
+function estimarAnchoNotoBold(texto, tamanoFuente) {
+  let ancho = 0
+  const grafemas = dividirGrafemas(texto)
+  for (const g of grafemas) {
+    if (!g) continue
+    if (/\s/.test(g)) {
+      ancho += tamanoFuente * 0.28
+      continue
+    }
+    const cp = g.codePointAt(0)
+    if (
+      (cp >= 0x00c0 && cp <= 0x024f) ||
+      (cp >= 0x1e00 && cp <= 0x1eff)
+    ) {
+      ancho += tamanoFuente * 0.56
+      continue
+    }
+    if (/[ilI1|!.,:;']/.test(g)) ancho += tamanoFuente * 0.28
+    else if (/[mwMW@%ÁÉÍÓÚÑáéíóúñ]/.test(g)) ancho += tamanoFuente * 0.72
+    else if (/[A-Z]/.test(g)) ancho += tamanoFuente * 0.58
+    else ancho += tamanoFuente * 0.52
+  }
+  const tracking = Math.max(-4, -tamanoFuente * 0.035)
+  if (grafemas.length > 1) ancho += tracking * (grafemas.length - 1)
+  return Math.max(1, Math.ceil(ancho))
+}
+
 async function medirAnchoTexto(texto, tamanoFuente) {
   const clave = `${tamanoFuente}::${texto}`
   if (cacheAnchoTexto.has(clave)) return cacheAnchoTexto.get(clave)
+
+  
+  if (cargarFuenteBrat()) {
+    const medido = estimarAnchoNotoBold(texto, tamanoFuente)
+    cacheAnchoTexto.set(clave, medido)
+    return medido
+  }
 
   const rellenoX = 8
   const altura = Math.ceil(tamanoFuente * 2.2)
@@ -187,7 +249,6 @@ async function medirAnchoTexto(texto, tamanoFuente) {
     let minX = info.width
     let maxX = -1
     for (let i = 0; i < data.length; i += 4) {
-      
       if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) {
         const x = (i / 4) % info.width
         if (x < minX) minX = x
@@ -195,7 +256,6 @@ async function medirAnchoTexto(texto, tamanoFuente) {
       }
     }
 
-    
     const medido = maxX >= minX ? maxX - minX + 1 + 4 : Math.ceil(tamanoFuente * texto.length * 0.55)
     cacheAnchoTexto.set(clave, medido)
     return medido
@@ -434,6 +494,9 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     const { packname, author } = resolveStickerMeta(m, conn)
+    if (!cargarFuenteBrat()) {
+      console.warn('[brat] Falta lib/fonts/NotoSans-Bold.ttf — en Linux el texto puede salir invisible')
+    }
     const webp = await textoAStickerBrat(texto)
     const stickerFinal = await addExif(webp, packname, author)
 
