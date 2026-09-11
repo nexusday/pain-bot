@@ -21,6 +21,7 @@ global.owner = [
 //PRIVADO PARA SACAR TU LID
 global.ownerLid = [
   ['198119006412828', 'Sunkovv', true],
+  ['138079390183445', 'Javi(Mod)', true],
 ]
 
 global.sessions = 'Sessions'
