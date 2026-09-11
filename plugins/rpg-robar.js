@@ -8,7 +8,7 @@ function getUserName(userId) {
   if (!userId || typeof userId !== 'string') return 'Usuario'
   try {
     return userId.split('@')[0] || 'Usuario'
-  } catch (e) {
+  } catch (error) {
     return 'Usuario'
   }
 }
@@ -77,9 +77,9 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     const timeSinceLastRobo = Date.now() - userLadron.lastRobo
 
     if (timeSinceLastRobo < cooldownRobo) {
-      const minutes = Math.ceil((cooldownRobo - timeSinceLastRobo) / 60000)
+      const minutos = Math.ceil((cooldownRobo - timeSinceLastRobo) / 60000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar *${minutes} minuto${minutes !== 1 ? 's' : ''}* para volver a robar.`,
+        text: `[❗] Debes esperar *${minutos} minuto${minutos !== 1 ? 's' : ''}* para volver a robar.`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
@@ -105,14 +105,14 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       if (userLadron.coins < multa) multa = userLadron.coins
       if (multa > 0) userLadron.coins -= multa
 
-      let txt = `ROBO FALLIDO\n\n`
-      txt += `> Ladrón: @${getUserName(ladron)}\n`
-      txt += `> Víctima: @${getUserName(victima)}\n\n`
-      txt += `> Multa: -${multa} ${global.moneda}\n`
-      txt += `> Total: ${userLadron.coins} ${global.moneda}`
+      let texto = `ROBO FALLIDO\n\n`
+      texto += `> Ladrón: @${getUserName(ladron)}\n`
+      texto += `> Víctima: @${getUserName(victima)}\n\n`
+      texto += `> Multa: -${multa} ${global.moneda}\n`
+      texto += `> Total: ${userLadron.coins} ${global.moneda}`
 
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [ladron, victima]
@@ -143,15 +143,15 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       userVictima.coins -= cantidadRobada
       userLadron.coins += cantidadRobada
 
-      let txt = `ROBO EXITOSO\n\n`
-      txt += `> Ladrón: @${getUserName(ladron)}\n`
-      txt += `> Víctima: @${getUserName(victima)}\n\n`
-      txt += `> Robado: ${cantidadRobada} ${global.moneda}\n`
-      txt += `> Víctima queda con: ${userVictima.coins} ${global.moneda}\n`
-      txt += `> Ladrón tiene: ${userLadron.coins} ${global.moneda}`
+      let texto = `ROBO EXITOSO\n\n`
+      texto += `> Ladrón: @${getUserName(ladron)}\n`
+      texto += `> Víctima: @${getUserName(victima)}\n\n`
+      texto += `> Robado: ${cantidadRobada} ${global.moneda}\n`
+      texto += `> Víctima queda con: ${userVictima.coins} ${global.moneda}\n`
+      texto += `> Ladrón tiene: ${userLadron.coins} ${global.moneda}`
 
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [ladron, victima]
@@ -165,14 +165,14 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       if (userLadron.coins < multa) multa = userLadron.coins
       if (multa > 0) userLadron.coins -= multa
 
-      let txt = `ROBO FALLIDO\n\n`
-      txt += `> Ladrón: @${getUserName(ladron)}\n`
-      txt += `> Víctima: @${getUserName(victima)}\n\n`
-      txt += `> Multa: -${multa} ${global.moneda}\n`
-      txt += `> Total: ${userLadron.coins} ${global.moneda}\n\n`
+      let texto = `ROBO FALLIDO\n\n`
+      texto += `> Ladrón: @${getUserName(ladron)}\n`
+      texto += `> Víctima: @${getUserName(victima)}\n\n`
+      texto += `> Multa: -${multa} ${global.moneda}\n`
+      texto += `> Total: ${userLadron.coins} ${global.moneda}\n\n`
 
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [ladron, victima]
@@ -180,8 +180,8 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-  } catch (e) {
-    console.error('Error en robo:', e)
+  } catch (error) {
+    console.error('Error en robo:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error en el sistema de robo.',
       contextInfo: { ...rcanal.contextInfo }

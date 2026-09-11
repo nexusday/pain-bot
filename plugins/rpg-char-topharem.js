@@ -3,10 +3,10 @@ import { showTopHarem } from '../lib/characters/index.js'
 let handler = async (m, { conn, usedPrefix, args }) => {
   try {
     await showTopHarem(m, conn, usedPrefix || '.', args?.[0] || '10')
-  } catch (e) {
-    console.error('char-topharem:', e)
+  } catch (error) {
+    console.error('char-topharem:', error)
     await conn.sendMessage(m.chat, {
-      text: `*[❗] No se pudo mostrar el top harem.*\n> ${e?.message || e}`,
+      text: `*[❗] No se pudo mostrar el top harem.*\n> ${error?.message || error}`,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m }).catch(() => {})
   }

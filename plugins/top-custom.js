@@ -1,10 +1,10 @@
-function parseTopInput(text) {
-  const raw = String(text || '').trim()
-  if (!raw) return null
+function parsearEntradaTop(text) {
+  const crudo = String(text || '').trim()
+  if (!crudo) return null
 
-  const pipeIndex = raw.indexOf('|')
-  const name = (pipeIndex === -1 ? raw : raw.slice(0, pipeIndex)).trim()
-  const emoji = pipeIndex === -1 ? '' : raw.slice(pipeIndex + 1).trim()
+  const indicePipe = crudo.indexOf('|')
+  const name = (indicePipe === -1 ? crudo : crudo.slice(0, indicePipe)).trim()
+  const emoji = indicePipe === -1 ? '' : crudo.slice(indicePipe + 1).trim()
 
   if (!name || name.length > 40) return null
 
@@ -14,15 +14,15 @@ function parseTopInput(text) {
   }
 }
 
-function pickRandomParticipants(participants, botJid, limit = 10) {
+function pickRandomParticipants(participants, botJid, limite = 10) {
   const pool = participants.filter(p => p.id && p.id !== botJid)
   const selected = []
-  const maxUsers = Math.min(limit, pool.length)
+  const maxUsuarios = Math.min(limite, pool.length)
 
-  for (let i = 0; i < maxUsers; i++) {
-    const user = pool[Math.floor(Math.random() * pool.length)]
-    if (!selected.find(u => u.id === user.id)) {
-      selected.push(user)
+  for (let i = 0; i < maxUsuarios; i++) {
+    const usuario = pool[Math.floor(Math.random() * pool.length)]
+    if (!selected.find(u => u.id === usuario.id)) {
+      selected.push(usuario)
     } else {
       i--
     }
@@ -31,11 +31,11 @@ function pickRandomParticipants(participants, botJid, limit = 10) {
   return selected
 }
 
-function lineEmoji(position, customEmoji) {
+function lineEmoji(posicion, customEmoji) {
   if (customEmoji) return customEmoji
-  if (position === 1) return '🥇'
-  if (position === 2) return '🥈'
-  if (position === 3) return '🥉'
+  if (posicion === 1) return '🥇'
+  if (posicion === 2) return '🥈'
+  if (posicion === 3) return '🥉'
   return '⭐'
 }
 
@@ -47,7 +47,7 @@ let handler = async (m, { conn, text, usedPrefix }) => {
     }, { quoted: m })
   }
 
-  const parsed = parseTopInput(text)
+  const parsed = parsearEntradaTop(text)
   if (!parsed) {
     return conn.sendMessage(m.chat, {
       text: `𓍯 𝚃𝙾𝙿 𝙿𝙴𝚁𝚂𝙾𝙽𝙰𝙻𝙸𝚉𝙰𝙳𝙾 𓍯
@@ -64,12 +64,12 @@ let handler = async (m, { conn, text, usedPrefix }) => {
   }
 
   try {
-    const groupMetadata = await conn.groupMetadata(m.chat)
-    const participants = groupMetadata.participants || []
+    const metadatosGrupo = await conn.groupMetadata(m.chat)
+    const participants = metadatosGrupo.participants || []
     const botJid = conn.decodeJid(conn.user?.jid || conn.user?.id)
-    const selectedUsers = pickRandomParticipants(participants, botJid, 10)
+    const usuariosSeleccionados = pickRandomParticipants(participants, botJid, 10)
 
-    if (selectedUsers.length === 0) {
+    if (usuariosSeleccionados.length === 0) {
       return conn.sendMessage(m.chat, {
         text: '[❗] No hay suficientes usuarios en el grupo para crear el top.',
         contextInfo: { ...rcanal.contextInfo },
@@ -77,23 +77,23 @@ let handler = async (m, { conn, text, usedPrefix }) => {
     }
 
     const title = parsed.name.toUpperCase()
-    let txt = `   𓍯  TOP ${title}  𓍯\n\n`
+    let texto = `   𓍯  TOP ${title}  𓍯\n\n`
 
-    selectedUsers.forEach((user, index) => {
-      const position = index + 1
-      const emoji = lineEmoji(position, parsed.emoji)
-      txt += `${emoji} @${user.id.split('@')[0]}\n`
+    usuariosSeleccionados.forEach((usuario, indice) => {
+      const posicion = indice + 1
+      const emoji = lineEmoji(posicion, parsed.emoji)
+      texto += `${emoji} @${usuario.id.split('@')[0]}\n`
     })
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: selectedUsers.map(user => user.id),
+        mentionedJid: usuariosSeleccionados.map(usuario => usuario.id),
       },
     }, { quoted: m })
-  } catch (e) {
-    console.error('Error en top personalizado:', e)
+  } catch (error) {
+    console.error('Error en top personalizado:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al generar el top.',
       contextInfo: { ...rcanal.contextInfo },

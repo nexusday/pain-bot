@@ -2,17 +2,17 @@
 
 let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin, isOwner, isPrems }) => {
  
-  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
-  const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []  
-  const user = (m.isGroup ? findGroupParticipant(groupParticipants, m, conn) : {}) || {}  
-  const isRAdmin = user?.admin == 'superadmin' || false  
-  const isAdminManual = Boolean(isAdmin) || isRAdmin || user?.admin == 'admin' || false  
+  const metadatosVerificacionAdmin = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+  const participantesGrupo = (m.isGroup ? metadatosVerificacionAdmin.participants : []) || []  
+  const usuario = (m.isGroup ? findGroupParticipant(participantesGrupo, m, conn) : {}) || {}  
+  const esSuperAdmin = usuario?.admin == 'superadmin' || false  
+  const esAdminManual = Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false  
   
-  const isOwnerManual = global.owner.some(([number]) => number.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
-                  global.ownerLid?.some(([number]) => number.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
+  const esOwnerManual = global.owner.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
+                  global.ownerLid?.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
                   m.sender === conn.user.jid
   
-  if (!isAdminManual && !isRAdmin && !isOwnerManual) {
+  if (!esAdminManual && !esSuperAdmin && !esOwnerManual) {
     return conn.reply(m.chat, '[❗] Solo los administradores pueden usar este comando.', m)
   }
 
@@ -25,9 +25,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin, 
 
 
 
-  const newName = args.join(' ').trim()
+  const nuevoNombre = args.join(' ').trim()
 
-  if (!newName) {
+  if (!nuevoNombre) {
     return conn.sendMessage(m.chat, {
       text: `[❗] Debes poner el nuevo nombre del grupo.\n\n*Ejemplo:*\n- ${usedPrefix + command} Grupo de diversión`,
       contextInfo: {
@@ -36,9 +36,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin, 
     }, { quoted: m })
   }
 
-  if (newName.length > 100) {
+  if (nuevoNombre.length > 100) {
     return conn.sendMessage(m.chat, {
-      text: `[❗] El nombre es demasiado largo.\n\n*Máximo permitido:* 100 caracteres\n*Tu nombre:* ${newName.length} caracteres` ,
+      text: `[❗] El nombre es demasiado largo.\n\n*Máximo permitido:* 100 caracteres\n*Tu nombre:* ${nuevoNombre.length} caracteres` ,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -46,13 +46,13 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin, 
   }
 
   try {
-    const metadata = await conn.groupMetadata(m.chat)
-    const oldName = metadata?.subject || 'Sin nombre'
+    const metadatos = await conn.groupMetadata(m.chat)
+    const nombreAnterior = metadatos?.subject || 'Sin nombre'
 
-    await conn.groupUpdateSubject(m.chat, newName)
+    await conn.groupUpdateSubject(m.chat, nuevoNombre)
 
     return conn.sendMessage(m.chat, {
-      text: `🌴 𝗡𝗼𝗺𝗯𝗿𝗲 𝗮𝗰𝘁𝘂𝗮𝗹𝗶𝘇𝗮𝗱𝗼\n> *Antes:* ${oldName}\n> *Ahora:* ${newName}\n│\n> *Por:* @${m.sender.split('@')[0]}\n`,
+      text: `🌴 𝗡𝗼𝗺𝗯𝗿𝗲 𝗮𝗰𝘁𝘂𝗮𝗹𝗶𝘇𝗮𝗱𝗼\n> *Antes:* ${nombreAnterior}\n> *Ahora:* ${nuevoNombre}\n│\n> *Por:* @${m.sender.split('@')[0]}\n`,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]

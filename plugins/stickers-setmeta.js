@@ -1,8 +1,8 @@
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text || !text.trim()) {
-    const user = global.db.data.users[m.sender] || {}
-    const actual = (user.packname || user.author)
-      ? `\n\nActual:\n> Pack: *${user.packname || '(defecto)'}*\n> Autor: *${user.author || '(defecto)'}*`
+    const usuario = global.db.data.users[m.sender] || {}
+    const actual = (usuario.packname || usuario.author)
+      ? `\n\nActual:\n> Pack: *${usuario.packname || '(defecto)'}*\n> Autor: *${usuario.author || '(defecto)'}*`
       : '\n\nAhora usas el pack/autor por defecto del bot.'
 
     return conn.reply(
@@ -18,11 +18,11 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     )
   }
 
-  const parts = text.split('|')
-  const packname = (parts[0] || '').trim()
-  const author = parts.length > 1 ? parts.slice(1).join('|').trim() : ''
+  const partes = text.split('|')
+  const nombrePack = (partes[0] || '').trim()
+  const autor = partes.length > 1 ? partes.slice(1).join('|').trim() : ''
 
-  if (!packname && !author) {
+  if (!nombrePack && !autor) {
     return conn.reply(
       m.chat,
       `*[❗] No se detectó ningún dato válido.*\n> Usa: *pack* | autor\n> Ejemplo: *Forger* | Stickers`,
@@ -31,17 +31,17 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     )
   }
 
-  const user = global.db.data.users[m.sender]
-  if (!user) return
+  const usuario = global.db.data.users[m.sender]
+  if (!usuario) return
 
-  if (packname) user.packname = packname
-  if (parts.length > 1) user.author = author
+  if (nombrePack) usuario.packname = nombrePack
+  if (partes.length > 1) usuario.author = autor
 
   return conn.reply(
     m.chat,
     `✐ Metadata por defecto actualizada para tus stickers.` +
-      `\n> Pack: *${user.packname || '(defecto del bot)'}*` +
-      `\n> Autor: *${user.author || '(defecto del bot)'}*` +
+      `\n> Pack: *${usuario.packname || '(defecto del bot)'}*` +
+      `\n> Autor: *${usuario.author || '(defecto del bot)'}*` +
       `\n\nPrueba con ${usedPrefix}s respondiendo a una imagen.`,
     m,
     global.rcanal

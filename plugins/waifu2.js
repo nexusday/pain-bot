@@ -2,8 +2,8 @@ import fetch from 'node-fetch'
 
 let handler = async (m, { conn, usedPrefix, command }) => {
   try {
-    const apiUrl = 'https://bytebazz-api.koyeb.app/api/images/waifu4?apikey=8jkh5icbf05'
-    const response = await fetch(apiUrl)
+    const urlApi = 'https://bytebazz-api.koyeb.app/api/images/waifu4?apikey=8jkh5icbf05'
+    const response = await fetch(urlApi)
     const data = await response.json()
     
     if (!data.status || !data.resultado || !data.resultado.resultado) {
@@ -16,8 +16,8 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       mentions: [m.sender]
     }, { quoted: m })
     
-  } catch (e) {
-    console.error('Error en comando waifu-sfw:', e)
+  } catch (error) {
+    console.error('Error en comando waifu-sfw:', error)
     m.reply('*[❗] Ocurrió un error al obtener la imagen de waifu. Por favor, inténtalo de nuevo más tarde.*')
   }
 }

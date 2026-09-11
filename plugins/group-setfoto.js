@@ -6,9 +6,9 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin }) => {
 
 
   const q = m.quoted || m
-  const mime = (q.msg || q).mimetype || ''
+  const tipoMime = (q.msg || q).mimetype || ''
 
-  if (!/image\/(jpe?g|png|webp)/i.test(mime)) {
+  if (!/image\/(jpe?g|png|webp)/i.test(tipoMime)) {
     return conn.sendMessage(m.chat, {
       text: `[❗] Debes responder a una imagen para ponerlo como foto del grupo.\n\n> *Ejemplo:* Responde a una imagen con: ${usedPrefix + command}`,
       contextInfo: { ...rcanal.contextInfo }
@@ -16,10 +16,10 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin }) => {
   }
 
   try {
-    const imgBuffer = await q.download?.()
-    if (!imgBuffer) return conn.sendMessage(m.chat, { text: '[❗] No pude descargar la imagen.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
+    const bufferImg = await q.download?.()
+    if (!bufferImg) return conn.sendMessage(m.chat, { text: '[❗] No pude descargar la imagen.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
 
-    await conn.updateProfilePicture(m.chat, imgBuffer)
+    await conn.updateProfilePicture(m.chat, bufferImg)
 
     return conn.sendMessage(m.chat, {
       text: `🌴 𝗙𝗼𝘁𝗼 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼 𝗔𝗰𝘁𝘂𝗮𝗹𝗶𝘇𝗮𝗱𝗮\n> *Por:* @${m.sender.split('@')[0]}`,

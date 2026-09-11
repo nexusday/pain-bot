@@ -2,20 +2,20 @@ import ws from 'ws'
 import fs from 'fs'
 import { join } from 'path'
 
-export function cleanBotNum(jidOrNum = '') {
-  return String(jidOrNum).split('@')[0].split(':')[0].replace(/\D/g, '')
+export function limpiarNumBot(jidONum = '') {
+  return String(jidONum).split('@')[0].split(':')[0].replace(/\D/g, '')
 }
 
 
-export function isMainBotConn(conn) {
+export function esConnBotPrincipal(conn) {
   if (!conn) return false
   if (conn === global.conn) return true
-  const mine = cleanBotNum(conn.user?.jid || conn.user?.id)
-  const main = cleanBotNum(global.conn?.user?.jid || global.conn?.user?.id)
-  return Boolean(mine && main && mine === main)
+  const mio = limpiarNumBot(conn.user?.jid || conn.user?.id)
+  const principalConn = limpiarNumBot(global.conn?.user?.jid || global.conn?.user?.id)
+  return Boolean(mio && principalConn && mio === principalConn)
 }
 
-function decodeJid(conn, jid) {
+function decodificarJid(conn, jid) {
   try {
     return conn?.decodeJid?.(jid) || String(jid || '')
   } catch {
@@ -23,17 +23,17 @@ function decodeJid(conn, jid) {
   }
 }
 
-function sameUser(a, b) {
-  const na = cleanBotNum(a)
-  const nb = cleanBotNum(b)
+function mismoUsuario(a, b) {
+  const na = limpiarNumBot(a)
+  const nb = limpiarNumBot(b)
   return na.length > 5 && na === nb
 }
 
-function botInParticipants(botConn, participants = []) {
-  if (!botConn?.user) return false
-  const botJid = decodeJid(botConn, botConn.user.jid || botConn.user.id)
-  const botNum = cleanBotNum(botJid)
-  if (!botNum) return false
+function botEnParticipantes(connBot, participants = []) {
+  if (!connBot?.user) return false
+  const jidBot = decodificarJid(connBot, connBot.user.jid || connBot.user.id)
+  const numBot = limpiarNumBot(jidBot)
+  if (!numBot) return false
 
   for (const p of participants) {
     const ids = [
@@ -42,22 +42,22 @@ function botInParticipants(botConn, participants = []) {
       p.lid,
       p.phoneNumber
     ].filter(Boolean).map(j => {
-      const raw = String(j)
-      return raw.includes('@') ? decodeJid(botConn, raw) : `${raw.replace(/\D/g, '')}@s.whatsapp.net`
+      const crudo = String(j)
+      return crudo.includes('@') ? decodificarJid(connBot, crudo) : `${crudo.replace(/\D/g, '')}@s.whatsapp.net`
     })
 
-    if (ids.some(id => sameUser(id, botJid) || cleanBotNum(id) === botNum)) return true
+    if (ids.some(id => mismoUsuario(id, jidBot) || limpiarNumBot(id) === numBot)) return true
   }
   return false
 }
 
-function getBotDisplayName(botConn, isMain) {
-  if (isMain) return global.namebot || 'Bot Principal'
+function obtenerNombreVisibleBot(connBot, esPrincipal) {
+  if (esPrincipal) return global.namebot || 'Bot Principal'
   try {
-    const num = cleanBotNum(botConn.user?.jid)
-    const configPath = join('./Serbot', num, 'config.json')
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    const num = limpiarNumBot(connBot.user?.jid)
+    const rutaConfig = join('./Serbot', num, 'config.json')
+    if (fs.existsSync(rutaConfig)) {
+      const config = JSON.parse(fs.readFileSync(rutaConfig, 'utf-8'))
       if (config.name) return config.name
     }
   } catch {}
@@ -67,33 +67,33 @@ function getBotDisplayName(botConn, isMain) {
 /**
  * Lista bots (principal + subbots) presentes en el grupo.
  */
-export function listBotsInGroup(participants = []) {
+export function listarBotsEnGrupo(participants = []) {
   const bots = []
-  const main = global.conn
+  const principalConn = global.conn
 
-  if (main?.user && botInParticipants(main, participants)) {
+  if (principalConn?.user && botEnParticipantes(principalConn, participants)) {
     bots.push({
       index: bots.length + 1,
       type: 'principal',
-      number: cleanBotNum(main.user.jid || main.user.id),
-      name: getBotDisplayName(main, true),
-      conn: main
+      number: limpiarNumBot(principalConn.user.jid || principalConn.user.id),
+      name: obtenerNombreVisibleBot(principalConn, true),
+      conn: principalConn
     })
   }
 
   const subs = (global.conns || []).filter(c =>
     c?.user &&
     c.ws?.socket?.readyState === ws.OPEN &&
-    c !== main
+    c !== principalConn
   )
 
   for (const sub of subs) {
-    if (!botInParticipants(sub, participants)) continue
+    if (!botEnParticipantes(sub, participants)) continue
     bots.push({
       index: bots.length + 1,
       type: 'subbot',
-      number: cleanBotNum(sub.user.jid || sub.user.id),
-      name: getBotDisplayName(sub, false),
+      number: limpiarNumBot(sub.user.jid || sub.user.id),
+      name: obtenerNombreVisibleBot(sub, false),
       conn: sub
     })
   }
@@ -101,85 +101,85 @@ export function listBotsInGroup(participants = []) {
   return bots
 }
 
-export function getActiveBotForGroup(chatId) {
+export function obtenerBotActivoDelGrupo(idChat) {
   if (!global.db.data.modoSub) global.db.data.modoSub = {}
-  const value = global.db.data.modoSub[chatId]
+  const value = global.db.data.modoSub[idChat]
   if (!value || value === 'all' || value === true) return null
   return String(value).replace(/\D/g, '') || null
 }
 
-export function setActiveBotForGroup(chatId, botNumberOrAll) {
+export function establecerBotActivoDelGrupo(idChat, numeroBotOTodos) {
   if (!global.db.data.modoSub) global.db.data.modoSub = {}
-  if (!botNumberOrAll || botNumberOrAll === 'all' || botNumberOrAll === 'off') {
-    delete global.db.data.modoSub[chatId]
+  if (!numeroBotOTodos || numeroBotOTodos === 'all' || numeroBotOTodos === 'off') {
+    delete global.db.data.modoSub[idChat]
     return null
   }
-  const num = String(botNumberOrAll).replace(/\D/g, '')
-  global.db.data.modoSub[chatId] = num
+  const num = String(numeroBotOTodos).replace(/\D/g, '')
+  global.db.data.modoSub[idChat] = num
   return num
 }
 
 /** Números de principal + subbots conectados. */
-export function listKnownBotNumbers() {
+export function listarNumerosBotsConocidos() {
   const nums = new Set()
-  const push = (jid) => {
-    const n = cleanBotNum(jid)
+  const agregar = (jid) => {
+    const n = limpiarNumBot(jid)
     if (n && n.length >= 6) nums.add(n)
   }
-  push(global.conn?.user?.jid || global.conn?.user?.id)
+  agregar(global.conn?.user?.jid || global.conn?.user?.id)
   for (const c of global.conns || []) {
-    push(c?.user?.jid || c?.user?.id)
+    agregar(c?.user?.jid || c?.user?.id)
   }
   return nums
 }
 
-export function isKnownBotNumber(jidOrNum) {
-  const n = cleanBotNum(jidOrNum)
+export function esNumeroBotConocido(jidONum) {
+  const n = limpiarNumBot(jidONum)
   if (!n || n.length < 6) return false
-  return listKnownBotNumbers().has(n)
+  return listarNumerosBotsConocidos().has(n)
 }
 
-function extractGroupSenderNum(conn, rawMsg) {
-  const key = rawMsg?.key || {}
+function extraerNumRemitenteGrupo(conn, msgCrudo) {
+  const key = msgCrudo?.key || {}
   if (key.fromMe) {
-    return cleanBotNum(conn?.user?.jid || conn?.user?.id)
+    return limpiarNumBot(conn?.user?.jid || conn?.user?.id)
   }
-  const candidates = [
+  const candidatos = [
     key.participantPn,
     key.participant,
     key.participantAlt,
-    rawMsg?.participant,
+    msgCrudo?.participant,
   ].filter(Boolean)
 
-  for (const raw of candidates) {
-    const decoded = decodeJid(conn, raw)
-    const n = cleanBotNum(decoded)
+  for (const crudo of candidatos) {
+    const decodificado = decodificarJid(conn, crudo)
+    const n = limpiarNumBot(decodificado)
     if (n.length >= 6) return n
   }
   return ''
 }
 
-function isModoSubCommandText(text = '', prefix = '.') {
+function esTextoComandoModoSub(text = '', prefix = '.') {
   if (!text) return false
-  const str2Regex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
-  const prefixes = Array.isArray(global.prefix) ? global.prefix : [global.prefix || prefix]
-  for (const p of prefixes) {
-    const re = p instanceof RegExp ? p : new RegExp('^' + str2Regex(String(p)))
+  const strARegex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
+  const prefijos = Array.isArray(global.prefix) ? global.prefix : [global.prefix || prefix]
+  for (const p of prefijos) {
+    const re = p instanceof RegExp ? p : new RegExp('^' + strARegex(String(p)))
     if (!re.test(text)) continue
-    const body = text.replace(re, '').trim()
-    const cmd = body.split(/\s+/)[0]?.toLowerCase() || ''
+    const cuerpo = text.replace(re, '').trim()
+    const cmd = cuerpo.split(/\s+/)[0]?.toLowerCase() || ''
     if (['modosub', 'modobot', 'botactivo', 'onlybot'].includes(cmd)) return true
   }
   return false
 }
 
 
-export function extractRawMessageText(rawMsg) {
+export function extraerTextoMensajeCrudo(msgCrudo) {
   try {
-    const root = rawMsg?.message
-    if (!root) return ''
+    const raiz = msgCrudo?.message
+    if (!raiz) return ''
 
-    const unwrap = (msg) => {
+    const desenvolver = (msg) => {
       if (!msg || typeof msg !== 'object') return msg
       return (
         msg.ephemeralMessage?.message ||
@@ -189,10 +189,10 @@ export function extractRawMessageText(rawMsg) {
       )
     }
 
-    const msg = unwrap(root)
+    const msg = desenvolver(raiz)
     if (typeof msg === 'string') return msg
 
-    const direct =
+    const directo =
       msg.conversation ||
       msg.extendedTextMessage?.text ||
       msg.imageMessage?.caption ||
@@ -203,13 +203,13 @@ export function extractRawMessageText(rawMsg) {
       msg.templateButtonReplyMessage?.selectedId ||
       ''
 
-    if (direct) return String(direct)
+    if (directo) return String(directo)
 
     for (const value of Object.values(msg)) {
       if (!value || typeof value !== 'object') continue
       if (value.message) {
-        const nested = extractRawMessageText({ message: value.message })
-        if (nested) return nested
+        const anidado = extraerTextoMensajeCrudo({ message: value.message })
+        if (anidado) return anidado
       }
       if (typeof value.text === 'string' && value.text) return value.text
       if (typeof value.caption === 'string' && value.caption) return value.caption
@@ -231,31 +231,31 @@ export function extractRawMessageText(rawMsg) {
  *    los demás ignoran para no duplicar /rw, menús, etc.
  * 3) /modosub siempre se deja pasar en todos (para poder cambiar el activo).
  */
-export function shouldSkipGroupMessageEarly(conn, rawMsg) {
-  if (!rawMsg?.key) return false
+export function debeOmitirMensajeGrupoTemprano(conn, msgCrudo) {
+  if (!msgCrudo?.key) return false
 
-  const chatId = conn?.decodeJid?.(rawMsg.key.remoteJid) || rawMsg.key.remoteJid || ''
-  if (!String(chatId).endsWith('@g.us')) return false
+  const idChat = conn?.decodeJid?.(msgCrudo.key.remoteJid) || msgCrudo.key.remoteJid || ''
+  if (!String(idChat).endsWith('@g.us')) return false
   if (!global.db?.data) return false
 
-  const myNum = cleanBotNum(conn?.user?.jid || conn?.user?.id)
-  if (!myNum) return false
+  const miNum = limpiarNumBot(conn?.user?.jid || conn?.user?.id)
+  if (!miNum) return false
 
-  const text = extractRawMessageText(rawMsg)
-  if (isModoSubCommandText(text)) return false
+  const text = extraerTextoMensajeCrudo(msgCrudo)
+  if (esTextoComandoModoSub(text)) return false
 
-  const active = getActiveBotForGroup(chatId)
-  const fromMe = Boolean(rawMsg.key.fromMe)
+  const activo = obtenerBotActivoDelGrupo(idChat)
+  const desdeMi = Boolean(msgCrudo.key.fromMe)
 
   // Bot único elegido: los demás (incluido fromMe de otro subbot) no ejecutan nada
-  if (active) {
-    return myNum !== active
+  if (activo) {
+    return miNum !== activo
   }
 
   // Modo all: evita que principal + sub ejecuten el mismo comando escrito desde un bot
-  if (!fromMe) {
-    const senderNum = extractGroupSenderNum(conn, rawMsg)
-    if (senderNum && isKnownBotNumber(senderNum)) return true
+  if (!desdeMi) {
+    const numRemitente = extraerNumRemitenteGrupo(conn, msgCrudo)
+    if (numRemitente && esNumeroBotConocido(numRemitente)) return true
   }
 
   return false
@@ -264,16 +264,16 @@ export function shouldSkipGroupMessageEarly(conn, rawMsg) {
 /**
  * true = este socket NO debe responder en el grupo (otro bot está elegido)
  */
-export function shouldSkipByModoSub(conn, chatId, { allowModoSubCommand = false, text = '', prefix = '.' } = {}) {
-  if (!chatId || !String(chatId).endsWith('@g.us')) return false
+export function debeOmitirPorModoSub(conn, idChat, { allowModoSubCommand = false, text = '', prefix = '.' } = {}) {
+  if (!idChat || !String(idChat).endsWith('@g.us')) return false
 
-  const active = getActiveBotForGroup(chatId)
-  if (!active) return false
+  const activo = obtenerBotActivoDelGrupo(idChat)
+  if (!activo) return false
 
-  const myNum = cleanBotNum(conn?.user?.jid || conn?.user?.id)
-  if (myNum && myNum === active) return false
+  const miNum = limpiarNumBot(conn?.user?.jid || conn?.user?.id)
+  if (miNum && miNum === activo) return false
 
-  if (allowModoSubCommand && isModoSubCommandText(text, prefix)) return false
+  if (allowModoSubCommand && esTextoComandoModoSub(text, prefix)) return false
 
   return true
 }
@@ -287,63 +287,63 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
     return m.reply('[❗] Solo admins y owners pueden usar este comando.')
   }
 
-  let groupParticipants = participants || []
+  let participantesGrupo = participants || []
   try {
-    const fresh = await conn.groupMetadata(m.chat)
-    if (fresh?.participants?.length) groupParticipants = fresh.participants
+    const fresco = await conn.groupMetadata(m.chat)
+    if (fresco?.participants?.length) participantesGrupo = fresco.participants
   } catch {}
 
-  const bots = listBotsInGroup(groupParticipants)
+  const bots = listarBotsEnGrupo(participantesGrupo)
   if (!bots.length) {
     return m.reply('[❗] No detecté bots (principal/sub) en este grupo.')
   }
 
-  const action = (args[0] || '').toLowerCase().trim()
+  const accion = (args[0] || '').toLowerCase().trim()
 
-  if (!action) {
-    const active = getActiveBotForGroup(m.chat)
-    let txt = `*Modo Sub / Bot activo*\n\n`
-    txt += `Elige qué bot responde en este grupo.\n`
-    txt += `Uso: *${usedPrefix}modosub <número>*\n`
-    txt += `Todos: *${usedPrefix}modosub all*\n\n`
+  if (!accion) {
+    const activo = obtenerBotActivoDelGrupo(m.chat)
+    let textoMsg = `*Modo Sub / Bot activo*\n\n`
+    textoMsg += `Elige qué bot responde en este grupo.\n`
+    textoMsg += `Uso: *${usedPrefix}modosub <número>*\n`
+    textoMsg += `Todos: *${usedPrefix}modosub all*\n\n`
 
     for (const bot of bots) {
-      const tag = bot.type === 'principal' ? 'Principal' : 'Sub-Bot'
-      const on = active && active === bot.number ? ' ✅ *ACTIVO*' : ''
-      txt += `*${bot.index}.* ${tag} — ${bot.name}\n`
-      txt += `   └ +${bot.number}${on}\n`
+      const etiqueta = bot.type === 'principal' ? 'Principal' : 'Sub-Bot'
+      const activoMarca = activo && activo === bot.number ? ' ✅ *ACTIVO*' : ''
+      textoMsg += `*${bot.index}.* ${etiqueta} — ${bot.name}\n`
+      textoMsg += `   └ +${bot.number}${activoMarca}\n`
     }
 
-    if (active) {
-      const current = bots.find(b => b.number === active)
-      txt += `\n> Ahora solo responde: *${current ? `${current.index} (${current.name})` : active}*`
+    if (activo) {
+      const actual = bots.find(b => b.number === activo)
+      textoMsg += `\n> Ahora solo responde: *${actual ? `${actual.index} (${actual.name})` : activo}*`
     } else {
-      txt += `\n> Ahora responden *todos* los bots del grupo.`
+      textoMsg += `\n> Ahora responden *todos* los bots del grupo.`
     }
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: textoMsg,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) }
     }, { quoted: m })
   }
 
-  if (['all', 'off', 'todos', 'reset'].includes(action)) {
-    setActiveBotForGroup(m.chat, 'all')
+  if (['all', 'off', 'todos', 'reset'].includes(accion)) {
+    establecerBotActivoDelGrupo(m.chat, 'all')
     await global.db.write?.()
     return m.reply('✅ Modo Sub desactivado.\n> Todos los bots del grupo pueden responder otra vez.')
   }
 
-  const index = parseInt(action, 10)
-  if (!Number.isFinite(index) || index < 1 || index > bots.length) {
+  const indice = parseInt(accion, 10)
+  if (!Number.isFinite(indice) || indice < 1 || indice > bots.length) {
     return m.reply(`[❗] Número inválido.\n\nUsa *${usedPrefix}modosub* para ver la lista\no *${usedPrefix}modosub 1* / *${usedPrefix}modosub all*`)
   }
 
-  const selected = bots[index - 1]
-  setActiveBotForGroup(m.chat, selected.number)
+  const seleccionado = bots[indice - 1]
+  establecerBotActivoDelGrupo(m.chat, seleccionado.number)
   await global.db.write?.()
 
-  const tag = selected.type === 'principal' ? 'Bot Principal' : 'Sub-Bot'
-  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${index}.* ${tag} — ${selected.name}\n> +${selected.number}\n\n> Los demás bots ignoran comandos aquí (también si escriben desde su propio número).\n> Para volver a todos: *${usedPrefix}modosub all*`)
+  const etiqueta = seleccionado.type === 'principal' ? 'Bot Principal' : 'Sub-Bot'
+  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${indice}.* ${etiqueta} — ${seleccionado.name}\n> +${seleccionado.number}\n\n> Los demás bots ignoran comandos aquí (también si escriben desde su propio número).\n> Para volver a todos: *${usedPrefix}modosub all*`)
 }
 
 handler.command = ['modosub', 'modobot', 'botactivo', 'onlybot']
@@ -353,3 +353,16 @@ handler.group = true
 handler.admin = true
 
 export default handler
+
+export {
+  limpiarNumBot as cleanBotNum,
+  esConnBotPrincipal as isMainBotConn,
+  listarBotsEnGrupo as listBotsInGroup,
+  obtenerBotActivoDelGrupo as getActiveBotForGroup,
+  establecerBotActivoDelGrupo as setActiveBotForGroup,
+  listarNumerosBotsConocidos as listKnownBotNumbers,
+  esNumeroBotConocido as isKnownBotNumber,
+  extraerTextoMensajeCrudo as extractRawMessageText,
+  debeOmitirMensajeGrupoTemprano as shouldSkipGroupMessageEarly,
+  debeOmitirPorModoSub as shouldSkipByModoSub
+}

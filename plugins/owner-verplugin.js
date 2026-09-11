@@ -14,32 +14,32 @@ ${usedPrefix}verplugin <nombre_archivo.js>
 ${usedPrefix}verplugin play.js`)
   }
 
-  let fileName = args[0]
+  let nombreArchivo = args[0]
   
   
-  if (!fileName.endsWith('.js')) {
-    fileName += '.js'
+  if (!nombreArchivo.endsWith('.js')) {
+    nombreArchivo += '.js'
   }
 
  
-  if (!/^[a-zA-Z0-9-_]+\.js$/.test(fileName)) {
+  if (!/^[a-zA-Z0-9-_]+\.js$/.test(nombreArchivo)) {
     return m.reply('*[❗] Nombre de archivo inválido. Solo letras, números, guiones y guiones bajos.*')
   }
 
-  const pluginPath = join('./plugins', fileName)
+  const rutaPlugin = join('./plugins', nombreArchivo)
 
  
-  if (!fs.existsSync(pluginPath)) {
-    return m.reply(`*[❗] El archivo ${fileName} no existe.*`)
+  if (!fs.existsSync(rutaPlugin)) {
+    return m.reply(`*[❗] El archivo ${nombreArchivo} no existe.*`)
   }
 
   try {
     
-    const pluginContent = fs.readFileSync(pluginPath, 'utf8')
+    const contenidoPlugin = fs.readFileSync(rutaPlugin, 'utf8')
     
    
     await conn.sendMessage(m.chat, {
-      text: pluginContent
+      text: contenidoPlugin
     }, { quoted: m })
 
   } catch (error) {

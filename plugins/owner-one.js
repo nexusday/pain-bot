@@ -24,32 +24,32 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     }, { quoted: m })
   }
 
-  const action = (args[0] || '').toLowerCase().trim()
-  const groupName = (await conn.groupMetadata(m.chat).catch(() => null))?.subject || await conn.getName(m.chat).catch(() => 'Grupo')
+  const accion = (args[0] || '').toLowerCase().trim()
+  const nombreGrupo = (await conn.groupMetadata(m.chat).catch(() => null))?.subject || await conn.getName(m.chat).catch(() => 'Grupo')
 
-  if (!action) {
+  if (!accion) {
     return conn.sendMessage(m.chat, {
-      text: buildRentalStatusText(m.chat, groupName),
+      text: buildRentalStatusText(m.chat, nombreGrupo),
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 
-  if (['del', 'delete', 'remove', 'quitar', 'off'].includes(action)) {
+  if (['del', 'delete', 'remove', 'quitar', 'off'].includes(accion)) {
     await removeRental(m.chat)
     return conn.sendMessage(m.chat, {
-      text: `🗑️ *Alquiler eliminado*\n\n> *Grupo:* ${groupName}\n> El bot quedó sin plan activo en este grupo.`,
+      text: `🗑️ *Alquiler eliminado*\n\n> *Grupo:* ${nombreGrupo}\n> El bot quedó sin plan activo en este grupo.`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 
-  const permanentType = resolvePermanentRentalType(action)
-  if (permanentType) {
-    await savePermanentRental(m.chat, permanentType, m.sender)
+  const tipoPermanente = resolvePermanentRentalType(accion)
+  if (tipoPermanente) {
+    await savePermanentRental(m.chat, tipoPermanente, m.sender)
 
-    const label = permanentType === 'official' ? 'Grupo Oficial ♾️' : 'Infinito ♾️'
+    const etiqueta = tipoPermanente === 'official' ? 'Grupo Oficial ♾️' : 'Infinito ♾️'
 
     return conn.sendMessage(m.chat, {
-      text: `✅ *Alquiler activado*\n\n> *Grupo:* ${groupName}\n> *Tipo:* ${label}\n> *Tiempo:* Sin expiración\n> *Por:* @${m.sender.split('@')[0]}`,
+      text: `✅ *Alquiler activado*\n\n> *Grupo:* ${nombreGrupo}\n> *Tipo:* ${etiqueta}\n> *Tiempo:* Sin expiración\n> *Por:* @${m.sender.split('@')[0]}`,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]
@@ -57,8 +57,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     }, { quoted: m })
   }
 
-  const durationMs = parseRentalTime(args.join(' ').trim() || action)
-  if (!durationMs) {
+  const duracionMs = parseRentalTime(args.join(' ').trim() || accion)
+  if (!duracionMs) {
     return conn.sendMessage(m.chat, {
       text: `*[❗] Tiempo inválido.*\n\nUsá:\n> ${usedPrefix + command} 1h\n> ${usedPrefix + command} 1d\n> ${usedPrefix + command} 30m\n> ${usedPrefix + command} 7d\n> ${usedPrefix + command} infinito\n> ${usedPrefix + command} oficial\n\nSin tiempo muestra el estado.\n> ${usedPrefix + command} del → quitar límite`,
       contextInfo: { ...rcanal.contextInfo }
@@ -66,10 +66,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
   }
 
   try {
-    const rental = await saveRental(m.chat, durationMs, m.sender)
+    const alquiler = await saveRental(m.chat, duracionMs, m.sender)
 
     return conn.sendMessage(m.chat, {
-      text: `✅ *Alquiler activado*\n\n> *Grupo:* ${groupName}\n> *Tiempo establecido:* ${formatDuration(durationMs)}\n> *Restante:* ${formatRemainingDetailed(rental.expiresAt)}\n> *Vence:* ${new Date(rental.expiresAt).toLocaleString('es-ES')}\n> *Por:* @${m.sender.split('@')[0]}`,
+      text: `✅ *Alquiler activado*\n\n> *Grupo:* ${nombreGrupo}\n> *Tiempo establecido:* ${formatDuration(duracionMs)}\n> *Restante:* ${formatRemainingDetailed(alquiler.expiresAt)}\n> *Vence:* ${new Date(alquiler.expiresAt).toLocaleString('es-ES')}\n> *Por:* @${m.sender.split('@')[0]}`,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]

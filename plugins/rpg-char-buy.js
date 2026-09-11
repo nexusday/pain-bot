@@ -3,10 +3,10 @@ import { buyFromCharShop } from '../lib/characters/index.js'
 let handler = async (m, { conn, usedPrefix, args }) => {
   try {
     await buyFromCharShop(m, conn, usedPrefix || '.', args?.[0] || '')
-  } catch (e) {
-    console.error('char-buy:', e)
+  } catch (error) {
+    console.error('char-buy:', error)
     await conn.sendMessage(m.chat, {
-      text: `*[❗] No se pudo comprar.*\n> ${e?.message || e}`,
+      text: `*[❗] No se pudo comprar.*\n> ${error?.message || error}`,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m }).catch(() => {})
   }

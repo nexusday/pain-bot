@@ -9,17 +9,17 @@ const __dirname = dirname(__filename)
 
 let handler = async (m, { conn, usedPrefix, command }) => {
   try {
-    const quoted = m.quoted ? m.quoted : m
-    const mime = (quoted.msg || quoted).mimetype || ''
+    const citado = m.quoted ? m.quoted : m
+    const tipoMime = (citado.msg || citado).mimetype || ''
     
-    if (!/webp/.test(mime)) {
+    if (!/webp/.test(tipoMime)) {
       return m.reply(`*[❗] Responde a un sticker con el comando ${usedPrefix + command} para convertirlo en imagen*`)
     }
     
-    const tmpDir = join(process.cwd(), 'tmp')
-    await mkdir(tmpDir, { recursive: true }).catch(() => {})
+    const dirTemp = join(process.cwd(), 'tmp')
+    await mkdir(dirTemp, { recursive: true }).catch(() => {})
     
-    const media = await quoted.download()
+    const media = await citado.download()
     if (!media) throw new Error('No se pudo descargar el sticker')
     
    
@@ -28,24 +28,24 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     }
     
     try {
-      const imageUrl = await webp2png(media)
-      if (!imageUrl) throw new Error('No se pudo convertir el sticker a imagen')
+      const urlImagen = await webp2png(media)
+      if (!urlImagen) throw new Error('No se pudo convertir el sticker a imagen')
       
       await conn.sendMessage(m.chat, { 
-        image: { url: imageUrl },
+        image: { url: urlImagen },
         caption: '',
         mentions: [m.sender],
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
-    } catch (e) {
-      console.error('Error al procesar el sticker:', e)
-      throw e
+    } catch (error) {
+      console.error('Error al procesar el sticker:', error)
+      throw error
     }
     
-  } catch (e) {
-    console.error('Error en toimg:', e)
+  } catch (error) {
+    console.error('Error en toimg:', error)
     m.reply('*[❗] Ocurrió un error al procesar el sticker. Asegúrate de estar respondiendo a un sticker válido.*')
   }
 }

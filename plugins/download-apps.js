@@ -14,15 +14,15 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
     }, { quoted: m })
   }
 
-  const query = text.trim()
+  const consulta = text.trim()
   
   try {
 
   
-    const apiUrl = `https://bytebazz-api.koyeb.app/api/download/aptoide?query=${encodeURIComponent(query)}&apikey=8jkh5icbf05`
-    const { data } = await axios.get(apiUrl)
+    const urlApi = `https://bytebazz-api.koyeb.app/api/download/aptoide?query=${encodeURIComponent(consulta)}&apikey=8jkh5icbf05`
+    const { datos } = await axios.get(urlApi)
 
-    if (!data.status) {
+    if (!datos.status) {
       await conn.sendMessage(m.chat, {
         text: `[❗] No se encontró la aplicación intenta con otro nombre.`,
         contextInfo: {
@@ -32,42 +32,42 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
       return
     }
 
-    const appData = data.data
+    const datosApp = datos.data
 
     
-    const appInfo = `𓂃 ࣪ ִֶָ☾. Nombre: ${appData.name}
-𓂃 ࣪ ִֶָ☾. Paquete: ${appData.package}
-𓂃 ࣪ ִֶָ☾. Tamaño: ${appData.size}
-𓂃 ࣪ ִֶָ☾. Actualizado: ${appData.lastup}`
+    const infoApp = `𓂃 ࣪ ִֶָ☾. Nombre: ${datosApp.name}
+𓂃 ࣪ ִֶָ☾. Paquete: ${datosApp.package}
+𓂃 ࣪ ִֶָ☾. Tamaño: ${datosApp.size}
+𓂃 ࣪ ִֶָ☾. Actualizado: ${datosApp.lastup}`
 
     
     try {
-      const apkResponse = await axios.get(appData.dllink, { responseType: 'arraybuffer' })
-      const apkBuffer = Buffer.from(apkResponse.data)
+      const respuestaApk = await axios.get(datosApp.dllink, { responseType: 'arraybuffer' })
+      const buferApk = Buffer.from(respuestaApk.data)
       
       
       await conn.sendMessage(m.chat, {
-        document: apkBuffer,
-        fileName: `${appData.name}.apk`,
+        document: buferApk,
+        fileName: `${datosApp.name}.apk`,
         mimetype: 'application/vnd.android.package-archive',
-        caption: appInfo,
+        caption: infoApp,
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
       
-    } catch (apkError) {
-      console.error('Error descargando APK:', apkError)
+    } catch (errorApk) {
+      console.error('Error descargando APK:', errorApk)
       
     
-      const fallbackInfo = `𓂃 ࣪ ִֶָ☾. Nombre: ${appData.name}
-𓂃 ࣪ ִֶָ☾. Paquete: ${appData.package}
-𓂃 ࣪ ִֶָ☾. Tamaño: ${appData.size}
-𓂃 ࣪ ִֶָ☾. Actualizado: ${appData.lastup}
-𓂃 ࣪ ִֶָ☾. Enlace de descarga: ${appData.dllink}`
+      const infoReserva = `𓂃 ࣪ ִֶָ☾. Nombre: ${datosApp.name}
+𓂃 ࣪ ִֶָ☾. Paquete: ${datosApp.package}
+𓂃 ࣪ ִֶָ☾. Tamaño: ${datosApp.size}
+𓂃 ࣪ ִֶָ☾. Actualizado: ${datosApp.lastup}
+𓂃 ࣪ ִֶָ☾. Enlace de descarga: ${datosApp.dllink}`
 
       await conn.sendMessage(m.chat, {
-        text: fallbackInfo,
+        text: infoReserva,
         contextInfo: {
           ...rcanal.contextInfo
         }

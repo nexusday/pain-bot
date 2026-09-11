@@ -10,96 +10,96 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   if (!global.db.data.notes) global.db.data.notes = {}
   if (!global.db.data.notes[m.chat]) global.db.data.notes[m.chat] = []
 
-  const groupMetadata = await conn.groupMetadata(m.chat)
-  const groupName = groupMetadata.subject
+  const metadatosGrupo = await conn.groupMetadata(m.chat)
+  const nombreGrupo = metadatosGrupo.subject
 
   
-  const now = Date.now()
-  global.db.data.notes[m.chat] = global.db.data.notes[m.chat].filter(note => note.expiresAt > now)
+  const ahora = Date.now()
+  global.db.data.notes[m.chat] = global.db.data.notes[m.chat].filter(nota => nota.expiresAt > ahora)
 
  
   if (m.mentionedJid && m.mentionedJid.length > 0) {
-    const who = m.mentionedJid[0]
-    const userNotes = global.db.data.notes[m.chat].filter(note => note.author === who)
+    const quien = m.mentionedJid[0]
+    const notasUsuario = global.db.data.notes[m.chat].filter(nota => nota.author === quien)
     
-    if (userNotes.length === 0) {
+    if (notasUsuario.length === 0) {
       return conn.sendMessage(m.chat, {
-        text: `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 📝 」─╮\n│\n╰➺ ✧ *Usuario:* @${who.split('@')[0]}\n╰➺ ✧ *Notas:* 0 📝\n╰➺ ✧ *Estado:* Sin notas activas\n│\n╰➺ ✧ *Grupo:* ${groupName}\n\n> PAIN COMMUNITY`,
+        text: `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 📝 」─╮\n│\n╰➺ ✧ *Usuario:* @${quien.split('@')[0]}\n╰➺ ✧ *Notas:* 0 📝\n╰➺ ✧ *Estado:* Sin notas activas\n│\n╰➺ ✧ *Grupo:* ${nombreGrupo}\n\n> PAIN COMMUNITY`,
         contextInfo: {
           ...rcanal.contextInfo,
-          mentionedJid: [who]
+          mentionedJid: [quien]
         }
       }, { quoted: m })
     }
 
-    let notesText = `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 📝 」─╮\n│\n`
-    notesText += `╰➺ ✧ *Usuario:* @${who.split('@')[0]}\n`
-    notesText += `╰➺ ✧ *Notas:* ${userNotes.length} 📝\n│\n`
+    let textoNotas = `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 📝 」─╮\n│\n`
+    textoNotas += `╰➺ ✧ *Usuario:* @${quien.split('@')[0]}\n`
+    textoNotas += `╰➺ ✧ *Notas:* ${notasUsuario.length} 📝\n│\n`
     
-    userNotes.forEach((note, index) => {
-      const timeLeft = note.expiresAt - now
-      const hoursLeft = Math.floor(timeLeft / (60 * 60 * 1000))
-      const minutesLeft = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000))
+    notasUsuario.forEach((nota, index) => {
+      const tiempoRestante = nota.expiresAt - ahora
+      const horasRestantes = Math.floor(tiempoRestante / (60 * 60 * 1000))
+      const minutosRestantes = Math.floor((tiempoRestante % (60 * 60 * 1000)) / (60 * 1000))
       
-      notesText += `╰➺ ✧ *${index + 1}.* ${note.content}\n`
-      notesText += `   ↳ Tiempo restante: ${hoursLeft}h ${minutesLeft}m\n`
+      textoNotas += `╰➺ ✧ *${index + 1}.* ${nota.content}\n`
+      textoNotas += `   ↳ Tiempo restante: ${horasRestantes}h ${minutosRestantes}m\n`
     })
     
-    notesText += `│\n╰➺ ✧ *Grupo:* ${groupName}\n\n> PAIN COMMUNITY`
+    textoNotas += `│\n╰➺ ✧ *Grupo:* ${nombreGrupo}\n\n> PAIN COMMUNITY`
 
-    const mentionedUsers = [who, ...userNotes.map(n => n.author)]
+    const usuariosMencionados = [quien, ...notasUsuario.map(n => n.author)]
     
     return conn.sendMessage(m.chat, {
-      text: notesText,
+      text: textoNotas,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: mentionedUsers
+        mentionedJid: usuariosMencionados
       }
     }, { quoted: m })
   }
 
 
-  const allNotes = global.db.data.notes[m.chat]
+  const todasLasNotas = global.db.data.notes[m.chat]
 
-  if (allNotes.length === 0) {
+  if (todasLasNotas.length === 0) {
     return conn.sendMessage(m.chat, {
-      text: `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼 📝 」─╮\n│\n╰➺ ✧ *Grupo:* ${groupName}\n╰➺ ✧ *Notas activas:* 0\n╰➺ ✧ *Estado:* Sin notas 📝\n│\n╰➺ ✧ *Nota:* No hay notas activas en este grupo.\n\n> PAIN COMMUNITY`,
+      text: `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼 📝 」─╮\n│\n╰➺ ✧ *Grupo:* ${nombreGrupo}\n╰➺ ✧ *Notas activas:* 0\n╰➺ ✧ *Estado:* Sin notas 📝\n│\n╰➺ ✧ *Nota:* No hay notas activas en este grupo.\n\n> PAIN COMMUNITY`,
       contextInfo: {
         ...rcanal.contextInfo
       }
     }, { quoted: m })
   }
 
-  let groupNotesText = `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼 📝 」─╮\n│\n`
-  groupNotesText += `╰➺ ✧ *Grupo:* ${groupName}\n`
-  groupNotesText += `╰➺ ✧ *Notas activas:* ${allNotes.length}\n│\n`
+  let textoNotasGrupo = `╭─「 📝 𝗡𝗼𝘁𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼 📝 」─╮\n│\n`
+  textoNotasGrupo += `╰➺ ✧ *Grupo:* ${nombreGrupo}\n`
+  textoNotasGrupo += `╰➺ ✧ *Notas activas:* ${todasLasNotas.length}\n│\n`
 
-  const mentionedUsers = []
+  const usuariosMencionados = []
   
-  for (let i = 0; i < allNotes.length; i++) {
-    const note = allNotes[i]
-    const timeLeft = note.expiresAt - now
-    const hoursLeft = Math.floor(timeLeft / (60 * 60 * 1000))
-    const minutesLeft = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000))
+  for (let i = 0; i < todasLasNotas.length; i++) {
+    const nota = todasLasNotas[i]
+    const tiempoRestante = nota.expiresAt - ahora
+    const horasRestantes = Math.floor(tiempoRestante / (60 * 60 * 1000))
+    const minutosRestantes = Math.floor((tiempoRestante % (60 * 60 * 1000)) / (60 * 1000))
     
-    mentionedUsers.push(note.author)
+    usuariosMencionados.push(nota.author)
     
-    groupNotesText += `╰➺ ✧ *${i + 1}.* ${note.content}\n`
-    groupNotesText += `   ↳ Por: @${note.author.split('@')[0]} | ${hoursLeft}h ${minutesLeft}m\n`
+    textoNotasGrupo += `╰➺ ✧ *${i + 1}.* ${nota.content}\n`
+    textoNotasGrupo += `   ↳ Por: @${nota.author.split('@')[0]} | ${horasRestantes}h ${minutosRestantes}m\n`
     
-    if (i < allNotes.length - 1) {
-      groupNotesText += `│\n`
+    if (i < todasLasNotas.length - 1) {
+      textoNotasGrupo += `│\n`
     }
   }
   
-  groupNotesText += `│\n╰➺ ✧ *Comando:* ${usedPrefix}vernotas @usuario\n`
-  groupNotesText += `╰➺ ✧ *Para ver notas de un usuario específico*\n\n> PAIN COMMUNITY`
+  textoNotasGrupo += `│\n╰➺ ✧ *Comando:* ${usedPrefix}vernotas @usuario\n`
+  textoNotasGrupo += `╰➺ ✧ *Para ver notas de un usuario específico*\n\n> PAIN COMMUNITY`
 
   return conn.sendMessage(m.chat, {
-    text: groupNotesText,
+    text: textoNotasGrupo,
     contextInfo: {
       ...rcanal.contextInfo,
-      mentionedJid: mentionedUsers
+      mentionedJid: usuariosMencionados
     }
   }, { quoted: m })
 }

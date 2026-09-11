@@ -36,10 +36,10 @@ let handler = async (m, { conn, text, args, usedPrefix }) => {
     }
 
    
-    let sender = global.db.data.users[m.sender]
-    if (!sender) global.db.data.users[m.sender] = {}
+    let remitente = global.db.data.users[m.sender]
+    if (!remitente) global.db.data.users[m.sender] = {}
     
-    let senderCoins = sender.coins || 0
+    let senderCoins = remitente.coins || 0
     
     
     if (senderCoins < cantidad) {
@@ -66,21 +66,21 @@ let handler = async (m, { conn, text, args, usedPrefix }) => {
     const receiverName = await conn.getName(who)
 
     
-    let txt = `💸 𝗧𝗿𝗮𝗻𝘀𝗳𝗲𝗿𝗲𝗻𝗰𝗶𝗮\n\n`
-    txt += `> *De:* @${m.sender.split('@')[0]}\n`
-    txt += `> *Para:* @${who.split('@')[0]}\n`
-    txt += `> *Cantidad:* ${cantidad} coins`
+    let texto = `💸 𝗧𝗿𝗮𝗻𝘀𝗳𝗲𝗿𝗲𝗻𝗰𝗶𝗮\n\n`
+    texto += `> *De:* @${m.sender.split('@')[0]}\n`
+    texto += `> *Para:* @${who.split('@')[0]}\n`
+    texto += `> *Cantidad:* ${cantidad} coins`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender, who]
       }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error('Error en transfer:', e)
+  } catch (error) {
+    console.error('Error en transfer:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al realizar la transferencia.',
       contextInfo: {

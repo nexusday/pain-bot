@@ -21,38 +21,38 @@ let handler = async (m, { conn, usedPrefix }) => {
       } catch {}
     }
 
-    const inactive = listInactiveInGroup(conn, m.chat, participants)
-    if (!inactive.length) {
+    const inactivos = listInactiveInGroup(conn, m.chat, participants)
+    if (!inactivos.length) {
       return conn.sendMessage(m.chat, {
         text: `👻 *TOP INACTIVOS*\n\n> No hay miembros sin mensajes registrados en este grupo.\n> (El conteo empieza desde que el bot registra actividad)`,
         contextInfo: { ...(global.rcanal?.contextInfo || {}) },
       }, { quoted: m })
     }
 
-    const mentions = inactive.map(x => x.jid)
+    const menciones = inactivos.map(x => x.jid)
     // Formato compacto: 1 línea por persona (mensaje único y rápido)
-    const list = inactive
+    const lista = inactivos
       .map((row, i) => `*#${i + 1}* @${String(row.jid).split('@')[0]}`)
       .join('\n')
 
     const text = [
       `👻 *TOP INACTIVOS*`,
-      `> Sin mensajes en *este grupo* · Total: *${inactive.length}*`,
+      `> Sin mensajes en *este grupo* · Total: *${inactivos.length}*`,
       ``,
-      list,
+      lista,
       ``,
       `> Perfil: *${usedPrefix || '.'}perfil @user*`,
     ].join('\n')
 
     await conn.sendMessage(m.chat, {
       text,
-      mentions,
+      mentions: menciones,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m })
-  } catch (e) {
-    console.error('topinactivos:', e)
+  } catch (error) {
+    console.error('topinactivos:', error)
     await conn.sendMessage(m.chat, {
-      text: `*[❗] No se pudo generar el top de inactivos.*\n> ${e?.message || e}`,
+      text: `*[❗] No se pudo generar el top de inactivos.*\n> ${error?.message || error}`,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m })
   }

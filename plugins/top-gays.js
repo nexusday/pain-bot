@@ -8,32 +8,32 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
 
   try {
     
-    const groupMetadata = await conn.groupMetadata(m.chat)
-    const participants = groupMetadata.participants || []
+    const metadatosGrupo = await conn.groupMetadata(m.chat)
+    const participants = metadatosGrupo.participants || []
     
    
-    const users = participants.filter(p => !p.admin && p.id !== conn.user.jid)
+    const usuarios = participants.filter(p => !p.admin && p.id !== conn.user.jid)
     
     
-    const allParticipants = participants.filter(p => p.id !== conn.user.jid)
+    const todosParticipantes = participants.filter(p => p.id !== conn.user.jid)
     
     
-    const selectedUsers = []
-    const maxUsers = Math.min(10, allParticipants.length)
+    const usuariosSeleccionados = []
+    const maxUsuarios = Math.min(10, todosParticipantes.length)
     
-    for (let i = 0; i < maxUsers; i++) {
-      const randomIndex = Math.floor(Math.random() * allParticipants.length)
-      const user = allParticipants[randomIndex]
+    for (let i = 0; i < maxUsuarios; i++) {
+      const indiceAleatorio = Math.floor(Math.random() * todosParticipantes.length)
+      const usuario = todosParticipantes[indiceAleatorio]
       
       
-      if (!selectedUsers.find(u => u.id === user.id)) {
-        selectedUsers.push(user)
+      if (!usuariosSeleccionados.find(u => u.id === usuario.id)) {
+        usuariosSeleccionados.push(usuario)
       } else {
         i-- 
       }
     }
     
-    if (selectedUsers.length === 0) {
+    if (usuariosSeleccionados.length === 0) {
       return conn.sendMessage(m.chat, {
         text: '[❗] No hay suficientes usuarios en el grupo para crear el top.',
         contextInfo: {
@@ -43,27 +43,27 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }
     
    
-    let txt = `🏳‍🌈 𝗧𝗼𝗽 𝗴𝗮𝘆𝘀 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼 \n\n`   
+    let texto = `🏳‍🌈 𝗧𝗼𝗽 𝗴𝗮𝘆𝘀 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼 \n\n`   
   
-    selectedUsers.forEach((user, index) => {
-      const position = index + 1
-      const emoji = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '🏳️‍🌈'
-      txt += `*${position}.* @${user.id.split('@')[0]}\n`
+    usuariosSeleccionados.forEach((usuario, indice) => {
+      const posicion = indice + 1
+      const emoji = posicion === 1 ? '🥇' : posicion === 2 ? '🥈' : posicion === 3 ? '🥉' : '🏳️‍🌈'
+      texto += `*${posicion}.* @${usuario.id.split('@')[0]}\n`
     })
         
  
-    const mentionedJid = selectedUsers.map(user => user.id)
+    const jidsMencionados = usuariosSeleccionados.map(usuario => usuario.id)
     
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: mentionedJid
+        mentionedJid: jidsMencionados
       }
     }, { quoted: m })
     
-  } catch (e) {
-    console.error('Error en top gays:', e)
+  } catch (error) {
+    console.error('Error en top gays:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al generar el top de gays del grupo.',
       contextInfo: {

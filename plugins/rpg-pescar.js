@@ -1,20 +1,20 @@
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
-    let user = global.db.data.users[m.sender]
-    if (!user) global.db.data.users[m.sender] = {}
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) global.db.data.users[m.sender] = {}
 
-    let coins = user.coins || 0
+    let monedas = usuario.coins || 0
 
     
     const cooldown = 2 * 60 * 1000
-    const lastPescar = user.lastPescar || 0
-    const timeLeft = cooldown - (Date.now() - lastPescar)
+    const lastPescar = usuario.lastPescar || 0
+    const tiempoRestante = cooldown - (Date.now() - lastPescar)
 
-    if (timeLeft > 0) {
-      const minutes = Math.floor(timeLeft / 60000)
-      const seconds = Math.floor((timeLeft % 60000) / 1000)
+    if (tiempoRestante > 0) {
+      const minutos = Math.floor(tiempoRestante / 60000)
+      const segundos = Math.floor((tiempoRestante % 60000) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar *${minutes} minuto${minutes !== 1 ? 's' : ''} y ${seconds} segundo${seconds !== 1 ? 's' : ''}* para volver a pescar.`,
+        text: `[❗] Debes esperar *${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''}* para volver a pescar.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -82,7 +82,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     if (pescado) {
       
-      global.db.data.users[m.sender].coins = coins + pescado.valor
+      global.db.data.users[m.sender].coins = monedas + pescado.valor
       global.db.data.users[m.sender].lastPescar = Date.now()
 
       
@@ -105,16 +105,16 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
           break
       }
 
-      let txt = `🎣 𝗣𝗲𝘀𝗰𝗮𝗿\n`
-      txt += `\n`
-      txt += `> ${mensajeRareza}\n`
-      txt += `> *Pez capturado:* ${pescado.nombre} ${pescado.emoji}\n`
-      txt += `> *Valor:* +${pescado.valor} ${global.moneda}\n`
-      txt += `> *Total:* ${coins + pescado.valor} ${global.moneda}\n`
-      txt += `> *Rareza:* ${pescado.rareza}\n`
+      let texto = `🎣 𝗣𝗲𝘀𝗰𝗮𝗿\n`
+      texto += `\n`
+      texto += `> ${mensajeRareza}\n`
+      texto += `> *Pez capturado:* ${pescado.nombre} ${pescado.emoji}\n`
+      texto += `> *Valor:* +${pescado.valor} ${global.moneda}\n`
+      texto += `> *Total:* ${monedas + pescado.valor} ${global.moneda}\n`
+      texto += `> *Rareza:* ${pescado.rareza}\n`
 
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -124,10 +124,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       
       global.db.data.users[m.sender].lastPescar = Date.now()
 
-      let txt = `🎣 𝗣𝗲𝘀𝗰𝗮𝗿 \n> *No pescaste nada esta vez*\n> *Total:* ${coins} ${global.moneda}`
+      let texto = `🎣 𝗣𝗲𝘀𝗰𝗮𝗿 \n> *No pescaste nada esta vez*\n> *Total:* ${monedas} ${global.moneda}`
 
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -135,8 +135,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-  } catch (e) {
-    console.error('Error en juego de pescar:', e)
+  } catch (error) {
+    console.error('Error en juego de pescar:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al pescar. Contacta al administrador.',
       contextInfo: {

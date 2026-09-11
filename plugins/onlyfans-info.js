@@ -10,12 +10,12 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
     }, { quoted: m })
   }
 
-  const username = text.trim().toLowerCase()
+  const nombreUsuario = text.trim().toLowerCase()
   
   try {
    
-    const apiUrl = `https://bytebazz-api.koyeb.app/api/busqueda/onlyfans?username=${encodeURIComponent(username)}&apikey=8jkh5icbf05`
-    const { data } = await axios.get(apiUrl)
+    const urlApi = `https://bytebazz-api.koyeb.app/api/busqueda/onlyfans?username=${encodeURIComponent(nombreUsuario)}&apikey=8jkh5icbf05`
+    const { data } = await axios.get(urlApi)
 
     if (!data.status) {
       await conn.sendMessage(m.chat, {
@@ -27,53 +27,53 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
       return
     }
 
-    const userData = data.user
+    const datosUsuario = data.user
     
    
-    const userInfo = ` *${userData.name}* 
-> *Nombre:* ${userData.name}
-> *Username:* @${userData.username}
-> *ID:* ${userData.id}
-> *Verificado:* ${userData.isVerified ? 'Sí ✅' : 'No ❌'}
+    const infoUsuario = ` *${datosUsuario.name}* 
+> *Nombre:* ${datosUsuario.name}
+> *Username:* @${datosUsuario.username}
+> *ID:* ${datosUsuario.id}
+> *Verificado:* ${datosUsuario.isVerified ? 'Sí ✅' : 'No ❌'}
 
 > *Descripción:*
-> ${userData.about || 'Sin descripción'}
+> ${datosUsuario.about || 'Sin descripción'}
 
 > *Estadísticas:*
-> Posts: ${userData.postsCount || 0}
-> Fotos: ${userData.photosCount || 0}
-> Videos: ${userData.videosCount || 0}
-> Audios: ${userData.audiosCount || 0}
-> Total: ${userData.mediasCount || 0}
+> Posts: ${datosUsuario.postsCount || 0}
+> Fotos: ${datosUsuario.photosCount || 0}
+> Videos: ${datosUsuario.videosCount || 0}
+> Audios: ${datosUsuario.audiosCount || 0}
+> Total: ${datosUsuario.mediasCount || 0}
 
 > *Información adicional:*
-> Fecha de registro: ${new Date(userData.joinDate).toLocaleDateString()}
-> Última vez visto: ${new Date(userData.lastSeen).toLocaleDateString()}
-> Contenido adulto: ${userData.isAdultContent ? 'Sí 🔞' : 'No ✅'}
-> Precio suscripción: $${userData.subscribePrice || 0}
+> Fecha de registro: ${new Date(datosUsuario.joinDate).toLocaleDateString()}
+> Última vez visto: ${new Date(datosUsuario.lastSeen).toLocaleDateString()}
+> Contenido adulto: ${datosUsuario.isAdultContent ? 'Sí 🔞' : 'No ✅'}
+> Precio suscripción: $${datosUsuario.subscribePrice || 0}
 
 > *Enlaces:*
-> [Website] (${userData.website})`
+> [Website] (${datosUsuario.website})`
 
    
-    if (userData.avatar) {
+    if (datosUsuario.avatar) {
       try {
-        const avatarResponse = await axios.get(userData.avatar, { responseType: 'arraybuffer' })
-        const avatarBuffer = Buffer.from(avatarResponse.data)
+        const respuestaAvatar = await axios.get(datosUsuario.avatar, { responseType: 'arraybuffer' })
+        const bufferAvatar = Buffer.from(respuestaAvatar.data)
         
         await conn.sendMessage(m.chat, {
-          image: avatarBuffer,
-          caption: userInfo,
+          image: bufferAvatar,
+          caption: infoUsuario,
           contextInfo: {
             ...rcanal.contextInfo
           }
         }, { quoted: m })
-      } catch (avatarError) {
-        console.error('Error descargando avatar:', avatarError)
+      } catch (errorAvatar) {
+        console.error('Error descargando avatar:', errorAvatar)
         
        
         await conn.sendMessage(m.chat, {
-          text: userInfo,
+          text: infoUsuario,
           contextInfo: {
             ...rcanal.contextInfo
           }
@@ -82,7 +82,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
     } else {
     
       await conn.sendMessage(m.chat, {
-        text: userInfo,
+        text: infoUsuario,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -90,20 +90,20 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
     }
 
    
-    if (userData.header) {
+    if (datosUsuario.header) {
       try {
-        const headerResponse = await axios.get(userData.header, { responseType: 'arraybuffer' })
-        const headerBuffer = Buffer.from(headerResponse.data)
+        const respuestaHeader = await axios.get(datosUsuario.header, { responseType: 'arraybuffer' })
+        const bufferHeader = Buffer.from(respuestaHeader.data)
         
         await conn.sendMessage(m.chat, {
-          image: headerBuffer,
-          caption: `> Su Banner de *${userData.name}*`,
+          image: bufferHeader,
+          caption: `> Su Banner de *${datosUsuario.name}*`,
           contextInfo: {
             ...rcanal.contextInfo
           }
         }, { quoted: m })
-      } catch (headerError) {
-        console.error('Error descargando header:', headerError)
+      } catch (errorHeader) {
+        console.error('Error descargando header:', errorHeader)
       }
     }
 

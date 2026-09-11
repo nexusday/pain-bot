@@ -47,6 +47,7 @@ await this.pushMessage(chatUpdate.messages).catch(console.error)
 try {
 m = smsg(this, m) || m
 if (!m) return
+const conn = this
 
 if (!m.messageStubType && m.isGroup && !m.fromMe) {
   await runAntiViewOnce(this, m)
@@ -100,12 +101,12 @@ try {
   
   
   if (global.db.data.notes && global.db.data.notes[m.chat]) {
-    const now = Date.now()
-    const originalLength = global.db.data.notes[m.chat].length
-    global.db.data.notes[m.chat] = global.db.data.notes[m.chat].filter(note => note.expiresAt > now)
-    const cleanedLength = global.db.data.notes[m.chat].length
-    if (originalLength > cleanedLength) {
-      console.log(`[NOTAS] Se limpiaron ${originalLength - cleanedLength} notas expiradas en ${m.chat}`)
+    const ahora = Date.now()
+    const longitudOriginal = global.db.data.notes[m.chat].length
+    global.db.data.notes[m.chat] = global.db.data.notes[m.chat].filter(nota => nota.expiresAt > ahora)
+    const longitudLimpia = global.db.data.notes[m.chat].length
+    if (longitudOriginal > longitudLimpia) {
+      console.log(`[NOTAS] Se limpiaron ${longitudOriginal - longitudLimpia} notas expiradas en ${m.chat}`)
     }
   }
 } catch (e) {  
@@ -120,45 +121,45 @@ if (typeof m.text !== 'string') m.text = ''
 
 let _user = global.db.data?.users?.[m.sender]  
 
-const createOwnerIds = (number) => {
-  const cleanNumber = String(number || '').replace(/[^0-9]/g, '')
-  if (!cleanNumber) return []
+const crearIdsOwner = (numero) => {
+  const numeroLimpio = String(numero || '').replace(/[^0-9]/g, '')
+  if (!numeroLimpio) return []
   return [
-    cleanNumber + '@s.whatsapp.net',
-    cleanNumber + '@lid'
+    numeroLimpio + '@s.whatsapp.net',
+    numeroLimpio + '@lid'
   ]
 }
 
-const ownerList = Array.isArray(global.owner) ? global.owner : []
-const ownerLidList = Array.isArray(global.ownerLid) ? global.ownerLid : []
-const modsList = Array.isArray(global.mods) ? global.mods : []
-const premsList = Array.isArray(global.prems) ? global.prems : []
+const listaOwner = Array.isArray(global.owner) ? global.owner : []
+const listaOwnerLid = Array.isArray(global.ownerLid) ? global.ownerLid : []
+const listaMods = Array.isArray(global.mods) ? global.mods : []
+const listaPrems = Array.isArray(global.prems) ? global.prems : []
 
-const allOwnerIds = [
+const todosIdsOwner = [
   conn.decodeJid(global.conn.user.id),
-  ...ownerList.flatMap((entry) => {
-    const number = Array.isArray(entry) ? entry[0] : entry
-    return createOwnerIds(number)
+  ...listaOwner.flatMap((entrada) => {
+    const numero = Array.isArray(entrada) ? entrada[0] : entrada
+    return crearIdsOwner(numero)
   }),
-  ...ownerLidList.flatMap((entry) => {
-    const number = Array.isArray(entry) ? entry[0] : entry
-    return createOwnerIds(number)
+  ...listaOwnerLid.flatMap((entrada) => {
+    const numero = Array.isArray(entrada) ? entrada[0] : entrada
+    return crearIdsOwner(numero)
   })
 ]
 
-const isROwner = allOwnerIds.includes(m.sender)
+const isROwner = todosIdsOwner.includes(m.sender)
 const isOwner = isROwner || m.fromMe  
-const isMods = isOwner || modsList.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)  
-const isPrems = isROwner || premsList.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || _user?.prem == true  
+const isMods = isOwner || listaMods.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)  
+const isPrems = isROwner || listaPrems.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || _user?.prem == true  
 
 if (opts['queque'] && m.text && !(isMods || isPrems)) {  
-  let queque = this.msgqueque, time = 1000 * 5  
-  const previousID = queque[queque.length - 1]  
-  queque.push(m.id || m.key.id)  
+  let cola = this.msgqueque, tiempo = 1000 * 5  
+  const idAnterior = cola[cola.length - 1]  
+  cola.push(m.id || m.key.id)  
   setInterval(async function () {  
-    if (queque.indexOf(previousID) === -1) clearInterval(this)  
-    await delay(time)  
-  }, time)  
+    if (cola.indexOf(idAnterior) === -1) clearInterval(this)  
+    await delay(tiempo)  
+  }, tiempo)  
 }  
 
 if (m.isBaileys) return  
@@ -170,8 +171,8 @@ try {
 }
 
 if (!m.fromMe && isStickerMessage(m)) {
-  const dbUser = global.db.data.users[m.sender]
-  if (dbUser) trackSentSticker(dbUser)
+  const usuarioDb = global.db.data.users[m.sender]
+  if (usuarioDb) trackSentSticker(usuarioDb)
 }
 
 const groupMetadata = (m.isGroup ? ((this.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
@@ -185,17 +186,17 @@ const isBotAdmin = bot?.admin || false
 if (shouldBlockByGrupoOff(m, this)) return
 
 if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
-  const rentalBlocked = await checkGroupRental(m, this)
-  if (rentalBlocked) return
+  const alquilerBloqueado = await checkGroupRental(m, this)
+  if (alquilerBloqueado) return
 }
 
   
   try {
     if (!global.db.data.muted) global.db.data.muted = {}
-    const mutedList = m.isGroup ? global.db.data.muted[m.chat] : null
-    if (m.isGroup && Array.isArray(mutedList) && mutedList.length && !m.fromMe) {
+    const listaMuteados = m.isGroup ? global.db.data.muted[m.chat] : null
+    if (m.isGroup && Array.isArray(listaMuteados) && listaMuteados.length && !m.fromMe) {
     
-      const senderIds = [
+      const idsRemitente = [
         m.sender,
         m.participant,
         m.key?.participant,
@@ -205,20 +206,20 @@ if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
         m.participantAlt
       ].filter(Boolean).map(String)
 
-      const digitSet = new Set(
-        mutedList.map(j => String(j).split('@')[0].split(':')[0].replace(/\D/g, '')).filter(d => d.length >= 6)
+      const conjuntoDigitos = new Set(
+        listaMuteados.map(j => String(j).split('@')[0].split(':')[0].replace(/\D/g, '')).filter(d => d.length >= 6)
       )
-      let mutedHit = senderIds.some(id => mutedList.includes(id))
-      if (!mutedHit) {
-        mutedHit = senderIds.some(id => {
+      let golpeMute = idsRemitente.some(id => listaMuteados.includes(id))
+      if (!golpeMute) {
+        golpeMute = idsRemitente.some(id => {
           const d = String(id).split('@')[0].split(':')[0].replace(/\D/g, '')
-          return d.length >= 6 && digitSet.has(d)
+          return d.length >= 6 && conjuntoDigitos.has(d)
         })
       }
-      if (!mutedHit) {
+      if (!golpeMute) {
         const p = findGroupParticipant(participants, m, this)
         if (p) {
-          const pIds = [p.id, p.jid, p.lid, p.phoneNumber]
+          const idsParticipante = [p.id, p.jid, p.lid, p.phoneNumber]
             .filter(Boolean)
             .map(v => {
               const s = String(v)
@@ -226,15 +227,15 @@ if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
               if (String(p.lid) === s || /lid/i.test(s)) return `${s.replace(/\D/g, '')}@lid`
               return `${s.replace(/\D/g, '')}@s.whatsapp.net`
             })
-          mutedHit = pIds.some(id => mutedList.includes(id)) ||
-            pIds.some(id => {
+          golpeMute = idsParticipante.some(id => listaMuteados.includes(id)) ||
+            idsParticipante.some(id => {
               const d = String(id).split('@')[0].split(':')[0].replace(/\D/g, '')
-              return d.length >= 6 && digitSet.has(d)
+              return d.length >= 6 && conjuntoDigitos.has(d)
             })
         }
       }
 
-      if (mutedHit) {
+      if (golpeMute) {
         try {
           await this.sendMessage(m.chat, { delete: m.key })
         } catch (err) {
@@ -252,16 +253,16 @@ const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './pl
 let usedPrefix = '.'  
 
 
-let commandExecuted = false
+let comandoEjecutado = false
 
 
-const processedPlugins = []
+const pluginsProcesados = []
 for (let name in global.plugins) {
   let plugin = global.plugins[name]
   if (!plugin || plugin.disabled) continue
   
  
-  let normalizedPlugin = {
+  let pluginNormalizado = {
     name: name,
     handler: plugin.handler || plugin,
     command: plugin.command || [],
@@ -272,22 +273,22 @@ for (let name in global.plugins) {
   }
   
   
-  if (typeof normalizedPlugin.command === 'string') {
-    normalizedPlugin.command = [normalizedPlugin.command]
+  if (typeof pluginNormalizado.command === 'string') {
+    pluginNormalizado.command = [pluginNormalizado.command]
   }
   
   
-  if (normalizedPlugin.command instanceof RegExp) {
-    normalizedPlugin.command = [normalizedPlugin.command.source]
+  if (pluginNormalizado.command instanceof RegExp) {
+    pluginNormalizado.command = [pluginNormalizado.command.source]
   }
   
-  processedPlugins.push(normalizedPlugin)
+  pluginsProcesados.push(pluginNormalizado)
 }
 
-const sessionPlugins = ['xnxx.js', 'hentai.js', 'xvideos.js']
+const pluginsSesion = ['xnxx.js', 'hentai.js', 'xvideos.js']
 
-for (let plugin of processedPlugins) {
-  if (plugin.handler && typeof plugin.handler.before === 'function' && sessionPlugins.includes(plugin.name)) {
+for (let plugin of pluginsProcesados) {
+  if (plugin.handler && typeof plugin.handler.before === 'function' && pluginsSesion.includes(plugin.name)) {
     try {
       await plugin.handler.before.call(this, m, {
         conn: this,
@@ -313,7 +314,7 @@ for (let plugin of processedPlugins) {
   }
 }
 
-for (let plugin of processedPlugins) {
+for (let plugin of pluginsProcesados) {
   const __filename = join(___dirname, plugin.name)
 
   
@@ -346,48 +347,48 @@ for (let plugin of processedPlugins) {
   }
 
   
-  const str2Regex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
+  const escaparRegex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
   let _prefix = plugin.customPrefix ? plugin.customPrefix : conn.prefix ? conn.prefix : global.prefix
   
   let match = (_prefix instanceof RegExp ?
     [[_prefix.exec(m.text), _prefix]] :
     Array.isArray(_prefix) ?
       _prefix.map(p => {
-        let re = p instanceof RegExp ? p : new RegExp(str2Regex(p))
+        let re = p instanceof RegExp ? p : new RegExp(escaparRegex(p))
         return [re.exec(m.text), re]
       }) :
       typeof _prefix === 'string' ?
-        [[new RegExp(str2Regex(_prefix)).exec(m.text), new RegExp(str2Regex(_prefix))]] :
+        [[new RegExp(escaparRegex(_prefix)).exec(m.text), new RegExp(escaparRegex(_prefix))]] :
         [[[], new RegExp]]
   ).find(p => p[1] && p[0])
 
   // prefijo o sin 
-  let prefixMatch, noPrefix, commandText, args, command
+  let coincidenciaPrefijo, sinPrefijo, textoComando, args, command
   if (!match) {
-    const groupAllowNoPrefix = m.isGroup && global.db?.data?.antiprefijo && global.db.data.antiprefijo[m.chat] === true
-    if (!isOwner && !isROwner && !groupAllowNoPrefix) continue
+    const grupoPermiteSinPrefijo = m.isGroup && global.db?.data?.antiprefijo && global.db.data.antiprefijo[m.chat] === true
+    if (!isOwner && !isROwner && !grupoPermiteSinPrefijo) continue
     
-    noPrefix = (m.text || '').trim()
-    if (!noPrefix) continue
-    ;[commandText, ...args] = noPrefix.split(/\s+/)
-    command = commandText?.toLowerCase()
+    sinPrefijo = (m.text || '').trim()
+    if (!sinPrefijo) continue
+    ;[textoComando, ...args] = sinPrefijo.split(/\s+/)
+    command = textoComando?.toLowerCase()
     
-    const isMatchNoPrefix = plugin.command && plugin.command.some(cmd => {
+    const esCoincideSinPrefijo = plugin.command && plugin.command.some(cmd => {
       if (typeof cmd === 'string') return command === cmd.toLowerCase()
       if (cmd instanceof RegExp) return cmd.test(command)
       return false
     })
-    if (!isMatchNoPrefix) continue
-    prefixMatch = ['']
+    if (!esCoincideSinPrefijo) continue
+    coincidenciaPrefijo = ['']
   } else {
-    prefixMatch = match[0]
-    noPrefix = m.text.slice(prefixMatch[0].length).trim()
-    ;[commandText, ...args] = noPrefix.split(/\s+/)
-    command = commandText?.toLowerCase()
+    coincidenciaPrefijo = match[0]
+    sinPrefijo = m.text.slice(coincidenciaPrefijo[0].length).trim()
+    ;[textoComando, ...args] = sinPrefijo.split(/\s+/)
+    command = textoComando?.toLowerCase()
   }
 
  
-  const isMatchCommand = plugin.command && plugin.command.some(cmd => {
+  const esComandoCoincide = plugin.command && plugin.command.some(cmd => {
     if (typeof cmd === 'string') {
       return command === cmd.toLowerCase()
     } else if (cmd instanceof RegExp) {
@@ -396,7 +397,7 @@ for (let plugin of processedPlugins) {
     return false
   })
 
-  if (isMatchCommand) {
+  if (esComandoCoincide) {
     
   
     if (m.isGroup && global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
@@ -406,8 +407,8 @@ for (let plugin of processedPlugins) {
       }
     }
     
-    const allowedPrivateCommands = ['qr', 'code', 'setbotname', 'setbotimg', 'setautoread']
-    if (!m.isGroup && !allowedPrivateCommands.includes(command) && !isOwner) {
+    const comandosPrivadosPermitidos = ['qr', 'code', 'setbotname', 'setbotimg', 'setautoread']
+    if (!m.isGroup && !comandosPrivadosPermitidos.includes(command) && !isOwner) {
       return 
     }
     
@@ -415,11 +416,11 @@ for (let plugin of processedPlugins) {
       if (command !== 'grupo') return
     }
 
-    if (await checkCmd18Command(m, this, command, prefixMatch[0] || usedPrefix, isOwner, isROwner)) {
+    if (await checkCmd18Command(m, this, command, coincidenciaPrefijo[0] || usedPrefix, isOwner, isROwner)) {
       continue
     }
     
-    commandExecuted = true
+    comandoEjecutado = true
     try {
       await plugin.handler.call(this, m, {
         match,
@@ -437,7 +438,7 @@ for (let plugin of processedPlugins) {
         chatUpdate,
         __dirname: ___dirname,
         __filename,
-        usedPrefix: prefixMatch[0],
+        usedPrefix: coincidenciaPrefijo[0],
         command,
         args,
         text: args.join(' ').trim()
@@ -447,10 +448,10 @@ for (let plugin of processedPlugins) {
       m.args = args
 
       if (m.error == null && !m.rpgAwarded) {
-        const dbUser = global.db.data.users[m.sender]
-        if (dbUser) {
-          const isSticker = Array.isArray(plugin.tags) && plugin.tags.includes('stickers')
-          m.rpgProgress = awardCommandProgress(dbUser, { isSticker })
+        const usuarioDb = global.db.data.users[m.sender]
+        if (usuarioDb) {
+          const esSticker = Array.isArray(plugin.tags) && plugin.tags.includes('stickers')
+          m.rpgProgress = awardCommandProgress(usuarioDb, { isSticker: esSticker })
           m.rpgAwarded = true
         }
       }
@@ -471,7 +472,7 @@ if (m.rpgProgress?.leveled) {
 
 
 
-if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db.data.adivinanzasActivas[m.chat]) {
+if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.db.data.adivinanzasActivas[m.chat]) {
   
   if (m.isGroup && global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
     if (!isAdmin && !isOwner && !isROwner) {
@@ -531,13 +532,13 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
 
 
   
-  await handleModoDescargas(m, this, commandExecuted)
-  await handleAntiSystems(m, this, isAdmin, isOwner, isRAdmin, isBotAdmin, isPrems, commandExecuted)
+  await handleModoDescargas(m, this, comandoEjecutado)
+  await handleAntiSystems(m, this, isAdmin, isOwner, isRAdmin, isBotAdmin, isPrems, comandoEjecutado)
 
   await handleGroupEvents(m, this, isAdmin, isBotAdmin, isOwner, participants)
 
   
-  if (m.isGroup && global.pendingInvites && global.pendingInvites[m.chat] && !commandExecuted) {
+  if (m.isGroup && global.pendingInvites && global.pendingInvites[m.chat] && !comandoEjecutado) {
     
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) {
@@ -545,38 +546,38 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
       }
     }
     
-    const invite = global.pendingInvites[m.chat]
+    const invitacion = global.pendingInvites[m.chat]
 
-    if (!isInviteOpponent(m, invite, this, participants)) return
+    if (!isInviteOpponent(m, invitacion, this, participants)) return
 
-    const message = m.text?.toLowerCase().trim()
+    const mensaje = m.text?.toLowerCase().trim()
 
-    if (message === 'si' || message === 'sí' || message === 'yes' || message === 'acepto') {
+    if (mensaje === 'si' || mensaje === 'sí' || mensaje === 'yes' || mensaje === 'acepto') {
       try {
-        let mod
-        if (invite.type === 'miner') mod = await import(`./lib/logic-miner.js`)
-        else if (invite.type === 'bomba') mod = await import(`./lib/logic-bomba.js`)
-        else mod = await import(`./plugins/rpg-michi.js`)
-        const { acceptInvite } = mod
-        return acceptInvite.call(this, m, this, invite, participants)
+        let modulo
+        if (invitacion.type === 'miner') modulo = await import(`./lib/logic-miner.js`)
+        else if (invitacion.type === 'bomba') modulo = await import(`./lib/logic-bomba.js`)
+        else modulo = await import(`./plugins/rpg-michi.js`)
+        const { acceptInvite } = modulo
+        return acceptInvite.call(this, m, this, invitacion, participants)
       } catch (e) {
         console.error('Error al aceptar invitación:', e)
       }
-    } else if (message === 'no' || message === 'rechazo' || message === 'rechazar') {
+    } else if (mensaje === 'no' || mensaje === 'rechazo' || mensaje === 'rechazar') {
       try {
-        let mod
-        if (invite.type === 'miner') mod = await import(`./lib/logic-miner.js`)
-        else if (invite.type === 'bomba') mod = await import(`./lib/logic-bomba.js`)
-        else mod = await import(`./plugins/rpg-michi.js`)
-        const { rejectInvite } = mod
-        return rejectInvite.call(this, m, this, invite)
+        let modulo
+        if (invitacion.type === 'miner') modulo = await import(`./lib/logic-miner.js`)
+        else if (invitacion.type === 'bomba') modulo = await import(`./lib/logic-bomba.js`)
+        else modulo = await import(`./plugins/rpg-michi.js`)
+        const { rejectInvite } = modulo
+        return rejectInvite.call(this, m, this, invitacion)
       } catch (e) {
         console.error('Error al rechazar invitación:', e)
       }
     }
   }
 
-  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'tictactoe' && !commandExecuted) {
+  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'tictactoe' && !comandoEjecutado) {
     
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) {
@@ -584,33 +585,33 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
       }
     }
     
-    const gameData = global.games[m.chat]
-    const game = gameData.game
+    const datosJuego = global.games[m.chat]
+    const game = datosJuego.game
 
     
-    if (!gameData.players.includes(m.sender)) return
+    if (!datosJuego.players.includes(m.sender)) return
 
     
     if (!game.gameActive) return
 
     
-    const message = m.text?.trim()
-    if (!message || !/^[1-9]$/.test(message)) return
+    const mensaje = m.text?.trim()
+    if (!mensaje || !/^[1-9]$/.test(mensaje)) return
 
-    const position = parseInt(message)
+    const posicion = parseInt(mensaje)
 
     try {
       
       const { handleGameEnd } = await import(`./plugins/rpg-michi.js`)
 
       
-      const result = game.makeMove(position, m.sender)
+      const resultado = game.makeMove(posicion, m.sender)
 
-      if (!result.success) {
+      if (!resultado.success) {
         
         return this.sendMessage(m.chat, {
           text: `𝗧𝗲𝗻𝗲𝗺𝗼𝘀 𝘂𝗻 𝗲𝗿𝗿𝗼𝗿:  
-  𓂃 ࣪ ִֶָ☾.  ${result.message}`,
+  𓂃 ࣪ ִֶָ☾.  ${resultado.message}`,
           contextInfo: {
             ...rcanal.contextInfo
           }
@@ -624,18 +625,18 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
         }
       })
 
-      if (result.finished) {
+      if (resultado.finished) {
         
-        return handleGameEnd(m, this, game, result.winner ? 'finished' : 'draw')
+        return handleGameEnd(m, this, game, resultado.winner ? 'finished' : 'draw')
       } else {
-        const nextPlayer = game.currentPlayer
-        const nextSymbol = game.currentPlayer === game.player1 ? '❌' : '⭕'
-        const caption = `Movimiento realizado\n\nTurno de @${nextPlayer.split('@')[0]} (${nextSymbol})\nResponde con el numero 1-9`
+        const siguienteJugador = game.currentPlayer
+        const siguienteSimbolo = game.currentPlayer === game.player1 ? '❌' : '⭕'
+        const leyenda = `Movimiento realizado\n\nTurno de @${siguienteJugador.split('@')[0]} (${siguienteSimbolo})\nResponde con el numero 1-9`
 
         return sendMichiBoard(this, m.chat, game, {
           quoted: m,
-          caption,
-          mentionedJid: [nextPlayer],
+          caption: leyenda,
+          mentionedJid: [siguienteJugador],
           status: 'playing',
         })
       }
@@ -652,24 +653,24 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
   }
 
   // Miner game moves
-  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'miner' && !commandExecuted) {
+  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'miner' && !comandoEjecutado) {
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) {
         return 
       }
     }
 
-    const gameData = global.games[m.chat]
-    const game = gameData.game
-    if (!gameData.players.includes(m.sender)) return
+    const datosJuego = global.games[m.chat]
+    const game = datosJuego.game
+    if (!datosJuego.players.includes(m.sender)) return
     if (!game?.gameActive) return
 
-    const message = m.text?.trim()
-    if (!message || !/^[0-9]+$/.test(message)) return
+    const mensaje = m.text?.trim()
+    if (!mensaje || !/^[0-9]+$/.test(mensaje)) return
 
     try {
-      const mod = await import(`./lib/logic-miner.js`)
-      await mod.handleMove.call(this, m, this, gameData)
+      const modulo = await import(`./lib/logic-miner.js`)
+      await modulo.handleMove.call(this, m, this, datosJuego)
     } catch (e) {
       console.error('Error procesando movimiento miner:', e)
       return this.sendMessage(m.chat, { text: '[❌] Error al procesar el movimiento.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
@@ -677,14 +678,14 @@ if (m.text && !commandExecuted && global.db.data.adivinanzasActivas && global.db
   }
 
   // Bomba game moves (botones interactivos o numero 1-10)
-  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'bomba' && !commandExecuted) {
+  if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'bomba' && !comandoEjecutado) {
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) return
     }
 
     try {
-      const mod = await import(`./lib/logic-bomba.js`)
-      await mod.handleMove(m, this, global.games[m.chat], participants)
+      const modulo = await import(`./lib/logic-bomba.js`)
+      await modulo.handleMove(m, this, global.games[m.chat], participants)
     } catch (e) {
       console.error('Error procesando movimiento bomba:', e)
     }
@@ -710,8 +711,8 @@ global.dfail = (type, m, conn) => {
 console.error(e)
 } finally {
 if (opts['queque'] && m.text) {
-const quequeIndex = this.msgqueque.indexOf(m.id || m.key.id)
-if (quequeIndex !== -1) this.msgqueque.splice(quequeIndex, 1)
+const indiceCola = this.msgqueque.indexOf(m.id || m.key.id)
+if (indiceCola !== -1) this.msgqueque.splice(indiceCola, 1)
 }
 
 let user, stats = global.db.data.stats  
@@ -744,22 +745,22 @@ try {
   console.log(m, m.quoted, e)  
 }  
 
-const settingsREAD = global.db.data.settings[this.user.jid] || {}
+const ajustesLectura = global.db.data.settings[this.user.jid] || {}
 
 
-const isSubBot = this.user.jid !== global.conn.user.jid
-let shouldAutoRead = true
+const esSubBot = this.user.jid !== global.conn.user.jid
+let debeAutoLeer = true
 
-if (isSubBot) {
+if (esSubBot) {
   try {
-    const botNumber = this.user.jid.split('@')[0].replace(/\D/g, '')
-    const configPath = `./Serbot/${botNumber}/config.json`
+    const numeroBot = this.user.jid.split('@')[0].replace(/\D/g, '')
+    const rutaConfig = `./Serbot/${numeroBot}/config.json`
 
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf-8'))
+    if (existsSync(rutaConfig)) {
+      const config = JSON.parse(readFileSync(rutaConfig, 'utf-8'))
 
       if (config.autoRead === false) {
-        shouldAutoRead = false
+        debeAutoLeer = false
       }
     }
   } catch (error) {
@@ -767,20 +768,20 @@ if (isSubBot) {
   }
 } else {
   try {
-    const botKey = this.user?.jid || this.decodeJid(this.user?.id)
-    const settings = botKey && global.db?.data?.settings?.[botKey]
+    const claveBot = this.user?.jid || this.decodeJid(this.user?.id)
+    const settings = claveBot && global.db?.data?.settings?.[claveBot]
     if (settings?.autoread === false) {
-      shouldAutoRead = false
+      debeAutoLeer = false
     }
   } catch (error) {
     console.error('Error leyendo visto del bot principal:', error)
   }
 }
 
-const msgId = m.id || m.key?.id
-const skipAutoRead = isKnownViewOnce(msgId) || isViewOnceCandidate(m)
+const idMensaje = m.id || m.key?.id
+const saltarAutoLeer = isKnownViewOnce(idMensaje) || isViewOnceCandidate(m)
 
-if (shouldAutoRead && !skipAutoRead) {
+if (debeAutoLeer && !saltarAutoLeer) {
   try {
     await this.readMessages([m.key])
 
@@ -792,7 +793,7 @@ if (shouldAutoRead && !skipAutoRead) {
   }
 }
 
-if (shouldAutoRead) {
+if (debeAutoLeer) {
   await handleAIModes(m, this)
 }
 

@@ -5,7 +5,7 @@ import sharp from '../lib/sharp.js'
 import { createWorker } from 'tesseract.js'
 import { webp2png } from '../lib/webp2mp4.js'
 
-const LANG_MAP = {
+const MAPA_IDIOMAS = {
   es: 'spa',
   spa: 'spa',
   en: 'eng',
@@ -16,30 +16,30 @@ const LANG_MAP = {
   fra: 'fra'
 }
 
-let workerInstance = null
-let workerLang = ''
+let instanciaTrabajador = null
+let idiomaTrabajador = ''
 
-async function getWorker(lang = 'spa+eng') {
-  if (workerInstance && workerLang === lang) return workerInstance
+async function obtenerTrabajador(idioma = 'spa+eng') {
+  if (instanciaTrabajador && idiomaTrabajador === idioma) return instanciaTrabajador
 
-  if (workerInstance) {
-    try { await workerInstance.terminate() } catch {}
-    workerInstance = null
+  if (instanciaTrabajador) {
+    try { await instanciaTrabajador.terminate() } catch {}
+    instanciaTrabajador = null
   }
 
-  workerInstance = await createWorker(lang, 1, {
+  instanciaTrabajador = await createWorker(idioma, 1, {
     logger: () => {}
   })
-  await workerInstance.setParameters({
+  await instanciaTrabajador.setParameters({
     tessedit_pageseg_mode: '3',
     preserve_interword_spaces: '1'
   })
-  workerLang = lang
-  return workerInstance
+  idiomaTrabajador = idioma
+  return instanciaTrabajador
 }
 
-function cleanLine(line) {
-  return line
+function limpiarLinea(linea) {
+  return linea
     .replace(/\s+/g, ' ')
     .replace(/^[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9¿¡]{1,4}\s*/u, '')
     .replace(/([a-zA-ZáéíóúñÁÉÍÓÚÑ])\s*[=|/\\]{1,2}\s*/gu, '$1 ')
@@ -48,102 +48,102 @@ function cleanLine(line) {
     .trim()
 }
 
-function isReadableToken(token) {
+function esTokenLegible(token) {
   if (!token) return false
-  const letters = (token.match(/[\p{L}\p{N}]/gu) || []).length
-  if (letters === 0) return false
-  if (token.length <= 2 && letters / token.length < 0.6) return false
-  return letters / token.length >= 0.45
+  const letras = (token.match(/[\p{L}\p{N}]/gu) || []).length
+  if (letras === 0) return false
+  if (token.length <= 2 && letras / token.length < 0.6) return false
+  return letras / token.length >= 0.45
 }
 
-function rebuildByLines(words) {
-  if (!words.length) return ''
+function reconstruirPorLineas(palabras) {
+  if (!palabras.length) return ''
 
-  const sorted = [...words].sort((a, b) => {
+  const ordenados = [...palabras].sort((a, b) => {
     const dy = (a.bbox?.y0 || 0) - (b.bbox?.y0 || 0)
     if (Math.abs(dy) > 14) return dy
     return (a.bbox?.x0 || 0) - (b.bbox?.x0 || 0)
   })
 
-  const lines = []
-  let current = []
-  let lastY = sorted[0].bbox?.y0 || 0
+  const lineas = []
+  let actual = []
+  let ultimaY = ordenados[0].bbox?.y0 || 0
 
-  for (const word of sorted) {
-    const y = word.bbox?.y0 || 0
-    if (Math.abs(y - lastY) > 16 && current.length) {
-      lines.push(cleanLine(current.join(' ')))
-      current = []
+  for (const palabra of ordenados) {
+    const y = palabra.bbox?.y0 || 0
+    if (Math.abs(y - ultimaY) > 16 && actual.length) {
+      lineas.push(limpiarLinea(actual.join(' ')))
+      actual = []
     }
-    current.push(word.text.trim())
-    lastY = y
+    actual.push(palabra.text.trim())
+    ultimaY = y
   }
 
-  if (current.length) lines.push(cleanLine(current.join(' ')))
+  if (actual.length) lineas.push(limpiarLinea(actual.join(' ')))
 
-  return lines.filter((line) => {
-    if (!line) return false
-    const letters = (line.match(/[\p{L}\p{N}]/gu) || []).length
-    return letters >= 3 && letters / line.length >= 0.5
+  return lineas.filter((linea) => {
+    if (!linea) return false
+    const letras = (linea.match(/[\p{L}\p{N}]/gu) || []).length
+    return letras >= 3 && letras / linea.length >= 0.5
   }).join('\n')
 }
 
-function extractCleanText(data) {
-  const minConf = 58
-  const words = (data.words || []).filter((w) => {
-    const conf = w.confidence ?? 0
+function extraerTextoLimpio(datos) {
+  const confianzaMin = 58
+  const palabras = (datos.words || []).filter((w) => {
+    const confianza = w.confidence ?? 0
     const token = (w.text || '').trim()
-    return conf >= minConf && isReadableToken(token)
+    return confianza >= confianzaMin && esTokenLegible(token)
   })
 
-  if (words.length >= 2) {
-    const rebuilt = rebuildByLines(words)
-    if (rebuilt.trim()) return rebuilt.trim()
+  if (palabras.length >= 2) {
+    const reconstruido = reconstruirPorLineas(palabras)
+    if (reconstruido.trim()) return reconstruido.trim()
   }
 
-  return (data.text || '')
+  return (datos.text || '')
     .split('\n')
-    .map(cleanLine)
-    .filter((line) => {
-      if (!line) return false
-      const letters = (line.match(/[\p{L}\p{N}]/gu) || []).length
-      return letters >= 3 && letters / line.length >= 0.45
+    .map(limpiarLinea)
+    .filter((linea) => {
+      if (!linea) return false
+      const letras = (linea.match(/[\p{L}\p{N}]/gu) || []).length
+      return letras >= 3 && letras / linea.length >= 0.45
     })
     .join('\n')
     .trim()
 }
 
-async function toImageBuffer(media, mime) {
-  let buffer
+async function aBuferImagen(medio, mime) {
+  let bufer
 
   if (/webp/i.test(mime)) {
     try {
-      buffer = await sharp(media).png().toBuffer()
+      bufer = await sharp(medio).png().toBuffer()
     } catch {
-      const url = await webp2png(media)
+      const url = await webp2png(medio)
       if (!url) throw new Error('No se pudo convertir webp')
-      const res = await fetch(url)
-      buffer = Buffer.from(await res.arrayBuffer())
+      const respuesta = await fetch(url)
+      bufer = Buffer.from(await respuesta.arrayBuffer())
     }
   } else if (/image\//i.test(mime)) {
-    buffer = await sharp(media).png().toBuffer()
+    bufer = await sharp(medio).png().toBuffer()
   } else {
     throw new Error('Formato no compatible')
   }
 
-  return preprocessForOcr(buffer)
+  return preprocesarParaOcr(bufer)
 }
 
-async function preprocessForOcr(buffer) {
-  const meta = await sharp(buffer).metadata()
-  const minSide = Math.min(meta.width || 0, meta.height || 0)
-  const scale = minSide > 0 && minSide < 1200 ? Math.min(4, 1200 / minSide) : 1
+async function preprocesarParaOcr(bufer) {
+  const metadatos = await sharp(bufer).metadata()
+  const ladoMin = Math.min(metadatos.width || 0, metadatos.height || 0)
+  const escala = ladoMin > 0 && ladoMin < 1200 ? Math.min(4, 1200 / ladoMin) : 1
 
-  let pipeline = sharp(buffer)
+  let tuberia = sharp(bufer)
     .rotate()
     .resize({
-      width: scale > 1 ? Math.round((meta.width || 1) * scale) : undefined,
-      height: scale > 1 ? Math.round((meta.height || 1) * scale) : undefined,
+      width: escala > 1 ? Math.round((metadatos.width || 1) * escala) : undefined,
+      height: escala > 1 ? Math.round((metadatos.height || 1) * escala) : undefined,
       fit: 'inside',
       withoutEnlargement: false
     })
@@ -153,62 +153,62 @@ async function preprocessForOcr(buffer) {
     .sharpen({ sigma: 1.2 })
     .png({ density: 300 })
 
-  return pipeline.toBuffer()
+  return tuberia.toBuffer()
 }
 
-function resolveLang(args) {
-  const raw = (args[0] || '').toLowerCase().trim()
-  if (!raw) return 'spa+eng'
-  const code = LANG_MAP[raw] || raw
+function resolverIdioma(args) {
+  const crudo = (args[0] || '').toLowerCase().trim()
+  if (!crudo) return 'spa+eng'
+  const code = MAPA_IDIOMAS[crudo] || crudo
   return code.includes('+') ? code : `${code}+eng`
 }
 
-function isOcrMedia(mime = '', mtype = '') {
+function esMedioOcr(mime = '', mtype = '') {
   return /image|webp|sticker/i.test(mime) || /imageMessage|stickerMessage/i.test(mtype)
 }
 
-function resolveMediaTarget(m) {
+function resolverObjetivoMedio(m) {
   if (m.quoted) {
     const mime = (m.quoted.msg || m.quoted).mimetype || m.quoted.mediaType || ''
     const mtype = m.quoted.mtype || ''
-    if (isOcrMedia(mime, mtype) && m.quoted.download) return m.quoted
+    if (esMedioOcr(mime, mtype) && m.quoted.download) return m.quoted
   }
 
   const mime = (m.msg || m).mimetype || m.mediaType || ''
   const mtype = m.mtype || ''
-  if (isOcrMedia(mime, mtype) && m.download) return m
+  if (esMedioOcr(mime, mtype) && m.download) return m
 
   return null
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-  let tmpPath = ''
+  let rutaTmp = ''
 
   try {
-    const target = resolveMediaTarget(m)
+    const objetivo = resolverObjetivoMedio(m)
 
-    if (!target) {
+    if (!objetivo) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Enviá una *imagen* o *sticker* con el comando, o respondé a uno con ${usedPrefix + command}.*\n\nEjemplos:\n• Foto + comando: ${usedPrefix + command}\n• Responder imagen: ${usedPrefix + command}\n\nIdioma opcional: ${usedPrefix + command} es | en | pt`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const mime = (target.msg || target).mimetype || target.mediaType || ''
-    const media = await target.download()
-    if (!media?.length) throw new Error('No se pudo descargar la imagen')
+    const mime = (objetivo.msg || objetivo).mimetype || objetivo.mediaType || ''
+    const medio = await objetivo.download()
+    if (!medio?.length) throw new Error('No se pudo descargar la imagen')
 
-    const tmpDir = join(process.cwd(), 'tmp')
-    if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+    const dirTmp = join(process.cwd(), 'tmp')
+    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
 
-    const imageBuffer = await toImageBuffer(media, mime)
-    tmpPath = join(tmpDir, `ocr_${Date.now()}.png`)
-    await writeFile(tmpPath, imageBuffer)
+    const buferImagen = await aBuferImagen(medio, mime)
+    rutaTmp = join(dirTmp, `ocr_${Date.now()}.png`)
+    await writeFile(rutaTmp, buferImagen)
 
-    const lang = resolveLang(args)
-    const worker = await getWorker(lang)
-    const { data } = await worker.recognize(tmpPath)
-    const text = extractCleanText(data)
+    const idioma = resolverIdioma(args)
+    const trabajador = await obtenerTrabajador(idioma)
+    const { datos } = await trabajador.recognize(rutaTmp)
+    const text = extraerTextoLimpio(datos)
 
     if (!text) {
       return conn.sendMessage(m.chat, {
@@ -217,11 +217,11 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const maxLen = 45000
-    const output = text.length > maxLen ? `${text.slice(0, maxLen)}\n\n_[Texto recortado]_` : text
+    const longitudMax = 45000
+    const textoSalida = text.length > longitudMax ? `${text.slice(0, longitudMax)}\n\n_[Texto recortado]_` : text
 
     await conn.sendMessage(m.chat, {
-      text: `Texto detectado:\n\n${output}`,
+      text: `Texto detectado:\n\n${textoSalida}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
@@ -231,8 +231,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    if (tmpPath) {
-      try { await unlink(tmpPath) } catch {}
+    if (rutaTmp) {
+      try { await unlink(rutaTmp) } catch {}
     }
   }
 }

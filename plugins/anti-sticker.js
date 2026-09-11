@@ -10,30 +10,30 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     }
     
     
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
     
     if (!global.db.data.antiSticker) global.db.data.antiSticker = {}
     
-    if (action === 'on') {
+    if (accion === 'on') {
       global.db.data.antiSticker[m.chat] = true
       
-      let txt = `ִֶָ☾. *Anti-stickers activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-stickers activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'off') {
+    } else if (accion === 'off') {
       global.db.data.antiSticker[m.chat] = false
       
-      let txt = `ִֶָ☾. *Anti-stickers desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-stickers desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -49,8 +49,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }, { quoted: m })
     }
     
-  } catch (e) {
-    console.error('Error en antisticker:', e)
+  } catch (error) {
+    console.error('Error en antisticker:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al configurar el anti-sticker.',
       contextInfo: {

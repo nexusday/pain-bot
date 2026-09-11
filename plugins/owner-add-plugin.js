@@ -15,23 +15,23 @@ ${usedPrefix}plugin <nombre_archivo.js>
 2. Responde a este mensaje con el código completo del plugin`)
   }
 
-  let fileName = args[0]
+  let nombreArchivo = args[0]
   
   
-  if (!fileName.endsWith('.js')) {
-    fileName += '.js'
+  if (!nombreArchivo.endsWith('.js')) {
+    nombreArchivo += '.js'
   }
 
  
-  if (!/^[a-zA-Z0-9-_]+\.js$/.test(fileName)) {
+  if (!/^[a-zA-Z0-9-_]+\.js$/.test(nombreArchivo)) {
     return m.reply('*[❗] Nombre de archivo inválido. Solo letras, números, guiones y guiones bajos.*')
   }
 
-  const pluginPath = join('./plugins', fileName)
+  const rutaPlugin = join('./plugins', nombreArchivo)
 
   
-  if (fs.existsSync(pluginPath)) {
-    return m.reply(`*[❗] El archivo ${fileName} ya existe.*`)
+  if (fs.existsSync(rutaPlugin)) {
+    return m.reply(`*[❗] El archivo ${nombreArchivo} ya existe.*`)
   }
 
  
@@ -43,16 +43,16 @@ ${usedPrefix}plugin <nombre_archivo.js>
 2. Responde a este mensaje con el código completo`)
   }
 
-  let pluginContent = m.quoted.text
+  let contenidoPlugin = m.quoted.text
 
   try {
     
-    fs.writeFileSync(pluginPath, pluginContent, 'utf8')
+    fs.writeFileSync(rutaPlugin, contenidoPlugin, 'utf8')
     
-    let txt = `✅ 𝗣𝗹𝘂𝗴𝗶𝗻 𝗰𝗿𝗲𝗮𝗱𝗼\n\n> *Archivo:* ${fileName}\n> *Ruta:* plugins/${fileName}\n> *Comando:* .${fileName.replace('.js', '')}\n`
+    let texto = `✅ 𝗣𝗹𝘂𝗴𝗶𝗻 𝗰𝗿𝗲𝗮𝗱𝗼\n\n> *Archivo:* ${nombreArchivo}\n> *Ruta:* plugins/${nombreArchivo}\n> *Comando:* .${nombreArchivo.replace('.js', '')}\n`
 
     await conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo
       }

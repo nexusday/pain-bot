@@ -6,7 +6,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }, { quoted: m })
     }    
     
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
     
     if (!global.db.data.bienvenidas) global.db.data.bienvenidas = {}
     
@@ -36,27 +36,27 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
     }
     
-    if (action === 'on') {
+    if (accion === 'on') {
       global.db.data.bienvenidas[m.chat].enabled = true
       
-      let txt = `╭─「 *BIENVENIDAS ACTIVADAS* 」─╮\n`
-      txt += `│\n`
-      txt += `╰➺ *Estado:* Activado\n`
-      txt += `╰➺ *Funciones:* Bienvenidas + Despedidas\n`
-      txt += `╰➺ *Mensajes:* Por defecto (personalizables)\n`
-      txt += `╰➺ *Imágenes:* Foto del grupo (personalizables)\n`
-      txt += `│\n`
-      txt += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
-      txt += `\n> PAIN COMMUNITY`
+      let texto = `╭─「 *BIENVENIDAS ACTIVADAS* 」─╮\n`
+      texto += `│\n`
+      texto += `╰➺ *Estado:* Activado\n`
+      texto += `╰➺ *Funciones:* Bienvenidas + Despedidas\n`
+      texto += `╰➺ *Mensajes:* Por defecto (personalizables)\n`
+      texto += `╰➺ *Imágenes:* Foto del grupo (personalizables)\n`
+      texto += `│\n`
+      texto += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
+      texto += `\n> PAIN COMMUNITY`
       
       await conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-      const welcomePreview = global.db.data.bienvenidas[m.chat].welcomeMsg || 
+      const vistaPreviaBienvenida = global.db.data.bienvenidas[m.chat].welcomeMsg || 
         `╭─「 *BIENVENIDO* 」─╮\n` +
         `│\n` +
         `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
@@ -69,7 +69,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         `╰➺ *Bienvenido al grupo!*\n` +
         `> PAIN COMMUNITY`
       
-      const goodbyePreview = global.db.data.bienvenidas[m.chat].goodbyeMsg || 
+      const vistaPreviaDespedida = global.db.data.bienvenidas[m.chat].goodbyeMsg || 
         `╭─「 *ADIOS* 」─╮\n` +
         `│\n` +
         `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
@@ -83,32 +83,32 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         `> PAIN COMMUNITY`
       
       await conn.sendMessage(m.chat, {
-        text: `《✧》*VISTA PREVIA ACTIVADA*\n\n*Mensaje de bienvenida:*\n${welcomePreview}\n\n*Mensaje de despedida:*\n${goodbyePreview}\n\n*Nota:* Las imágenes se mostrarán automáticamente con la foto del grupo.\n\n> Para personalizar las bienvenidas y despedidas usa el comando ${usedPrefix}welcome`
+        text: `《✧》*VISTA PREVIA ACTIVADA*\n\n*Mensaje de bienvenida:*\n${vistaPreviaBienvenida}\n\n*Mensaje de despedida:*\n${vistaPreviaDespedida}\n\n*Nota:* Las imágenes se mostrarán automáticamente con la foto del grupo.\n\n> Para personalizar las bienvenidas y despedidas usa el comando ${usedPrefix}welcome`
       })
       
       return
       
-    } else if (action === 'off') {
+    } else if (accion === 'off') {
       global.db.data.bienvenidas[m.chat].enabled = false
       
-      let txt = `╭─「 *BIENVENIDAS DESACTIVADAS* 」─╮\n`
-      txt += `│\n`
-      txt += `╰➺ *Estado:* Desactivado\n`
-      txt += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
-      txt += `\n> PAIN COMMUNITY`
+      let texto = `╭─「 *BIENVENIDAS DESACTIVADAS* 」─╮\n`
+      texto += `│\n`
+      texto += `╰➺ *Estado:* Desactivado\n`
+      texto += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
+      texto += `\n> PAIN COMMUNITY`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'msg') {
-      const type = args[1]?.toLowerCase()
-      const message = m.text.replace(new RegExp(`^${usedPrefix}welcome\\s+msg\\s+${type}\\s+`, 'i'), '')
+    } else if (accion === 'msg') {
+      const tipo = args[1]?.toLowerCase()
+      const mensaje = m.text.replace(new RegExp(`^${usedPrefix}welcome\\s+msg\\s+${tipo}\\s+`, 'i'), '')
       
-      if (!type || !message) {
+      if (!tipo || !mensaje) {
         return conn.sendMessage(m.chat, {
           text: `《✧》*Uso:* ${usedPrefix}welcome msg <tipo> <mensaje>\n\n*Tipos:*\n• welcome - Mensaje de bienvenida\n• goodbye - Mensaje de despedida\n\n*Variables disponibles:*\n• \${user} - Nombre del usuario\n• \${participant} - @usuario\n• \${group} - Nombre del grupo\n• \${memberCount} - Número de miembros\n• \${date} - Fecha actual\n• \${time} - Hora actual\n\n*Ejemplo:*\n${usedPrefix}welcome msg welcome ¡Hola \${user}! Bienvenido a \${group}`
         }, { quoted: m })
@@ -120,10 +120,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         }, { quoted: m })
       }
       
-      if (type === 'welcome') {
-        global.db.data.bienvenidas[m.chat].welcomeMsg = message
+      if (tipo === 'welcome') {
+        global.db.data.bienvenidas[m.chat].welcomeMsg = mensaje
         
-        const previewMsg = message
+        const mensajeVistaPrevia = mensaje
           .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
           .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
           .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
@@ -132,31 +132,31 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
         
         await conn.sendMessage(m.chat, {
-          text: `《✧》*MENSAJE DE BIENVENIDA CONFIGURADO*\n\n*Mensaje:* ${message}\n\n*Ahora se enviará así cuando alguien entre al grupo:*`
+          text: `《✧》*MENSAJE DE BIENVENIDA CONFIGURADO*\n\n*Mensaje:* ${mensaje}\n\n*Ahora se enviará así cuando alguien entre al grupo:*`
         }, { quoted: m })
         
         try {
-          const pp = await conn.profilePictureUrl(m.chat, 'image')
+          const fotoPerfil = await conn.profilePictureUrl(m.chat, 'image')
           await conn.sendMessage(m.chat, {
-            image: { url: pp },
-            caption: previewMsg,
+            image: { url: fotoPerfil },
+            caption: mensajeVistaPrevia,
             contextInfo: {
               mentionedJid: [m.sender]
             }
           })
         } catch (ppError) {
           await conn.sendMessage(m.chat, {
-            text: previewMsg,
+            text: mensajeVistaPrevia,
             contextInfo: {
               mentionedJid: [m.sender]
             }
           })
         }
         
-      } else if (type === 'goodbye') {
-        global.db.data.bienvenidas[m.chat].goodbyeMsg = message
+      } else if (tipo === 'goodbye') {
+        global.db.data.bienvenidas[m.chat].goodbyeMsg = mensaje
         
-        const previewMsg = message
+        const mensajeVistaPrevia = mensaje
           .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
           .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
           .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
@@ -165,21 +165,21 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
         
         await conn.sendMessage(m.chat, {
-          text: `《✧》*MENSAJE DE DESPEDIDA CONFIGURADO*\n\n*Mensaje:* ${message}\n\n*Ahora se enviará así cuando alguien salga del grupo:*`
+          text: `《✧》*MENSAJE DE DESPEDIDA CONFIGURADO*\n\n*Mensaje:* ${mensaje}\n\n*Ahora se enviará así cuando alguien salga del grupo:*`
         }, { quoted: m })
         
         try {
-          const pp = await conn.profilePictureUrl(m.chat, 'image')
+          const fotoPerfil = await conn.profilePictureUrl(m.chat, 'image')
           await conn.sendMessage(m.chat, {
-            image: { url: pp },
-            caption: previewMsg,
+            image: { url: fotoPerfil },
+            caption: mensajeVistaPrevia,
             contextInfo: {
               mentionedJid: [m.sender]
             }
           })
         } catch (ppError) {
           await conn.sendMessage(m.chat, {
-            text: previewMsg,
+            text: mensajeVistaPrevia,
             contextInfo: {
               mentionedJid: [m.sender]
             }
@@ -192,11 +192,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         }, { quoted: m })
       }
       
-    } else if (action === 'img') {
-      const type = args[1]?.toLowerCase()
-      const imageUrl = args[2]
+    } else if (accion === 'img') {
+      const tipo = args[1]?.toLowerCase()
+      const urlImagen = args[2]
       
-      if (!type || !imageUrl) {
+      if (!tipo || !urlImagen) {
         return conn.sendMessage(m.chat, {
           text: `《✧》*Uso:* ${usedPrefix}welcome img <tipo> <url>\n\n*Tipos:*\n• welcome - Imagen de bienvenida\n• goodbye - Imagen de despedida\n• reset - Quitar imagen personalizada\n\n*Ejemplo:*\n${usedPrefix}welcome img welcome https://ejemplo.com/imagen.jpg`
         }, { quoted: m })
@@ -208,8 +208,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         }, { quoted: m })
       }
       
-      if (type === 'welcome') {
-        if (imageUrl === 'reset') {
+      if (tipo === 'welcome') {
+        if (urlImagen === 'reset') {
           global.db.data.bienvenidas[m.chat].welcomeImg = ''
           
           return conn.sendMessage(m.chat, {
@@ -217,7 +217,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           }, { quoted: m })
         }
         
-        global.db.data.bienvenidas[m.chat].welcomeImg = imageUrl
+        global.db.data.bienvenidas[m.chat].welcomeImg = urlImagen
         
         const welcomeMsg = global.db.data.bienvenidas[m.chat].welcomeMsg || 
           `╭─「 *BIENVENIDO* 」─╮\n` +
@@ -232,7 +232,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           `╰➺ *Bienvenido al grupo!*\n` +
           `> PAIN COMMUNITY`
         
-        const finalWelcomeMsg = welcomeMsg
+        const mensajeBienvenidaFinal = welcomeMsg
           .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
           .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
           .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
@@ -241,32 +241,32 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
         
         await conn.sendMessage(m.chat, {
-          text: `《✧》*IMAGEN DE BIENVENIDA CONFIGURADA*\n\n*URL:* ${imageUrl}\n\n*Ahora se enviará así cuando alguien entre al grupo:*`
+          text: `《✧》*IMAGEN DE BIENVENIDA CONFIGURADA*\n\n*URL:* ${urlImagen}\n\n*Ahora se enviará así cuando alguien entre al grupo:*`
         }, { quoted: m })
         
         try {
           await conn.sendMessage(m.chat, {
-            image: { url: imageUrl },
-            caption: finalWelcomeMsg,
+            image: { url: urlImagen },
+            caption: mensajeBienvenidaFinal,
             contextInfo: {
               mentionedJid: [m.sender]
             }
           })
         } catch (imgError) {
           return conn.sendMessage(m.chat, {
-            text: `《✧》*ERROR AL CARGAR IMAGEN*\n\n*URL:* ${imageUrl}\n\n*Error:* La imagen no se puede cargar. Verifica que la URL sea válida.`
+            text: `《✧》*ERROR AL CARGAR IMAGEN*\n\n*URL:* ${urlImagen}\n\n*Error:* La imagen no se puede cargar. Verifica que la URL sea válida.`
           }, { quoted: m })
         }
         
-      } else if (type === 'goodbye') {
-        if (imageUrl === 'reset') {
+      } else if (tipo === 'goodbye') {
+        if (urlImagen === 'reset') {
           global.db.data.bienvenidas[m.chat].goodbyeImg = ''
           
           return conn.sendMessage(m.chat, {
             text: '《✧》Imagen de despedida reseteada. Se usará la foto del grupo.'
           }, { quoted: m })
         }
-        global.db.data.bienvenidas[m.chat].goodbyeImg = imageUrl
+        global.db.data.bienvenidas[m.chat].goodbyeImg = urlImagen
         
         const goodbyeMsg = global.db.data.bienvenidas[m.chat].goodbyeMsg || 
           `╭─「 *ADIOS* 」─╮\n` +
@@ -281,7 +281,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           `╰➺ *¡Que tengas un buen día!*\n` +
           `> PAIN COMMUNITY`
         
-        const finalGoodbyeMsg = goodbyeMsg
+        const mensajeDespedidaFinal = goodbyeMsg
           .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
           .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
           .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
@@ -290,20 +290,20 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
         
         await conn.sendMessage(m.chat, {
-          text: `《✧》*IMAGEN DE DESPEDIDA CONFIGURADA*\n\n*URL:* ${imageUrl}\n\n*Ahora se enviará así cuando alguien salga del grupo:*`
+          text: `《✧》*IMAGEN DE DESPEDIDA CONFIGURADA*\n\n*URL:* ${urlImagen}\n\n*Ahora se enviará así cuando alguien salga del grupo:*`
         }, { quoted: m })
         
         try {
           await conn.sendMessage(m.chat, {
-            image: { url: imageUrl },
-            caption: finalGoodbyeMsg,
+            image: { url: urlImagen },
+            caption: mensajeDespedidaFinal,
             contextInfo: {
               mentionedJid: [m.sender]
             }
           })
         } catch (imgError) {
           return conn.sendMessage(m.chat, {
-            text: `《✧》*ERROR AL CARGAR IMAGEN*\n\n*URL:* ${imageUrl}\n\n*Error:* La imagen no se puede cargar. Verifica que la URL sea válida.`
+            text: `《✧》*ERROR AL CARGAR IMAGEN*\n\n*URL:* ${urlImagen}\n\n*Error:* La imagen no se puede cargar. Verifica que la URL sea válida.`
           }, { quoted: m })
         }
         
@@ -313,32 +313,32 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         }, { quoted: m })
       }
       
-    } else if (action === 'status' || action === 'estado') {
-      const config = global.db.data.bienvenidas[m.chat]
-      const isEnabled = config.enabled === true
-      const status = isEnabled ? 'ACTIVADO' : 'DESACTIVADO'
+    } else if (accion === 'status' || accion === 'estado') {
+      const configuracion = global.db.data.bienvenidas[m.chat]
+      const estaActivo = configuracion.enabled === true
+      const estado = estaActivo ? 'ACTIVADO' : 'DESACTIVADO'
       
-      let txt = `╭─「 *ESTADO DE BIENVENIDAS* 」─╮\n`
-      txt += `│\n`
-      txt += `╰➺ *Estado:* ${status}\n`
-      txt += `╰➺ *Grupo:* ${m.chat}\n`
-      txt += `│\n`
-      txt += `╰➺ *Mensaje Bienvenida:* ${config.welcomeMsg || 'Por defecto'}\n`
-      txt += `╰➺ *Mensaje Despedida:* ${config.goodbyeMsg || 'Por defecto'}\n`
-      txt += `╰➺ *Imagen Bienvenida:* ${config.welcomeImg || 'Foto del grupo'}\n`
-      txt += `╰➺ *Imagen Despedida:* ${config.goodbyeImg || 'Foto del grupo'}\n`
-      txt += `│\n`
-      txt += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
-      txt += `\n> PAIN COMMUNITY`
+      let texto = `╭─「 *ESTADO DE BIENVENIDAS* 」─╮\n`
+      texto += `│\n`
+      texto += `╰➺ *Estado:* ${estado}\n`
+      texto += `╰➺ *Grupo:* ${m.chat}\n`
+      texto += `│\n`
+      texto += `╰➺ *Mensaje Bienvenida:* ${configuracion.welcomeMsg || 'Por defecto'}\n`
+      texto += `╰➺ *Mensaje Despedida:* ${configuracion.goodbyeMsg || 'Por defecto'}\n`
+      texto += `╰➺ *Imagen Bienvenida:* ${configuracion.welcomeImg || 'Foto del grupo'}\n`
+      texto += `╰➺ *Imagen Despedida:* ${configuracion.goodbyeImg || 'Foto del grupo'}\n`
+      texto += `│\n`
+      texto += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
+      texto += `\n> PAIN COMMUNITY`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'reset') {
+    } else if (accion === 'reset') {
       global.db.data.bienvenidas[m.chat] = {
         enabled: false,
         welcomeMsg: '',
@@ -351,43 +351,43 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         text: '《✧》*CONFIGURACIÓN RESETEADA*\n\n*Mensajes:* Por defecto\n*Imágenes:* Foto del grupo\n*Estado:* Desactivado'
       }, { quoted: m })
       
-    } else if (action === 'debug' || action === 'test') {
-      const config = global.db.data.bienvenidas[m.chat]
-      let debugInfo = `《✧》*DEBUG - CONFIGURACIÓN ACTUAL*\n\n`
-      debugInfo += `*Grupo:* ${m.chat}\n`
-      debugInfo += `*Tipo de configuración:* ${typeof config}\n`
-      debugInfo += `*Configuración completa:* ${JSON.stringify(config, null, 2)}\n\n`
+    } else if (accion === 'debug' || accion === 'test') {
+      const configuracion = global.db.data.bienvenidas[m.chat]
+      let infoDepuracion = `《✧》*DEBUG - CONFIGURACIÓN ACTUAL*\n\n`
+      infoDepuracion += `*Grupo:* ${m.chat}\n`
+      infoDepuracion += `*Tipo de configuración:* ${typeof configuracion}\n`
+      infoDepuracion += `*Configuración completa:* ${JSON.stringify(configuracion, null, 2)}\n\n`
       
-      if (config && typeof config === 'object') {
-        debugInfo += `*Estado:* ${config.enabled ? 'ACTIVADO' : 'DESACTIVADO'}\n`
-        debugInfo += `*Mensaje bienvenida:* ${config.welcomeMsg || 'Por defecto'}\n`
-        debugInfo += `*Mensaje despedida:* ${config.goodbyeMsg || 'Por defecto'}\n`
-        debugInfo += `*Imagen bienvenida:* ${config.welcomeImg || 'Foto del grupo'}\n`
-        debugInfo += `*Imagen despedida:* ${config.goodbyeImg || 'Foto del grupo'}\n`
+      if (configuracion && typeof configuracion === 'object') {
+        infoDepuracion += `*Estado:* ${configuracion.enabled ? 'ACTIVADO' : 'DESACTIVADO'}\n`
+        infoDepuracion += `*Mensaje bienvenida:* ${configuracion.welcomeMsg || 'Por defecto'}\n`
+        infoDepuracion += `*Mensaje despedida:* ${configuracion.goodbyeMsg || 'Por defecto'}\n`
+        infoDepuracion += `*Imagen bienvenida:* ${configuracion.welcomeImg || 'Foto del grupo'}\n`
+        infoDepuracion += `*Imagen despedida:* ${configuracion.goodbyeImg || 'Foto del grupo'}\n`
       } else {
-        debugInfo += `*Error:* Configuración no válida\n`
+        infoDepuracion += `*Error:* Configuración no válida\n`
       }
       
       return conn.sendMessage(m.chat, {
-        text: debugInfo
+        text: infoDepuracion
       }, { quoted: m })
       
-    } else if (action === 'testimg') {
-      const config = global.db.data.bienvenidas[m.chat]
+    } else if (accion === 'testimg') {
+      const configuracion = global.db.data.bienvenidas[m.chat]
       
-      if (!config || !config.enabled) {
+      if (!configuracion || !configuracion.enabled) {
         return conn.sendMessage(m.chat, {
           text: '《✧》El sistema no está activado. Usa .welcome on primero.'
         }, { quoted: m })
       }
       
-      if (!config.welcomeImg || config.welcomeImg === '') {
+      if (!configuracion.welcomeImg || configuracion.welcomeImg === '') {
         return conn.sendMessage(m.chat, {
           text: '《✧》No hay imagen personalizada configurada. Usa .welcome img welcome <url> primero.'
         }, { quoted: m })
       }
       
-      const testMsg = config.welcomeMsg || 
+      const mensajePrueba = configuracion.welcomeMsg || 
         `╭─「 *BIENVENIDO* 」─╮\n` +
         `│\n` +
         `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
@@ -400,7 +400,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         `╰➺ *Bienvenido al grupo!*\n` +
         `> PAIN COMMUNITY`
       
-      const finalTestMsg = testMsg
+      const mensajePruebaFinal = mensajePrueba
         .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
         .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
         .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
@@ -410,12 +410,12 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       
       try {
         await conn.sendMessage(m.chat, {
-          text: `《✧》*PRUEBA DE IMAGEN PERSONALIZADA*\n\n*URL:* ${config.welcomeImg}\n\n*Enviando mensaje de prueba:*`
+          text: `《✧》*PRUEBA DE IMAGEN PERSONALIZADA*\n\n*URL:* ${configuracion.welcomeImg}\n\n*Enviando mensaje de prueba:*`
         }, { quoted: m })
         
         await conn.sendMessage(m.chat, {
-          image: { url: config.welcomeImg },
-          caption: finalTestMsg,
+          image: { url: configuracion.welcomeImg },
+          caption: mensajePruebaFinal,
           contextInfo: {
             mentionedJid: [m.sender]
           }
@@ -427,7 +427,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
         
       } catch (error) {
         return conn.sendMessage(m.chat, {
-          text: `《✧》*ERROR EN PRUEBA*\n\n*Error:* ${error.message}\n\n*URL:* ${config.welcomeImg}`
+          text: `《✧》*ERROR EN PRUEBA*\n\n*Error:* ${error.message}\n\n*URL:* ${configuracion.welcomeImg}`
         }, { quoted: m })
       }
       

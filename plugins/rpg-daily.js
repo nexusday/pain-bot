@@ -1,62 +1,62 @@
-const DAILY_COOLDOWN = 24 * 60 * 60 * 1000
-const DAILY_BASE = 9000
-const DAILY_STREAK_STEP = 500
+const ENFRIAMIENTO_DIARIO = 24 * 60 * 60 * 1000
+const BASE_DIARIO = 9000
+const PASO_RACHA_DIARIO = 500
 
-function getDailyReward(streak) {
-  return DAILY_BASE + (streak - 1) * DAILY_STREAK_STEP
+function obtenerPremioDiario(racha) {
+  return BASE_DIARIO + (racha - 1) * PASO_RACHA_DIARIO
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
-    let user = global.db.data.users[m.sender]
-    if (!user) global.db.data.users[m.sender] = {}
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) global.db.data.users[m.sender] = {}
 
-    user = global.db.data.users[m.sender]
-    const coins = user.coins || 0
+    usuario = global.db.data.users[m.sender]
+    const monedas = usuario.coins || 0
 
-    const lastDaily = user.lastDaily || 0
-    const timeLeft = DAILY_COOLDOWN - (Date.now() - lastDaily)
+    const ultimoDiario = usuario.lastDaily || 0
+    const tiempoRestante = ENFRIAMIENTO_DIARIO - (Date.now() - ultimoDiario)
 
-    if (timeLeft > 0) {
-      const hours = Math.floor(timeLeft / 3600000)
-      const minutes = Math.floor((timeLeft % 3600000) / 60000)
-      const seconds = Math.floor((timeLeft % 60000) / 1000)
-      const nextStreak = (user.dailyStreak || 0) + 1
+    if (tiempoRestante > 0) {
+      const horas = Math.floor(tiempoRestante / 3600000)
+      const minutos = Math.floor((tiempoRestante % 3600000) / 60000)
+      const segundos = Math.floor((tiempoRestante % 60000) / 1000)
+      const proximaRacha = (usuario.dailyStreak || 0) + 1
 
       return conn.sendMessage(m.chat, {
-        text: `[❗] Ya reclamaste tu daily hoy.\n\n> *⏱️ Tiempo restante:* ${hours}h ${minutes}m ${seconds}s\n\n> *🎯 Tu próxima racha:* ${nextStreak} 🔥\n> *Próximo premio:* ${getDailyReward(nextStreak).toLocaleString()} ${global.moneda}`,
+        text: `[❗] Ya reclamaste tu daily hoy.\n\n> *⏱️ Tiempo restante:* ${horas}h ${minutos}m ${segundos}s\n\n> *🎯 Tu próxima racha:* ${proximaRacha} 🔥\n> *Próximo premio:* ${obtenerPremioDiario(proximaRacha).toLocaleString()} ${global.moneda}`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    let streak = user.dailyStreak || 0
+    let racha = usuario.dailyStreak || 0
     let mensaje = ''
 
-    const timeSinceLastClaim = Date.now() - lastDaily
-    if (lastDaily > 0 && timeSinceLastClaim > DAILY_COOLDOWN + 60000) {
-      streak = 0
+    const tiempoDesdeUltimoClaim = Date.now() - ultimoDiario
+    if (ultimoDiario > 0 && tiempoDesdeUltimoClaim > ENFRIAMIENTO_DIARIO + 60000) {
+      racha = 0
       mensaje = '❌ *¡Perdiste tu racha!* No reclamaste a tiempo'
     }
 
-    if (streak === 0) {
-      streak = 1
-      if (lastDaily === 0) {
+    if (racha === 0) {
+      racha = 1
+      if (ultimoDiario === 0) {
         mensaje = '🎉 *¡Primer daily!* Bienvenido al sistema de rachas'
       }
     } else {
-      streak++
-      if (!mensaje) mensaje = `🔥 *¡Racha de ${streak} días!* Sigue así`
+      racha++
+      if (!mensaje) mensaje = `🔥 *¡Racha de ${racha} días!* Sigue así`
     }
 
-    const premio = getDailyReward(streak)
-    const nextPremio = getDailyReward(streak + 1)
+    const premio = obtenerPremioDiario(racha)
+    const proximoPremio = obtenerPremioDiario(racha + 1)
 
-    user.coins = coins + premio
-    user.dailyStreak = streak
-    user.lastDaily = Date.now()
+    usuario.coins = monedas + premio
+    usuario.dailyStreak = racha
+    usuario.lastDaily = Date.now()
 
-    const nextClaim = new Date(Date.now() + DAILY_COOLDOWN)
-    const nextDate = nextClaim.toLocaleDateString('es-ES', {
+    const proximoClaim = new Date(Date.now() + ENFRIAMIENTO_DIARIO)
+    const proximaFecha = proximoClaim.toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -65,27 +65,27 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       second: '2-digit'
     })
 
-    const txt = `🎁 *𝗗𝗮𝗶𝗹𝘆*
+    const texto = `🎁 *𝗗𝗮𝗶𝗹𝘆*
 
-> *Racha:* ${streak} 🔥
+> *Racha:* ${racha} 🔥
 > *Premio hoy:* +${premio.toLocaleString()} ${global.moneda}
-> *Total:* ${user.coins.toLocaleString()} ${global.moneda}
+> *Total:* ${usuario.coins.toLocaleString()} ${global.moneda}
 > ${mensaje}
 
-> *Mañana (racha ${streak + 1}):* +${nextPremio.toLocaleString()} ${global.moneda}
-> *Próximo claim:* ${nextDate}
+> *Mañana (racha ${racha + 1}):* +${proximoPremio.toLocaleString()} ${global.moneda}
+> *Próximo claim:* ${proximaFecha}
 
 _Escala: día 1 = 9K, cada día +500 (9K → 9.5K → 10K…)_`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]
       }
     }, { quoted: m })
-  } catch (e) {
-    console.error('Error en daily:', e)
+  } catch (error) {
+    console.error('Error en daily:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al reclamar el daily.',
       contextInfo: { ...rcanal.contextInfo }

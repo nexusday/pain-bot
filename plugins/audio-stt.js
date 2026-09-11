@@ -10,94 +10,94 @@ import {
   transcribeWavFile
 } from '../lib/localStt.js'
 
-const execPromise = promisify(exec)
+const ejecutarPromesa = promisify(exec)
 
-const LANGS = new Set(['es', 'en', 'pt', 'fr', 'de', 'it'])
+const IDIOMAS = new Set(['es', 'en', 'pt', 'fr', 'de', 'it'])
 
-function isAudioMedia(mime = '', mtype = '') {
+function esMedioAudio(mime = '', mtype = '') {
   return /audio|ogg|opus|mpeg|mp4|m4a|wav|webm/i.test(mime) ||
     /audioMessage|ptt|voice/i.test(mtype)
 }
 
-async function downloadQuotedAudio(m, conn) {
+async function descargarAudioCitado(m, conn) {
   if (!m.quoted) return null
 
   const q = m.getQuotedObj?.() || m.quoted
-  const audioMeta = q.msg?.audioMessage || q.msg?.voiceMessage || {}
-  const mime = q.msg?.mimetype || q.mimetype || audioMeta.mimetype || ''
+  const metaAudio = q.msg?.audioMessage || q.msg?.voiceMessage || {}
+  const mime = q.msg?.mimetype || q.mimetype || metaAudio.mimetype || ''
   const mtype = q.mtype || ''
 
-  if (!isAudioMedia(mime, mtype)) return null
+  if (!esMedioAudio(mime, mtype)) return null
 
-  let media = null
-  try { media = await q.download?.() } catch {}
+  let medio = null
+  try { medio = await q.download?.() } catch {}
 
-  if ((!media || !media.length) && conn.downloadM && q.msg) {
+  if ((!medio || !medio.length) && conn.downloadM && q.msg) {
     try {
-      media = await conn.downloadM(
+      medio = await conn.downloadM(
         q.msg.audioMessage || q.msg.voiceMessage || q.msg,
         'audioMessage'
       )
     } catch {}
   }
 
-  if ((!media || !media.length) && conn.getFile && q.msg) {
+  if ((!medio || !medio.length) && conn.getFile && q.msg) {
     try {
-      const file = await conn.getFile(q.msg.audioMessage || q.msg.voiceMessage || q.msg)
-      media = file?.data || null
+      const archivo = await conn.getFile(q.msg.audioMessage || q.msg.voiceMessage || q.msg)
+      medio = archivo?.data || null
     } catch {}
   }
 
-  if (!media?.length) return null
+  if (!medio?.length) return null
 
   let ext = 'ogg'
   try { ext = (mime.split('/')[1] || '').split(';')[0] || ext } catch {}
   if (!/^[a-z0-9]+$/i.test(ext)) ext = 'ogg'
 
-  return { media, ext, mime }
+  return { medio, ext, mime }
 }
 
-function resolveLanguage(args) {
-  const raw = (args[0] || '').toLowerCase().trim()
-  if (raw && LANGS.has(raw)) return raw
+function resolverIdioma(args) {
+  const crudo = (args[0] || '').toLowerCase().trim()
+  if (crudo && IDIOMAS.has(crudo)) return crudo
   return null
 }
 
-function languageLabel(lang) {
-  if (!lang) return 'Auto'
-  const labels = { es: 'Español', en: 'English', pt: 'Português', fr: 'Français', de: 'Deutsch', it: 'Italiano' }
-  return labels[lang] || lang.toUpperCase()
+function etiquetaIdioma(idioma) {
+  if (!idioma) return 'Auto'
+  const etiquetas = { es: 'Español', en: 'English', pt: 'Português', fr: 'Français', de: 'Deutsch', it: 'Italiano' }
+  return etiquetas[idioma] || idioma.toUpperCase()
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-  let inputPath = ''
-  let wavPath = ''
+  let rutaEntrada = ''
+  let rutaWav = ''
 
   try {
-    const source = await downloadQuotedAudio(m, conn)
-    if (!source) {
+    const fuente = await descargarAudioCitado(m, conn)
+    if (!fuente) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Respondé a una nota de voz o audio (máx. ${getMaxAudioDuration()} seg).*\n\nEjemplo:\n> (respondés audio)\n> ${usedPrefix + command}`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const lang = resolveLanguage(args)
+    const idioma = resolverIdioma(args)
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-    inputPath = join(tmpdir(), `stt_in_${id}.${source.ext}`)
-    wavPath = join(tmpdir(), `stt_${id}.wav`)
+    rutaEntrada = join(tmpdir(), `stt_in_${id}.${fuente.ext}`)
+    rutaWav = join(tmpdir(), `stt_${id}.wav`)
 
-    writeFileSync(inputPath, Buffer.from(source.media))
+    writeFileSync(rutaEntrada, Buffer.from(fuente.media))
 
-    const duration = await getAudioDurationSeconds(inputPath)
-    if (duration > getMaxAudioDuration()) {
+    const duracion = await getAudioDurationSeconds(rutaEntrada)
+    if (duracion > getMaxAudioDuration()) {
       return conn.sendMessage(m.chat, {
-        text: `*[❗] Audio muy largo.* Máximo ${getMaxAudioDuration()} segundos (tiene ~${Math.ceil(duration)}s).`,
+        text: `*[❗] Audio muy largo.* Máximo ${getMaxAudioDuration()} segundos (tiene ~${Math.ceil(duracion)}s).`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    if (duration < 0.4) {
+    if (duracion < 0.4) {
       return conn.sendMessage(m.chat, {
         text: '*[❗] El audio es demasiado corto para transcribir.*',
         contextInfo: { ...rcanal.contextInfo }
@@ -106,13 +106,13 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     await conn.sendPresenceUpdate('composing', m.chat)
 
-    await convertAudioToWav(inputPath, wavPath)
+    await convertAudioToWav(rutaEntrada, rutaWav)
 
-    if (!existsSync(wavPath)) {
+    if (!existsSync(rutaWav)) {
       throw new Error('No se pudo convertir el audio (FFmpeg)')
     }
 
-    const text = await transcribeWavFile(wavPath, lang, duration)
+    const text = await transcribeWavFile(rutaWav, idioma, duracion)
 
     if (!text) {
       return conn.sendMessage(m.chat, {
@@ -121,26 +121,26 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const langLabel = languageLabel(lang)
+    const etiquetaIdiomaRes = etiquetaIdioma(idioma)
     await conn.sendMessage(m.chat, {
-      text: `🎙️ *Transcripción* (~${Math.ceil(duration)}s | ${langLabel})\n\n${text}`,
+      text: `🎙️ *Transcripción* (~${Math.ceil(duracion)}s | ${etiquetaIdiomaRes})\n\n${text}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
     console.error('[stt] Error:', e)
-    const hint = /ffmpeg|ffprobe/i.test(String(e.message || e))
+    const pista = /ffmpeg|ffprobe/i.test(String(e.message || e))
       ? '\n\nVerificá que FFmpeg esté instalado en el PATH.'
       : /whisper|model|onnx/i.test(String(e.message || e))
         ? '\n\nLa primera vez descarga el modelo local (~40-150 MB, sin API).'
         : ''
 
     conn.sendMessage(m.chat, {
-      text: `*[❌] Error al transcribir:* ${e.message || 'desconocido'}${hint}`,
+      text: `*[❌] Error al transcribir:* ${e.message || 'desconocido'}${pista}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    for (const file of [inputPath, wavPath]) {
-      try { if (file && existsSync(file)) unlinkSync(file) } catch {}
+    for (const archivo of [rutaEntrada, rutaWav]) {
+      try { if (archivo && existsSync(archivo)) unlinkSync(archivo) } catch {}
     }
   }
 }

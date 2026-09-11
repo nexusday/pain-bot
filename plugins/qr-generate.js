@@ -5,91 +5,91 @@ import { existsSync } from 'fs'
 import fetch from 'node-fetch'
 import FormData from 'form-data'
 
-const MAX_QR_TEXT = 4000
+const MAX_TEXTO_QR = 4000
 
-function isImageMedia(mime = '', mtype = '') {
+function esMedioImagen(mime = '', mtype = '') {
   return /image|webp|sticker/i.test(mime) || /imageMessage|stickerMessage/i.test(mtype)
 }
 
-function resolveMediaTarget(m) {
+function resolverObjetivoMedio(m) {
   if (m.quoted) {
     const mime = (m.quoted.msg || m.quoted).mimetype || m.quoted.mediaType || ''
     const mtype = m.quoted.mtype || ''
-    if (isImageMedia(mime, mtype) && m.quoted.download) {
+    if (esMedioImagen(mime, mtype) && m.quoted.download) {
       return { target: m.quoted, mime, mtype }
     }
   }
 
   const mime = (m.msg || m).mimetype || m.mediaType || ''
   const mtype = m.mtype || ''
-  if (isImageMedia(mime, mtype) && m.download) {
+  if (esMedioImagen(mime, mtype) && m.download) {
     return { target: m, mime, mtype }
   }
 
   return null
 }
 
-async function uploadImage(buffer, mime) {
+async function subirImagen(bufer, mime) {
   const ext = /png/i.test(mime) ? 'png' : /webp/i.test(mime) ? 'webp' : 'jpg'
-  const form = new FormData()
-  form.append('reqtype', 'fileupload')
-  form.append('fileToUpload', buffer, {
+  const formulario = new FormData()
+  formulario.append('reqtype', 'fileupload')
+  formulario.append('fileToUpload', bufer, {
     filename: `qrimg_${Date.now()}.${ext}`,
     contentType: mime || 'image/jpeg'
   })
 
-  const res = await fetch('https://catbox.moe/user/api.php', {
+  const respuesta = await fetch('https://catbox.moe/user/api.php', {
     method: 'POST',
-    body: form,
-    headers: form.getHeaders()
+    body: formulario,
+    headers: formulario.getHeaders()
   })
 
-  const url = (await res.text()).trim()
-  if (!res.ok || !/^https?:\/\//i.test(url)) {
+  const url = (await respuesta.text()).trim()
+  if (!respuesta.ok || !/^https?:\/\//i.test(url)) {
     throw new Error('No se pudo subir la imagen')
   }
 
   return url
 }
 
-async function downloadImageSource(m) {
-  const media = resolveMediaTarget(m)
-  if (!media) return null
+async function descargarFuenteImagen(m) {
+  const medio = resolverObjetivoMedio(m)
+  if (!medio) return null
 
-  const imageBuffer = await media.target.download()
-  if (!imageBuffer?.length) throw new Error('No se pudo descargar la imagen')
+  const buferImagen = await medio.target.download()
+  if (!buferImagen?.length) throw new Error('No se pudo descargar la imagen')
 
-  return { imageBuffer, mime: media.mime }
+  return { buferImagen, mime: medio.mime }
 }
 
-async function resolveQrContent(m, args) {
-  const fromArgs = (args.join(' ') || '').trim()
-  const imageSource = await downloadImageSource(m)
+async function resolverContenidoQr(m, args) {
+  const desdeArgs = (args.join(' ') || '').trim()
+  const fuenteImagen = await descargarFuenteImagen(m)
 
-  if (imageSource && !fromArgs) {
-    const url = await uploadImage(imageSource.imageBuffer, imageSource.mime)
+  if (fuenteImagen && !desdeArgs) {
+    const url = await subirImagen(fuenteImagen.imageBuffer, fuenteImagen.mime)
     return { text: url, source: 'image' }
   }
 
-  if (fromArgs) {
-    return { text: fromArgs, source: 'args' }
+  if (desdeArgs) {
+    return { text: desdeArgs, source: 'args' }
   }
 
-  const fromQuote = (m.quoted?.text || '').trim()
-  if (fromQuote) {
-    return { text: fromQuote, source: 'caption' }
+  const desdeCita = (m.quoted?.text || '').trim()
+  if (desdeCita) {
+    return { text: desdeCita, source: 'caption' }
   }
 
   return { text: '', source: '' }
 }
 
-function previewText(text, max = 120) {
-  const clean = text.replace(/\s+/g, ' ').trim()
-  if (clean.length <= max) return clean
-  return `${clean.slice(0, max)}...`
+function textoVistaPrevia(text, max = 120) {
+  const limpio = text.replace(/\s+/g, ' ').trim()
+  if (limpio.length <= max) return limpio
+  return `${limpio.slice(0, max)}...`
 }
 
-async function buildQrImage(text) {
+async function construirImagenQr(text) {
   return QRCode.toBuffer(text, {
     type: 'png',
     errorCorrectionLevel: 'M',
@@ -103,10 +103,10 @@ async function buildQrImage(text) {
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-  let tmpPath = ''
+  let rutaTmp = ''
 
   try {
-    const { text, source } = await resolveQrContent(m, args)
+    const { text, fuente } = await resolverContenidoQr(m, args)
 
     if (!text) {
       return conn.sendMessage(m.chat, {
@@ -115,29 +115,29 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    if (text.length > MAX_QR_TEXT) {
+    if (text.length > MAX_TEXTO_QR) {
       return conn.sendMessage(m.chat, {
-        text: `*[❗] El contenido es muy largo.* Máximo ${MAX_QR_TEXT} caracteres (tenés ${text.length}).`,
+        text: `*[❗] El contenido es muy largo.* Máximo ${MAX_TEXTO_QR} caracteres (tenés ${text.length}).`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const qrBuffer = await buildQrImage(text)
+    const buferQr = await construirImagenQr(text)
 
-    const tmpDir = join(process.cwd(), 'tmp')
-    if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+    const dirTmp = join(process.cwd(), 'tmp')
+    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
 
-    tmpPath = join(tmpDir, `qr_${Date.now()}.png`)
-    await writeFile(tmpPath, qrBuffer)
+    rutaTmp = join(dirTmp, `qr_${Date.now()}.png`)
+    await writeFile(rutaTmp, buferQr)
 
-    let caption = `*[✓] Código QR generado*\n> ${previewText(text)}`
-    if (source === 'image') {
-      caption += '\n> Al escanear abre la imagen.'
+    let leyenda = `*[✓] Código QR generado*\n> ${textoVistaPrevia(text)}`
+    if (fuente === 'image') {
+      leyenda += '\n> Al escanear abre la imagen.'
     }
 
     await conn.sendMessage(m.chat, {
-      image: { url: tmpPath },
-      caption,
+      image: { url: rutaTmp },
+      caption: leyenda,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
@@ -147,8 +147,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    if (tmpPath) {
-      try { await unlink(tmpPath) } catch {}
+    if (rutaTmp) {
+      try { await unlink(rutaTmp) } catch {}
     }
   }
 }

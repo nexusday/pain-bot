@@ -1,6 +1,6 @@
 import fetch from 'node-fetch'
 
-const IG_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+/i
+const REGEX_URL_IG = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:reel|reels|p|tv)\/[\w-]+/i
 
 const handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
@@ -11,67 +11,67 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const query = text.trim()
-    let reelUrl = query.match(IG_URL_REGEX)?.[0]
-    let title = 'Instagram Reel'
-    let description = ''
-    let thumbUrl
+    const consulta = text.trim()
+    let urlReel = consulta.match(REGEX_URL_IG)?.[0]
+    let titulo = 'Instagram Reel'
+    let descripcion = ''
+    let urlMiniatura
 
-    if (!reelUrl) {
-      const searchUrl = `https://api.delirius.online/search/instagramreels?query=${encodeURIComponent(query)}&language=es`
-      const sres = await fetch(searchUrl).then(r => r.json())
+    if (!urlReel) {
+      const urlBusqueda = `https://api.delirius.online/search/instagramreels?query=${encodeURIComponent(consulta)}&language=es`
+      const resBusqueda = await fetch(urlBusqueda).then(r => r.json())
 
-      if (!sres?.status || !Array.isArray(sres.data) || !sres.data.length) {
+      if (!resBusqueda?.status || !Array.isArray(resBusqueda.data) || !resBusqueda.data.length) {
         throw '[❗] No se encontraron reels para esa búsqueda.'
       }
 
-      const first = sres.data[0]
-      reelUrl = first.url
-      title = first.title || title
-      description = first.description || ''
-      thumbUrl = first.image
+      const primero = resBusqueda.data[0]
+      urlReel = primero.url
+      titulo = primero.title || titulo
+      descripcion = primero.description || ''
+      urlMiniatura = primero.image
     }
 
-    if (!reelUrl) throw '[❗] No se pudo obtener el enlace del reel.'
+    if (!urlReel) throw '[❗] No se pudo obtener el enlace del reel.'
 
-    const downloadApi = `https://api.delirius.online/download/instagram?url=${encodeURIComponent(reelUrl)}`
-    const dres = await fetch(downloadApi).then(r => r.json())
+    const apiDescarga = `https://api.delirius.online/download/instagram?url=${encodeURIComponent(urlReel)}`
+    const resDescarga = await fetch(apiDescarga).then(r => r.json())
 
-    if (!dres?.status || !Array.isArray(dres.data) || !dres.data.length) {
+    if (!resDescarga?.status || !Array.isArray(resDescarga.data) || !resDescarga.data.length) {
       throw '[❗] No se pudo descargar el contenido de Instagram.'
     }
 
-    const media = dres.data[0]
-    const mediaUrl = media?.url
+    const medio = resDescarga.data[0]
+    const urlMedio = medio?.url
 
-    if (!mediaUrl) throw '[❗] No se encontró la URL del video.'
+    if (!urlMedio) throw '[❗] No se encontró la URL del video.'
 
-    let caption = `> *${title}*`
-    if (description) caption += `\n> ${description}`
-    caption += `\n> *Enlace:* ${reelUrl}`
+    let leyenda = `> *${titulo}*`
+    if (descripcion) leyenda += `\n> ${descripcion}`
+    leyenda += `\n> *Enlace:* ${urlReel}`
 
-    if (thumbUrl) {
+    if (urlMiniatura) {
       try {
-        const thumb = (await conn.getFile(thumbUrl)).data
+        const miniatura = (await conn.getFile(urlMiniatura)).data
         await conn.sendMessage(m.chat, {
-          image: thumb,
-          caption,
+          image: miniatura,
+          caption: leyenda,
           contextInfo: { ...rcanal?.contextInfo }
         }, { quoted: m })
       } catch {}
     }
 
-    if (media.type === 'video') {
+    if (medio.type === 'video') {
       await conn.sendMessage(m.chat, {
-        video: { url: mediaUrl },
+        video: { url: urlMedio },
         fileName: 'instagram.mp4',
-        caption: thumbUrl ? '' : caption,
+        caption: urlMiniatura ? '' : leyenda,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
     } else {
       await conn.sendMessage(m.chat, {
-        image: { url: mediaUrl },
-        caption: thumbUrl ? '' : caption,
+        image: { url: urlMedio },
+        caption: urlMiniatura ? '' : leyenda,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
     }

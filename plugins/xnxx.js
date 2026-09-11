@@ -26,22 +26,22 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       const res = await xnxxdl(text)
       const { dur, qual, views } = res.result.info
 
-      const txt = `ᴠɪᴅᴇᴏ xnxx\n\n *Título:* ${res.result.title}\n *Duración:* ${dur || 'Desconocida'}\n *Calidad:* ${qual || 'Desconocida'}\n *Vistas:* ${views || 'Desconocidas'}\n`
+      const texto = `ᴠɪᴅᴇᴏ xnxx\n\n *Título:* ${res.result.title}\n *Duración:* ${dur || 'Desconocida'}\n *Calidad:* ${qual || 'Desconocida'}\n *Vistas:* ${views || 'Desconocidas'}\n`
 
       const dll = res.result.files.high || res.result.files.low
       if (!dll) throw new Error('No se pudo obtener el enlace de descarga')
 
       await conn.sendMessage(m.chat, {
         video: { url: dll },
-        caption: txt,
+        caption: texto,
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
-    } catch (e) {
-      console.error('Error en descarga XNXX:', e)
+    } catch (error) {
+      console.error('Error en descarga XNXX:', error)
       await conn.sendMessage(m.chat, {
-        text: `[❌] *Error:* ${e.message}\n[❌] *Verifica la URL*`,
+        text: `[❌] *Error:* ${error.message}\n[❌] *Verifica la URL*`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -67,14 +67,14 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }, { quoted: m })
   }
 
-  const list = res.result.slice(0, 10).map((v, i) =>
+  const lista = res.result.slice(0, 10).map((v, i) =>
     `*${i + 1}.*\n *Título:* ${v.title}\n *Info:* ${v.info || 'Sin información'}\n *Link:* ${v.link}`
   ).join('\n\n')
 
-  const caption = `ʀᴇsᴜʟᴛᴀᴅᴏs ᴅᴇ ʙᴜsǫᴜᴇᴅᴀ\n\n *Búsqueda:* ${text}\n *Resultados:* ${res.result.length}\n\n${list}\n\n *Escribe solo el número (1-10) para descargar*\n *Ejemplo: 3, 7, 1*\n *O usa directamente la URL*\n\n`
+  const leyenda = `ʀᴇsᴜʟᴛᴀᴅᴏs ᴅᴇ ʙᴜsǫᴜᴇᴅᴀ\n\n *Búsqueda:* ${text}\n *Resultados:* ${res.result.length}\n\n${lista}\n\n *Escribe solo el número (1-10) para descargar*\n *Ejemplo: 3, 7, 1*\n *O usa directamente la URL*\n\n`
 
   const { key } = await conn.sendMessage(m.chat, {
-    text: caption,
+    text: leyenda,
     contextInfo: {
       ...rcanal.contextInfo
     }
@@ -115,22 +115,22 @@ handler.before = async (m, { conn }) => {
     const res = await xnxxdl(link)
     const { dur, qual, views } = res.result.info
 
-    const txt = `ᴠɪᴅᴇᴏ xnxx\n\n *Título:* ${res.result.title}\n *Duración:* ${dur || 'Desconocida'}\n *Calidad:* ${qual || 'Desconocida'}\n *Vistas:* ${views || 'Desconocidas'}\n`
+    const texto = `ᴠɪᴅᴇᴏ xnxx\n\n *Título:* ${res.result.title}\n *Duración:* ${dur || 'Desconocida'}\n *Calidad:* ${qual || 'Desconocida'}\n *Vistas:* ${views || 'Desconocidas'}\n`
 
     const dll = res.result.files.high || res.result.files.low
     if (!dll) throw new Error('No se pudo obtener el enlace de descarga')
 
     await conn.sendMessage(m.chat, {
       video: { url: dll },
-      caption: txt,
+      caption: texto,
       contextInfo: {
         ...rcanal.contextInfo
       }
     }, { quoted: m })
-  } catch (e) {
-    console.error('Error en descarga XNXX:', e)
+  } catch (error) {
+    console.error('Error en descarga XNXX:', error)
     await conn.sendMessage(m.chat, {
-      text: `[❌] *Error:* ${e.message}\n *Inténtalo más tarde*`,
+      text: `[❌] *Error:* ${error.message}\n *Inténtalo más tarde*`,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -214,7 +214,7 @@ async function search(query) {
         $('div.mozaique').each(function (a, b) {
           $(b).find('div.thumb-under').each(function (c, d) {
             desc.push($(d).find('p.metadata').text())
-            $(d).find('a').each(function (e, f) {
+            $(d).find('a').each(function (error, f) {
               title.push($(f).attr('title'))
             })
           })

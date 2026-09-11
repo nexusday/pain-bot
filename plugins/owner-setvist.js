@@ -1,8 +1,8 @@
 import { isMainBotConn } from './modo-sub.js'
 
-const line = '> 𓂃 ࣪ ִֶָ☾.'
+const linea = '> 𓂃 ࣪ ִֶָ☾.'
 
-function getBotSettingsKey(conn) {
+function obtenerClaveAjustesBot(conn) {
   return conn.user?.jid || conn.decodeJid(conn.user?.id)
 }
 
@@ -14,51 +14,51 @@ let handler = async (m, { conn, usedPrefix, text, isOwner }) => {
   if (!isMainBotConn(conn)) {
     return conn.reply(
       m.chat,
-      `${line}  Este comando es solo para el *bot principal*.\n\n${line}  En sub-bots usa *${usedPrefix}setautoread on/off*`,
+      `${linea}  Este comando es solo para el *bot principal*.\n\n${linea}  En sub-bots usa *${usedPrefix}setautoread on/off*`,
       m,
       rcanal,
     )
   }
 
-  const botKey = getBotSettingsKey(conn)
-  if (!botKey) {
-    return conn.reply(m.chat, `${line}  No se pudo identificar la sesión del bot.`, m, rcanal)
+  const claveBot = obtenerClaveAjustesBot(conn)
+  if (!claveBot) {
+    return conn.reply(m.chat, `${linea}  No se pudo identificar la sesión del bot.`, m, rcanal)
   }
 
-  global.db.data.settings[botKey] ||= {}
-  const settings = global.db.data.settings[botKey]
-  if (!('autoread' in settings)) settings.autoread = true
+  global.db.data.settings[claveBot] ||= {}
+  const ajustes = global.db.data.settings[claveBot]
+  if (!('autoread' in ajustes)) ajustes.autoread = true
 
   if (!text) {
-    const status = settings.autoread !== false ? 'Activado ✅' : 'Desactivado ❌'
+    const estado = ajustes.autoread !== false ? 'Activado ✅' : 'Desactivado ❌'
     return conn.reply(
       m.chat,
       `𓍯 𝚅𝙸𝚂𝚃𝙾 𓍯
 
-${line}  *Estado:* ${status}
+${linea}  *Estado:* ${estado}
 
-${line}  *${usedPrefix}setvist on* — Marcar mensajes como leídos
-${line}  *${usedPrefix}setvist off* — No marcar visto (sin doble check azul)`,
+${linea}  *${usedPrefix}setvist on* — Marcar mensajes como leídos
+${linea}  *${usedPrefix}setvist off* — No marcar visto (sin doble check azul)`,
       m,
       rcanal,
     )
   }
 
-  const action = text.toLowerCase().trim()
+  const accion = text.toLowerCase().trim()
 
-  if (action === 'on' || action === 'activar' || action === 'enable') {
-    settings.autoread = true
-    return conn.reply(m.chat, `${line}  𝚅𝙸𝚂𝚃𝙾 *activado* ✅`, m, rcanal)
+  if (accion === 'on' || accion === 'activar' || accion === 'enable') {
+    ajustes.autoread = true
+    return conn.reply(m.chat, `${linea}  𝚅𝙸𝚂𝚃𝙾 *activado* ✅`, m, rcanal)
   }
 
-  if (action === 'off' || action === 'desactivar' || action === 'disable') {
-    settings.autoread = false
-    return conn.reply(m.chat, `${line}  𝚅𝙸𝚂𝚃𝙾 *desactivado* ❌`, m, rcanal)
+  if (accion === 'off' || accion === 'desactivar' || accion === 'disable') {
+    ajustes.autoread = false
+    return conn.reply(m.chat, `${linea}  𝚅𝙸𝚂𝚃𝙾 *desactivado* ❌`, m, rcanal)
   }
 
   return conn.reply(
     m.chat,
-    `${line}  Uso: *${usedPrefix}setvist on/off*`,
+    `${linea}  Uso: *${usedPrefix}setvist on/off*`,
     m,
     rcanal,
   )

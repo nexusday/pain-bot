@@ -1,22 +1,22 @@
-const KNOWN_SUBS = ['on', 'off', 'add', 'del', 'remove', 'list', 'clear', 'action']
+const SUBCOMANDOS_CONOCIDOS = ['on', 'off', 'add', 'del', 'remove', 'list', 'clear', 'action']
 
 import { normalizeAntiText, sanitizeAntiPalabraWords, ensureAntiPalabraStore } from '../lib/Antis/anti-palabra.js'
 
-async function saveAntiPalabra() {
+async function guardarAntiPalabra() {
   try {
     if (global.db?.data) await global.db.write()
   } catch {}
 }
 
-async function addBannedWord(cfg, palabra, m) {
-  const normalized = normalizeAntiText(palabra)
-  if (!normalized) return m.reply('Palabra vacía.')
-  if (cfg.words.some(w => normalizeAntiText(w) === normalized)) {
+async function agregarPalabraProhibida(config, palabra, m) {
+  const normalizado = normalizeAntiText(palabra)
+  if (!normalizado) return m.reply('Palabra vacía.')
+  if (config.words.some(w => normalizeAntiText(w) === normalizado)) {
     return m.reply('La palabra ya está en la lista.')
   }
-  cfg.words.push(normalized)
-  await saveAntiPalabra()
-  return m.reply(`Palabra añadida: *${normalized}*\n\n> Activa con *${m.usedPrefix || '.'}antipalabra on* si aún no lo hiciste.`)
+  config.words.push(normalizado)
+  await guardarAntiPalabra()
+  return m.reply(`Palabra añadida: *${normalizado}*\n\n> Activa con *${m.usedPrefix || '.'}antipalabra on* si aún no lo hiciste.`)
 }
 
 let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwner }) => {
@@ -28,99 +28,99 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
   }
 
   m.usedPrefix = usedPrefix
-  const chat = m.chat
-  const arg = (args || []).map(a => a.trim()).filter(Boolean)
-  const sub = (arg[0] || '').toLowerCase()
+  const idChat = m.chat
+  const argumentosArr = (args || []).map(a => a.trim()).filter(Boolean)
+  const subcomando = (argumentosArr[0] || '').toLowerCase()
 
   if (!global.db) global.db = { data: {} }
   ensureAntiPalabraStore()
-  if (!global.db.data.antiPalabra[chat]) {
-    global.db.data.antiPalabra[chat] = { enabled: false, words: [], action: 'delete' }
+  if (!global.db.data.antiPalabra[idChat]) {
+    global.db.data.antiPalabra[idChat] = { enabled: false, words: [], action: 'delete' }
   }
 
-  const cfg = global.db.data.antiPalabra[chat]
-  cfg.words = sanitizeAntiPalabraWords(cfg.words)
+  const config = global.db.data.antiPalabra[idChat]
+  config.words = sanitizeAntiPalabraWords(config.words)
 
-  switch (sub) {
+  switch (subcomando) {
     case 'on':
-      cfg.enabled = true
-      await saveAntiPalabra()
+      config.enabled = true
+      await guardarAntiPalabra()
       return conn.sendMessage(m.chat, {
-        text: `ִֶָ☾. *Anti-palabras activado*\n> Palabras: ${cfg.words.length}\n> Acción: ${cfg.action || 'delete'}\n> Por: @${m.sender.split('@')[0]}`,
+        text: `ִֶָ☾. *Anti-palabras activado*\n> Palabras: ${config.words.length}\n> Acción: ${config.action || 'delete'}\n> Por: @${m.sender.split('@')[0]}`,
         contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] },
       }, { quoted: m })
     case 'off':
-      cfg.enabled = false
-      await saveAntiPalabra()
+      config.enabled = false
+      await guardarAntiPalabra()
       return conn.sendMessage(m.chat, {
         text: `ִֶָ☾. *Anti-palabras desactivado*\n> Por: @${m.sender.split('@')[0]}`,
         contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] },
       }, { quoted: m })
     case 'add':
-      if (!arg[1]) {
+      if (!argumentosArr[1]) {
         return conn.sendMessage(m.chat, {
           text: `[❗] Uso: ${usedPrefix}${command} add <palabra o frase>`,
           contextInfo: { ...rcanal.contextInfo },
         }, { quoted: m })
       }
-      return addBannedWord(cfg, arg.slice(1).join(' ').trim(), m)
+      return agregarPalabraProhibida(config, argumentosArr.slice(1).join(' ').trim(), m)
     case 'del':
     case 'remove':
-      if (!arg[1]) {
+      if (!argumentosArr[1]) {
         return conn.sendMessage(m.chat, {
           text: `[❗] Uso: ${usedPrefix}${command} del <palabra|indice>`,
           contextInfo: { ...rcanal.contextInfo },
         }, { quoted: m })
       }
       {
-        const target = normalizeAntiText(arg.slice(1).join(' '))
-        let idx = parseInt(arg[1])
+        const objetivo = normalizeAntiText(argumentosArr.slice(1).join(' '))
+        let idx = parseInt(argumentosArr[1])
         if (!isNaN(idx)) {
           idx -= 1
-          if (idx < 0 || idx >= cfg.words.length) return m.reply('Índice inválido.')
-          const removed = cfg.words.splice(idx, 1)
-          await saveAntiPalabra()
-          return m.reply(`Eliminado: ${removed[0]}`)
+          if (idx < 0 || idx >= config.words.length) return m.reply('Índice inválido.')
+          const eliminado = config.words.splice(idx, 1)
+          await guardarAntiPalabra()
+          return m.reply(`Eliminado: ${eliminado[0]}`)
         }
-        const i = cfg.words.findIndex(w => normalizeAntiText(w) === target)
+        const i = config.words.findIndex(w => normalizeAntiText(w) === objetivo)
         if (i === -1) return m.reply('Palabra no encontrada.')
-        cfg.words.splice(i, 1)
-        await saveAntiPalabra()
-        return m.reply(`Palabra eliminada: ${target}`)
+        config.words.splice(i, 1)
+        await guardarAntiPalabra()
+        return m.reply(`Palabra eliminada: ${objetivo}`)
       }
     case 'list':
-      if (!cfg.words?.length) {
+      if (!config.words?.length) {
         return conn.sendMessage(m.chat, { text: '[❗] No hay palabras prohibidas configuradas.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
       }
       {
-        let txt = `*Palabras prohibidas (${cfg.words.length}):*\n`
-        txt += `> Estado: ${cfg.enabled ? 'ON' : 'OFF'} | Acción: ${cfg.action || 'delete'}\n\n`
-        cfg.words.forEach((w, i) => { txt += `${i + 1}. ${w}\n` })
-        return m.reply(txt)
+        let texto = `*Palabras prohibidas (${config.words.length}):*\n`
+        texto += `> Estado: ${config.enabled ? 'ON' : 'OFF'} | Acción: ${config.action || 'delete'}\n\n`
+        config.words.forEach((w, i) => { texto += `${i + 1}. ${w}\n` })
+        return m.reply(texto)
       }
     case 'clear':
-      cfg.words = []
-      await saveAntiPalabra()
+      config.words = []
+      await guardarAntiPalabra()
       return m.reply('Lista de palabras prohibidas vaciada.')
     case 'action':
-      if (!arg[1]) {
+      if (!argumentosArr[1]) {
         return conn.sendMessage(m.chat, {
           text: `[❗] Uso: ${usedPrefix}${command} action <delete|kick>`,
           contextInfo: { ...rcanal.contextInfo },
         }, { quoted: m })
       }
       {
-        const act = arg[1].toLowerCase()
-        if (!['delete', 'kick'].includes(act)) {
+        const acto = argumentosArr[1].toLowerCase()
+        if (!['delete', 'kick'].includes(acto)) {
           return conn.sendMessage(m.chat, { text: 'Acción inválida. Opciones: delete, kick', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
         }
-        cfg.action = act
-        await saveAntiPalabra()
-        return m.reply(`Acción de antipalabra: *${act}*`)
+        config.action = acto
+        await guardarAntiPalabra()
+        return m.reply(`Acción de antipalabra: *${acto}*`)
       }
     default:
-      if (sub && !KNOWN_SUBS.includes(sub)) {
-        return addBannedWord(cfg, arg.join(' ').trim(), m)
+      if (subcomando && !SUBCOMANDOS_CONOCIDOS.includes(subcomando)) {
+        return agregarPalabraProhibida(config, argumentosArr.join(' ').trim(), m)
       }
       return conn.sendMessage(m.chat, {
         text: `[❗] Uso de *antipalabra*\n\n` +

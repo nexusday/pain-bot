@@ -25,8 +25,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    let user = global.db.data.users[m.sender]
-    if (!user) {
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) {
       global.db.data.users[m.sender] = {
         coins: 100,
         exp: 0,
@@ -34,17 +34,17 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         registered: true,
         name: m.name || m.pushName || 'Usuario'
       }
-      user = global.db.data.users[m.sender]
+      usuario = global.db.data.users[m.sender]
     }
 
     
-    if (!user.lastSlotPlay) user.lastSlotPlay = 0
-    const timeSinceLastPlay = Date.now() - user.lastSlotPlay
+    if (!usuario.lastSlotPlay) usuario.lastSlotPlay = 0
+    const timeSinceLastPlay = Date.now() - usuario.lastSlotPlay
 
     if (timeSinceLastPlay < cooldownTime) {
-      const seconds = Math.ceil((cooldownTime - timeSinceLastPlay) / 1000)
+      const segundos = Math.ceil((cooldownTime - timeSinceLastPlay) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar *${seconds} segundo${seconds !== 1 ? 's' : ''}* para volver a jugar.`,
+        text: `[❗] Debes esperar *${segundos} segundo${segundos !== 1 ? 's' : ''}* para volver a jugar.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -63,9 +63,9 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    if ((user.coins || 0) < bet) {
+    if ((usuario.coins || 0) < bet) {
       return conn.sendMessage(m.chat, {
-        text: `[❌] No tienes suficientes ${global.moneda}.\n> Tienes: ${user.coins || 0} ${global.moneda}`,
+        text: `[❌] No tienes suficientes ${global.moneda}.\n> Tienes: ${usuario.coins || 0} ${global.moneda}`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -73,8 +73,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    user.lastSlotPlay = Date.now()
-    user.coins -= bet
+    usuario.lastSlotPlay = Date.now()
+    usuario.coins -= bet
 
     
     const result = generateSlotResult()
@@ -104,23 +104,23 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    user.coins += winnings
+    usuario.coins += winnings
 
     
-    let txt = `🎰 𝗔𝗣𝗨𝗘𝗦𝗧𝗔𝗦  🎰\n`
-    txt += `\n`
-    txt += `${reels}\n`
-    txt += `\n\n> ${resultado}\n> *Premio:* ${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\n> *Total:* ${user.coins} ${global.moneda}\n> *Próximo:* 30 seg\n`
+    let texto = `🎰 𝗔𝗣𝗨𝗘𝗦𝗧𝗔𝗦  🎰\n`
+    texto += `\n`
+    texto += `${reels}\n`
+    texto += `\n\n> ${resultado}\n> *Premio:* ${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\n> *Total:* ${usuario.coins} ${global.moneda}\n> *Próximo:* 30 seg\n`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo
       }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error('Error en slot:', e)
+  } catch (error) {
+    console.error('Error en slot:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al ejecutar el juego.',
       contextInfo: {

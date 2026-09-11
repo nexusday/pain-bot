@@ -8,13 +8,13 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     }, { quoted: m })
   }
 
-  const label = text.trim()
+  const etiqueta = text.trim()
 
   try {
-    const apiUrl = `https://api.delirius.online/random/cat?text=${encodeURIComponent(label)}`
+    const urlApi = `https://api.delirius.online/random/cat?text=${encodeURIComponent(etiqueta)}`
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 30000)
-    const res = await fetch(apiUrl, { signal: controller.signal })
+    const res = await fetch(urlApi, { signal: controller.signal })
     clearTimeout(timer)
 
     if (!res.ok) {
@@ -39,17 +39,17 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       throw new Error('Imagen vacía.')
     }
 
-    const caption = `ִֶָ☾. 𝗖𝗮𝘁 ִֶָ☾.\n 𓍯  *Texto:* ${label}`
+    const leyenda = `ִֶָ☾. 𝗖𝗮𝘁 ִֶָ☾.\n 𓍯  *Texto:* ${etiqueta}`
 
     await conn.sendMessage(m.chat, {
       image: imageBuffer,
-      caption,
+      caption: leyenda,
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
-  } catch (e) {
-    console.error('Error en random-cat:', e)
+  } catch (error) {
+    console.error('Error en random-cat:', error)
     return conn.sendMessage(m.chat, {
-      text: `[❌] No se pudo generar la imagen del gato.\n\n> ${e.message || 'Intenta de nuevo.'}`,
+      text: `[❌] No se pudo generar la imagen del gato.\n\n> ${error.message || 'Intenta de nuevo.'}`,
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
   }

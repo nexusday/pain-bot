@@ -9,12 +9,12 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 
   try {
-    const apiUrl = `https://api.delirius.online/ia/copilot?query=${encodeURIComponent(text.trim())}`
-    const { data } = await axios.get(apiUrl, { timeout: 60000 })
+    const urlApi = `https://api.delirius.online/ia/copilot?query=${encodeURIComponent(text.trim())}`
+    const { datos } = await axios.get(urlApi, { timeout: 60000 })
 
-    const response = (typeof data?.text === 'string' ? data.text.trim() : '') || ''
+    const respuestaApi = (typeof datos?.text === 'string' ? datos.text.trim() : '') || ''
 
-    if (!response) {
+    if (!respuestaApi) {
       return conn.sendMessage(m.chat, {
         text: '*[❗] No se pudo obtener una respuesta de Copilot.*',
         contextInfo: { ...rcanal.contextInfo }
@@ -22,14 +22,14 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
     await conn.sendMessage(m.chat, {
-      text: response,
+      text: respuestaApi,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
     console.error('Error en ia-copilot:', e)
-    const detail = e?.response?.data?.message || e.message || 'Intenta de nuevo más tarde.'
+    const detalle = e?.response?.data?.message || e.message || 'Intenta de nuevo más tarde.'
     return conn.sendMessage(m.chat, {
-      text: `*[❌] Error al consultar a Copilot.*\n\n> ${detail}`,
+      text: `*[❌] Error al consultar a Copilot.*\n\n> ${detalle}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }

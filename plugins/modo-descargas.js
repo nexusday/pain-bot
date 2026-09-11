@@ -9,10 +9,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
     ensureModeMap('modoDescargas')
 
-    if (action === 'on') {
+    if (accion === 'on') {
       setModeState('modoDescargas', m.chat, true)
       await global.db.write()
 
@@ -30,7 +30,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    if (action === 'off') {
+    if (accion === 'off') {
       setModeState('modoDescargas', m.chat, false)
       await global.db.write()
 
@@ -57,8 +57,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 > *Off:* sin descarga automática`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
-  } catch (e) {
-    console.error('Error en mododescargas:', e)
+  } catch (error) {
+    console.error('Error en mododescargas:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al configurar el modo descargas.',
       contextInfo: { ...rcanal.contextInfo }

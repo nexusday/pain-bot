@@ -4,24 +4,24 @@ import { decodeImageToPng, sharpMetadata, sharpResizePng } from '../lib/image-bu
 
 
 
-const MAX_TEXT = 180
-const DEFAULT_TEXT = ''
-const FLAG_OPACITY = 0.41
+const MAX_TEXTO = 180
+const TEXTO_DEFAULT = ''
+const OPACIDAD_BANDERA = 0.41
 
 
-const PRIDE_COLORS = ['#E40303', '#FF8C00', '#FFED00', '#008026', '#24408E', '#732982']
+const COLORES_ORGULLO = ['#E40303', '#FF8C00', '#FFED00', '#008026', '#24408E', '#732982']
 
-const WA_EMOJI_CDN = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
-const WA_EMOJI_FALLBACK = 'https://emoji-cdn.mqrio.dev'
+const CDN_EMOJI_WA = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
+const EMOJI_WA_RESERVA = 'https://emoji-cdn.mqrio.dev'
 
-const emojiPngCache = new Map()
-const textWidthCache = new Map()
-const graphemeSegmenter =
+const cachePngEmoji = new Map()
+const cacheAnchoTexto = new Map()
+const segmentadorGrafemas =
   typeof Intl !== 'undefined' && Intl.Segmenter
     ? new Intl.Segmenter('und', { granularity: 'grapheme' })
     : null
 
-function escapeXml(text) {
+function escaparXml(text) {
   return String(text || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -30,42 +30,42 @@ function escapeXml(text) {
     .replace(/'/g, '&apos;')
 }
 
-function normalizeInput(text) {
+function normalizarEntrada(text) {
   return String(text || '')
     .replace(/\\n/gi, '\n')
     .replace(/\r\n/g, '\n')
     .trim()
 }
 
-function isImageMedia(mime = '', mtype = '') {
+function esMedioImagen(mime = '', mtype = '') {
   return /image|webp|sticker/i.test(mime) || /imageMessage|stickerMessage/i.test(mtype)
 }
 
-function resolveMediaTarget(m) {
+function resolverObjetivoMedio(m) {
   if (m.quoted) {
     const mime = (m.quoted.msg || m.quoted).mimetype || m.quoted.mediaType || ''
     const mtype = m.quoted.mtype || ''
-    if (isImageMedia(mime, mtype) && m.quoted.download) return m.quoted
+    if (esMedioImagen(mime, mtype) && m.quoted.download) return m.quoted
   }
   const mime = (m.msg || m).mimetype || m.mediaType || ''
   const mtype = m.mtype || ''
-  if (isImageMedia(mime, mtype) && m.download) return m
+  if (esMedioImagen(mime, mtype) && m.download) return m
   return null
 }
 
-async function loadImageBuffer(media, mime) {
-  return decodeImageToPng(media, mime)
+async function cargarBuferImagen(medio, mime) {
+  return decodeImageToPng(medio, mime)
 }
 
-function splitGraphemes(text) {
+function partirGrafemas(text) {
   if (!text) return []
-  if (graphemeSegmenter) {
-    return [...graphemeSegmenter.segment(text)].map(s => s.segment)
+  if (segmentadorGrafemas) {
+    return [...segmentadorGrafemas.segment(text)].map(s => s.segment)
   }
   return [...text]
 }
 
-function isEmojiCodePoint(cp) {
+function esPuntoCodigoEmoji(cp) {
   if (cp == null) return false
   if (cp === 0xfe0f || cp === 0x200d || cp === 0x20e3) return true
   return (
@@ -79,452 +79,452 @@ function isEmojiCodePoint(cp) {
   )
 }
 
-function isEmojiGrapheme(segment) {
-  if (!segment) return false
-  return [...segment].some(char => isEmojiCodePoint(char.codePointAt(0)))
+function esGrafemaEmoji(segmento) {
+  if (!segmento) return false
+  return [...segmento].some(caracter => esPuntoCodigoEmoji(caracter.codePointAt(0)))
 }
 
-function emojiToCodes(emoji) {
-  const cps = [...emoji].map(char => char.codePointAt(0).toString(16))
-  const withFe0f = cps.join('-')
-  const withoutFe0f = cps.filter(code => code !== 'fe0f').join('-')
-  const codes = [withFe0f, withoutFe0f]
-  if (!cps.includes('fe0f') && withoutFe0f) codes.push(`${withoutFe0f}-fe0f`)
-  return [...new Set(codes.filter(Boolean))]
+function emojiACodigos(emoji) {
+  const cps = [...emoji].map(caracter => caracter.codePointAt(0).toString(16))
+  const conFe0f = cps.join('-')
+  const sinFe0f = cps.filter(code => code !== 'fe0f').join('-')
+  const codigos = [conFe0f, sinFe0f]
+  if (!cps.includes('fe0f') && sinFe0f) codigos.push(`${sinFe0f}-fe0f`)
+  return [...new Set(codigos.filter(Boolean))]
 }
 
-async function fetchPng(url) {
-  const res = await fetch(url)
-  if (!res.ok) return null
-  const type = String(res.headers.get('content-type') || '')
+async function obtenerPng(url) {
+  const respuesta = await fetch(url)
+  if (!respuesta.ok) return null
+  const type = String(respuesta.headers.get('content-type') || '')
   if (!type.includes('png') && !type.includes('octet-stream') && !type.includes('image')) {
     return null
   }
-  const buffer = Buffer.from(await res.arrayBuffer())
-  return buffer.length > 100 ? buffer : null
+  const bufer = Buffer.from(await respuesta.arrayBuffer())
+  return bufer.length > 100 ? bufer : null
 }
 
-async function getEmojiPng(emoji) {
-  if (emojiPngCache.has(emoji)) return emojiPngCache.get(emoji)
+async function obtenerPngEmoji(emoji) {
+  if (cachePngEmoji.has(emoji)) return cachePngEmoji.get(emoji)
   try {
-    for (const code of emojiToCodes(emoji)) {
-      const buffer = await fetchPng(`${WA_EMOJI_CDN}/${code}.png`)
-      if (buffer) {
-        emojiPngCache.set(emoji, buffer)
-        return buffer
+    for (const code of emojiACodigos(emoji)) {
+      const bufer = await obtenerPng(`${CDN_EMOJI_WA}/${code}.png`)
+      if (bufer) {
+        cachePngEmoji.set(emoji, bufer)
+        return bufer
       }
     }
-    const buffer = await fetchPng(
-      `${WA_EMOJI_FALLBACK}/${encodeURIComponent(emoji)}?style=whatsapp`
+    const bufer = await obtenerPng(
+      `${EMOJI_WA_RESERVA}/${encodeURIComponent(emoji)}?style=whatsapp`
     )
-    if (buffer) {
-      emojiPngCache.set(emoji, buffer)
-      return buffer
+    if (bufer) {
+      cachePngEmoji.set(emoji, bufer)
+      return bufer
     }
-    emojiPngCache.set(emoji, null)
+    cachePngEmoji.set(emoji, null)
     return null
   } catch {
-    emojiPngCache.set(emoji, null)
+    cachePngEmoji.set(emoji, null)
     return null
   }
 }
 
-async function prefetchEmojis(text) {
+async function precargarEmojis(text) {
   await Promise.all(
-    splitGraphemes(text)
-      .filter(isEmojiGrapheme)
-      .map(g => getEmojiPng(g))
+    partirGrafemas(text)
+      .filter(esGrafemaEmoji)
+      .map(g => obtenerPngEmoji(g))
   )
 }
 
-function tokenize(text) {
+function tokenizar(text) {
   const tokens = []
   let buf = ''
-  const flush = () => {
+  const vaciar = () => {
     if (!buf) return
     tokens.push({ type: 'text', text: buf })
     buf = ''
   }
-  for (const g of splitGraphemes(text)) {
-    if (isEmojiGrapheme(g)) {
-      flush()
+  for (const g of partirGrafemas(text)) {
+    if (esGrafemaEmoji(g)) {
+      vaciar()
       tokens.push({ type: 'emoji', text: g })
       continue
     }
     if (/\s/.test(g)) {
-      flush()
+      vaciar()
       continue
     }
     buf += g
   }
-  flush()
+  vaciar()
   return tokens
 }
 
-function strokeForSize(fontSize) {
-  return Math.max(5, Math.round(fontSize * 0.16))
+function trazoPorTamano(tamanoFuente) {
+  return Math.max(5, Math.round(tamanoFuente * 0.16))
 }
 
-function fontAttrs(fontSize, { fill = '#fff', stroke = null, strokeWidth = 0 } = {}) {
+function attrsFuente(tamanoFuente, { relleno = '#fff', trazo = null, anchoDeTrazo = 0 } = {}) {
   let s =
     `font-family="Impact, Arial Black, Arial, Helvetica, sans-serif" ` +
-    `font-size="${fontSize}" font-weight="900" fill="${fill}" ` +
+    `font-size="${tamanoFuente}" font-weight="900" fill="${relleno}" ` +
     `text-anchor="start" dominant-baseline="alphabetic"`
-  if (stroke && strokeWidth > 0) {
+  if (trazo && anchoDeTrazo > 0) {
     s +=
-      ` stroke="${stroke}" stroke-width="${strokeWidth}" ` +
+      ` stroke="${trazo}" stroke-width="${anchoDeTrazo}" ` +
       `paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"`
   }
   return s
 }
 
-async function measureTextWidth(text, fontSize, strokeW) {
-  const key = `${fontSize}:${strokeW}::${text}`
-  if (textWidthCache.has(key)) return textWidthCache.get(key)
+async function medirAnchoTexto(text, tamanoFuente, anchoTrazo) {
+  const clave = `${tamanoFuente}:${anchoTrazo}::${text}`
+  if (cacheAnchoTexto.has(clave)) return cacheAnchoTexto.get(clave)
 
-  const padX = Math.max(20, strokeW + 8)
-  const height = Math.ceil(fontSize * 2.6 + strokeW * 2)
-  const guess = Math.ceil(fontSize * Math.max(1, text.length) * 1.2 + padX * 2 + strokeW * 2)
-  const width = Math.min(2400, Math.max(120, guess))
+  const padX = Math.max(20, anchoTrazo + 8)
+  const alto = Math.ceil(tamanoFuente * 2.6 + anchoTrazo * 2)
+  const estimacion = Math.ceil(tamanoFuente * Math.max(1, text.length) * 1.2 + padX * 2 + anchoTrazo * 2)
+  const ancho = Math.min(2400, Math.max(120, estimacion))
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}">
   <rect width="100%" height="100%" fill="#ffffff"/>
-  <text x="${padX}" y="${Math.round(fontSize * 1.45 + strokeW)}" ${fontAttrs(fontSize, {
+  <text x="${padX}" y="${Math.round(tamanoFuente * 1.45 + anchoTrazo)}" ${attrsFuente(tamanoFuente, {
     fill: '#000000',
     stroke: '#000000',
-    strokeWidth: strokeW
-  })}>${escapeXml(text)}</text>
+    strokeWidth: anchoTrazo
+  })}>${escaparXml(text)}</text>
 </svg>`
 
   try {
-    const { data, info } = await sharp(Buffer.from(svg))
+    const { datos, informacion } = await sharp(Buffer.from(svg))
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true })
-    let minX = info.width
+    let minX = informacion.width
     let maxX = -1
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) {
-        const x = (i / 4) % info.width
+    for (let i = 0; i < datos.length; i += 4) {
+      if (datos[i] < 248 || datos[i + 1] < 248 || datos[i + 2] < 248) {
+        const x = (i / 4) % informacion.width
         if (x < minX) minX = x
         if (x > maxX) maxX = x
       }
     }
-    const measured =
-      maxX >= minX ? maxX - minX + 1 + 6 : Math.ceil(fontSize * text.length * 0.7 + strokeW * 2)
-    textWidthCache.set(key, measured)
-    return measured
+    const medido =
+      maxX >= minX ? maxX - minX + 1 + 6 : Math.ceil(tamanoFuente * text.length * 0.7 + anchoTrazo * 2)
+    cacheAnchoTexto.set(clave, medido)
+    return medido
   } catch {
-    const fallback = Math.ceil(fontSize * text.length * 0.72 + strokeW * 2)
-    textWidthCache.set(key, fallback)
-    return fallback
+    const reserva = Math.ceil(tamanoFuente * text.length * 0.72 + anchoTrazo * 2)
+    cacheAnchoTexto.set(clave, reserva)
+    return reserva
   }
 }
 
-function emojiSize(fontSize) {
-  return Math.round(fontSize * 1.08)
+function tamanoEmoji(tamanoFuente) {
+  return Math.round(tamanoFuente * 1.08)
 }
 
-function emojiSlotWidth(fontSize, strokeW) {
-  return emojiSize(fontSize) + Math.round(strokeW * 0.6)
+function anchoRanuraEmoji(tamanoFuente, anchoTrazo) {
+  return tamanoEmoji(tamanoFuente) + Math.round(anchoTrazo * 0.6)
 }
 
-function gapFor(fontSize, strokeW) {
-  return Math.max(14, Math.round(fontSize * 0.28 + strokeW * 0.5))
+function espacioPara(tamanoFuente, anchoTrazo) {
+  return Math.max(14, Math.round(tamanoFuente * 0.28 + anchoTrazo * 0.5))
 }
 
-async function tokenWidth(token, fontSize, strokeW) {
-  if (token.type === 'emoji') return emojiSlotWidth(fontSize, strokeW)
-  return measureTextWidth(token.text, fontSize, strokeW)
+async function anchoToken(token, tamanoFuente, anchoTrazo) {
+  if (token.type === 'emoji') return anchoRanuraEmoji(tamanoFuente, anchoTrazo)
+  return medirAnchoTexto(token.text, tamanoFuente, anchoTrazo)
 }
 
-async function lineWidth(tokens, fontSize, strokeW, gap) {
+async function anchoLinea(tokens, tamanoFuente, anchoTrazo, espacio) {
   if (!tokens.length) return 0
   let w = 0
   for (let i = 0; i < tokens.length; i++) {
-    w += await tokenWidth(tokens[i], fontSize, strokeW)
-    if (i < tokens.length - 1) w += gap
+    w += await anchoToken(tokens[i], tamanoFuente, anchoTrazo)
+    if (i < tokens.length - 1) w += espacio
   }
   return w
 }
 
-async function wrapTokens(tokens, fontSize, strokeW, maxWidth) {
-  const gap = gapFor(fontSize, strokeW)
-  const lines = []
-  let current = []
+async function envolverTokens(tokens, tamanoFuente, anchoTrazo, anchoMax) {
+  const espacio = espacioPara(tamanoFuente, anchoTrazo)
+  const lineas = []
+  let actual = []
   for (const token of tokens) {
-    const test = [...current, token]
-    const w = await lineWidth(test, fontSize, strokeW, gap)
-    if (w <= maxWidth || current.length === 0) {
-      current.push(token)
+    const test = [...actual, token]
+    const w = await anchoLinea(test, tamanoFuente, anchoTrazo, espacio)
+    if (w <= anchoMax || actual.length === 0) {
+      actual.push(token)
       continue
     }
-    lines.push(current)
-    current = [token]
+    lineas.push(actual)
+    actual = [token]
   }
-  if (current.length) lines.push(current)
-  return lines
+  if (actual.length) lineas.push(actual)
+  return lineas
 }
 
-async function wrapText(text, fontSize, strokeW, maxWidth) {
-  const lines = []
-  for (const para of text.split('\n')) {
-    const trimmed = para.trim()
-    if (!trimmed) {
-      if (lines.length) lines.push([])
+async function envolverTexto(text, tamanoFuente, anchoTrazo, anchoMax) {
+  const lineas = []
+  for (const parrafo of text.split('\n')) {
+    const recortado = parrafo.trim()
+    if (!recortado) {
+      if (lineas.length) lineas.push([])
       continue
     }
-    lines.push(...(await wrapTokens(tokenize(trimmed), fontSize, strokeW, maxWidth)))
+    lineas.push(...(await envolverTokens(tokenizar(recortado), tamanoFuente, anchoTrazo, anchoMax)))
   }
-  return lines.length ? lines : [tokenize(text)]
+  return lineas.length ? lineas : [tokenizar(text)]
 }
 
-async function fitFont(text, imgW) {
-  const maxWidth = Math.floor(imgW * 0.88)
-  const maxBlockH = Math.floor(imgW * 0.28)
-  let fontSize = Math.max(26, Math.min(84, Math.round(imgW * 0.08)))
-  let lines = []
-  let strokeW = strokeForSize(fontSize)
+async function ajustarFuente(text, imgW) {
+  const anchoMax = Math.floor(imgW * 0.88)
+  const altoBloqueMax = Math.floor(imgW * 0.28)
+  let tamanoFuente = Math.max(26, Math.min(84, Math.round(imgW * 0.08)))
+  let lineas = []
+  let anchoTrazo = trazoPorTamano(tamanoFuente)
 
-  while (fontSize >= 18) {
-    strokeW = strokeForSize(fontSize)
-    lines = await wrapText(text, fontSize, strokeW, maxWidth)
-    const lineH = fontSize * 1.28
-    const blockH = lines.length * lineH
-    const gap = gapFor(fontSize, strokeW)
-    let ok = blockH <= maxBlockH
+  while (tamanoFuente >= 18) {
+    anchoTrazo = trazoPorTamano(tamanoFuente)
+    lineas = await envolverTexto(text, tamanoFuente, anchoTrazo, anchoMax)
+    const altoLineaCalc = tamanoFuente * 1.28
+    const altoBloque = lineas.length * altoLineaCalc
+    const espacio = espacioPara(tamanoFuente, anchoTrazo)
+    let ok = altoBloque <= altoBloqueMax
     if (ok) {
-      for (const line of lines) {
-        if ((await lineWidth(line, fontSize, strokeW, gap)) > maxWidth) {
+      for (const linea of lineas) {
+        if ((await anchoLinea(linea, tamanoFuente, anchoTrazo, espacio)) > anchoMax) {
           ok = false
           break
         }
       }
     }
     if (ok) break
-    fontSize -= 2
+    tamanoFuente -= 2
   }
 
-  if (fontSize < 18) {
-    fontSize = 18
-    strokeW = strokeForSize(fontSize)
-    lines = await wrapText(text, fontSize, strokeW, maxWidth)
+  if (tamanoFuente < 18) {
+    tamanoFuente = 18
+    anchoTrazo = trazoPorTamano(tamanoFuente)
+    lineas = await envolverTexto(text, tamanoFuente, anchoTrazo, anchoMax)
   }
 
-  return { lines, fontSize, strokeW, lineHeight: fontSize * 1.28 }
+  return { lineas, tamanoFuente, anchoTrazo, lineHeight: tamanoFuente * 1.28 }
 }
 
-function buildPrideOverlay(width, height) {
-  const n = PRIDE_COLORS.length
-  const band = height / n
-  const rects = PRIDE_COLORS.map((color, i) => {
-    const y = Math.floor(i * band)
-    const h = i === n - 1 ? height - y : Math.ceil(band)
-    return `<rect x="0" y="${y}" width="${width}" height="${h}" fill="${color}" fill-opacity="${FLAG_OPACITY}"/>`
+function construirSuperposicionOrgullo(ancho, alto) {
+  const n = COLORES_ORGULLO.length
+  const banda = alto / n
+  const rectangulos = COLORES_ORGULLO.map((color, i) => {
+    const y = Math.floor(i * banda)
+    const h = i === n - 1 ? alto - y : Math.ceil(banda)
+    return `<rect x="0" y="${y}" width="${ancho}" height="${h}" fill="${color}" fill-opacity="${OPACIDAD_BANDERA}"/>`
   }).join('\n  ')
 
   return Buffer.from(
-    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  ${rects}
+    `<svg width="${ancho}" height="${alto}" xmlns="http://www.w3.org/2000/svg">
+  ${rectangulos}
 </svg>`
   )
 }
 
-async function buildTextOverlay(width, height, lines, fontSize, strokeW, lineHeight) {
-  const cx = width / 2
-  const gap = gapFor(fontSize, strokeW)
-  const emojiSz = emojiSize(fontSize)
-  const emojiSlot = emojiSlotWidth(fontSize, strokeW)
-  const blockH = Math.max(1, lines.length) * lineHeight
-  const bottomPad = Math.max(22, Math.round(height * 0.04))
+async function construirSuperposicionTexto(ancho, alto, lineas, tamanoFuente, anchoTrazo, altoLinea) {
+  const cx = ancho / 2
+  const espacio = espacioPara(tamanoFuente, anchoTrazo)
+  const tamEmoji = tamanoEmoji(tamanoFuente)
+  const ranuraEmoji = anchoRanuraEmoji(tamanoFuente, anchoTrazo)
+  const altoBloque = Math.max(1, lineas.length) * altoLinea
+  const padInferior = Math.max(22, Math.round(alto * 0.04))
   
-  let y = height - bottomPad - blockH + fontSize * 0.92
+  let y = alto - padInferior - altoBloque + tamanoFuente * 0.92
 
-  const parts = []
+  const partes = []
  
-  const strokeColor = '#1B1464'
+  const colorTrazo = '#1B1464'
 
-  for (const tokens of lines) {
+  for (const tokens of lineas) {
     if (!tokens.length) {
-      y += lineHeight
+      y += altoLinea
       continue
     }
 
-    const widths = []
-    for (const t of tokens) widths.push(await tokenWidth(t, fontSize, strokeW))
-    const total = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, tokens.length - 1)
+    const anchos = []
+    for (const t of tokens) anchos.push(await anchoToken(t, tamanoFuente, anchoTrazo))
+    const total = anchos.reduce((a, b) => a + b, 0) + espacio * Math.max(0, tokens.length - 1)
     let x = cx - total / 2
 
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i]
-      const tw = widths[i]
+      const tw = anchos[i]
 
       if (token.type === 'emoji') {
-        const png = await getEmojiPng(token.text)
-        const drawX = x + (emojiSlot - emojiSz) / 2
-        const ey = y - fontSize * 0.9
+        const png = await obtenerPngEmoji(token.text)
+        const dibujarX = x + (ranuraEmoji - tamEmoji) / 2
+        const ey = y - tamanoFuente * 0.9
         if (png) {
           const b64 = png.toString('base64')
-          parts.push(
-            `<image x="${drawX.toFixed(1)}" y="${ey.toFixed(1)}" width="${emojiSz}" height="${emojiSz}" ` +
+          partes.push(
+            `<image x="${dibujarX.toFixed(1)}" y="${ey.toFixed(1)}" width="${tamEmoji}" height="${tamEmoji}" ` +
               `href="data:image/png;base64,${b64}" xlink:href="data:image/png;base64,${b64}"/>`
           )
         }
       } else {
-        parts.push(
+        partes.push(
           `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" ` +
-            `${fontAttrs(fontSize, {
+            `${attrsFuente(tamanoFuente, {
               fill: '#ffffff',
-              stroke: strokeColor,
-              strokeWidth: strokeW
+              stroke: colorTrazo,
+              strokeWidth: anchoTrazo
             })}>` +
-            `${escapeXml(token.text)}</text>`
+            `${escaparXml(token.text)}</text>`
         )
       }
 
       x += tw
-      if (i < tokens.length - 1) x += gap
+      if (i < tokens.length - 1) x += espacio
     }
-    y += lineHeight
+    y += altoLinea
   }
 
   return Buffer.from(
-    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  ${parts.join('\n  ')}
+    `<svg width="${ancho}" height="${alto}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  ${partes.join('\n  ')}
 </svg>`
   )
 }
 
-export async function applyGayFilterRaster(photoBuffer, rawText) {
+export async function aplicarFiltroGayRaster(buferFoto, textoCrudo) {
   const { Jimp } = await import('jimp')
   const { Resvg } = await import('@resvg/resvg-js')
 
-  const text = normalizeInput(rawText) || DEFAULT_TEXT
-  await prefetchEmojis(text)
+  const text = normalizarEntrada(textoCrudo) || TEXTO_DEFAULT
+  await precargarEmojis(text)
 
-  const decoded = await decodeImageToPng(photoBuffer)
-  let img = await Jimp.read(decoded)
+  const decodificado = await decodeImageToPng(buferFoto)
+  let img = await Jimp.read(decodificado)
 
-  const maxSide = 1600
+  const ladoMax = 1600
   const w0 = img.bitmap.width
   const h0 = img.bitmap.height
-  if (w0 > maxSide || h0 > maxSide) {
-    const scale = Math.min(maxSide / w0, maxSide / h0)
+  if (w0 > ladoMax || h0 > ladoMax) {
+    const escala = Math.min(ladoMax / w0, ladoMax / h0)
     img.resize({
-      w: Math.max(1, Math.round(w0 * scale)),
-      h: Math.max(1, Math.round(h0 * scale))
+      w: Math.max(1, Math.round(w0 * escala)),
+      h: Math.max(1, Math.round(h0 * escala))
     })
   }
 
-  const width = img.bitmap.width
-  const height = img.bitmap.height
+  const ancho = img.bitmap.width
+  const alto = img.bitmap.height
 
-  const renderSvg = (svgBuf) => {
+  const renderizarSvg = (svgBuf) => {
     const resvg = new Resvg(svgBuf.toString('utf8'), {
-      fitTo: { mode: 'width', value: width },
+      fitTo: { mode: 'width', value: ancho },
       font: { loadSystemFonts: true }
     })
     return Buffer.from(resvg.render().asPng())
   }
 
-  const prideLayer = await Jimp.read(renderSvg(buildPrideOverlay(width, height)))
-  img.composite(prideLayer, 0, 0)
+  const capaOrgullo = await Jimp.read(renderizarSvg(construirSuperposicionOrgullo(ancho, alto)))
+  img.composite(capaOrgullo, 0, 0)
 
-  const { lines, fontSize, strokeW, lineHeight } = await fitFont(text, width)
-  const textSvg = await buildTextOverlay(width, height, lines, fontSize, strokeW, lineHeight)
-  const textLayer = await Jimp.read(renderSvg(textSvg))
-  img.composite(textLayer, 0, 0)
+  const { lineas, tamanoFuente, anchoTrazo, altoLinea } = await ajustarFuente(text, ancho)
+  const svgTexto = await construirSuperposicionTexto(ancho, alto, lineas, tamanoFuente, anchoTrazo, altoLinea)
+  const capaTexto = await Jimp.read(renderizarSvg(svgTexto))
+  img.composite(capaTexto, 0, 0)
 
   return img.getBuffer('image/jpeg', { quality: 92 })
 }
 
-async function applyGayFilterSharp(photoBuffer, rawText) {
-  const text = normalizeInput(rawText) || DEFAULT_TEXT
-  await prefetchEmojis(text)
+async function aplicarFiltroGaySharp(buferFoto, textoCrudo) {
+  const text = normalizarEntrada(textoCrudo) || TEXTO_DEFAULT
+  await precargarEmojis(text)
 
-  const meta = await sharpMetadata(photoBuffer)
-  let width = meta.width || 1080
-  let height = meta.height || 1080
+  const metadatos = await sharpMetadata(buferFoto)
+  let ancho = metadatos.width || 1080
+  let alto = metadatos.height || 1080
 
-  const maxSide = 1600
-  if (width > maxSide || height > maxSide) {
-    const scale = Math.min(maxSide / width, maxSide / height)
-    width = Math.round(width * scale)
-    height = Math.round(height * scale)
+  const ladoMax = 1600
+  if (ancho > ladoMax || alto > ladoMax) {
+    const escala = Math.min(ladoMax / ancho, ladoMax / alto)
+    ancho = Math.round(ancho * escala)
+    alto = Math.round(alto * escala)
   }
 
-  const resized = await sharpResizePng(photoBuffer, width, height)
+  const redimensionado = await sharpResizePng(buferFoto, ancho, alto)
 
-  const info = await sharp(resized).metadata()
-  width = info.width
-  height = info.height
+  const informacion = await sharp(redimensionado).metadata()
+  ancho = informacion.width
+  alto = informacion.height
 
-  const pride = buildPrideOverlay(width, height)
-  const { lines, fontSize, strokeW, lineHeight } = await fitFont(text, width)
-  const textSvg = await buildTextOverlay(width, height, lines, fontSize, strokeW, lineHeight)
+  const orgullo = construirSuperposicionOrgullo(ancho, alto)
+  const { lineas, tamanoFuente, anchoTrazo, altoLinea } = await ajustarFuente(text, ancho)
+  const svgTexto = await construirSuperposicionTexto(ancho, alto, lineas, tamanoFuente, anchoTrazo, altoLinea)
 
-  return sharp(resized)
+  return sharp(redimensionado)
     .composite([
-      { input: pride, top: 0, left: 0 },
-      { input: textSvg, top: 0, left: 0 }
+      { input: orgullo, top: 0, left: 0 },
+      { input: svgTexto, top: 0, left: 0 }
     ])
     .jpeg({ quality: 92 })
     .toBuffer()
 }
 
-export async function applyGayFilter(photoBuffer, rawText) {
+export async function aplicarFiltroGay(buferFoto, textoCrudo) {
   try {
-    return await applyGayFilterRaster(photoBuffer, rawText)
+    return await aplicarFiltroGayRaster(buferFoto, textoCrudo)
   } catch (e) {
     console.warn('[imgay] jimp+resvg falló, probando sharp:', e?.message || e)
-    return applyGayFilterSharp(photoBuffer, rawText)
+    return aplicarFiltroGaySharp(buferFoto, textoCrudo)
   }
 }
 
-function resolveText(m, text, usedPrefix, command) {
-  const captionText = text || m.msg?.caption || ''
-  return normalizeInput(
-    String(captionText).replace(new RegExp(`^\\s*${usedPrefix}?${command}\\s*`, 'i'), '')
+function resolverTexto(m, text, usedPrefix, command) {
+  const textoLeyenda = text || m.msg?.caption || ''
+  return normalizarEntrada(
+    String(textoLeyenda).replace(new RegExp(`^\\s*${usedPrefix}?${command}\\s*`, 'i'), '')
   )
 }
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
-    const target = resolveMediaTarget(m)
-    const msgText = resolveText(m, text, usedPrefix, command)
+    const objetivo = resolverObjetivoMedio(m)
+    const textoMsg = resolverTexto(m, text, usedPrefix, command)
 
-    if (!target) {
+    if (!objetivo) {
       return conn.reply(
         m.chat,
         `*[❗] Responde a una foto (o envíala con el comando) y escribe el texto.*\n\n` +
           `Ejemplos:\n` +
           `> ${usedPrefix + command} Lo suponia\n` +
           `> ${usedPrefix + command} ya sabía 🏳️‍🌈\n` +
-          `> Sin texto usa: *${DEFAULT_TEXT}*\n\n` +
+          `> Sin texto usa: *${TEXTO_DEFAULT}*\n\n` +
           `> Sticker: *${usedPrefix}sgay*`,
         m,
         global.rcanal
       )
     }
 
-    const finalText = msgText || DEFAULT_TEXT
-    if (finalText.length > MAX_TEXT) {
+    const textoFinal = textoMsg || TEXTO_DEFAULT
+    if (textoFinal.length > MAX_TEXTO) {
       return conn.reply(
         m.chat,
-        `*[❗] Texto muy largo.* Máximo ${MAX_TEXT} caracteres.`,
+        `*[❗] Texto muy largo.* Máximo ${MAX_TEXTO} caracteres.`,
         m,
         global.rcanal
       )
     }
 
-    const mime = (target.msg || target).mimetype || target.mediaType || ''
-    const media = await target.download()
-    const photo = await loadImageBuffer(media, mime)
+    const mime = (objetivo.msg || objetivo).mimetype || objetivo.mediaType || ''
+    const medio = await objetivo.download()
+    const foto = await cargarBuferImagen(medio, mime)
 
     await conn.sendMessage(m.chat, { react: { text: '', key: m.key } }).catch(() => {})
 
-    const out = await applyGayFilter(photo, finalText)
-    await conn.sendFile(m.chat, out, 'imgay.jpg', '', m, null, global.rcanal)
+    const resultado = await aplicarFiltroGay(foto, textoFinal)
+    await conn.sendFile(m.chat, resultado, 'imgay.jpg', '', m, null, global.rcanal)
   } catch (e) {
     console.error('[imgay]', e)
     return conn.reply(
@@ -540,13 +540,6 @@ handler.help = ['#imgay + {foto + texto} → filtro + texto (imagen)']
 handler.tags = ['tools', 'img', 'fun']
 handler.command = ['imgay', 'gayfilter', 'pridefilter']
 
-export {
-  resolveMediaTarget,
-  loadImageBuffer,
-  resolveText,
-  normalizeInput,
-  DEFAULT_TEXT,
-  MAX_TEXT
-}
-
 export default handler
+
+export { aplicarFiltroGayRaster as applyGayFilterRaster, aplicarFiltroGay as applyGayFilter, resolverObjetivoMedio as resolveMediaTarget, cargarBuferImagen as loadImageBuffer, resolverTexto as resolveText, normalizarEntrada as normalizeInput, TEXTO_DEFAULT as DEFAULT_TEXT, MAX_TEXTO as MAX_TEXT }

@@ -12,9 +12,9 @@ import {
   formatBalance,
 } from '../lib/michi-users.js'
 
-function clearPendingInvite(chat, invite) {
+function clearPendingInvite(idChat, invite) {
   if (invite?.timeout) clearTimeout(invite.timeout)
-  if (global.pendingInvites?.[chat]) delete global.pendingInvites[chat]
+  if (global.pendingInvites?.[idChat]) delete global.pendingInvites[idChat]
 }
 
 const BOMBA_MAX_BET = 10_000_000
@@ -23,10 +23,10 @@ function parseBet(args, text = '') {
   const candidates = []
 
   for (const a of args || []) {
-    const raw = String(a).trim()
-    if (!raw || raw.startsWith('@')) continue
-    if (!/^\d+$/.test(raw)) continue
-    candidates.push(parseInt(raw, 10))
+    const crudo = String(a).trim()
+    if (!crudo || crudo.startsWith('@')) continue
+    if (!/^\d+$/.test(crudo)) continue
+    candidates.push(parseInt(crudo, 10))
   }
 
   if (!candidates.length && text) {
@@ -141,7 +141,7 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, text })
       }
     }, 20000)
 
-    const caption = `@${opponent.split('@')[0]} responde en *20 segundos*\n\nApuesta: *${bet}* ${global.moneda} c/u\nPremio: *${pot}* ${global.moneda}\n\n> *si* — Aceptar\n> *no* — Rechazar`
+    const leyenda = `@${opponent.split('@')[0]} responde en *20 segundos*\n\nApuesta: *${bet}* ${global.moneda} c/u\nPremio: *${pot}* ${global.moneda}\n\n> *si* — Aceptar\n> *no* — Rechazar`
 
     return sendBombaInvite(conn, m.chat, {
       challenger,
@@ -149,11 +149,11 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, text })
       bet,
       participants: groupParts,
       quoted: m,
-      caption,
+      caption: leyenda,
       mentionedJid: [challenger, opponent],
     })
-  } catch (e) {
-    console.error('Error invitacion bomba:', e)
+  } catch (error) {
+    console.error('Error invitacion bomba:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Error al enviar la invitacion.',
       contextInfo: { ...rcanal.contextInfo },

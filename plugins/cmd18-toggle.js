@@ -14,11 +14,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
       }, { quoted: m })
     }
 
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
 
     if (!global.db.data.cmd18) global.db.data.cmd18 = {}
 
-    if (action === 'on') {
+    if (accion === 'on') {
       global.db.data.cmd18[m.chat] = true
       await global.db.write()
 
@@ -31,7 +31,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
       }, { quoted: m })
     }
 
-    if (action === 'off') {
+    if (accion === 'off') {
       global.db.data.cmd18[m.chat] = false
       await global.db.write()
 

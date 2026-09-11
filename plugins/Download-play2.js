@@ -14,8 +14,8 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
   try {
     
-    const search = await yts(text)
-    if (!search || !search.videos || search.videos.length === 0) {
+    const busqueda = await yts(text)
+    if (!busqueda || !busqueda.videos || busqueda.videos.length === 0) {
       return conn.sendMessage(m.chat, {
         text: `[❗] No se encontró resultados para: ${text}`,
         contextInfo: {
@@ -24,14 +24,14 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const video = search.videos[0]
+    const video = busqueda.videos[0]
 
     
    
-    const downloadApi = `https://api.delirius.online/download/ytmp3?url=${encodeURIComponent(video.url)}`
-    const dres = await fetch(downloadApi).then(r => r.json())
+    const apiDescarga = `https://api.delirius.online/download/ytmp3?url=${encodeURIComponent(video.url)}`
+    const resDescarga = await fetch(apiDescarga).then(r => r.json())
 
-    if (!dres?.status || !dres.data) {
+    if (!resDescarga?.status || !resDescarga.data) {
       return conn.sendMessage(m.chat, {
         text: `[❌] No se pudo descargar el audio.`,
         contextInfo: {
@@ -41,31 +41,31 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
   
-    const meta = {
-      title: dres.data.title || video.title,
+    const metadatos = {
+      title: resDescarga.data.title || video.title,
       author: { name: (video.author && video.author.name) || video.author || "Desconocido" },
       timestamp: video.timestamp,
-      thumbnail: dres.data.image || video.image || video.thumbnail,
+      thumbnail: resDescarga.data.image || video.image || video.thumbnail,
       url: video.url
     }
-    const down = {
-      url: typeof dres.data.download === "string" ? dres.data.download : dres.data.download?.url,
-      filename: `${meta.title}.mp3`
+    const descarga = {
+      url: typeof resDescarga.data.download === "string" ? resDescarga.data.download : resDescarga.data.download?.url,
+      filename: `${metadatos.title}.mp3`
     }
 
     
     await conn.sendMessage(m.chat, {
-      audio: { url: down.url },
+      audio: { url: descarga.url },
       mimetype: "audio/mpeg",
       ptt: false,
       contextInfo: {
         externalAdReply: {
-          title: `ִֶָ☾. 𝐓𝐢𝐭𝐮𝐥𝐨: ${meta.title}`,
-          body: `ִֶָ☾. 𝐀𝐮𝐭𝐨𝐫: ${meta.author.name} | 𝐃𝐮𝐫𝐚𝐜𝐢𝐨́𝐧: ${meta.timestamp}`,
-          thumbnailUrl: meta.thumbnail,
+          title: `ִֶָ☾. 𝐓𝐢𝐭𝐮𝐥𝐨: ${metadatos.title}`,
+          body: `ִֶָ☾. 𝐀𝐮𝐭𝐨𝐫: ${metadatos.author.name} | 𝐃𝐮𝐫𝐚𝐜𝐢𝐨́𝐧: ${metadatos.timestamp}`,
+          thumbnailUrl: metadatos.thumbnail,
           mediaType: 4,
           renderLargerThumbnail: false,
-          sourceUrl: meta.url
+          sourceUrl: metadatos.url
         }
       }
     }, { quoted: m })

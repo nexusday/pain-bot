@@ -1,15 +1,15 @@
 import moment from 'moment-timezone'
 
 let handler = async (m, { conn }) => {
-  let users = Object.entries(global.db.data.users)
+  let usuarios = Object.entries(global.db.data.users)
     .filter(([_, u]) => u.birth)
 
-  if (!users.length) return conn.reply(m.chat, '《✧》No hay usuarios con cumpleaños registrados en este momento.', m, rcanal)
+  if (!usuarios.length) return conn.reply(m.chat, '《✧》No hay usuarios con cumpleaños registrados en este momento.', m, rcanal)
 
   let now = moment.tz('America/Lima')
   let lista = []
 
-  for (let [jid, data] of users) {
+  for (let [jid, data] of usuarios) {
     let fecha = data.birth
     let [d, m, y] = fecha.split(/[\/\-]/).map(n => parseInt(n))
     if (!y) y = now.year()
@@ -36,7 +36,7 @@ let handler = async (m, { conn }) => {
   let texto = `「✿」Cumpleaños en *${await conn.getName(m.chat)}*:\n\n` + lista.map(v => v.texto).join('\n\n')
 
   conn.reply(m.chat, texto, m, rcanal, {
-    mentions: users.map(([jid]) => jid)
+    mentions: usuarios.map(([jid]) => jid)
   })
 }
 

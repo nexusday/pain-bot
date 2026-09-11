@@ -7,18 +7,18 @@ import { addExif } from '../lib/sticker.js'
  */
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
-    const q = m.quoted ? m.quoted : null
-    const mime = ((q?.msg || q)?.mimetype || q?.mediaType || '').toLowerCase()
-    const isSticker =
-      !!q &&
+    const citado = m.quoted ? m.quoted : null
+    const tipoMime = ((citado?.msg || citado)?.mimetype || citado?.mediaType || '').toLowerCase()
+    const esSticker =
+      !!citado &&
       (
-        /webp/.test(mime) ||
-        q.mtype === 'stickerMessage' ||
-        !!q.isAnimated ||
-        typeof q.isAnimated !== 'undefined'
+        /webp/.test(tipoMime) ||
+        citado.mtype === 'stickerMessage' ||
+        !!citado.isAnimated ||
+        typeof citado.isAnimated !== 'undefined'
       )
 
-    if (!q || !isSticker || typeof q.download !== 'function') {
+    if (!citado || !esSticker || typeof citado.download !== 'function') {
       return conn.reply(
         m.chat,
         `*[❗] Responde a un *sticker* (normal o animado) con el comando.*\n\n` +
@@ -31,8 +31,8 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       )
     }
 
-    const raw = String(text || '').trim()
-    if (!raw) {
+    const crudo = String(text || '').trim()
+    if (!crudo) {
       return conn.reply(
         m.chat,
         `*[❗] Escribe el nombre del pack y, opcional, el autor.*\n\n` +
@@ -43,19 +43,19 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       )
     }
 
-    let packname = ''
-    let author = ''
+    let nombrePack = ''
+    let autor = ''
 
-    if (raw.includes('|')) {
-      const parts = raw.split('|')
-      packname = (parts[0] || '').trim()
-      author = parts.slice(1).join('|').trim()
+    if (crudo.includes('|')) {
+      const partes = crudo.split('|')
+      nombrePack = (partes[0] || '').trim()
+      autor = partes.slice(1).join('|').trim()
     } else {
-      packname = raw
-      author = ''
+      nombrePack = crudo
+      autor = ''
     }
 
-    if (!packname) {
+    if (!nombrePack) {
       return conn.reply(
         m.chat,
         `*[❗] Debes indicar al menos el *nombre* del pack.*\n\n` +
@@ -65,36 +65,36 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       )
     }
 
-    const pushname =
+    const nombrePush =
       m.pushName ||
       m.name ||
       conn.getName?.(m.sender) ||
       'Usuario'
 
-    if (!author) author = String(pushname).trim() || 'Usuario'
+    if (!autor) autor = String(nombrePush).trim() || 'Usuario'
 
-    const buffer = await q.download()
-    if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 10) {
+    const bufer = await citado.download()
+    if (!bufer || !Buffer.isBuffer(bufer) || bufer.length < 10) {
       return conn.reply(m.chat, '[❌] No se pudo descargar el sticker.', m, global.rcanal)
     }
 
    
-    const finalSticker = await addExif(buffer, packname, author)
+    const stickerFinal = await addExif(bufer, nombrePack, autor)
 
     await conn.sendFile(
       m.chat,
-      finalSticker,
+      stickerFinal,
       'sticker.webp',
       '',
       m,
       null,
       global.rcanal
     )
-  } catch (e) {
-    console.error('[delmeta]', e)
+  } catch (error) {
+    console.error('[delmeta]', error)
     return conn.reply(
       m.chat,
-      `*[❌] Error al cambiar la metadata del sticker.*\n> ${e?.message || e}`,
+      `*[❌] Error al cambiar la metadata del sticker.*\n> ${error?.message || error}`,
       m,
       global.rcanal
     )

@@ -14,7 +14,7 @@ import { fileURLToPath } from 'url'
 //   ['wa.me/@Sunkovv', 'Sunkovv', true]
 //   ['@Sunkovv', 'Sunkovv', true]
 global.owner = [
-  ['wa.me/@Sunkovv', 'Sunkovv', true],
+  ['wa.me/@Sunkovv', 'Sunkovv', true]
 ]
 
 //  ACA PON EL LID DEL OWNER DEL BOT PARA QUE TE HAGA CASO COMO OWNER EL BOT, USA EL COMANDO /ID EN TU 
@@ -27,8 +27,8 @@ global.sessions = 'Sessions'
 global.bot = 'Serbot' 
 global.AFBots = true
 
-global.packname = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧'
-global.namebot = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧'
+global.packname = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧 𝗠𝗗'
+global.namebot = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧 𝗠𝗗'
 global.author = 'Sunkovv'
 global.moneda = 'USD'
 

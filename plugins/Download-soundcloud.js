@@ -1,135 +1,135 @@
 import fetch from 'node-fetch'
 
 const API_BASE = () => (global.APIs?.delirius?.url || 'https://api.delirius.online').replace(/\/$/, '')
-const RESULTS_LIMIT = 8
+const LIMITE_RESULTADOS = 8
 
-function trimText(text = '', max = 100) {
-  const value = String(text).replace(/\s+/g, ' ').trim()
-  if (!value || value === '-') return ''
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+function recortarTexto(text = '', max = 100) {
+  const valor = String(text).replace(/\s+/g, ' ').trim()
+  if (!valor || valor === '-') return ''
+  return valor.length > max ? `${valor.slice(0, max - 1)}…` : valor
 }
 
-function formatDuration(ms) {
+function formatearDuracion(ms) {
   if (!ms || ms <= 0) return '--:--'
-  const sec = Math.floor(Number(ms) / 1000)
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
+  const seg = Math.floor(Number(ms) / 1000)
+  const m = Math.floor(seg / 60)
+  const s = seg % 60
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function cleanFileName(title = 'audio') {
-  return String(title)
+function limpiarNombreArchivo(titulo = 'audio') {
+  return String(titulo)
     .replace(/[<>:"/\\|?*]/g, '')
     .replace(/\s+/g, '_')
     .slice(0, 80) || 'soundcloud'
 }
 
-function artistOf(item = {}) {
+function artistaDe(elemento = {}) {
   return (
-    trimText(item.artist, 50) ||
-    trimText(item.author, 50) ||
-    trimText(item.label_name, 40) ||
+    recortarTexto(elemento.artist, 50) ||
+    recortarTexto(elemento.author, 50) ||
+    recortarTexto(elemento.label_name, 40) ||
     'SoundCloud'
   )
 }
 
-function trackLink(item = {}) {
-  return item.link || item.url || item.permalink_url || ''
+function enlacePista(elemento = {}) {
+  return elemento.link || elemento.url || elemento.permalink_url || ''
 }
 
 
-function buildQueryVariants(query) {
-  const q = String(query || '').replace(/\s+/g, ' ').trim()
+function construirVariantesConsulta(consulta) {
+  const q = String(consulta || '').replace(/\s+/g, ' ').trim()
   if (!q) return []
-  const words = q.split(' ')
-  const variants = [q]
+  const palabras = q.split(' ')
+  const variantes = [q]
 
-  for (let i = words.length - 1; i >= 2; i--) {
-    variants.push(words.slice(0, i).join(' '))
+  for (let i = palabras.length - 1; i >= 2; i--) {
+    variantes.push(palabras.slice(0, i).join(' '))
   }
-  if (words.length >= 2) variants.push(words.slice(-2).join(' '))
-  if (words.length >= 3) variants.push(words.slice(0, 3).join(' '))
-  if (words.length >= 1) variants.push(words[words.length - 1])
+  if (palabras.length >= 2) variantes.push(palabras.slice(-2).join(' '))
+  if (palabras.length >= 3) variantes.push(palabras.slice(0, 3).join(' '))
+  if (palabras.length >= 1) variantes.push(palabras[palabras.length - 1])
 
-  return [...new Set(variants.filter(Boolean))]
+  return [...new Set(variantes.filter(Boolean))]
 }
 
-async function apiJson(pathWithQuery) {
-  const url = `${API_BASE()}${pathWithQuery}`
-  const res = await fetch(url, {
+async function apiJson(rutaConConsulta) {
+  const url = `${API_BASE()}${rutaConConsulta}`
+  const respuesta = await fetch(url, {
     headers: {
       Accept: 'application/json',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) PainBot/1.0'
     }
   })
-  const raw = await res.text()
-  let json
+  const crudo = await respuesta.text()
+  let jsonDatos
   try {
-    json = JSON.parse(raw)
+    jsonDatos = JSON.parse(crudo)
   } catch {
-    throw `[❗] La API de SoundCloud no devolvió JSON válido (${res.status}).\n> ${url}`
+    throw `[❗] La API de SoundCloud no devolvió JSON válido (${respuesta.status}).\n> ${url}`
   }
-  if (!res.ok) {
-    throw `[❗] Error API SoundCloud (${res.status}).`
+  if (!respuesta.ok) {
+    throw `[❗] Error API SoundCloud (${respuesta.status}).`
   }
-  return json
+  return jsonDatos
 }
 
-async function searchOnce(query) {
-  const sres = await apiJson(`/search/soundcloud?q=${encodeURIComponent(query)}`)
-  const list = Array.isArray(sres?.data) ? sres.data : []
-  return list
-    .map(item => ({ ...item, link: trackLink(item) }))
+async function buscarUnaVez(consulta) {
+  const resBusqueda = await apiJson(`/search/soundcloud?q=${encodeURIComponent(consulta)}`)
+  const lista = Array.isArray(resBusqueda?.data) ? resBusqueda.data : []
+  return lista
+    .map(elemento => ({ ...elemento, link: enlacePista(elemento) }))
     .filter(t => t.link)
 }
 
-async function searchTracks(query, limit = RESULTS_LIMIT) {
-  const variants = buildQueryVariants(query)
-  let lastCount = 0
+async function buscarPistas(consulta, limite = LIMITE_RESULTADOS) {
+  const variantes = construirVariantesConsulta(consulta)
+  let ultimoConteo = 0
 
-  for (const q of variants) {
-    const list = await searchOnce(q)
-    lastCount = list.length
-    if (list.length) {
-      console.log(`[sc] search ok q="${q}" (orig="${query}") n=${list.length}`)
-      return list.slice(0, limit)
+  for (const q of variantes) {
+    const lista = await buscarUnaVez(q)
+    ultimoConteo = lista.length
+    if (lista.length) {
+      console.log(`[sc] search ok q="${q}" (orig="${consulta}") n=${lista.length}`)
+      return lista.slice(0, limite)
     }
   }
 
   throw (
     `[❗] No se encontraron resultados en SoundCloud.\n` +
-    `> Búsqueda: *${query}*\n` +
+    `> Búsqueda: *${consulta}*\n` +
     `> Prueba con menos palabras o corrige el nombre.\n` +
     `> Ej: *como me encanta* / *kevin kaarl*`
   )
 }
 
-async function downloadTrack(scUrl) {
-  const dres = await apiJson(`/download/soundcloud?url=${encodeURIComponent(scUrl)}`)
-  if (!dres?.status || !dres.data) {
+async function descargarPista(scUrl) {
+  const resDescarga = await apiJson(`/download/soundcloud?url=${encodeURIComponent(scUrl)}`)
+  if (!resDescarga?.status || !resDescarga.data) {
     throw '[❗] No se pudo descargar el audio de SoundCloud.'
   }
-  if (!dres.data.download) throw '[❗] No se encontró el enlace MP3.'
-  return dres.data
+  if (!resDescarga.data.download) throw '[❗] No se encontró el enlace MP3.'
+  return resDescarga.data
 }
 
-async function fetchBuffer(url) {
-  const res = await fetch(url, {
+async function obtenerBufer(url) {
+  const respuesta = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) PainBot/1.0' }
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return Buffer.from(await res.arrayBuffer())
+  if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`)
+  return Buffer.from(await respuesta.arrayBuffer())
 }
 
-function rememberSearch(sender, query, results) {
+function recordarBusqueda(sender, consulta, resultados) {
   if (!global.lastScSearch) global.lastScSearch = {}
   global.lastScSearch[sender] = {
-    query,
-    results: results.map(r => ({
+    query: consulta,
+    results: resultados.map(r => ({
       title: r.title,
       link: r.link,
       image: r.image,
-      artist: artistOf(r),
+      artist: artistaDe(r),
       duration: r.duration,
       play: r.play
     })),
@@ -152,81 +152,81 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const input = text.trim()
-    let scLink = null
-    let preview = null
+    const entrada = text.trim()
+    let enlaceSc = null
+    let vistaPrevia = null
 
-    const isUrl = /soundcloud\.com/i.test(input)
+    const esUrl = /soundcloud\.com/i.test(entrada)
 
-    if (isUrl) {
-      scLink = input.split(/\s+/)[0]
-    } else if (/^\d+$/.test(input)) {
-      const idx = parseInt(input, 10) - 1
-      const cache = global.lastScSearch?.[m.sender]
-      if (!cache?.results?.length || Date.now() - cache.at > 10 * 60 * 1000) {
+    if (esUrl) {
+      enlaceSc = entrada.split(/\s+/)[0]
+    } else if (/^\d+$/.test(entrada)) {
+      const indice = parseInt(entrada, 10) - 1
+      const cacheBusqueda = global.lastScSearch?.[m.sender]
+      if (!cacheBusqueda?.results?.length || Date.now() - cacheBusqueda.at > 10 * 60 * 1000) {
         throw `[❗] No hay búsqueda reciente. Usa primero *${usedPrefix}scsearch <texto>* o *${usedPrefix}sc <búsqueda>*.`
       }
-      if (idx < 0 || idx >= cache.results.length) {
-        throw `[❗] Elige un número del 1 al ${cache.results.length}.`
+      if (indice < 0 || indice >= cacheBusqueda.results.length) {
+        throw `[❗] Elige un número del 1 al ${cacheBusqueda.results.length}.`
       }
-      scLink = cache.results[idx].link
-      preview = cache.results[idx]
+      enlaceSc = cacheBusqueda.results[indice].link
+      vistaPrevia = cacheBusqueda.results[indice]
     } else {
       await conn.sendMessage(m.chat, { react: { text: '', key: m.key } }).catch(() => {})
-      const results = await searchTracks(input)
-      rememberSearch(m.sender, input, results)
-      const first = results[0]
-      scLink = first.link
-      preview = first
+      const resultados = await buscarPistas(entrada)
+      recordarBusqueda(m.sender, entrada, resultados)
+      const primero = resultados[0]
+      enlaceSc = primero.link
+      vistaPrevia = primero
     }
 
     await conn.sendMessage(m.chat, { react: { text: '', key: m.key } }).catch(() => {})
     await conn.sendPresenceUpdate('composing', m.chat).catch(() => {})
 
-    const data = await downloadTrack(scLink)
-    const title = data.title || preview?.title || 'SoundCloud'
-    const author = trimText(data.author, 50) || artistOf(preview || {}) || 'SoundCloud'
-    const cover = data.image || preview?.image
-    const duration = formatDuration(data.duration)
-    const isPreview = Number(data.duration) > 0 && Number(data.duration) <= 35000
+    const datos = await descargarPista(enlaceSc)
+    const titulo = datos.title || vistaPrevia?.title || 'SoundCloud'
+    const autor = recortarTexto(datos.author, 50) || artistaDe(vistaPrevia || {}) || 'SoundCloud'
+    const portada = datos.image || vistaPrevia?.image
+    const duracion = formatearDuracion(datos.duration)
+    const esVistaPrevia = Number(datos.duration) > 0 && Number(datos.duration) <= 35000
 
-    const info =
+    const informacion =
       `ִֶָ☾. 𝗦𝗼𝘂𝗻𝗱𝗖𝗹𝗼𝘂𝗱 ִֶָ☾.\n` +
-      ` 𓍯  *Título:* ${trimText(title, 90)}\n` +
-      ` 𓍯  *Autor:* ${author}\n` +
-      ` 𓍯  *Duración:* ${duration}${isPreview ? ' _(preview)_' : ''}\n` +
-      ` 𓍯  *Reproducciones:* ${data.playbacks ?? preview?.play ?? '—'}\n` +
-      ` 𓍯  *Enlace:* ${data.link || scLink}`
+      ` 𓍯  *Título:* ${recortarTexto(titulo, 90)}\n` +
+      ` 𓍯  *Autor:* ${autor}\n` +
+      ` 𓍯  *Duración:* ${duracion}${esVistaPrevia ? ' _(preview)_' : ''}\n` +
+      ` 𓍯  *Reproducciones:* ${datos.playbacks ?? vistaPrevia?.play ?? '—'}\n` +
+      ` 𓍯  *Enlace:* ${datos.link || enlaceSc}`
 
-    if (cover) {
+    if (portada) {
       try {
-        const thumb = await fetchBuffer(cover)
+        const miniatura = await obtenerBufer(portada)
         await conn.sendMessage(
           m.chat,
-          { image: thumb, caption: info, contextInfo: { ...rcanal?.contextInfo } },
+          { image: miniatura, caption: informacion, contextInfo: { ...rcanal?.contextInfo } },
           { quoted: m }
         )
       } catch {
         await conn.sendMessage(
           m.chat,
-          { text: info, contextInfo: { ...rcanal?.contextInfo } },
+          { text: informacion, contextInfo: { ...rcanal?.contextInfo } },
           { quoted: m }
         )
       }
     } else {
       await conn.sendMessage(
         m.chat,
-        { text: info, contextInfo: { ...rcanal?.contextInfo } },
+        { text: informacion, contextInfo: { ...rcanal?.contextInfo } },
         { quoted: m }
       )
     }
 
-    const audio = await fetchBuffer(data.download)
+    const audio = await obtenerBufer(datos.download)
     await conn.sendMessage(
       m.chat,
       {
         audio,
-        fileName: `${cleanFileName(title)}.mp3`,
+        fileName: `${limpiarNombreArchivo(titulo)}.mp3`,
         mimetype: 'audio/mpeg'
       },
       { quoted: m }

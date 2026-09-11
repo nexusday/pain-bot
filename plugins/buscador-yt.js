@@ -1,14 +1,14 @@
 import fetch from 'node-fetch'
 
-const RESULTS_LIMIT = 5
+const LIMITE_RESULTADOS = 5
 
-function trimText(text = '', max = 100) {
-  const value = String(text).replace(/\s+/g, ' ').trim()
-  if (!value || value === '-') return ''
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+function recortarTexto(text = '', max = 100) {
+  const valor = String(text).replace(/\s+/g, ' ').trim()
+  if (!valor || valor === '-') return ''
+  return valor.length > max ? `${valor.slice(0, max - 1)}…` : valor
 }
 
-function formatViews(n) {
+function formatearVistas(n) {
   const v = Number(n) || 0
   if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
@@ -25,37 +25,37 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const query = text.trim()
-    const searchUrl = `https://api.delirius.online/search/ytsearch?q=${encodeURIComponent(query)}`
-    const sres = await fetch(searchUrl).then(r => r.json())
+    const consulta = text.trim()
+    const urlBusqueda = `https://api.delirius.online/search/ytsearch?q=${encodeURIComponent(consulta)}`
+    const resBusqueda = await fetch(urlBusqueda).then(r => r.json())
 
-    if (!sres?.status || !Array.isArray(sres.data) || !sres.data.length) {
+    if (!resBusqueda?.status || !Array.isArray(resBusqueda.data) || !resBusqueda.data.length) {
       throw '[❗] No se encontraron resultados para tu búsqueda.'
     }
 
-    const results = sres.data.slice(0, RESULTS_LIMIT)
+    const resultados = resBusqueda.data.slice(0, LIMITE_RESULTADOS)
 
-    let list = `ִֶָ☾. 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 ִֶָ☾.\n\n> *Búsqueda:* ${query}\n> *Encontrados:* ${results.length}\n\n`
-    results.forEach((item, i) => {
-      const channel = trimText(item.author?.name, 40) || 'YouTube'
-      list += `*${i + 1}.* ${trimText(item.title, 70)}\n`
-      list += ` 𓍯  *Canal:* ${channel}\n`
-      list += ` 𓍯  *Duración:* ${item.duration || '—'}\n`
-      list += ` 𓍯  *Vistas:* ${formatViews(item.views)}\n`
-      list += ` 𓍯  *Publicado:* ${item.publishedAt || '—'}\n`
-      list += ` 𓍯  *Enlace:* ${item.url}\n\n`
+    let lista = `ִֶָ☾. 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 ִֶָ☾.\n\n> *Búsqueda:* ${consulta}\n> *Encontrados:* ${resultados.length}\n\n`
+    resultados.forEach((elemento, i) => {
+      const canal = recortarTexto(elemento.author?.name, 40) || 'YouTube'
+      lista += `*${i + 1}.* ${recortarTexto(elemento.title, 70)}\n`
+      lista += ` 𓍯  *Canal:* ${canal}\n`
+      lista += ` 𓍯  *Duración:* ${elemento.duration || '—'}\n`
+      lista += ` 𓍯  *Vistas:* ${formatearVistas(elemento.views)}\n`
+      lista += ` 𓍯  *Publicado:* ${elemento.publishedAt || '—'}\n`
+      lista += ` 𓍯  *Enlace:* ${elemento.url}\n\n`
     })
-    list += `> Descargar video:\n> ${usedPrefix}video <número>\n> ${usedPrefix}video <enlace>\n> ${usedPrefix}play <número>`
+    lista += `> Descargar video:\n> ${usedPrefix}video <número>\n> ${usedPrefix}video <enlace>\n> ${usedPrefix}play <número>`
 
     await conn.sendMessage(m.chat, {
-      text: list.trim(),
+      text: lista.trim(),
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
 
     if (!global.lastYtSearch) global.lastYtSearch = {}
     global.lastYtSearch[m.sender] = {
-      query,
-      results: results.map(r => ({
+      query: consulta,
+      results: resultados.map(r => ({
         title: r.title,
         url: r.url || `https://youtu.be/${r.videoId}`,
         image: r.image || r.thumbnail,
@@ -66,24 +66,24 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       at: Date.now()
     }
 
-    for (let i = 0; i < results.length; i++) {
-      const item = results[i]
-      const channel = trimText(item.author?.name, 40) || 'YouTube'
-      const caption = `*${i + 1}.* ${trimText(item.title, 90)}
- 𓍯  *Canal:* ${channel}
- 𓍯  *Duración:* ${item.duration || '—'}
- 𓍯  *Vistas:* ${formatViews(item.views)}
- 𓍯  *Enlace:* ${item.url}
+    for (let i = 0; i < resultados.length; i++) {
+      const elemento = resultados[i]
+      const canal = recortarTexto(elemento.author?.name, 40) || 'YouTube'
+      const leyenda = `*${i + 1}.* ${recortarTexto(elemento.title, 90)}
+ 𓍯  *Canal:* ${canal}
+ 𓍯  *Duración:* ${elemento.duration || '—'}
+ 𓍯  *Vistas:* ${formatearVistas(elemento.views)}
+ 𓍯  *Enlace:* ${elemento.url}
 
 > ${usedPrefix}video ${i + 1}`
 
-      const thumb = item.image || item.thumbnail
-      if (thumb) {
+      const miniatura = elemento.image || elemento.thumbnail
+      if (miniatura) {
         try {
-          const image = (await conn.getFile(thumb)).data
+          const imagen = (await conn.getFile(miniatura)).data
           await conn.sendMessage(m.chat, {
-            image,
-            caption,
+            image: imagen,
+            caption: leyenda,
             contextInfo: { ...rcanal?.contextInfo }
           }, { quoted: m })
           continue
@@ -91,7 +91,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }
 
       await conn.sendMessage(m.chat, {
-        text: caption,
+        text: leyenda,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
     }

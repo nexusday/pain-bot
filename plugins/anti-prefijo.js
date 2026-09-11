@@ -3,17 +3,17 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     if (!m.isGroup) return conn.sendMessage(m.chat, { text: '[❗] Este comando solo funciona en grupos.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
     if (!isAdmin) return conn.sendMessage(m.chat, { text: '[❗] Solo administradores pueden configurar antiprefijo.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
 
-    const action = (args[0] || '').toLowerCase()
+    const accion = (args[0] || '').toLowerCase()
     if (!global.db.data.antiprefijo) global.db.data.antiprefijo = {}
 
-    if (action === 'on') {
+    if (accion === 'on') {
       global.db.data.antiprefijo[m.chat] = true
-      let txt = `ִֶָ☾. *Anti-prefijo activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
-      return conn.sendMessage(m.chat, { text: txt, contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] } }, { quoted: m })
-    } else if (action === 'off') {
+      let texto = `ִֶָ☾. *Anti-prefijo activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      return conn.sendMessage(m.chat, { text: texto, contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] } }, { quoted: m })
+    } else if (accion === 'off') {
       global.db.data.antiprefijo[m.chat] = false
-      let txt = `ִֶָ☾. *Anti-prefijo desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
-      return conn.sendMessage(m.chat, { text: txt, contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] } }, { quoted: m })
+      let texto = `ִֶָ☾. *Anti-prefijo desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      return conn.sendMessage(m.chat, { text: texto, contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] } }, { quoted: m })
     } else {
       return conn.sendMessage(m.chat, { text: `[❗] Debes poner una acción.\n\n> *Ejemplo:* ${usedPrefix}antiprefijo on\n> *Ejemplo:* ${usedPrefix}antiprefijo off`, contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
     }

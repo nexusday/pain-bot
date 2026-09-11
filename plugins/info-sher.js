@@ -38,8 +38,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         if (tipo === 'github') {
           
           try {
-            const apiUrl = `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=5`
-            const response = await fetch(apiUrl, {
+            const urlApi = `https://api.github.com/search/users?q=${encodeURIComponent(query)}&per_page=5`
+            const response = await fetch(urlApi, {
               signal: controller.signal,
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -105,35 +105,35 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     ])
 
     
-    let infoText = `🌴 𝗕𝗨𝗦𝗤𝗨𝗘𝗗𝗔 𝗨𝗦𝗘𝗥𝗦\n\n`
-    infoText += `> *Búsqueda:* "${query}"\n`
-    infoText += `> *Plataformas revisadas:* ${totalPlataformas}/${totalPlataformas}\n`
-    infoText += `> *Resultados encontrados:* ${resultados.length}\n`
-    infoText += `\n`
+    let textoInfo = `🌴 𝗕𝗨𝗦𝗤𝗨𝗘𝗗𝗔 𝗨𝗦𝗘𝗥𝗦\n\n`
+    textoInfo += `> *Búsqueda:* "${query}"\n`
+    textoInfo += `> *Plataformas revisadas:* ${totalPlataformas}/${totalPlataformas}\n`
+    textoInfo += `> *Resultados encontrados:* ${resultados.length}\n`
+    textoInfo += `\n`
 
     if (resultados.length > 0) {
-      infoText += `> *PERFILES ENCONTRADOS:*\n\n`
-      resultados.forEach((resultado, index) => {
-        infoText += `> *${index + 1}. ${resultado.plataforma}*\n`
-        infoText += `> ${resultado.descripcion}\n`
-        infoText += `> ${resultado.url}\n`
-        if (index < resultados.length - 1) infoText += `\n`
+      textoInfo += `> *PERFILES ENCONTRADOS:*\n\n`
+      resultados.forEach((resultado, indice) => {
+        textoInfo += `> *${indice + 1}. ${resultado.plataforma}*\n`
+        textoInfo += `> ${resultado.descripcion}\n`
+        textoInfo += `> ${resultado.url}\n`
+        if (indice < resultados.length - 1) textoInfo += `\n`
       })
     } else {
-      infoText += `> *NINGÚN PERFIL ENCONTRADO*\n`
-      infoText += `> El usuario no parece tener perfiles públicos\n`
-      infoText += `> en las plataformas revisadas.\n`
+      textoInfo += `> *NINGÚN PERFIL ENCONTRADO*\n`
+      textoInfo += `> El usuario no parece tener perfiles públicos\n`
+      textoInfo += `> en las plataformas revisadas.\n`
     }
 
-    infoText += `\n`
-    infoText += `> *Plataformas buscadas:*\n`
-    infoText += `> • GitHub • Instagram • Twitter/X\n`
-    infoText += `> • Reddit • YouTube • TikTok\n`
-    infoText += `> • Twitch • Discord • Roblox\n`
-    infoText += `> • Steam • LinkedIn • Facebook\n`
+    textoInfo += `\n`
+    textoInfo += `> *Plataformas buscadas:*\n`
+    textoInfo += `> • GitHub • Instagram • Twitter/X\n`
+    textoInfo += `> • Reddit • YouTube • TikTok\n`
+    textoInfo += `> • Twitch • Discord • Roblox\n`
+    textoInfo += `> • Steam • LinkedIn • Facebook\n`
 
     await conn.sendMessage(m.chat, {
-      text: infoText,
+      text: textoInfo,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]

@@ -7,26 +7,26 @@ import { formatBotUptime } from '../lib/bot-uptime.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const ROOT_DIR = join(__dirname, '..')
-const IMG_DIR = join(ROOT_DIR, 'storage', 'img')
-const DEFAULT_IMG = 'https://files.catbox.moe/iomah1.jpg'
+const DIR_RAIZ = join(__dirname, '..')
+const DIR_IMG = join(DIR_RAIZ, 'storage', 'img')
+const IMG_POR_DEFECTO = 'https://files.catbox.moe/iomah1.jpg'
 
-function resolveBotImage(configPath) {
-  const candidates = ['menu2.jpg', 'menu.jpg', 'menu3.jpg']
-  let imgBot = candidates
-    .map(name => join(IMG_DIR, name))
-    .find(full => {
-      try { return fs.existsSync(full) } catch { return false }
-    }) || DEFAULT_IMG
+function resolverImagenBot(rutaConfig) {
+  const candidatos = ['menu2.jpg', 'menu.jpg', 'menu3.jpg']
+  let imgBot = candidatos
+    .map(nombre => join(DIR_IMG, nombre))
+    .find(completo => {
+      try { return fs.existsSync(completo) } catch { return false }
+    }) || IMG_POR_DEFECTO
 
-  if (!fs.existsSync(configPath)) return imgBot
+  if (!fs.existsSync(rutaConfig)) return imgBot
 
   try {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-    if (config.img) {
-      const custom = config.img
-      const customAbs = path.isAbsolute(custom) ? custom : join(ROOT_DIR, custom)
-      if (fs.existsSync(customAbs)) imgBot = customAbs
+    const configuracion = JSON.parse(fs.readFileSync(rutaConfig, 'utf-8'))
+    if (configuracion.img) {
+      const personalizado = configuracion.img
+      const personalizadoAbs = path.isAbsolute(personalizado) ? personalizado : join(DIR_RAIZ, personalizado)
+      if (fs.existsSync(personalizadoAbs)) imgBot = personalizadoAbs
     }
   } catch {}
 
@@ -35,55 +35,55 @@ function resolveBotImage(configPath) {
 
 let handler = async (m, { conn, usedPrefix }) => {
   const botActual = cleanBotNum(conn.user?.jid || conn.user?.id)
-  const configPath = join(ROOT_DIR, 'Serbot', botActual, 'config.json')
-  const isMain = isMainBotConn(conn)
+  const rutaConfig = join(DIR_RAIZ, 'Serbot', botActual, 'config.json')
+  const esPrincipal = isMainBotConn(conn)
 
   let nombreBot = global.namebot || 'PAIN BOT'
-  let imgBot = resolveBotImage(configPath)
+  let imgBot = resolverImagenBot(rutaConfig)
 
-  if (!isMain && fs.existsSync(configPath)) {
+  if (!esPrincipal && fs.existsSync(rutaConfig)) {
     try {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-      if (config.name) nombreBot = config.name
+      const configuracion = JSON.parse(fs.readFileSync(rutaConfig, 'utf-8'))
+      if (configuracion.name) nombreBot = configuracion.name
     } catch {}
   }
 
-  const tipo = isMain ? 'Principal' : 'Sub-Bot'
+  const tipo = esPrincipal ? 'Principal' : 'Sub-Bot'
   const totalf = Object.values(global.plugins).filter(v => v.help && v.tags).length
 
-  const botFormatUptime = formatBotUptime(conn)
+  const formatearUptimeBot = formatBotUptime(conn)
 
   let subBotsActivos = 0
   if (global.conns && Array.isArray(global.conns)) {
-    subBotsActivos = global.conns.filter(subConn =>
-      subConn.user &&
-      subConn.ws?.socket?.readyState !== ws.CLOSED
+    subBotsActivos = global.conns.filter(connSub =>
+      connSub.user &&
+      connSub.ws?.socket?.readyState !== ws.CLOSED
     ).length
   }
 
-  let txt = `ɪɴғᴏ ᴅᴇʟ ʙᴏᴛ\n\n`
-  txt += ` *Nombre:* ${nombreBot}\n`
-  txt += ` *Número:* +${botActual || 'Desconocido'}\n`
-  txt += ` *Tipo:* ${tipo}\n`
-  txt += ` *Librería:* Baileys MD\n`
-  txt += ` *Tiempo activo:* ${botFormatUptime}\n`
-  txt += ` *Sub-bots activos:* ${subBotsActivos}\n`
-  txt += ` *Plugins:* ${totalf}\n`
-  txt += ` *Prefijo:* ${usedPrefix}\n\n`
+  let texto = `ɪɴғᴏ ᴅᴇʟ ʙᴏᴛ\n\n`
+  texto += ` *Nombre:* ${nombreBot}\n`
+  texto += ` *Número:* +${botActual || 'Desconocido'}\n`
+  texto += ` *Tipo:* ${tipo}\n`
+  texto += ` *Librería:* Baileys MD\n`
+  texto += ` *Tiempo activo:* ${formatearUptimeBot}\n`
+  texto += ` *Sub-bots activos:* ${subBotsActivos}\n`
+  texto += ` *Plugins:* ${totalf}\n`
+  texto += ` *Prefijo:* ${usedPrefix}\n\n`
 
   if (global.owner && Array.isArray(global.owner) && global.owner.length) {
-    txt += `ᴘʀᴏᴘɪᴇᴛᴀʀɪᴏs\n\n`
-    for (const [number, name] of global.owner) {
-      if (!number || /tunumero|acael|xxx/i.test(String(number))) continue
-      txt += ` *${name || 'Owner'}:* +${String(number).replace(/\D/g, '')}\n`
+    texto += `ᴘʀᴏᴘɪᴇᴛᴀʀɪᴏs\n\n`
+    for (const [numero, nombre] of global.owner) {
+      if (!numero || /tunumero|acael|xxx/i.test(String(numero))) continue
+      texto += ` *${nombre || 'Owner'}:* +${String(numero).replace(/\D/g, '')}\n`
     }
-    txt += `\n`
+    texto += `\n`
   }
 
-  txt += `ʜᴏsᴛɪɴɢ ᴏғɪᴄɪᴀʟ\n\n`
-  txt += ` *URL:* https://nexcodea.com`
+  texto += `ʜᴏsᴛɪɴɢ ᴏғɪᴄɪᴀʟ\n\n`
+  texto += ` *URL:* https://nexcodea.com`
 
-  await conn.sendFile(m.chat, imgBot, 'thumbnail.jpg', txt.trim(), m, null, {
+  await conn.sendFile(m.chat, imgBot, 'thumbnail.jpg', texto.trim(), m, null, {
     contextInfo: {
       ...(global.rcanal?.contextInfo || {})
     }

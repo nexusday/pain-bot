@@ -18,12 +18,12 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }, { quoted: m })
   }
 
-  const noteContent = args.join(' ')
+  const contenidoNota = args.join(' ')
   
   
-  if (noteContent.length > 250) {
+  if (contenidoNota.length > 250) {
     return conn.sendMessage(m.chat, {
-      text: `《✧》La nota es demasiado larga.\n\n> Máximo permitido: 250 caracteres\n> Tu nota: ${noteContent.length} caracteres\n> Exceso: ${noteContent.length - 250} caracteres`,
+      text: `《✧》La nota es demasiado larga.\n\n> Máximo permitido: 250 caracteres\n> Tu nota: ${contenidoNota.length} caracteres\n> Exceso: ${contenidoNota.length - 250} caracteres`,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -35,9 +35,9 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   if (!global.db.data.notes[m.chat]) global.db.data.notes[m.chat] = []
 
 
-  const newNote = {
+  const notaNueva = {
     id: Date.now().toString(),
-    content: noteContent,
+    content: contenidoNota,
     author: m.sender,
     authorName: m.pushName || m.name || 'Admin',
     timestamp: Date.now(),
@@ -45,13 +45,13 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   }
 
   
-  global.db.data.notes[m.chat].push(newNote)
+  global.db.data.notes[m.chat].push(notaNueva)
 
-  const groupMetadata = await conn.groupMetadata(m.chat)
-  const groupName = groupMetadata.subject
+  const metadatosGrupo = await conn.groupMetadata(m.chat)
+  const nombreGrupo = metadatosGrupo.subject
 
   return conn.sendMessage(m.chat, {
-    text: `𝗡𝗼𝘁𝗮 𝗔𝗴𝗿𝗲𝗴𝗮𝗱𝗮 \n\n *Usuario:* @${m.sender.split('@')[0]}\n *Contenido:* ${noteContent}\n *Caracteres:* ${noteContent.length}/250\n *Grupo:* ${groupName}\n *Expira:* En 24 horas\n`,
+    text: `𝗡𝗼𝘁𝗮 𝗔𝗴𝗿𝗲𝗴𝗮𝗱𝗮 \n\n *Usuario:* @${m.sender.split('@')[0]}\n *Contenido:* ${contenidoNota}\n *Caracteres:* ${contenidoNota.length}/250\n *Grupo:* ${nombreGrupo}\n *Expira:* En 24 horas\n`,
     contextInfo: {
       ...rcanal.contextInfo,
       mentionedJid: [m.sender]

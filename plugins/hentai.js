@@ -51,20 +51,20 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       }, { quoted: m })
     }
 
-    const list = results.slice(0, 10).map((r, i) =>
+    const lista = results.slice(0, 10).map((r, i) =>
       `*${i + 1}.*\n> *T��tulo:* ${r.titulo}\n> *Link:* ${r.url}`
     ).join('\n\n')
 
-    const caption = `? RESULTADOS ?
+    const leyenda = `? RESULTADOS ?
 > *B��squeda:* ${text}
 > *Resultados:* ${results.length}
 
-${list}
+${lista}
 
 > *Responde con un numero (1-10) para descargar*`
 
     const { key } = await conn.sendMessage(m.chat, {
-      text: caption,
+      text: leyenda,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
 
@@ -74,10 +74,10 @@ ${list}
       timeout: setTimeout(() => delete conn.hentai[m.sender], 120_000)
     }
 
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     return conn.sendMessage(m.chat, {
-      text: `[?] Error inesperado\n> ${e.message}`,
+      text: `[?] Error inesperado\n> ${error.message}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
@@ -117,10 +117,10 @@ handler.before = async (m, { conn }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     await conn.sendMessage(m.chat, {
-      text: `[?] Error\n> ${e.message}`,
+      text: `[?] Error\n> ${error.message}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }

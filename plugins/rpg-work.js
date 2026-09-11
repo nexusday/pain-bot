@@ -50,8 +50,8 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     }
 
 
-    let user = global.db.data.users[m.sender]
-    if (!user) {
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) {
       global.db.data.users[m.sender] = {
         coins: 100,
         exp: 0,
@@ -59,23 +59,23 @@ let handler = async (m, { conn, usedPrefix, command }) => {
         registered: true,
         name: m.name || m.pushName || 'Usuario'
       }
-      user = global.db.data.users[m.sender]
+      usuario = global.db.data.users[m.sender]
     }
 
-    if (!user.lastWork) user.lastWork = 0
-    const timeSinceLastWork = Date.now() - user.lastWork
+    if (!usuario.lastWork) usuario.lastWork = 0
+    const timeSinceLastWork = Date.now() - usuario.lastWork
 
     if (timeSinceLastWork < cooldownTime) {
-      const minutes = Math.ceil((cooldownTime - timeSinceLastWork) / 60000)
+      const minutos = Math.ceil((cooldownTime - timeSinceLastWork) / 60000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar *${minutes} minuto${minutes !== 1 ? 's' : ''}* para volver a trabajar.`,
+        text: `[❗] Debes esperar *${minutos} minuto${minutos !== 1 ? 's' : ''}* para volver a trabajar.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
     }
 
-    user.lastWork = Date.now()
+    usuario.lastWork = Date.now()
 
 
     const trabajoSeleccionado = trabajos[Math.floor(Math.random() * trabajos.length)]
@@ -87,13 +87,13 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     if (trabajoSeleccionado.tipo === 'positivo') {
       const [min, max] = trabajoSeleccionado.recompensa
       cantidad = Math.floor(Math.random() * (max - min + 1)) + min
-      user.coins += cantidad
+      usuario.coins += cantidad
       resultado = `✅ Trabajo completado`
       emoji = '💼'
     } else {
       const [min, max] = trabajoSeleccionado.perdida
       cantidad = Math.floor(Math.random() * (max - min + 1)) + min
-      user.coins -= cantidad
+      usuario.coins -= cantidad
       resultado = `❌ Qué mala suerte`
       emoji = '💸'
     }
@@ -120,19 +120,19 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       mensajeExtra = mensajesNegativos[Math.floor(Math.random() * mensajesNegativos.length)]
     }
 
-    let txt = `💼 𝗧𝗿𝗮𝗯𝗮𝗷𝗮𝘀𝘁𝗲 \n\n> *Trabajo:* ${trabajoSeleccionado.descripcion}\n> ${resultado}\n> *Resultado:* ${trabajoSeleccionado.tipo === 'positivo' ? '+' : '-'}${cantidad} ${global.moneda}\n> *Total:* ${user.coins} ${global.moneda}\n`
+    let texto = `💼 𝗧𝗿𝗮𝗯𝗮𝗷𝗮𝘀𝘁𝗲 \n\n> *Trabajo:* ${trabajoSeleccionado.descripcion}\n> ${resultado}\n> *Resultado:* ${trabajoSeleccionado.tipo === 'positivo' ? '+' : '-'}${cantidad} ${global.moneda}\n> *Total:* ${usuario.coins} ${global.moneda}\n`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo
       }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error('Error en work:', e)
+  } catch (error) {
+    console.error('Error en work:', error)
     return conn.sendMessage(m.chat, {
-      text: `[❌] No tienes suficientes ${global.moneda}.\nTienes: ${user.coins || 0} ${global.moneda}`,
+      text: `[❌] No tienes suficientes ${global.moneda}.\nTienes: ${usuario.coins || 0} ${global.moneda}`,
       contextInfo: {
         ...rcanal.contextInfo
       }

@@ -10,12 +10,12 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   
   try {
     
-    const searchQuery = encodeURIComponent(text)
-    const apiUrl = `https://api.delirius.online/ia/chatgpt?q=${searchQuery}`
+    const consultaBusqueda = encodeURIComponent(text)
+    const urlApi = `https://api.delirius.online/ia/chatgpt?q=${consultaBusqueda}`
 
-    const { data } = await axios.get(apiUrl)
+    const { datos } = await axios.get(urlApi)
 
-    if (!data?.status) {
+    if (!datos?.status) {
       return conn.sendMessage(m.chat, {
         text: '*[❗] No se pudo obtener una respuesta de la API.*',
         contextInfo: {
@@ -24,32 +24,32 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const response = (typeof data.data === 'string' ? data.data.trim() : '') || 'No se obtuvo respuesta de la API.'
+    const respuestaApi = (typeof datos.data === 'string' ? datos.data.trim() : '') || 'No se obtuvo respuesta de la API.'
     
     
-    let thought = ''
-    let finalResponse = response
+    let pensamiento = ''
+    let respuestaFinal = respuestaApi
     
     
-    const thinkMatch = response.match(/<think>([\s\S]*?)<\/think>/)
-    if (thinkMatch) {
-      thought = thinkMatch[1].trim()
+    const coincidenciaPensamiento = respuestaApi.match(/<think>([\s\S]*?)<\/think>/)
+    if (coincidenciaPensamiento) {
+      pensamiento = coincidenciaPensamiento[1].trim()
     
-      finalResponse = response.replace(/<think>[\s\S]*?<\/think>/, '').trim()
+      respuestaFinal = respuestaApi.replace(/<think>[\s\S]*?<\/think>/, '').trim()
     }
     
     
-        let formattedMessage = ''
-    if (thought) {
+        let mensajeFormateado = ''
+    if (pensamiento) {
       
-      const cleanThought = thought.replace(/\n+/g, ' ').trim()
+      const pensamientoLimpio = pensamiento.replace(/\n+/g, ' ').trim()
       
-      formattedMessage += `> *Su pensamiento:* ${cleanThought}\n\n`
+      mensajeFormateado += `> *Su pensamiento:* ${pensamientoLimpio}\n\n`
     }
-    formattedMessage += finalResponse
+    mensajeFormateado += respuestaFinal
     
     await conn.sendMessage(m.chat, {
-      text: formattedMessage,
+      text: mensajeFormateado,
       contextInfo: {
         ...rcanal.contextInfo
       }

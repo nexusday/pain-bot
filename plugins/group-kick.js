@@ -2,18 +2,18 @@ import { findGroupParticipant } from '../lib/group-participant.js'
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner, isPrems, usedPrefix, command }) => {
 
-  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
-  const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []  
-  const user = (m.isGroup ? findGroupParticipant(groupParticipants, m, conn) : null) || {}  
-  const isRAdmin = user?.admin == 'superadmin' || false  
-  const isAdminManual = Boolean(isAdmin) || isRAdmin || user?.admin == 'admin' || false  
+  const metadatosVerificacionAdmin = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+  const participantesGrupo = (m.isGroup ? metadatosVerificacionAdmin.participants : []) || []  
+  const usuario = (m.isGroup ? findGroupParticipant(participantesGrupo, m, conn) : null) || {}  
+  const esSuperAdmin = usuario?.admin == 'superadmin' || false  
+  const esAdminManual = Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false  
   
 
-  const isOwnerManual = global.owner.some(([number]) => number.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
-                  global.ownerLid?.some(([number]) => number.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
+  const esOwnerManual = global.owner.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
+                  global.ownerLid?.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
                   m.sender === conn.user.jid
   
-  if (!isAdminManual && !isRAdmin && !isOwnerManual) {
+  if (!esAdminManual && !esSuperAdmin && !esOwnerManual) {
     return conn.reply(m.chat, '[❗] Solo los administradores pueden usar este comando.', m)
   }
 
@@ -33,12 +33,12 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
       }
     }, { quoted: m })
   }
-  const who = m.mentionedJid[0]
+  const quien = m.mentionedJid[0]
   
-  const targetUser = participants.find(u => u.id === who)
-  const isTargetAdmin = targetUser?.admin === 'admin' || targetUser?.admin === 'superadmin'
+  const usuarioObjetivo = participants.find(u => u.id === quien)
+  const esAdminObjetivo = usuarioObjetivo?.admin === 'admin' || usuarioObjetivo?.admin === 'superadmin'
   
-  if (isTargetAdmin) {
+  if (esAdminObjetivo) {
     return conn.sendMessage(m.chat, {
       text: '[❗] No puedes eliminar a un administrador del grupo.',
       contextInfo: {
@@ -47,12 +47,12 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }, { quoted: m })
   }
   
-  const ownerNumbers = global.owner.map(v => {
+  const numerosOwner = global.owner.map(v => {
     const id = typeof v === 'string' ? v.replace(/[^0-9]/g, '') : String(v).replace(/[^0-9]/g, '');
     return id + '@s.whatsapp.net';
   });
   
-  if (ownerNumbers.includes(who)) {
+  if (numerosOwner.includes(quien)) {
     return conn.sendMessage(m.chat, {
       text: '[❗] No puedes eliminar a un propietario del bot.',
       contextInfo: {
@@ -61,31 +61,31 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }, { quoted: m })
   }
   
-  if (who === conn.user.jid) return conn.sendMessage(m.chat, {
+  if (quien === conn.user.jid) return conn.sendMessage(m.chat, {
     text: '[❗] No se puede usar este comando para eliminar al bot.',
     contextInfo: {
       ...rcanal.contextInfo
     }
   }, { quoted: m })
   
-  await conn.groupParticipantsUpdate(m.chat, [who], 'remove')
+  await conn.groupParticipantsUpdate(m.chat, [quien], 'remove')
   
-  if (!global.db.data.users[who]) {
-    global.db.data.users[who] = {}
+  if (!global.db.data.users[quien]) {
+    global.db.data.users[quien] = {}
   }
-  global.db.data.users[who].banned = true
+  global.db.data.users[quien].banned = true
   
 
-  const userName = await conn.getName(who)
-  const adminName = await conn.getName(m.sender)
-  const groupName = (await conn.groupMetadata(m.chat)).subject
+  const nombreUsuario = await conn.getName(quien)
+  const nombreAdmin = await conn.getName(m.sender)
+  const nombreGrupo = (await conn.groupMetadata(m.chat)).subject
   
 
   return conn.sendMessage(m.chat, {
-    text: `🌴 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 𝗯𝗮𝗻𝗲𝗮𝗱𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n\n> *Usuario:* @${who.split('@')[0]}\n> *Por:* @${m.sender.split('@')[0]}\n> *Grupo:* ${groupName}`,
+    text: `🌴 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 𝗯𝗮𝗻𝗲𝗮𝗱𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n\n> *Usuario:* @${quien.split('@')[0]}\n> *Por:* @${m.sender.split('@')[0]}\n> *Grupo:* ${nombreGrupo}`,
     contextInfo: {
       ...rcanal.contextInfo,
-      mentionedJid: [who, m.sender]
+      mentionedJid: [quien, m.sender]
     }
   }, { quoted: m })
 }

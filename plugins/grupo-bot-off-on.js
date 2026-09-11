@@ -4,9 +4,9 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner, isAdmi
   }
 
   try {
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
     
-    if (!action || !['on', 'off'].includes(action)) {
+    if (!accion || !['on', 'off'].includes(accion)) {
       return m.reply(`[❗] Uso incorrecto del comando.\n\n> *Opciones disponibles:*\n> • ${usedPrefix + command} on - Activar bot en este grupo\n> • ${usedPrefix + command} off - Desactivar bot en este grupo`)
     }
 
@@ -19,14 +19,14 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner, isAdmi
       global.db.data.botGroups = {}
     }
     
-    if (action === 'on') {
+    if (accion === 'on') {
       global.db.data.botGroups[m.chat] = true
       await global.db.write()
       
-      const message = `🌴 𝗕𝗢𝗧 𝗔𝗖𝗧𝗜𝗩𝗔𝗗𝗢\n\n> *Grupo:* ${await conn.getName(m.chat)}\n *Por:* @${m.sender.split('@')[0]}`
+      const mensaje = `🌴 𝗕𝗢𝗧 𝗔𝗖𝗧𝗜𝗩𝗔𝗗𝗢\n\n> *Grupo:* ${await conn.getName(m.chat)}\n *Por:* @${m.sender.split('@')[0]}`
       
       await conn.sendMessage(m.chat, {
-        text: message,
+        text: mensaje,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -35,14 +35,14 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner, isAdmi
       
       console.log(`✅ Bot activado en grupo: ${m.chat} por ${m.sender}`)
       
-    } else if (action === 'off') {
+    } else if (accion === 'off') {
       global.db.data.botGroups[m.chat] = false
       await global.db.write()
       
-      const message = `🌴 𝗕𝗢𝗧 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗗𝗢\n\n> *Grupo:* ${await conn.getName(m.chat)}\n *Por:* @${m.sender.split('@')[0]}\n\n> Solo responde a *${usedPrefix}grupo on* para reactivarlo.`
+      const mensaje = `🌴 𝗕𝗢𝗧 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗗𝗢\n\n> *Grupo:* ${await conn.getName(m.chat)}\n *Por:* @${m.sender.split('@')[0]}\n\n> Solo responde a *${usedPrefix}grupo on* para reactivarlo.`
       
       await conn.sendMessage(m.chat, {
-        text: message,
+        text: mensaje,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]

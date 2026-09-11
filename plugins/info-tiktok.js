@@ -10,13 +10,13 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    let username = args[0].trim()
+    let nombreUsuario = args[0].trim()
         
-    if (username.startsWith('@')) {
-      username = username.slice(1)
+    if (nombreUsuario.startsWith('@')) {
+      nombreUsuario = nombreUsuario.slice(1)
     }
 
-    if (username.length < 1) {
+    if (nombreUsuario.length < 1) {
       return conn.sendMessage(m.chat, {
         text: '[❗] Username inválido.',
         contextInfo: {
@@ -26,42 +26,42 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
 
-    const apiUrl = `https://bytebazz-api.koyeb.app/api/stalker/tiktok2?username=${encodeURIComponent(username)}&apikey=8jkh5icbf05`
-    const response = await fetch(apiUrl)
-    const data = await response.json()
+    const urlApi = `https://bytebazz-api.koyeb.app/api/stalker/tiktok2?username=${encodeURIComponent(nombreUsuario)}&apikey=8jkh5icbf05`
+    const respuestaApi = await fetch(urlApi)
+    const datos = await respuestaApi.json()
 
-    if (!data.status || !data.resultado) {
+    if (!datos.status || !datos.resultado) {
       throw new Error('Perfil no encontrado o API no disponible')
     }
 
-    const profile = data.resultado
+    const perfil = datos.resultado
 
     
-    const formatNumber = (num) => {
+    const formatearNumero = (num) => {
       if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
       if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
       return num.toString()
     }
 
-    const infoText = `
+    const textoInfo = `
  🌴 𝗧𝗜𝗞𝗧𝗢𝗞 𝗣𝗥𝗢𝗙𝗜𝗟𝗘 🌴
 
-> *Nombre:* ${profile.apodo || 'N/A'}
-> *Usuario:* @${profile.nombre_usuario || username}
-> *Seguidores:* ${profile.seguidores ? formatNumber(profile.seguidores) : 'N/A'}
-> *Siguiendo:* ${profile.siguiendo ? formatNumber(profile.siguiendo) : 'N/A'}
-> *Likes:* ${profile.me_gusta ? formatNumber(profile.me_gusta) : 'N/A'}
-> *Videos:* ${profile.videos ? formatNumber(profile.videos) : 'N/A'}
-> *Verificado:* ${profile.verificado ? 'Sí' : 'No'}
-> *Privada:* ${profile.cuenta_privada ? 'Sí' : 'No'}
-> *Biografía:* ${profile.biografia || 'Sin biografía'}`
+> *Nombre:* ${perfil.apodo || 'N/A'}
+> *Usuario:* @${perfil.nombre_usuario || nombreUsuario}
+> *Seguidores:* ${perfil.seguidores ? formatearNumero(perfil.seguidores) : 'N/A'}
+> *Siguiendo:* ${perfil.siguiendo ? formatearNumero(perfil.siguiendo) : 'N/A'}
+> *Likes:* ${perfil.me_gusta ? formatearNumero(perfil.me_gusta) : 'N/A'}
+> *Videos:* ${perfil.videos ? formatearNumero(perfil.videos) : 'N/A'}
+> *Verificado:* ${perfil.verificado ? 'Sí' : 'No'}
+> *Privada:* ${perfil.cuenta_privada ? 'Sí' : 'No'}
+> *Biografía:* ${perfil.biografia || 'Sin biografía'}`
 
 
-    if (profile.avatar) {
+    if (perfil.avatar) {
       try {
         await conn.sendMessage(m.chat, {
-          image: { url: profile.avatar },
-          caption: infoText,
+          image: { url: perfil.avatar },
+          caption: textoInfo,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
@@ -71,7 +71,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         console.log('Error al enviar imagen:', error.message)
         
         await conn.sendMessage(m.chat, {
-          text: infoText,
+          text: textoInfo,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
@@ -81,7 +81,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     } else {
       
       await conn.sendMessage(m.chat, {
-        text: infoText,
+        text: textoInfo,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -100,7 +100,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   }
 }
 
-handler.help = ['tik <usuario> �? Obtiene información completa de un perfil de TikTok']
+handler.help = ['tik <usuario> �? Obtiene información completa de un perfil de TikTok']
 handler.tags = ['herramientas', 'osint']
 handler.command = ['tik']
 

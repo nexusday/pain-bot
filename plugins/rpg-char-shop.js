@@ -3,10 +3,10 @@ import { showCharShop } from '../lib/characters/index.js'
 let handler = async (m, { conn, usedPrefix }) => {
   try {
     await showCharShop(m, conn, usedPrefix || '.')
-  } catch (e) {
-    console.error('char-shop:', e)
+  } catch (error) {
+    console.error('char-shop:', error)
     await conn.sendMessage(m.chat, {
-      text: `*[❗] No se pudo mostrar la tienda.*\n> ${e?.message || e}`,
+      text: `*[❗] No se pudo mostrar la tienda.*\n> ${error?.message || error}`,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m }).catch(() => {})
   }

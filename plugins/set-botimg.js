@@ -4,45 +4,45 @@ import { join } from 'path'
 
 const handler = async (m, { conn, usedPrefix, command }) => {
   const botActual = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
-  const configGlobalPath = path.join('./Serbot', botActual, 'config.json')
+  const rutaConfigGlobal = path.join('./Serbot', botActual, 'config.json')
 
   let nombreBot = global.namebot || 'PAIN BOT'
-  if (fs.existsSync(configGlobalPath)) {
+  if (fs.existsSync(rutaConfigGlobal)) {
     try {
-      const globalConfig = JSON.parse(fs.readFileSync(configGlobalPath))
-      if (globalConfig.name) nombreBot = globalConfig.name
+      const configGlobal = JSON.parse(fs.readFileSync(rutaConfigGlobal))
+      if (configGlobal.name) nombreBot = configGlobal.name
     } catch {}
   }
 
-  const senderNumber = m.sender?.split('@')[0].replace(/\D/g, '')
-  const botPath = path.join('./Serbot', senderNumber)
-  const configPath = path.join(botPath, 'config.json')
+  const numeroRemitente = m.sender?.split('@')[0].replace(/\D/g, '')
+  const rutaBot = path.join('./Serbot', numeroRemitente)
+  const rutaConfig = path.join(rutaBot, 'config.json')
 
-  if (!fs.existsSync(botPath) || !fs.existsSync(configPath)) {
+  if (!fs.existsSync(rutaBot) || !fs.existsSync(rutaConfig)) {
     return conn.reply(m.chat, `¿Hola, cómo te va?\n\n* No encontré una sesión activa vinculada a tu número\n\n* Puede que aún no te hayas conectado\n\n* Si deseas iniciar una nueva, estaré aquí para ayudarte`, m, rcanal)
   }
 
   const q = m.quoted || m
-  const mime = (q.msg || q).mimetype || ''
+  const tipoMime = (q.msg || q).mimetype || ''
 
-  if (!/image\/(jpe?g|png|webp)/.test(mime)) {
+  if (!/image\/(jpe?g|png|webp)/.test(tipoMime)) {
     return conn.reply(m.chat, `Para continuar, necesito que respondas a una imagen.\n\n* ¿Podrías enviarme una y luego responderla con el comando?\n\n* Envía o reenvía una imagen respóndela con .setbotimg`, m, rcanal)
   }
 
   try {
-    const imgBuffer = await q.download?.()
-    if (!imgBuffer) return
+    const bufferImg = await q.download?.()
+    if (!bufferImg) return
 
-    const fileName = `img_${Date.now()}.jpg`
-    const filePath = path.join(botPath, fileName)
-    fs.writeFileSync(filePath, imgBuffer)
+    const nombreArchivo = `img_${Date.now()}.jpg`
+    const rutaArchivo = path.join(rutaBot, nombreArchivo)
+    fs.writeFileSync(rutaArchivo, bufferImg)
 
-    const config = fs.existsSync(configPath)
-      ? JSON.parse(fs.readFileSync(configPath))
+    const configuracion = fs.existsSync(rutaConfig)
+      ? JSON.parse(fs.readFileSync(rutaConfig))
       : {}
 
-    config.img = filePath
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
+    configuracion.img = rutaArchivo
+    fs.writeFileSync(rutaConfig, JSON.stringify(configuracion, null, 2))
 
     return conn.reply(m.chat, `¡Imagen recibida con elegancia!\n\n* Tu imagen personalizada ha sido guardada correctamente\n\n* Puedes cambiarla nuevamente cuando lo desees`, m, rcanal)
   } catch (e) {

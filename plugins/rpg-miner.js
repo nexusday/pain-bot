@@ -8,9 +8,9 @@ import {
   formatBalance,
 } from '../lib/michi-users.js'
 
-function clearPendingInvite(chat, invite) {
+function clearPendingInvite(idChat, invite) {
   if (invite?.timeout) clearTimeout(invite.timeout)
-  if (global.pendingInvites?.[chat]) delete global.pendingInvites[chat]
+  if (global.pendingInvites?.[idChat]) delete global.pendingInvites[idChat]
 }
 
 let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
@@ -109,18 +109,18 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
       }
     }, 20000)
 
-    const caption = `@${opponent.split('@')[0]} responde en *20 segundos*\n\n> *si* — Aceptar\n> *no* — Rechazar`
+    const leyenda = `@${opponent.split('@')[0]} responde en *20 segundos*\n\n> *si* — Aceptar\n> *no* — Rechazar`
 
     return sendMinerInvite(conn, m.chat, {
       challenger,
       opponent,
       participants: groupParts,
       quoted: m,
-      caption,
+      caption: leyenda,
       mentionedJid: [challenger, opponent],
     })
-  } catch (e) {
-    console.error('Error invitacion miner:', e)
+  } catch (error) {
+    console.error('Error invitacion miner:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrio un error al enviar la invitacion.',
       contextInfo: { ...rcanal.contextInfo },

@@ -10,8 +10,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     }
     
     
-    const action = args[0]?.toLowerCase()
-    const limit = parseInt(args[1])
+    const accion = args[0]?.toLowerCase()
+    const limite = parseInt(args[1])
     
     if (!global.db.data.antiCaracter) global.db.data.antiCaracter = {}
     if (!global.db.data.antiCaracter[m.chat]) {
@@ -21,8 +21,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
     }
     
-    if (action === 'on') {
-      if (!limit || isNaN(limit) || limit < 1 || limit > 10000) {
+    if (accion === 'on') {
+      if (!limite || isNaN(limite) || limite < 1 || limite > 10000) {
         return conn.sendMessage(m.chat, {
           text: `[❗] Debes poner un límite válido entre 1 y +1000 caracteres.\n> *Ejemplo:* ${usedPrefix}anticaracter on 599`,
           contextInfo: {
@@ -32,39 +32,39 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
       
       global.db.data.antiCaracter[m.chat].enabled = true
-      global.db.data.antiCaracter[m.chat].limit = limit
+      global.db.data.antiCaracter[m.chat].limit = limite
       
-      let txt = `ִֶָ☾. *Anti-caracteres activado correctamente*\n\n*Limite:* ${limit} caracteres\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-caracteres activado correctamente*\n\n*Limite:* ${limite} caracteres\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'off') {
+    } else if (accion === 'off') {
       global.db.data.antiCaracter[m.chat].enabled = false
       
-      let txt = `ִֶָ☾. *Anti-caracteres desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-caracteres desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'status' || action === 'estado') {
-      const status = global.db.data.antiCaracter[m.chat].enabled ? 'Activado' : 'Desactivado'
-      const limit = global.db.data.antiCaracter[m.chat].limit
+    } else if (accion === 'status' || accion === 'estado') {
+      const estado = global.db.data.antiCaracter[m.chat].enabled ? 'Activado' : 'Desactivado'
+      const limite = global.db.data.antiCaracter[m.chat].limit
       
-      let txt = `ִֶָ☾. *Anti-caracteres estado*\n\n*Estado:* ${status}\n*Limite:* ${limit} caracteres`
+      let texto = `ִֶָ☾. *Anti-caracteres estado*\n\n*Estado:* ${estado}\n*Limite:* ${limite} caracteres`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -80,8 +80,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }, { quoted: m })
     }
     
-  } catch (e) {
-    console.error('Error en anticaracter:', e)
+  } catch (error) {
+    console.error('Error en anticaracter:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al configurar el anti-caracteres.',
       contextInfo: {

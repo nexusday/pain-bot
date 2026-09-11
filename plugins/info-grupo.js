@@ -38,13 +38,13 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     const descLength = desc ? desc.length : 0
 
     
-    let mentions = []
-    if (owner) mentions.push(owner)
-    if (admins.length > 0) mentions.push(...admins)
-    if (ownersInGroup.length > 0) mentions.push(...ownersInGroup)
+    let menciones = []
+    if (owner) menciones.push(owner)
+    if (admins.length > 0) menciones.push(...admins)
+    if (ownersInGroup.length > 0) menciones.push(...ownersInGroup)
 
     
-    let infoText = `
+    let textoInfo = `
 ╭───「  𝙄𝙉𝙁𝙊 𝙂𝙍𝙐𝙋𝙊  」
 │
 │  *Nombre:* ${name || 'Sin nombre'}
@@ -66,23 +66,23 @@ ${ownersInGroup.length > 0 ? ownersInGroup.map(o => `│  • @${o.split('@')[0]
       if (groupPic) {
         conn.sendMessage(m.chat, {
           image: { url: groupPic },
-          caption: infoText,
+          caption: textoInfo,
           contextInfo: {
-            mentionedJid: mentions,
+            mentionedJid: menciones,
             ...rcanal.contextInfo
           }
         }, { quoted: m })
         return
       }
-    } catch (e) {
+    } catch (error) {
       
     }
 
     
     conn.sendMessage(m.chat, {
-      text: infoText,
+      text: textoInfo,
       contextInfo: {
-        mentionedJid: mentions,
+        mentionedJid: menciones,
         ...rcanal.contextInfo
       }
     }, { quoted: m })

@@ -3,109 +3,109 @@ import fs from 'fs'
 import path from 'path'
 
 /** Config local del servidor: no se pierde al actualizar */
-const PRESERVE_ON_UPDATE = ['storage/maxsubs.json']
+const PRESERVAR_AL_ACTUALIZAR = ['storage/maxsubs.json']
 
-function run(cmd) {
+function ejecutar(cmd) {
   return execSync(cmd, { encoding: 'utf-8', stdio: 'pipe' })
 }
 
-function runIgnore(cmd) {
+function ejecutarIgnorando(cmd) {
   try {
     execSync(cmd, { stdio: 'ignore' })
   } catch {}
 }
 
-function backupPreserveFiles() {
-  const data = {}
-  for (const rel of PRESERVE_ON_UPDATE) {
-    const full = path.join(process.cwd(), rel)
-    if (!fs.existsSync(full)) continue
+function respaldarArchivosPreservar() {
+  const datos = {}
+  for (const relativo of PRESERVAR_AL_ACTUALIZAR) {
+    const completo = path.join(process.cwd(), relativo)
+    if (!fs.existsSync(completo)) continue
     try {
-      data[rel] = fs.readFileSync(full, 'utf-8')
+      datos[relativo] = fs.readFileSync(completo, 'utf-8')
     } catch {}
   }
-  return data
+  return datos
 }
 
-function restorePreserveFiles(data) {
-  for (const [rel, content] of Object.entries(data)) {
-    const full = path.join(process.cwd(), rel)
+function restaurarArchivosPreservar(datos) {
+  for (const [relativo, content] of Object.entries(datos)) {
+    const completo = path.join(process.cwd(), relativo)
     try {
-      fs.mkdirSync(path.dirname(full), { recursive: true })
-      fs.writeFileSync(full, content)
+      fs.mkdirSync(path.dirname(completo), { recursive: true })
+      fs.writeFileSync(completo, content)
     } catch (e) {
-      console.error(`No se pudo restaurar ${rel}:`, e)
+      console.error(`No se pudo restaurar ${relativo}:`, e)
     }
   }
 }
 
-function getRemoteBranch() {
+function obtenerRamaRemota() {
   try {
-    const upstream = run('git rev-parse --abbrev-ref @{u}').trim()
-    const slash = upstream.indexOf('/')
-    if (slash > 0) {
+    const upstream = ejecutar('git rev-parse --abbrev-ref @{u}').trim()
+    const barra = upstream.indexOf('/')
+    if (barra > 0) {
       return {
-        remote: upstream.slice(0, slash),
-        branch: upstream.slice(slash + 1)
+        remote: upstream.slice(0, barra),
+        branch: upstream.slice(barra + 1)
       }
     }
   } catch {}
 
-  let branch = 'main'
+  let rama = 'main'
   try {
-    branch = run('git rev-parse --abbrev-ref HEAD').trim() || 'main'
+    rama = ejecutar('git rev-parse --abbrev-ref HEAD').trim() || 'main'
   } catch {}
 
-  return { remote: 'origin', branch }
+  return { remote: 'origin', branch: rama }
 }
 
 /**
  * Actualiza igual que el repo remoto (sin merge conflictivo).
  * Muestra salida similar a git pull (archivos y commits).
  */
-function gitPullHard() {
-  runIgnore('git fetch origin')
+function gitPullForzado() {
+  ejecutarIgnorando('git fetch origin')
 
-  const { remote, branch } = getRemoteBranch()
-  const ref = `${remote}/${branch}`
+  const { remote, branch: rama } = obtenerRamaRemota()
+  const referencia = `${remote}/${rama}`
 
-  const before = run('git rev-parse HEAD').trim()
-  let remoteHash = ''
+  const antes = ejecutar('git rev-parse HEAD').trim()
+  let hashRemoto = ''
   try {
-    remoteHash = run(`git rev-parse ${ref}`).trim()
+    hashRemoto = ejecutar(`git rev-parse ${referencia}`).trim()
   } catch {
-    throw new Error(`No se encontró la rama remota ${ref}`)
+    throw new Error(`No se encontró la rama remota ${referencia}`)
   }
 
-  if (before === remoteHash) {
+  if (antes === hashRemoto) {
     return 'Already up to date.'
   }
 
-  for (const rel of PRESERVE_ON_UPDATE) {
-    runIgnore(`git rm --cached -f "${rel}"`)
-    runIgnore(`git update-index --assume-unchanged "${rel}"`)
+  for (const relativo of PRESERVAR_AL_ACTUALIZAR) {
+    ejecutarIgnorando(`git rm --cached -f "${relativo}"`)
+    ejecutarIgnorando(`git update-index --assume-unchanged "${relativo}"`)
   }
 
-  run(`git reset --hard ${ref}`)
+  ejecutar(`git reset --hard ${referencia}`)
 
-  for (const rel of PRESERVE_ON_UPDATE) {
-    runIgnore(`git update-index --no-assume-unchanged "${rel}"`)
-    runIgnore(`git rm --cached -f "${rel}"`)
+  for (const relativo of PRESERVAR_AL_ACTUALIZAR) {
+    ejecutarIgnorando(`git update-index --no-assume-unchanged "${relativo}"`)
+    ejecutarIgnorando(`git rm --cached -f "${relativo}"`)
   }
 
-  const after = run('git rev-parse HEAD').trim()
-  const shortBefore = before.slice(0, 7)
-  const shortAfter = after.slice(0, 7)
+  const despues = ejecutar('git rev-parse HEAD').trim()
+  const antesCorto = antes.slice(0, 7)
+  const despuesCorto = despues.slice(0, 7)
 
-  let out = `Updating ${shortBefore}..${shortAfter}\nFast-forward\n`
+  let out = `Updating ${antesCorto}..${despuesCorto}\nFast-forward\n`
 
   try {
-    const stat = run(`git diff --stat ${before}..${after}`).trim()
+    const stat = ejecutar(`git diff --stat ${antes}..${despues}`).trim()
     if (stat) out += stat + '\n'
   } catch {}
 
   try {
-    const commits = run(`git log ${before}..${after} --oneline`).trim()
+    const commits = ejecutar(`git log ${antes}..${despues} --oneline`).trim()
     if (commits) out += '\n' + commits
   } catch {}
 
@@ -125,21 +125,21 @@ let handler = async (m, { conn, text, isOwner }) => {
 
   await m.react('🕓')
 
-  const backed = backupPreserveFiles()
+  const respaldado = respaldarArchivosPreservar()
 
   try {
-    const stdout = gitPullHard()
-    restorePreserveFiles(backed)
+    const salidaStd = gitPullForzado()
+    restaurarArchivosPreservar(respaldado)
 
-    const reply = stdout.trim()
+    const respuesta = salidaStd.trim()
 
-    await conn.reply(m.chat, reply || '[✅] Actualización completada.', m, rcanal)
+    await conn.reply(m.chat, respuesta || '[✅] Actualización completada.', m, rcanal)
     await m.react('✅')
   } catch (error) {
-    restorePreserveFiles(backed)
+    restaurarArchivosPreservar(respaldado)
     console.error('Error ejecutando plugin owner-update.js:', error)
-    const msg = error?.stderr?.toString?.() || error?.stdout?.toString?.() || error?.message || String(error)
-    await m.reply(`*[❌] Error al actualizar.*\n\n\`\`\`${msg.slice(0, 1500)}\`\`\``)
+    const msgLocal = error?.stderr?.toString?.() || error?.stdout?.toString?.() || error?.message || String(error)
+    await m.reply(`*[❌] Error al actualizar.*\n\n\`\`\`${msgLocal.slice(0, 1500)}\`\`\``)
     await m.react('❌')
   }
 }

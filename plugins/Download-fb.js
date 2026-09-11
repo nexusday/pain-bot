@@ -10,20 +10,20 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
 
   try {
     const url = `https://api.vreden.my.id/api/v1/download/facebook?url=${encodeURIComponent(args[0])}`
-    const res = await fetch(url)
-    const json = await res.json()
+    const respuesta = await fetch(url)
+    const jsonDatos = await respuesta.json()
 
-    if (!json.status || !json.result?.download) {
+    if (!jsonDatos.status || !jsonDatos.result?.download) {
       return conn.sendMessage(m.chat, {
         text: `[❌]︎ No se pudo obtener el video.`,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
     }
 
-    const { title, durasi, download } = json.result
-    const videoUrl = download.hd || download.sd
+    const { titulo, durasi, download } = jsonDatos.result
+    const urlVideo = download.hd || download.sd
 
-    if (!videoUrl) {
+    if (!urlVideo) {
       return conn.sendMessage(m.chat, {
         text: `[❗] ︎ No se encontró un link válido de descarga.`,
         contextInfo: { ...rcanal?.contextInfo }
@@ -31,9 +31,9 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
     }
 
     await conn.sendMessage(m.chat, {
-      video: { url: videoUrl },
+      video: { url: urlVideo },
       fileName: "facebook.mp4",
-      caption: `*𓂃 ࣪ ִֶָ☾. *Aqui esta tu video*\n\n> *Título:* ${title}\n> *Duración:* ${durasi}`,
+      caption: `*𓂃 ࣪ ִֶָ☾. *Aqui esta tu video*\n\n> *Título:* ${titulo}\n> *Duración:* ${durasi}`,
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
 

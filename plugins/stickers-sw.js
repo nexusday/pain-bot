@@ -11,8 +11,8 @@ const FONTS_DIR = join(__dirname, '../lib/fonts')
 const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72'
 
 let notoRegularBase64 = null
-const emojiPngCache = new Map()
-const graphemeSegmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+const cachePngEmoji = new Map()
+const segmentadorGrafemas = typeof Intl !== 'undefined' && Intl.Segmenter
   ? new Intl.Segmenter('und', { granularity: 'grapheme' })
   : null
 
@@ -27,8 +27,8 @@ const TEXT_AREA_WIDTH = BUBBLE_MAX_WIDTH - BUBBLE_PAD_X * 2
 const MAX_MSG = 120
 const MAX_LINES = 6
 
-function escapeXml(text) {
-  return text
+function escaparXml(texto) {
+  return texto
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -36,429 +36,429 @@ function escapeXml(text) {
     .replace(/'/g, '&apos;')
 }
 
-function loadNotoBase64() {
+function cargarNotoBase64() {
   if (notoRegularBase64 !== null) return notoRegularBase64
 
-  const filePath = join(FONTS_DIR, 'NotoSans-Regular.ttf')
-  notoRegularBase64 = existsSync(filePath)
-    ? readFileSync(filePath).toString('base64')
+  const rutaArchivo = join(FONTS_DIR, 'NotoSans-Regular.ttf')
+  notoRegularBase64 = existsSync(rutaArchivo)
+    ? readFileSync(rutaArchivo).toString('base64')
     : ''
 
   return notoRegularBase64
 }
 
-function splitGraphemes(text) {
-  if (!text) return []
-  if (graphemeSegmenter) {
-    return [...graphemeSegmenter.segment(text)].map(s => s.segment)
+function dividirGrafemas(texto) {
+  if (!texto) return []
+  if (segmentadorGrafemas) {
+    return [...segmentadorGrafemas.segment(texto)].map(s => s.segment)
   }
-  return [...text]
+  return [...texto]
 }
 
-function isEmojiCodePoint(cp) {
-  if (cp === 0xFE0F || cp === 0x200D) return true
+function esPuntoCodigoEmoji(puntoCodigo) {
+  if (puntoCodigo === 0xFE0F || puntoCodigo === 0x200D) return true
   return (
-    (cp >= 0x1F300 && cp <= 0x1FAFF) ||
-    (cp >= 0x1F600 && cp <= 0x1F64F) ||
-    (cp >= 0x1F680 && cp <= 0x1F6FF) ||
-    (cp >= 0x1F900 && cp <= 0x1F9FF) ||
-    (cp >= 0x2600 && cp <= 0x27BF) ||
-    (cp >= 0x2300 && cp <= 0x23FF)
+    (puntoCodigo >= 0x1F300 && puntoCodigo <= 0x1FAFF) ||
+    (puntoCodigo >= 0x1F600 && puntoCodigo <= 0x1F64F) ||
+    (puntoCodigo >= 0x1F680 && puntoCodigo <= 0x1F6FF) ||
+    (puntoCodigo >= 0x1F900 && puntoCodigo <= 0x1F9FF) ||
+    (puntoCodigo >= 0x2600 && puntoCodigo <= 0x27BF) ||
+    (puntoCodigo >= 0x2300 && puntoCodigo <= 0x23FF)
   )
 }
 
-function isEmojiGrapheme(segment) {
-  if (!segment) return false
-  return [...segment].some(char => isEmojiCodePoint(char.codePointAt(0)))
+function esGrafemaEmoji(segmento) {
+  if (!segmento) return false
+  return [...segmento].some(caracter => esPuntoCodigoEmoji(caracter.codePointAt(0)))
 }
 
-function emojiToTwemojiCode(emoji) {
+function emojiACodigoTwemoji(emoji) {
   return [...emoji]
-    .map(char => char.codePointAt(0).toString(16))
-    .filter(code => code !== 'fe0f')
+    .map(caracter => caracter.codePointAt(0).toString(16))
+    .filter(codigo => codigo !== 'fe0f')
     .join('-')
 }
 
-async function getEmojiPng(emoji) {
-  if (emojiPngCache.has(emoji)) return emojiPngCache.get(emoji)
+async function obtenerPngEmoji(emoji) {
+  if (cachePngEmoji.has(emoji)) return cachePngEmoji.get(emoji)
 
   try {
-    const code = emojiToTwemojiCode(emoji)
-    const res = await fetch(`${TWEMOJI_BASE}/${code}.png`)
-    if (!res.ok) {
-      emojiPngCache.set(emoji, null)
+    const codigo = emojiACodigoTwemoji(emoji)
+    const respuesta = await fetch(`${TWEMOJI_BASE}/${codigo}.png`)
+    if (!respuesta.ok) {
+      cachePngEmoji.set(emoji, null)
       return null
     }
-    const buffer = Buffer.from(await res.arrayBuffer())
-    emojiPngCache.set(emoji, buffer)
-    return buffer
+    const bufer = Buffer.from(await respuesta.arrayBuffer())
+    cachePngEmoji.set(emoji, bufer)
+    return bufer
   } catch {
-    emojiPngCache.set(emoji, null)
+    cachePngEmoji.set(emoji, null)
     return null
   }
 }
 
-async function prefetchEmojis(text) {
-  const tasks = []
-  for (const grapheme of splitGraphemes(text)) {
-    if (isEmojiGrapheme(grapheme)) tasks.push(getEmojiPng(grapheme))
+async function precargarEmojis(texto) {
+  const tareas = []
+  for (const grafema of dividirGrafemas(texto)) {
+    if (esGrafemaEmoji(grafema)) tareas.push(obtenerPngEmoji(grafema))
   }
-  await Promise.all(tasks)
+  await Promise.all(tareas)
 }
 
-async function parseLineRuns(line) {
-  const runs = []
-  let currentText = ''
+async function parsearCorridasLinea(line) {
+  const corridas = []
+  let textoActual = ''
 
-  for (const grapheme of splitGraphemes(line)) {
-    if (isEmojiGrapheme(grapheme)) {
-      if (currentText) {
-        runs.push({ type: 'text', text: currentText })
-        currentText = ''
+  for (const grafema of dividirGrafemas(line)) {
+    if (esGrafemaEmoji(grafema)) {
+      if (textoActual) {
+        corridas.push({ type: 'text', text: textoActual })
+        textoActual = ''
       }
-      runs.push({ type: 'emoji', text: grapheme, png: await getEmojiPng(grapheme) })
+      corridas.push({ type: 'emoji', text: grafema, png: await obtenerPngEmoji(grafema) })
     } else {
-      currentText += grapheme
+      textoActual += grafema
     }
   }
 
-  if (currentText) runs.push({ type: 'text', text: currentText })
-  return runs
+  if (textoActual) corridas.push({ type: 'text', text: textoActual })
+  return corridas
 }
 
-function estimateTextWidth(text, fontSize) {
-  return splitGraphemes(text).reduce((width, grapheme) => {
-    return width + (isEmojiGrapheme(grapheme) ? fontSize * 1.05 : fontSize * 0.56)
+function estimarAnchoTexto(texto, tamanoFuente) {
+  return dividirGrafemas(texto).reduce((ancho, grafema) => {
+    return ancho + (esGrafemaEmoji(grafema) ? tamanoFuente * 1.05 : tamanoFuente * 0.56)
   }, 0)
 }
 
-function buildTextRunSvg(text, fontSize) {
-  const width = Math.max(8, Math.ceil(estimateTextWidth(text, fontSize)) + 6)
-  const height = Math.ceil(fontSize * 1.35)
-  const noto = loadNotoBase64()
-  const fontFace = noto
+function construirSvgCorridaTexto(texto, tamanoFuente) {
+  const ancho = Math.max(8, Math.ceil(estimarAnchoTexto(texto, tamanoFuente)) + 6)
+  const altura = Math.ceil(tamanoFuente * 1.35)
+  const noto = cargarNotoBase64()
+  const caraFuente = noto
     ? `@font-face { font-family: 'NotoSans'; src: url(data:font/ttf;base64,${noto}) format('truetype'); }`
     : ''
-  const family = noto ? 'NotoSans, Arial, sans-serif' : 'Segoe UI, Arial, sans-serif'
+  const familia = noto ? 'NotoSans, Arial, sans-serif' : 'Segoe UI, Arial, sans-serif'
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  <style>${fontFace}</style>
-  <text x="0" y="${fontSize * 0.9}" font-family="${family}" font-size="${fontSize}"
-    font-weight="500" fill="#111111">${escapeXml(text)}</text>
+<svg width="${ancho}" height="${altura}" xmlns="http://www.w3.org/2000/svg">
+  <style>${caraFuente}</style>
+  <text x="0" y="${tamanoFuente * 0.9}" font-family="${familia}" font-size="${tamanoFuente}"
+    font-weight="500" fill="#111111">${escaparXml(texto)}</text>
 </svg>`
 }
 
-function getMessageLayout(lines, msgFont) {
-  const lineHeight = msgFont * 1.28
-  const nameY = 168
-  const bubbleY = nameY + 18
-  const textStartY = bubbleY + BUBBLE_PAD_Y + msgFont * 0.85
+function obtenerDisenoMensaje(lineas, fuenteMsg) {
+  const alturaLinea = fuenteMsg * 1.28
+  const nombreY = 168
+  const burbujaY = nombreY + 18
+  const inicioTextoY = burbujaY + BUBBLE_PAD_Y + fuenteMsg * 0.85
   return { lineHeight, textStartY }
 }
 
-async function buildMessageComposites(lines, msgFont) {
-  const { lineHeight, textStartY } = getMessageLayout(lines, msgFont)
-  const emojiSize = Math.round(msgFont * 1.05)
-  const composites = []
+async function construirCompuestosMensaje(lineas, fuenteMsg) {
+  const { lineHeight, textStartY } = obtenerDisenoMensaje(lineas, fuenteMsg)
+  const tamanoEmoji = Math.round(fuenteMsg * 1.05)
+  const compuestos = []
 
-  for (let i = 0; i < lines.length; i++) {
-    const runs = await parseLineRuns(lines[i])
+  for (let i = 0; i < lineas.length; i++) {
+    const corridas = await parsearCorridasLinea(lineas[i])
     let x = TEXT_X + BUBBLE_PAD_X
-    const textTop = Math.round(textStartY + i * lineHeight - msgFont * 0.9)
-    const emojiTop = Math.round(textStartY + i * lineHeight - emojiSize * 0.82)
+    const textoArriba = Math.round(inicioTextoY + i * alturaLinea - fuenteMsg * 0.9)
+    const emojiArriba = Math.round(inicioTextoY + i * alturaLinea - tamanoEmoji * 0.82)
 
-    for (const run of runs) {
-      if (run.type === 'text' && run.text) {
-        const svg = buildTextRunSvg(run.text, msgFont)
-        const buffer = await sharp(Buffer.from(svg)).png().toBuffer()
-        composites.push({ input: buffer, left: Math.round(x), top: textTop })
-        x += estimateTextWidth(run.text, msgFont)
+    for (const corrida of corridas) {
+      if (corrida.type === 'text' && corrida.text) {
+        const svg = construirSvgCorridaTexto(corrida.text, fuenteMsg)
+        const bufer = await sharp(Buffer.from(svg)).png().toBuffer()
+        compuestos.push({ input: bufer, left: Math.round(x), top: textoArriba })
+        x += estimarAnchoTexto(corrida.text, fuenteMsg)
         continue
       }
 
-      if (run.type === 'emoji' && run.png) {
-        const buffer = await sharp(run.png).resize(emojiSize, emojiSize).png().toBuffer()
-        composites.push({ input: buffer, left: Math.round(x), top: emojiTop })
+      if (corrida.type === 'emoji' && corrida.png) {
+        const bufer = await sharp(corrida.png).resize(tamanoEmoji, tamanoEmoji).png().toBuffer()
+        compuestos.push({ input: bufer, left: Math.round(x), top: emojiArriba })
       }
 
-      if (run.type === 'emoji') x += emojiSize * 0.95
+      if (corrida.type === 'emoji') x += tamanoEmoji * 0.95
     }
   }
 
-  return composites
+  return compuestos
 }
 
-function wrapParagraph(paragraph, maxChars) {
-  const words = paragraph.split(/\s+/).filter(Boolean)
-  if (!words.length) return []
+function envolverParrafo(parrafo, maxCaracteres) {
+  const palabras = parrafo.split(/\s+/).filter(Boolean)
+  if (!palabras.length) return []
 
-  const lines = []
-  let current = ''
+  const lineas = []
+  let actual = ''
 
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word
-    if (test.length <= maxChars) {
-      current = test
+  for (const palabra of palabras) {
+    const prueba = actual ? `${actual} ${palabra}` : palabra
+    if (prueba.length <= maxCaracteres) {
+      actual = prueba
       continue
     }
-    if (current) lines.push(current)
-    if (word.length > maxChars) {
-      for (let i = 0; i < word.length; i += maxChars) {
-        lines.push(word.slice(i, i + maxChars))
+    if (actual) lineas.push(actual)
+    if (palabra.length > maxCaracteres) {
+      for (let i = 0; i < palabra.length; i += maxCaracteres) {
+        lineas.push(palabra.slice(i, i + maxCaracteres))
       }
-      current = ''
+      actual = ''
     } else {
-      current = word
+      actual = palabra
     }
   }
 
-  if (current) lines.push(current)
-  return lines
+  if (actual) lineas.push(actual)
+  return lineas
 }
 
-function estimateMaxChars(fontSize) {
-  const avgCharWidth = fontSize * 0.56
-  return Math.max(6, Math.floor(TEXT_AREA_WIDTH / avgCharWidth))
+function estimarMaxCaracteres(tamanoFuente) {
+  const anchoPromedioChar = tamanoFuente * 0.56
+  return Math.max(6, Math.floor(TEXT_AREA_WIDTH / anchoPromedioChar))
 }
 
-function wrapText(text, maxChars) {
-  const parts = text.split('\n').map(p => p.trim())
-  const lines = []
+function envolverTexto(texto, maxCaracteres) {
+  const partes = texto.split('\n').map(p => p.trim())
+  const lineas = []
 
-  for (const part of parts) {
-    if (!part) continue
-    lines.push(...wrapParagraph(part, maxChars))
+  for (const parte of partes) {
+    if (!parte) continue
+    lineas.push(...envolverParrafo(parte, maxCaracteres))
   }
 
-  return lines.length ? lines : [text.slice(0, maxChars)]
+  return lineas.length ? lineas : [texto.slice(0, maxCaracteres)]
 }
 
-function calcLayout(text) {
-  let fontSize = 30
-  let maxChars = estimateMaxChars(fontSize)
-  let lines = wrapText(text, maxChars)
+function calcularDiseno(texto) {
+  let tamanoFuente = 30
+  let maxCaracteres = estimarMaxCaracteres(tamanoFuente)
+  let lineas = envolverTexto(texto, maxCaracteres)
 
-  while (lines.length > MAX_LINES && fontSize > 20) {
-    fontSize -= 4
-    maxChars = estimateMaxChars(fontSize)
-    lines = wrapText(text, maxChars)
+  while (lineas.length > MAX_LINES && tamanoFuente > 20) {
+    tamanoFuente -= 4
+    maxCaracteres = estimarMaxCaracteres(tamanoFuente)
+    lineas = envolverTexto(texto, maxCaracteres)
   }
 
-  if (lines.length > MAX_LINES) {
-    lines = lines.slice(0, MAX_LINES)
-    const last = lines[MAX_LINES - 1]
-    lines[MAX_LINES - 1] = last.length > 3 ? `${last.slice(0, -1)}…` : `${last}…`
+  if (lineas.length > MAX_LINES) {
+    lineas = lineas.slice(0, MAX_LINES)
+    const ultimo = lineas[MAX_LINES - 1]
+    lineas[MAX_LINES - 1] = ultimo.length > 3 ? `${ultimo.slice(0, -1)}…` : `${ultimo}…`
   }
 
   return { lines, fontSize }
 }
 
-function buildOverlaySvg(pushname, lines, msgFont) {
-  const { lineHeight } = getMessageLayout(lines, msgFont)
-  const nameFont = 28
-  const bubbleWidth = BUBBLE_MAX_WIDTH
-  const bubbleHeight = BUBBLE_PAD_Y * 2 + lines.length * lineHeight
-  const nameY = 168
-  const bubbleY = nameY + 18
+function construirSvgSuperposicion(nombrePush, lineas, fuenteMsg) {
+  const { lineHeight } = obtenerDisenoMensaje(lineas, fuenteMsg)
+  const fuenteNombre = 28
+  const anchoBurbuja = BUBBLE_MAX_WIDTH
+  const alturaBurbuja = BUBBLE_PAD_Y * 2 + lineas.length * alturaLinea
+  const nombreY = 168
+  const burbujaY = nombreY + 18
 
   return `<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <text x="${TEXT_X}" y="${nameY}" font-family="Segoe UI, Arial, sans-serif"
-    font-size="${nameFont}" font-weight="700" fill="#25D366">${escapeXml(pushname)}</text>
-  <rect x="${TEXT_X}" y="${bubbleY}" width="${bubbleWidth}" height="${bubbleHeight}"
+  <text x="${TEXT_X}" y="${nombreY}" font-family="Segoe UI, Arial, sans-serif"
+    font-size="${fuenteNombre}" font-weight="700" fill="#25D366">${escaparXml(nombrePush)}</text>
+  <rect x="${TEXT_X}" y="${burbujaY}" width="${anchoBurbuja}" height="${alturaBurbuja}"
     rx="20" ry="20" fill="#FFFFFF" stroke="#ECECEC" stroke-width="1"/>
 </svg>`
 }
 
-function defaultAvatarSvg(letter) {
-  const safe = escapeXml(letter.slice(0, 1).toUpperCase() || '?')
+function svgAvatarPorDefecto(letra) {
+  const seguro = escaparXml(letra.slice(0, 1).toUpperCase() || '?')
   return `<svg width="${AVATAR_SIZE}" height="${AVATAR_SIZE}" xmlns="http://www.w3.org/2000/svg">
   <circle cx="${AVATAR_SIZE / 2}" cy="${AVATAR_SIZE / 2}" r="${AVATAR_SIZE / 2}" fill="#DFE5E7"/>
   <text x="50%" y="54%" font-family="Arial, sans-serif" font-size="52" font-weight="700"
-    fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${safe}</text>
+    fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${seguro}</text>
 </svg>`
 }
 
-function loadQuotedFromStore(conn, m) {
-  const stanzaId = m.quoted?.id || m.msg?.contextInfo?.stanzaId
-  if (!stanzaId || !conn?.chats) return null
+function cargarCitadoDesdeStore(conn, m) {
+  const idEstrofa = m.quoted?.id || m.msg?.contextInfo?.stanzaId
+  if (!idEstrofa || !conn?.chats) return null
 
-  const remoteJid = m.msg?.contextInfo?.remoteJid || m.quoted?.chat || m.chat
-  const participant = m.msg?.contextInfo?.participant
-  const candidates = []
-  const seen = new Set()
+  const jidRemoto = m.msg?.contextInfo?.remoteJid || m.quoted?.chat || m.chat
+  const participante = m.msg?.contextInfo?.participant
+  const candidatos = []
+  const vistos = new Set()
 
-  const push = (entry) => {
-    if (!entry?.message || seen.has(entry)) return
-    seen.add(entry)
-    candidates.push(entry)
+  const agregar = (entrada) => {
+    if (!entrada?.message || vistos.has(entrada)) return
+    vistos.add(entrada)
+    candidatos.push(entrada)
   }
 
-  push(conn.chats[remoteJid]?.messages?.[stanzaId])
-  push(conn.chats[m.chat]?.messages?.[stanzaId])
-  if (participant) push(conn.chats[participant]?.messages?.[stanzaId])
+  agregar(conn.chats[jidRemoto]?.messages?.[idEstrofa])
+  agregar(conn.chats[m.chat]?.messages?.[idEstrofa])
+  if (participante) agregar(conn.chats[participante]?.messages?.[idEstrofa])
 
   for (const chat of Object.values(conn.chats)) {
-    push(chat?.messages?.[stanzaId])
-    if (candidates.length) break
+    agregar(chat?.messages?.[idEstrofa])
+    if (candidatos.length) break
   }
 
-  return candidates[0] || null
+  return candidatos[0] || null
 }
 
-function sameJidUser(a, b) {
+function mismoUsuarioJid(a, b) {
   if (!a || !b) return false
-  const na = String(a).split('@')[0].replace(/\D/g, '')
-  const nb = String(b).split('@')[0].replace(/\D/g, '')
-  return na.length > 5 && na === nb
+  const numA = String(a).split('@')[0].replace(/\D/g, '')
+  const numB = String(b).split('@')[0].replace(/\D/g, '')
+  return numA.length > 5 && numA === numB
 }
 
-async function collectUserJids(m, conn, seeds = []) {
+async function recolectarJidsUsuario(m, conn, semillas = []) {
   const jids = new Set()
-  const add = (jid) => {
+  const agregarJid = (jid) => {
     if (!jid || typeof jid !== 'string') return
-    const decoded = conn.decodeJid(jid)
-    if (!decoded || decoded === 'status@broadcast' || decoded.endsWith('@g.us')) return
-    jids.add(decoded)
+    const decodificado = conn.decodeJid(jid)
+    if (!decodificado || decodificado === 'status@broadcast' || decodificado.endsWith('@g.us')) return
+    jids.add(decodificado)
   }
 
-  for (const seed of seeds) add(seed)
+  for (const semilla of semillas) agregarJid(semilla)
 
   if (m.isGroup) {
     try {
       const meta = conn.chats[m.chat]?.metadata || await conn.groupMetadata(m.chat).catch(() => null)
-      const targets = [...jids]
+      const objetivos = [...jids]
       for (const p of meta?.participants || []) {
-        const pid = conn.decodeJid(p.id)
-        if (targets.some(t => t === pid || sameJidUser(t, pid))) {
-          add(pid)
-          if (p.phoneNumber) add(`${String(p.phoneNumber).replace(/\D/g, '')}@s.whatsapp.net`)
-          if (p.lid) add(p.lid.includes('@') ? p.lid : `${p.lid}@lid`)
+        const idParticipante = conn.decodeJid(p.id)
+        if (objetivos.some(t => t === idParticipante || mismoUsuarioJid(t, idParticipante))) {
+          agregarJid(idParticipante)
+          if (p.phoneNumber) agregarJid(`${String(p.phoneNumber).replace(/\D/g, '')}@s.whatsapp.net`)
+          if (p.lid) agregarJid(p.lid.includes('@') ? p.lid : `${p.lid}@lid`)
         }
       }
     } catch {}
   }
 
-  const resolved = []
+  const resueltos = []
   for (const jid of jids) {
     if (!jid.includes('@lid') || !m.isGroup) {
-      resolved.push(jid)
+      resueltos.push(jid)
       continue
     }
     try {
       const real = await Promise.race([
         String.prototype.resolveLidToRealJid.call(jid, m.chat, conn),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
+        new Promise((_, rechazar) => setTimeout(() => rechazar(new Error('timeout')), 6000))
       ])
-      if (typeof real === 'string' && real) resolved.push(conn.decodeJid(real))
+      if (typeof real === 'string' && real) resueltos.push(conn.decodeJid(real))
     } catch {}
-    resolved.push(jid)
+    resueltos.push(jid)
   }
 
-  return [...new Set(resolved)]
+  return [...new Set(resueltos)]
 }
 
-async function resolvePushnameForJid(jid, jids, conn, extraNames = []) {
-  let pushname = ''
+async function resolverNombrePushParaJid(jid, jids, conn, nombresExtra = []) {
+  let nombrePush = ''
 
-  for (const candidate of extraNames) {
-    if (typeof candidate?.then === 'function') candidate = await candidate
-    const value = String(candidate || '').trim()
-    if (value) {
-      pushname = value
+  for (const candidato of nombresExtra) {
+    if (typeof candidato?.then === 'function') candidato = await candidato
+    const valor = String(candidato || '').trim()
+    if (valor) {
+      nombrePush = valor
       break
     }
   }
 
-  const lookupJids = [...new Set([jid, ...jids].filter(Boolean))]
-  if (!pushname) {
-    for (const id of lookupJids) {
-      const cached = conn.chats?.[id]
-      pushname = (cached?.notify || cached?.name || cached?.vname || '').trim()
-      if (pushname) break
+  const jidsConsulta = [...new Set([jid, ...jids].filter(Boolean))]
+  if (!nombrePush) {
+    for (const id of jidsConsulta) {
+      const enCache = conn.chats?.[id]
+      nombrePush = (enCache?.notify || enCache?.name || enCache?.vname || '').trim()
+      if (nombrePush) break
     }
   }
 
-  if (!pushname) {
-    for (const id of lookupJids) {
-      pushname = String(await Promise.resolve(conn.getName(id)) || '').trim()
-      if (pushname) break
+  if (!nombrePush) {
+    for (const id of jidsConsulta) {
+      nombrePush = String(await Promise.resolve(conn.getName(id)) || '').trim()
+      if (nombrePush) break
     }
   }
 
-  return pushname || 'Usuario'
+  return nombrePush || 'Usuario'
 }
 
-async function resolveQuotedUser(m, conn) {
-  const fullQuoted = m.getQuotedObj?.() || null
-  const stored = loadQuotedFromStore(conn, m)
+async function resolverUsuarioCitado(m, conn) {
+  const citadoCompleto = m.getQuotedObj?.() || null
+  const almacenado = cargarCitadoDesdeStore(conn, m)
   const ctx = m.msg?.contextInfo
-  const seeds = [
+  const semillas = [
     ctx?.participant,
-    fullQuoted?.key?.participant,
-    fullQuoted?.sender,
-    stored?.key?.participant
+    citadoCompleto?.key?.participant,
+    citadoCompleto?.sender,
+    almacenado?.key?.participant
   ].filter(Boolean)
 
-  const jids = await collectUserJids(m, conn, seeds)
-  const primaryJid = jids[0] || null
-  if (!primaryJid) return null
+  const jids = await recolectarJidsUsuario(m, conn, semillas)
+  const jidPrincipal = jids[0] || null
+  if (!jidPrincipal) return null
 
-  const pushname = await resolvePushnameForJid(primaryJid, jids, conn, [
-    fullQuoted?.pushName,
-    stored?.pushName,
-    fullQuoted?.name
+  const nombrePush = await resolverNombrePushParaJid(jidPrincipal, jids, conn, [
+    citadoCompleto?.pushName,
+    almacenado?.pushName,
+    citadoCompleto?.name
   ])
 
   return { primaryJid, jids, pushname }
 }
 
-async function resolveMentionedUser(m, conn) {
-  let mention = m.mentionedJid?.[0]
-  if (typeof mention?.then === 'function') mention = await mention
+async function resolverUsuarioMencionado(m, conn) {
+  let mencion = m.mentionedJid?.[0]
+  if (typeof mencion?.then === 'function') mencion = await mencion
 
-  if (!mention) {
-    const parsed = conn.parseMention?.(m.text || '') || []
-    mention = parsed[0]
+  if (!mencion) {
+    const analizado = conn.parseMention?.(m.text || '') || []
+    mencion = analizado[0]
   }
 
-  if (!mention) return null
+  if (!mencion) return null
 
-  mention = conn.decodeJid(mention)
-  const jids = await collectUserJids(m, conn, [mention])
-  const primaryJid = jids[0] || mention
+  mencion = conn.decodeJid(mencion)
+  const jids = await recolectarJidsUsuario(m, conn, [mencion])
+  const jidPrincipal = jids[0] || mencion
 
-  const pushname = await resolvePushnameForJid(primaryJid, jids, conn)
+  const nombrePush = await resolverNombrePushParaJid(jidPrincipal, jids, conn)
   return { primaryJid, jids, pushname }
 }
 
-function resolveSwMessage(m, args) {
-  let text = args.join(' ').trim()
+function resolverMensajeSw(m, args) {
+  let texto = args.join(' ').trim()
 
-  if (!text && m.text) {
-    const cleaned = m.text.replace(/^[\s\u200e\u200f]*/, '')
-    const match = cleaned.match(/^[^\w]?[.!#/]\S+\s+([\s\S]*)$/)
-    if (match) text = match[1].trim()
+  if (!texto && m.text) {
+    const limpiado = m.text.replace(/^[\s\u200e\u200f]*/, '')
+    const coincidencia = limpiado.match(/^[^\w]?[.!#/]\S+\s+([\s\S]*)$/)
+    if (coincidencia) texto = coincidencia[1].trim()
   }
 
-  return text
+  return texto
     .replace(/@\d{5,20}/g, '')
     .replace(/[\u200e\u200f\uFEFF]/g, '')
     .replace(/[^\S\n]+/g, ' ')
     .trim()
 }
 
-function hasMention(m, conn) {
+function tieneMencion(m, conn) {
   if (m.mentionedJid?.length) return true
   return (conn.parseMention?.(m.text || '') || []).length > 0
 }
 
-async function downloadImageUrl(conn, url) {
+async function descargarUrlImagen(conn, url) {
   if (!url) return null
 
   try {
-    const file = await conn.getFile(url)
-    if (file?.data?.length > 512) return file.data
+    const archivo = await conn.getFile(url)
+    if (archivo?.data?.length > 512) return archivo.data
   } catch {}
 
   try {
@@ -469,49 +469,49 @@ async function downloadImageUrl(conn, url) {
   return null
 }
 
-async function fetchProfileBuffer(conn, jids, pushname) {
-  const tried = new Set()
+async function obtenerBuferPerfil(conn, jids, nombrePush) {
+  const probados = new Set()
 
   for (const jid of jids) {
-    if (!jid || tried.has(jid)) continue
-    tried.add(jid)
+    if (!jid || probados.has(jid)) continue
+    probados.add(jid)
 
     try {
       let url = await conn.profilePictureUrl(jid, 'image').catch(() => null)
       if (!url) url = await conn.profilePictureUrl(jid, 'preview').catch(() => null)
-      const data = await downloadImageUrl(conn, url)
+      const data = await descargarUrlImagen(conn, url)
       if (data?.length > 512) return data
     } catch {}
   }
 
-  return sharp(Buffer.from(defaultAvatarSvg(pushname || '?')))
+  return sharp(Buffer.from(svgAvatarPorDefecto(nombrePush || '?')))
     .resize(AVATAR_SIZE, AVATAR_SIZE)
     .png()
     .toBuffer()
 }
 
-async function buildCircleAvatar(buffer) {
-  const mask = Buffer.from(
+async function construirAvatarCircular(bufer) {
+  const mascara = Buffer.from(
     `<svg width="${AVATAR_SIZE}" height="${AVATAR_SIZE}">
       <circle cx="${AVATAR_SIZE / 2}" cy="${AVATAR_SIZE / 2}" r="${AVATAR_SIZE / 2}" fill="white"/>
     </svg>`
   )
 
-  return sharp(buffer)
+  return sharp(bufer)
     .resize(AVATAR_SIZE, AVATAR_SIZE, { fit: 'cover' })
     .png()
-    .composite([{ input: mask, blend: 'dest-in' }])
+    .composite([{ input: mascara, blend: 'dest-in' }])
     .png()
     .toBuffer()
 }
 
-async function buildSticker(pushname, message, profileBuffer) {
-  const { lines, fontSize } = calcLayout(message)
-  await prefetchEmojis(message)
+async function construirSticker(nombrePush, mensaje, buferPerfil) {
+  const { lines, fontSize } = calcularDiseno(mensaje)
+  await precargarEmojis(mensaje)
 
-  const avatar = await buildCircleAvatar(profileBuffer)
-  const overlay = Buffer.from(buildOverlaySvg(pushname, lines, fontSize))
-  const messageLayer = await buildMessageComposites(lines, fontSize)
+  const avatar = await construirAvatarCircular(buferPerfil)
+  const superposicion = Buffer.from(construirSvgSuperposicion(nombrePush, lineas, tamanoFuente))
+  const capaMensaje = await construirCompuestosMensaje(lineas, tamanoFuente)
   const avatarY = Math.round((SIZE - AVATAR_SIZE) / 2)
 
   return sharp({
@@ -524,8 +524,8 @@ async function buildSticker(pushname, message, profileBuffer) {
   })
     .composite([
       { input: avatar, left: AVATAR_X, top: avatarY },
-      { input: overlay, left: 0, top: 0 },
-      ...messageLayer
+      { input: superposicion, left: 0, top: 0 },
+      ...capaMensaje
     ])
     .webp({ quality: 92 })
     .toBuffer()
@@ -533,56 +533,56 @@ async function buildSticker(pushname, message, profileBuffer) {
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
-    const mentioned = hasMention(m, conn)
-    const quoted = !!m.quoted
+    const mencionado = tieneMencion(m, conn)
+    const citado = !!m.quoted
 
-    if (!mentioned && !quoted) {
+    if (!mencionado && !citado) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Respondé a un mensaje o mencioná al usuario, y escribe el texto que "diría".*\n\nEjemplos:\n> (respondés mensaje)\n> ${usedPrefix + command} Soy tu amigo 😄\n\n> ${usedPrefix + command} @usuario Hola, ¿cómo estás?`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const message = resolveSwMessage(m, args)
-    if (!message) {
+    const mensaje = resolverMensajeSw(m, args)
+    if (!mensaje) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Falta el texto del mensaje.*\n\nEjemplos:\n> ${usedPrefix + command} Hola, ¿cómo estás?\n> ${usedPrefix + command} @usuario Te extraño`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    if (message.length > MAX_MSG) {
+    if (mensaje.length > MAX_MSG) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Texto muy largo.* Máximo ${MAX_MSG} caracteres.`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const target = mentioned
-      ? await resolveMentionedUser(m, conn)
-      : await resolveQuotedUser(m, conn)
+    const destino = mencionado
+      ? await resolverUsuarioMencionado(m, conn)
+      : await resolverUsuarioCitado(m, conn)
 
-    if (!target?.primaryJid) {
+    if (!destino?.primaryJid) {
       return conn.sendMessage(m.chat, {
         text: '*[❗] No se pudo identificar al usuario.*',
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const { primaryJid, jids, pushname } = target
+    const { primaryJid, jids, pushname } = destino
 
-    const profileBuffer = await fetchProfileBuffer(conn, jids.length ? jids : [primaryJid], pushname)
-    const stickerData = await buildSticker(pushname, message, profileBuffer)
+    const buferPerfil = await obtenerBuferPerfil(conn, jids.length ? jids : [jidPrincipal], nombrePush)
+    const datosSticker = await construirSticker(nombrePush, mensaje, buferPerfil)
 
     const { packname, author } = resolveStickerMeta(m, conn)
 
-    const finalSticker = await addExif(stickerData, packname, author)
+    const stickerFinal = await addExif(datosSticker, packname, author)
 
-    await conn.sendFile(m.chat, finalSticker, 'sticker.webp', '', m, null, rcanal)
-  } catch (e) {
-    console.error('[sw] Error:', e)
+    await conn.sendFile(m.chat, stickerFinal, 'sticker.webp', '', m, null, rcanal)
+  } catch (error) {
+    console.error('[sw] Error:', error)
     conn.sendMessage(m.chat, {
-      text: `*[❌] Error al crear sticker: ${e.message || 'desconocido'}*`,
+      text: `*[❌] Error al crear sticker: ${error.message || 'desconocido'}*`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }

@@ -9,29 +9,29 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 
   try {
-    const apiUrl = `https://api.delirius.online/ia/ripleai?query=${encodeURIComponent(text.trim())}`
-    const { data } = await axios.get(apiUrl, { timeout: 60000 })
+    const urlApi = `https://api.delirius.online/ia/ripleai?query=${encodeURIComponent(text.trim())}`
+    const { datos } = await axios.get(urlApi, { timeout: 60000 })
 
-    if (!data?.status) {
+    if (!datos?.status) {
       return conn.sendMessage(m.chat, {
         text: '*[❗] No se pudo obtener una respuesta de Replia.*',
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const response = (
-      typeof data.data?.result === 'string' ? data.data.result.trim()
-        : typeof data.data === 'string' ? data.data.trim()
+    const respuestaApi = (
+      typeof datos.data?.result === 'string' ? datos.data.result.trim()
+        : typeof datos.data === 'string' ? datos.data.trim()
           : ''
     ) || 'No se obtuvo respuesta de la API.'
 
     await conn.sendMessage(m.chat, {
-      text: response,
+      text: respuestaApi,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
     console.error('Error en ia-replia:', e)
-    const detail = e?.response?.data?.message || e.message || 'Intenta de nuevo más tarde.'
+    const detalle = e?.response?.data?.message || e.message || 'Intenta de nuevo más tarde.'
     return conn.sendMessage(m.chat, {
       text: `*[❌] Error al consultar a Replia.*`,
       contextInfo: { ...rcanal.contextInfo }

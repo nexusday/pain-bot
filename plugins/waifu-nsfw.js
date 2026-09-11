@@ -46,8 +46,8 @@ let handler = async (m, { conn }) => {
       },
       { quoted: m }
     )
-  } catch (e) {
-    console.error('Error en comando neko:', e)
+  } catch (error) {
+    console.error('Error en comando neko:', error)
     m.reply('*[❗] Ocurrió un error al obtener la imagen. Por favor, inténtalo de nuevo más tarde.*')
   }
 }

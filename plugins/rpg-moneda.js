@@ -31,8 +31,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    let user = global.db.data.users[m.sender]
-    if (!user) {
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) {
       global.db.data.users[m.sender] = {
         coins: 100,
         exp: 0,
@@ -40,17 +40,17 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         registered: true,
         name: m.name || m.pushName || 'Usuario'
       }
-      user = global.db.data.users[m.sender]
+      usuario = global.db.data.users[m.sender]
     }
 
     
-    if (!user.lastCoinFlip) user.lastCoinFlip = 0
-    const timeSinceLastPlay = Date.now() - user.lastCoinFlip
+    if (!usuario.lastCoinFlip) usuario.lastCoinFlip = 0
+    const timeSinceLastPlay = Date.now() - usuario.lastCoinFlip
 
     if (timeSinceLastPlay < cooldownTime) {
-      const seconds = Math.ceil((cooldownTime - timeSinceLastPlay) / 1000)
+      const segundos = Math.ceil((cooldownTime - timeSinceLastPlay) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar *${seconds} segundo${seconds !== 1 ? 's' : ''}* para volver a jugar.`,
+        text: `[❗] Debes esperar *${segundos} segundo${segundos !== 1 ? 's' : ''}* para volver a jugar.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -80,9 +80,9 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    if ((user.coins || 0) < bet) {
+    if ((usuario.coins || 0) < bet) {
       return conn.sendMessage(m.chat, {
-        text: `[❗] No tienes suficientes ${global.moneda}.\nTienes: ${user.coins || 0} ${global.moneda}`,
+        text: `[❗] No tienes suficientes ${global.moneda}.\nTienes: ${usuario.coins || 0} ${global.moneda}`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -90,8 +90,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    user.lastCoinFlip = Date.now()
-    user.coins -= bet
+    usuario.lastCoinFlip = Date.now()
+    usuario.coins -= bet
 
     
     const userWon = getCoinFlipResult(bet)
@@ -105,7 +105,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (userWon) {
       winnings = bet * 2 
-      user.coins += winnings
+      usuario.coins += winnings
       resultado = `🎉 ¡GANASTE! ${choice.toUpperCase()} salió!`
     } else {
       winnings = 0
@@ -125,28 +125,28 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    let txt = `🪙 𝗖𝗮𝗿𝗮 𝗼 𝘀𝗲𝗹𝗹𝗼 \n`
-    txt += `\n`
-    txt += `> ${resultEmoji} *Resultado:* ${resultText}\n`
-    txt += `> *Elegiste:* ${choice.toUpperCase()}\n`
-    txt += `> ${resultado}\n`
-    txt += `> *Apuesta:* ${bet} ${global.moneda}\n`
-    txt += `> *Premio:* ${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\n`
-    txt += `> *Total:* ${user.coins} ${global.moneda}\n`
-    txt += `\n`
-    txt += `> ${riskMessage}\n`
-    txt += `> *Probabilidad:* ${Math.round(probability * 100)}%\n`
-    txt += `> *Próximo:* 15 seg\n`
+    let texto = `🪙 𝗖𝗮𝗿𝗮 𝗼 𝘀𝗲𝗹𝗹𝗼 \n`
+    texto += `\n`
+    texto += `> ${resultEmoji} *Resultado:* ${resultText}\n`
+    texto += `> *Elegiste:* ${choice.toUpperCase()}\n`
+    texto += `> ${resultado}\n`
+    texto += `> *Apuesta:* ${bet} ${global.moneda}\n`
+    texto += `> *Premio:* ${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\n`
+    texto += `> *Total:* ${usuario.coins} ${global.moneda}\n`
+    texto += `\n`
+    texto += `> ${riskMessage}\n`
+    texto += `> *Probabilidad:* ${Math.round(probability * 100)}%\n`
+    texto += `> *Próximo:* 15 seg\n`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo
       }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error('Error en cara-sello:', e)
+  } catch (error) {
+    console.error('Error en cara-sello:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al ejecutar el juego.',
       contextInfo: {

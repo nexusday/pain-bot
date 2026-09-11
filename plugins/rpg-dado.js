@@ -1,20 +1,20 @@
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
 
-    let user = global.db.data.users[m.sender]
-    if (!user) global.db.data.users[m.sender] = {}
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) global.db.data.users[m.sender] = {}
 
-    let coins = user.coins || 0
+    let monedas = usuario.coins || 0
 
     const cooldown = 2 * 60 * 1000
-    const lastDado = user.lastDado || 0
-    const timeLeft = cooldown - (Date.now() - lastDado)
+    const lastDado = usuario.lastDado || 0
+    const tiempoRestante = cooldown - (Date.now() - lastDado)
 
-    if (timeLeft > 0) {
-      const minutes = Math.floor(timeLeft / 60000)
-      const seconds = Math.floor((timeLeft % 60000) / 1000)
+    if (tiempoRestante > 0) {
+      const minutos = Math.floor(tiempoRestante / 60000)
+      const segundos = Math.floor((tiempoRestante % 60000) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `🎲 𝗗𝗔𝗗𝗢\n> Debes esperar ${minutes} minuto${minutes !== 1 ? 's' : ''} y ${seconds} segundo${seconds !== 1 ? 's' : ''} para volver a jugar`,
+        text: `🎲 𝗗𝗔𝗗𝗢\n> Debes esperar ${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''} para volver a jugar`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -60,29 +60,29 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         break
     }
 
-    global.db.data.users[m.sender].coins = coins + ganancia
+    global.db.data.users[m.sender].coins = monedas + ganancia
     global.db.data.users[m.sender].lastDado = Date.now()
 
     const emojisDado = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅']
 
-    let txt = `🎲 𝗗𝗔𝗗𝗢\n 
+    let texto = `🎲 𝗗𝗔𝗗𝗢\n 
 > Dado: ${emojisDado[dado - 1]} (${dado})
 > Resultado: ${resultado}
 > Cambio: ${ganancia > 0 ? '+' : ''}${ganancia} ${global.moneda}
-> Total: ${coins + ganancia} ${global.moneda}
+> Total: ${monedas + ganancia} ${global.moneda}
 
 > Próximo intento: 2 minutos`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]
       }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error('Error en juego del dado:', e)
+  } catch (error) {
+    console.error('Error en juego del dado:', error)
     return conn.sendMessage(m.chat, {
       text: '❗ Ocurrió un error al ejecutar el juego del dado.',
       contextInfo: {

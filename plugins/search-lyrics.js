@@ -1,31 +1,31 @@
 import fetch from 'node-fetch'
 
-const MAX_CHUNK = 3800
+const MAX_FRAGMENTO = 3800
 
-function splitLyrics(text, max = MAX_CHUNK) {
-  const chunks = []
-  let rest = String(text || '').trim()
-  if (!rest) return chunks
+function partirLetras(text, max = MAX_FRAGMENTO) {
+  const fragmentos = []
+  let resto = String(text || '').trim()
+  if (!resto) return fragmentos
 
-  while (rest.length > max) {
-    let cut = rest.lastIndexOf('\n', max)
-    if (cut < max * 0.4) cut = max
-    chunks.push(rest.slice(0, cut).trim())
-    rest = rest.slice(cut).trim()
+  while (resto.length > max) {
+    let corte = resto.lastIndexOf('\n', max)
+    if (corte < max * 0.4) corte = max
+    fragmentos.push(resto.slice(0, corte).trim())
+    resto = resto.slice(corte).trim()
   }
 
-  if (rest) chunks.push(rest)
-  return chunks
+  if (resto) fragmentos.push(resto)
+  return fragmentos
 }
 
-function buildHeader(data, query) {
+function construirEncabezado(datos, consulta) {
   return `ִֶָ☾. 𝗟𝘆𝗿𝗶𝗰𝘀 ִֶָ☾.
 
- 𓍯  *Búsqueda:* ${query}
- 𓍯  *Título:* ${data.title || 'Desconocido'}
- 𓍯  *Artista:* ${data.artists || 'Desconocido'}
- 𓍯  *Álbum:* ${data.album || '—'}
- 𓍯  *Duración:* ${data.duration || '—'}`
+ 𓍯  *Búsqueda:* ${consulta}
+ 𓍯  *Título:* ${datos.title || 'Desconocido'}
+ 𓍯  *Artista:* ${datos.artists || 'Desconocido'}
+ 𓍯  *Álbum:* ${datos.album || '—'}
+ 𓍯  *Duración:* ${datos.duration || '—'}`
 }
 
 const handler = async (m, { conn, text, usedPrefix, command }) => {
@@ -37,31 +37,31 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const query = text.trim()
-    const apiUrl = `https://api.delirius.online/search/lyrics?query=${encodeURIComponent(query)}`
-    const sres = await fetch(apiUrl).then(r => r.json())
+    const consulta = text.trim()
+    const urlApi = `https://api.delirius.online/search/lyrics?query=${encodeURIComponent(consulta)}`
+    const resBusqueda = await fetch(urlApi).then(r => r.json())
 
-    if (!sres?.status || !sres?.data) {
+    if (!resBusqueda?.status || !resBusqueda?.data) {
       throw '[❗] No se encontraron letras para esa búsqueda.'
     }
 
-    const data = sres.data
-    const lyrics = String(data.lyrics || '').trim()
+    const datos = resBusqueda.data
+    const letra = String(datos.lyrics || '').trim()
 
-    if (!lyrics) {
+    if (!letra) {
       throw '[❗] La canción no tiene letra disponible.'
     }
 
     await conn.sendMessage(m.chat, {
-      text: buildHeader(data, query),
+      text: construirEncabezado(datos, consulta),
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
 
-    const parts = splitLyrics(lyrics)
-    for (let i = 0; i < parts.length; i++) {
-      const prefix = parts.length > 1 ? `*Parte ${i + 1}/${parts.length}*\n\n` : ''
+    const partes = partirLetras(letra)
+    for (let i = 0; i < partes.length; i++) {
+      const prefijo = partes.length > 1 ? `*Parte ${i + 1}/${partes.length}*\n\n` : ''
       await conn.sendMessage(m.chat, {
-        text: `${prefix}${parts[i]}`,
+        text: `${prefijo}${partes[i]}`,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
     }

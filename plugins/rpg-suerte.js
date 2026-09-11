@@ -47,8 +47,8 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     }
 
 
-    let user = global.db.data.users[m.sender]
-    if (!user) {
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) {
       global.db.data.users[m.sender] = {
         coins: 100,
         exp: 0,
@@ -56,23 +56,23 @@ let handler = async (m, { conn, usedPrefix, command }) => {
         registered: true,
         name: m.name || m.pushName || 'Usuario'
       }
-      user = global.db.data.users[m.sender]
+      usuario = global.db.data.users[m.sender]
     }
 
-    if (!user.lastLuck) user.lastLuck = 0
-    const timeSinceLastLuck = Date.now() - user.lastLuck
+    if (!usuario.lastLuck) usuario.lastLuck = 0
+    const timeSinceLastLuck = Date.now() - usuario.lastLuck
 
     if (timeSinceLastLuck < cooldownTime) {
-      const minutes = Math.ceil((cooldownTime - timeSinceLastLuck) / 60000)
+      const minutos = Math.ceil((cooldownTime - timeSinceLastLuck) / 60000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar *${minutes} minuto${minutes !== 1 ? 's' : ''}* para probar suerte de nuevo.`,
+        text: `[❗] Debes esperar *${minutos} minuto${minutos !== 1 ? 's' : ''}* para probar suerte de nuevo.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
     }
 
-    user.lastLuck = Date.now()
+    usuario.lastLuck = Date.now()
 
 
     const situacionSeleccionada = situacionesSuerte[Math.floor(Math.random() * situacionesSuerte.length)]
@@ -80,7 +80,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     
     const [min, max] = situacionSeleccionada.recompensa
     const recompensa = Math.floor(Math.random() * (max - min + 1)) + min
-    user.coins += recompensa
+    usuario.coins += recompensa
 
     
     const mensajesFelicitacion = [
@@ -96,17 +96,17 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
     const mensajeFelicitacion = mensajesFelicitacion[Math.floor(Math.random() * mensajesFelicitacion.length)]
 
-    let txt = `🧿 𝗧𝘂 𝘀𝘂𝗲𝗿𝘁𝗲\n\n> Situación: ${situacionSeleccionada.descripcion}\n> Recompensa: +${recompensa} ${global.moneda}\n> Total: ${user.coins} ${global.moneda}\n> Próxima suerte: 5 min`
+    let texto = `🧿 𝗧𝘂 𝘀𝘂𝗲𝗿𝘁𝗲\n\n> Situación: ${situacionSeleccionada.descripcion}\n> Recompensa: +${recompensa} ${global.moneda}\n> Total: ${usuario.coins} ${global.moneda}\n> Próxima suerte: 5 min`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo
       }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error('Error en suerte:', e)
+  } catch (error) {
+    console.error('Error en suerte:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al probar suerte.',
       contextInfo: {

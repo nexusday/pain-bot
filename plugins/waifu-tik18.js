@@ -60,8 +60,8 @@ let handler = async (m, { conn }) => {
     )
 
     await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})
-  } catch (e) {
-    console.error('Error en comando tik18:', e)
+  } catch (error) {
+    console.error('Error en comando tik18:', error)
     await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } }).catch(() => {})
     m.reply('*[❗] Ocurrió un error al obtener el video. Por favor, inténtalo de nuevo más tarde.*')
   }

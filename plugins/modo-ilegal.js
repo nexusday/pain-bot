@@ -12,17 +12,17 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     }
     
     
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
     
     ensureModeMap('modoIlegal')
     
-    if (action === 'on') {
+    if (accion === 'on') {
 
       if (isModeActive('modoIA', m.chat)) {
-        let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗜𝗔\n\n> Para desactivarlo usa: ${usedPrefix}modoia off`
+        let texto = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗜𝗔\n\n> Para desactivarlo usa: ${usedPrefix}modoia off`
         
         return conn.sendMessage(m.chat, {
-          text: txt,
+          text: texto,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
@@ -31,10 +31,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
       
       if (isModeActive('modoHot', m.chat)) {
-        let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗛𝗼𝘁\n\n> Para desactivarlo usa: ${usedPrefix}modohot off`
+        let texto = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗛𝗼𝘁\n\n> Para desactivarlo usa: ${usedPrefix}modohot off`
         
         return conn.sendMessage(m.chat, {
-          text: txt,
+          text: texto,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
@@ -43,10 +43,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
 
       if (isModeActive('modoHuman', m.chat)) {
-        let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗛𝘂𝗺𝗮𝗻𝗼\n\n> Para desactivarlo usa: ${usedPrefix}modohuman off`
+        let texto = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗛𝘂𝗺𝗮𝗻𝗼\n\n> Para desactivarlo usa: ${usedPrefix}modohuman off`
         
         return conn.sendMessage(m.chat, {
-          text: txt,
+          text: texto,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
@@ -55,10 +55,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
 
       if (isModeActive('modoSad', m.chat)) {
-        let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗦𝗮𝗱\n\n> Para desactivarlo usa: ${usedPrefix}modosad off`
+        let texto = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗦𝗮𝗱\n\n> Para desactivarlo usa: ${usedPrefix}modosad off`
         
         return conn.sendMessage(m.chat, {
-          text: txt,
+          text: texto,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
@@ -67,10 +67,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
 
       if (isModeActive('modoPsico', m.chat)) {
-        let txt = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗣𝘀𝗶𝗰𝗼\n\n> Para desactivarlo usa: ${usedPrefix}modospico off`
+        let texto = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗣𝘀𝗶𝗰𝗼\n\n> Para desactivarlo usa: ${usedPrefix}modospico off`
         
         return conn.sendMessage(m.chat, {
-          text: txt,
+          text: texto,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
@@ -80,55 +80,55 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       
       setModeState('modoIlegal', m.chat, true)
       
-      let txt = `♨️ 𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼.\n> *Por:* @${m.sender.split('@')[0]}`
+      let texto = `♨️ 𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼.\n> *Por:* @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'off') {
+    } else if (accion === 'off') {
       setModeState('modoIlegal', m.chat, false)
       
       
       try {
         const { clearMemory } = await import('../lib/geminiAPI.js')
         clearMemory(m.chat)
-      } catch (e) {
-        console.error('Error limpiando memoria:', e)
+      } catch (error) {
+        console.error('Error limpiando memoria:', error)
       }
       
-      let txt = `♨️ 𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹 𝗱𝗲𝘀𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼.\n> *Por:* @${m.sender.split('@')[0]}`
+      let texto = `♨️ 𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹 𝗱𝗲𝘀𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼.\n> *Por:* @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'clear' || action === 'limpiar') {
+    } else if (accion === 'clear' || accion === 'limpiar') {
 
       try {
         const { clearMemory } = await import('../lib/geminiAPI.js')
         clearMemory(m.chat)
         
-        let txt = `❄ 𝗠𝗲𝗺𝗼𝗿𝗶𝗮 𝗱𝗲 𝗠𝗼𝗱𝗼 𝗜𝗟𝗘𝗚𝗔𝗟 𝗳𝘂𝗲 𝗹𝗶𝗺𝗽𝗶𝗮𝗱𝗮.\n> *Por:* @${m.sender.split('@')[0]}`
+        let texto = `❄ 𝗠𝗲𝗺𝗼𝗿𝗶𝗮 𝗱𝗲 𝗠𝗼𝗱𝗼 𝗜𝗟𝗘𝗚𝗔𝗟 𝗳𝘂𝗲 𝗹𝗶𝗺𝗽𝗶𝗮𝗱𝗮.\n> *Por:* @${m.sender.split('@')[0]}`
         
         return conn.sendMessage(m.chat, {
-          text: txt,
+          text: texto,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
           }
         }, { quoted: m })
         
-      } catch (e) {
-        console.error('Error limpiando memoria:', e)
+      } catch (error) {
+        console.error('Error limpiando memoria:', error)
         return conn.sendMessage(m.chat, {
           text: '[❌] Error al limpiar la memoria.',
           contextInfo: {
@@ -138,18 +138,18 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
       
     } else {
-      let txt = `[❗] Uso incorrecto\n\n> *Ejemplos:*\n ${usedPrefix + command} on\n${usedPrefix + command} off\n${usedPrefix + command} clear`
+      let texto = `[❗] Uso incorrecto\n\n> *Ejemplos:*\n ${usedPrefix + command} on\n${usedPrefix + command} off\n${usedPrefix + command} clear`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
     }
     
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al procesar el comando.',
       contextInfo: {

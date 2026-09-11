@@ -8,107 +8,107 @@ import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, rgb } from 'pdf-lib'
 import { webp2png } from '../lib/webp2mp4.js'
 
-const FONTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'fonts')
+const DIR_FUENTES = join(dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'fonts')
 
-const PAGE_WIDTH = 595.28
-const PAGE_HEIGHT = 841.89
-const MARGIN = 72
-const FONT_SIZE = 12
-const TITLE_SIZE = 16
-const LINE_HEIGHT = FONT_SIZE * 1.45
-const TITLE_GAP = 28
-const IMAGE_FRAME_PAD = 14
-const IMAGE_BLOCK_GAP = 26
-const TEXT_SECTION_GAP = 22
-const MAX_IMG_WIDTH_RATIO = 0.82
-const MAX_IMG_HEIGHT = 340
-const MAX_CHARS = 50000
+const ANCHO_PAGINA = 595.28
+const ALTO_PAGINA = 841.89
+const MARGEN = 72
+const TAMANO_FUENTE = 12
+const TAMANO_TITULO = 16
+const ALTO_LINEA = TAMANO_FUENTE * 1.45
+const ESPACIO_TITULO = 28
+const PAD_MARCO_IMAGEN = 14
+const ESPACIO_BLOQUE_IMAGEN = 26
+const ESPACIO_SECCION_TEXTO = 22
+const RATIO_ANCHO_IMG_MAX = 0.82
+const ALTO_IMG_MAX = 340
+const MAX_CARACTERES = 50000
 
-const FONT_FILES = {
+const ARCHIVOS_FUENTE = {
   regular: 'NotoSans-Regular.ttf',
   bold: 'NotoSans-Bold.ttf',
   math: 'NotoSansMath-Regular.ttf',
   symbols: 'NotoSansSymbols2-Regular.ttf'
 }
 
-const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72'
+const BASE_TWEMOJI = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72'
 
-let fontBytesCache = null
-const encodeCache = new WeakMap()
-const emojiPngCache = new Map()
-const graphemeSegmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+let cacheBytesFuente = null
+const cacheCodificacion = new WeakMap()
+const cachePngEmoji = new Map()
+const segmentadorGrafemas = typeof Intl !== 'undefined' && Intl.Segmenter
   ? new Intl.Segmenter('und', { granularity: 'grapheme' })
   : null
 
-function loadFontBytes() {
-  if (fontBytesCache) return fontBytesCache
+function cargarBytesFuente() {
+  if (cacheBytesFuente) return cacheBytesFuente
 
-  fontBytesCache = {}
-  for (const [key, file] of Object.entries(FONT_FILES)) {
-    const filePath = join(FONTS_DIR, file)
+  cacheBytesFuente = {}
+  for (const [clave, archivo] of Object.entries(ARCHIVOS_FUENTE)) {
+    const filePath = join(DIR_FUENTES, archivo)
     if (existsSync(filePath)) {
-      fontBytesCache[key] = readFileSync(filePath)
+      cacheBytesFuente[clave] = readFileSync(filePath)
     }
   }
 
-  if (!fontBytesCache.regular || !fontBytesCache.bold) {
+  if (!cacheBytesFuente.regular || !cacheBytesFuente.bold) {
     throw new Error('Fuentes base no encontradas en lib/fonts')
   }
 
-  return fontBytesCache
+  return cacheBytesFuente
 }
 
-async function embedUtf8Fonts(pdfDoc) {
-  pdfDoc.registerFontkit(fontkit)
-  const bytes = loadFontBytes()
-  const fonts = {}
+async function incrustarFuentesUtf8(docPdf) {
+  docPdf.registerFontkit(fontkit)
+  const bytes = cargarBytesFuente()
+  const fuentes = {}
 
-  for (const [key, data] of Object.entries(bytes)) {
+  for (const [clave, datos] of Object.entries(bytes)) {
     try {
-      fonts[key] = await pdfDoc.embedFont(data, { subset: true })
+      fuentes[clave] = await docPdf.embedFont(datos, { subset: true })
     } catch (e) {
-      console.warn(`[tepdf] Fuente ${key} omitida:`, e.message)
+      console.warn(`[tepdf] Fuente ${clave} omitida:`, e.message)
     }
   }
 
-  return fonts
+  return fuentes
 }
 
-function emojiToTwemojiCode(emoji) {
+function emojiACodigoTwemoji(emoji) {
   return [...emoji]
-    .map(char => char.codePointAt(0).toString(16))
+    .map(caracter => caracter.codePointAt(0).toString(16))
     .filter(code => code !== 'fe0f')
     .join('-')
 }
 
-async function getEmojiPng(emoji) {
-  if (emojiPngCache.has(emoji)) return emojiPngCache.get(emoji)
+async function obtenerPngEmoji(emoji) {
+  if (cachePngEmoji.has(emoji)) return cachePngEmoji.get(emoji)
 
   try {
-    const code = emojiToTwemojiCode(emoji)
-    const res = await fetch(`${TWEMOJI_BASE}/${code}.png`)
-    if (!res.ok) {
-      emojiPngCache.set(emoji, null)
+    const code = emojiACodigoTwemoji(emoji)
+    const respuesta = await fetch(`${BASE_TWEMOJI}/${code}.png`)
+    if (!respuesta.ok) {
+      cachePngEmoji.set(emoji, null)
       return null
     }
-    const buffer = Buffer.from(await res.arrayBuffer())
-    emojiPngCache.set(emoji, buffer)
-    return buffer
+    const bufer = Buffer.from(await respuesta.arrayBuffer())
+    cachePngEmoji.set(emoji, bufer)
+    return bufer
   } catch {
-    emojiPngCache.set(emoji, null)
+    cachePngEmoji.set(emoji, null)
     return null
   }
 }
 
-function splitGraphemes(text) {
+function partirGrafemas(text) {
   if (!text) return []
-  if (graphemeSegmenter) {
-    return [...graphemeSegmenter.segment(text)].map(s => s.segment)
+  if (segmentadorGrafemas) {
+    return [...segmentadorGrafemas.segment(text)].map(s => s.segment)
   }
   return [...text]
 }
 
-function isEmojiCodePoint(cp) {
+function esPuntoCodigoEmoji(cp) {
   if (cp === 0xFE0F || cp === 0x200D) return true
   return (
     (cp >= 0x1F300 && cp <= 0x1FAFF) ||
@@ -120,170 +120,170 @@ function isEmojiCodePoint(cp) {
   )
 }
 
-function isMathAlpha(cp) {
+function esAlfaMatematico(cp) {
   return cp >= 0x1D400 && cp <= 0x1D7FF
 }
 
-function canEncode(font, text) {
+function puedeCodificar(font, text) {
   if (!font || !text) return false
 
-  let cache = encodeCache.get(font)
-  if (!cache) {
-    cache = new Map()
-    encodeCache.set(font, cache)
+  let cacheBusqueda = cacheCodificacion.get(font)
+  if (!cacheBusqueda) {
+    cacheBusqueda = new Map()
+    cacheCodificacion.set(font, cacheBusqueda)
   }
 
-  if (cache.has(text)) return cache.get(text)
+  if (cacheBusqueda.has(text)) return cacheBusqueda.get(text)
 
   try {
     font.widthOfTextAtSize(text, 12)
-    cache.set(text, true)
+    cacheBusqueda.set(text, true)
     return true
   } catch {
-    cache.set(text, false)
+    cacheBusqueda.set(text, false)
     return false
   }
 }
 
-function pickFontForSegment(segment, fonts, preferBold = false) {
-  const cp = segment.codePointAt(0)
-  const candidates = []
+function elegirFuenteParaSegmento(segmento, fuentes, preferirNegrita = false) {
+  const cp = segmento.codePointAt(0)
+  const candidatos = []
 
-  if (isMathAlpha(cp) && fonts.math) candidates.push(fonts.math)
-  if (preferBold && fonts.bold) candidates.push(fonts.bold)
-  if (fonts.regular) candidates.push(fonts.regular)
-  if (fonts.symbols) candidates.push(fonts.symbols)
-  if (!preferBold && fonts.bold) candidates.push(fonts.bold)
-  if (fonts.math) candidates.push(fonts.math)
+  if (esAlfaMatematico(cp) && fuentes.math) candidatos.push(fuentes.math)
+  if (preferirNegrita && fuentes.bold) candidatos.push(fuentes.bold)
+  if (fuentes.regular) candidatos.push(fuentes.regular)
+  if (fuentes.symbols) candidatos.push(fuentes.symbols)
+  if (!preferirNegrita && fuentes.bold) candidatos.push(fuentes.bold)
+  if (fuentes.math) candidatos.push(fuentes.math)
 
-  const seen = new Set()
-  for (const font of candidates) {
-    if (!font || seen.has(font)) continue
-    seen.add(font)
-    if (canEncode(font, segment)) return font
+  const vistos = new Set()
+  for (const font of candidatos) {
+    if (!font || vistos.has(font)) continue
+    vistos.add(font)
+    if (puedeCodificar(font, segmento)) return font
   }
 
-  return fonts.regular
+  return fuentes.regular
 }
 
-async function buildRichRuns(text, fonts, preferBold = false) {
-  const runs = []
-  let current = null
+async function construirCorridasRicas(text, fuentes, preferirNegrita = false) {
+  const corridas = []
+  let actual = null
 
-  for (const segment of splitGraphemes(text)) {
-    const cp = segment.codePointAt(0)
+  for (const segmento of partirGrafemas(text)) {
+    const cp = segmento.codePointAt(0)
 
-    if (isEmojiCodePoint(cp) && !isMathAlpha(cp)) {
-      const png = await getEmojiPng(segment)
+    if (esPuntoCodigoEmoji(cp) && !esAlfaMatematico(cp)) {
+      const png = await obtenerPngEmoji(segmento)
       if (png) {
-        if (current) {
-          runs.push(current)
-          current = null
+        if (actual) {
+          corridas.push(actual)
+          actual = null
         }
-        runs.push({ type: 'emoji', text: segment, png })
+        corridas.push({ type: 'emoji', text: segmento, png })
         continue
       }
     }
 
-    const font = pickFontForSegment(segment, fonts, preferBold)
-    if (current && current.type === 'text' && current.font === font) {
-      current.text += segment
+    const font = elegirFuenteParaSegmento(segmento, fuentes, preferirNegrita)
+    if (actual && actual.type === 'text' && actual.font === font) {
+      actual.text += segmento
     } else {
-      if (current) runs.push(current)
-      current = { type: 'text', font, text: segment }
+      if (actual) corridas.push(actual)
+      actual = { type: 'text', font, text: segmento }
     }
   }
 
-  if (current) runs.push(current)
-  return runs
+  if (actual) corridas.push(actual)
+  return corridas
 }
 
-function mergeRichRuns(target, source) {
-  for (const run of source) {
-    const last = target[target.length - 1]
-    if (run.type === 'text' && last?.type === 'text' && last.font === run.font) {
-      last.text += run.text
+function fusionarCorridasRicas(objetivo, fuente) {
+  for (const corrida of fuente) {
+    const ultimo = objetivo[objetivo.length - 1]
+    if (corrida.type === 'text' && ultimo?.type === 'text' && ultimo.font === corrida.font) {
+      ultimo.text += corrida.text
     } else {
-      target.push({ ...run })
+      objetivo.push({ ...corrida })
     }
   }
-  return target
+  return objetivo
 }
 
-function measureRichRunsWidth(runs, size) {
-  return runs.reduce((total, run) => {
-    if (run.type === 'emoji') return total + size * 1.12
+function medirAnchoCorridasRicas(corridas, tamano) {
+  return corridas.reduce((total, corrida) => {
+    if (corrida.type === 'emoji') return total + tamano * 1.12
     try {
-      return total + run.font.widthOfTextAtSize(run.text, size)
+      return total + corrida.font.widthOfTextAtSize(corrida.text, tamano)
     } catch {
-      return total + run.text.length * size * 0.45
+      return total + corrida.text.length * tamano * 0.45
     }
   }, 0)
 }
 
-async function wrapParagraphRuns(paragraph, fonts, fontSize, maxWidth, preferBold = false) {
-  if (!paragraph) return [[]]
+async function envolverCorridasParrafo(parrafo, fuentes, tamanoFuente, anchoMax, preferirNegrita = false) {
+  if (!parrafo) return [[]]
 
-  const tokens = paragraph.match(/\S+|\s+/g) || []
+  const tokens = parrafo.match(/\S+|\s+/g) || []
   if (!tokens.length) return [[]]
 
-  const lines = []
-  let currentRuns = []
-  let currentWidth = 0
+  const lineas = []
+  let corridasActuales = []
+  let anchoActual = 0
 
   for (const token of tokens) {
-    const tokenRuns = await buildRichRuns(token, fonts, preferBold)
-    const tokenWidth = measureRichRunsWidth(tokenRuns, fontSize)
-    const isSpace = /^\s+$/.test(token)
+    const corridasToken = await construirCorridasRicas(token, fuentes, preferirNegrita)
+    const anchoToken = medirAnchoCorridasRicas(corridasToken, tamanoFuente)
+    const esEspacio = /^\s+$/.test(token)
 
-    if (!isSpace && currentRuns.length && currentWidth + tokenWidth > maxWidth) {
-      lines.push(currentRuns)
-      currentRuns = [...tokenRuns]
-      currentWidth = tokenWidth
+    if (!esEspacio && corridasActuales.length && anchoActual + anchoToken > anchoMax) {
+      lineas.push(corridasActuales)
+      corridasActuales = [...corridasToken]
+      anchoActual = anchoToken
       continue
     }
 
-    if (isSpace && !currentRuns.length) continue
+    if (esEspacio && !corridasActuales.length) continue
 
-    mergeRichRuns(currentRuns, tokenRuns)
-    currentWidth = measureRichRunsWidth(currentRuns, fontSize)
+    fusionarCorridasRicas(corridasActuales, corridasToken)
+    anchoActual = medirAnchoCorridasRicas(corridasActuales, tamanoFuente)
   }
 
-  if (currentRuns.length) lines.push(currentRuns)
-  return lines.length ? lines : [[]]
+  if (corridasActuales.length) lineas.push(corridasActuales)
+  return lineas.length ? lineas : [[]]
 }
 
-async function buildLineRuns(text, fonts, fontSize, maxWidth, preferBold = false) {
+async function construirCorridasLinea(text, fuentes, tamanoFuente, anchoMax, preferirNegrita = false) {
   if (!text.trim()) return []
 
-  const paragraphs = text.split('\n')
-  const lines = []
+  const parrafos = text.split('\n')
+  const lineas = []
 
-  for (const paragraph of paragraphs) {
-    lines.push(...await wrapParagraphRuns(paragraph, fonts, fontSize, maxWidth, preferBold))
-    lines.push([])
+  for (const parrafo of parrafos) {
+    lineas.push(...await envolverCorridasParrafo(parrafo, fuentes, tamanoFuente, anchoMax, preferirNegrita))
+    lineas.push([])
   }
 
-  if (lines.length && lines.length === 1 && lines[0].length === 0) return []
-  if (lines.length && !lines[lines.length - 1].length) lines.pop()
-  return lines
+  if (lineas.length && lineas.length === 1 && lineas[0].length === 0) return []
+  if (lineas.length && !lineas[lineas.length - 1].length) lineas.pop()
+  return lineas
 }
 
-async function embedRunImages(pdfDoc, runs) {
-  for (const run of runs) {
-    if (run.type === 'emoji' && run.png && !run.embedded) {
-      run.embedded = await pdfDoc.embedPng(run.png)
+async function incrustarImagenesCorrida(docPdf, corridas) {
+  for (const corrida of corridas) {
+    if (corrida.type === 'emoji' && corrida.png && !corrida.embedded) {
+      corrida.embedded = await docPdf.embedPng(corrida.png)
     }
   }
 }
 
-function drawRichRuns(page, runs, x, y, size, color) {
+function dibujarCorridasRicas(pagina, corridas, x, y, tamano, color) {
   let cursor = x
 
-  for (const run of runs) {
-    if (run.type === 'emoji' && run.embedded) {
-      const dim = size * 1.12
-      page.drawImage(run.embedded, {
+  for (const corrida of corridas) {
+    if (corrida.type === 'emoji' && corrida.embedded) {
+      const dim = tamano * 1.12
+      pagina.drawImage(corrida.embedded, {
         x: cursor,
         y: y - dim * 0.2,
         width: dim,
@@ -293,58 +293,58 @@ function drawRichRuns(page, runs, x, y, size, color) {
       continue
     }
 
-    if (!run.text) continue
+    if (!corrida.text) continue
 
     try {
-      page.drawText(run.text, {
+      pagina.drawText(corrida.text, {
         x: cursor,
         y,
-        size,
-        font: run.font,
+        tamano,
+        font: corrida.font,
         color
       })
-      cursor += run.font.widthOfTextAtSize(run.text, size)
+      cursor += corrida.font.widthOfTextAtSize(corrida.text, tamano)
     } catch {
-      for (const segment of splitGraphemes(run.text)) {
-        const font = pickFontForSegment(segment, { regular: run.font }, false)
+      for (const segmento of partirGrafemas(corrida.text)) {
+        const font = elegirFuenteParaSegmento(segmento, { regular: corrida.font }, false)
         try {
-          page.drawText(segment, { x: cursor, y, size, font, color })
-          cursor += font.widthOfTextAtSize(segment, size)
+          pagina.drawText(segmento, { x: cursor, y, tamano, font, color })
+          cursor += font.widthOfTextAtSize(segmento, tamano)
         } catch {}
       }
     }
   }
 }
 
-function sanitizePdfName(args) {
-  const raw = (args.join(' ') || 'documento')
+function sanitizarNombrePdf(args) {
+  const crudo = (args.join(' ') || 'documento')
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
     .trim()
     .slice(0, 80)
 
-  const name = raw || 'documento'
-  return name.toLowerCase().endsWith('.pdf') ? name : `${name}.pdf`
+  const nombre = crudo || 'documento'
+  return nombre.toLowerCase().endsWith('.pdf') ? nombre : `${nombre}.pdf`
 }
 
-function toPdfSafeText(text) {
+function aTextoSeguroPdf(text) {
   return text
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
     .normalize('NFC')
 }
 
-function isImageMedia(mime = '', mtype = '') {
+function esMedioImagen(mime = '', mtype = '') {
   return /image|webp|sticker/i.test(mime) || /imageMessage|stickerMessage/i.test(mtype)
 }
 
-function resolveQuotedContent(quoted) {
+function resolverContenidoCitado(quoted) {
   if (!quoted) return null
 
   const mime = (quoted.msg || quoted).mimetype || quoted.mediaType || ''
   const mtype = quoted.mtype || ''
   const text = (quoted.text || '').trim()
-  const hasImage = isImageMedia(mime, mtype) && quoted.download
+  const tieneImagen = esMedioImagen(mime, mtype) && quoted.download
 
-  if (hasImage) {
+  if (tieneImagen) {
     return { text, mime, hasImage: true }
   }
 
@@ -355,192 +355,192 @@ function resolveQuotedContent(quoted) {
   return null
 }
 
-async function prepareImageBuffer(media, mime) {
+async function prepararBuferImagen(medio, mime) {
   if (/webp/i.test(mime)) {
     try {
-      return await sharp(media).rotate().jpeg({ quality: 90 }).toBuffer()
+      return await sharp(medio).rotate().jpeg({ quality: 90 }).toBuffer()
     } catch {
-      const url = await webp2png(media)
+      const url = await webp2png(medio)
       if (!url) throw new Error('No se pudo convertir la imagen')
-      const res = await fetch(url)
-      return Buffer.from(await res.arrayBuffer())
+      const respuesta = await fetch(url)
+      return Buffer.from(await respuesta.arrayBuffer())
     }
   }
 
   if (/image\/jpe?g/i.test(mime)) {
-    return sharp(media).rotate().jpeg({ quality: 90 }).toBuffer()
+    return sharp(medio).rotate().jpeg({ quality: 90 }).toBuffer()
   }
 
   if (/image\//i.test(mime)) {
-    return sharp(media).rotate().png().toBuffer()
+    return sharp(medio).rotate().png().toBuffer()
   }
 
   throw new Error('Formato de imagen no compatible')
 }
 
-function ensureSpace(pageRef, yRef, neededHeight, pdfDoc) {
-  if (yRef.value >= MARGIN + neededHeight) return pageRef.value
+function asegurarEspacio(refPagina, refY, alturaNecesaria, docPdf) {
+  if (refY.value >= MARGEN + alturaNecesaria) return refPagina.value
 
-  pageRef.value = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
-  yRef.value = PAGE_HEIGHT - MARGIN
-  return pageRef.value
+  refPagina.value = docPdf.addPage([ANCHO_PAGINA, ALTO_PAGINA])
+  refY.value = ALTO_PAGINA - MARGEN
+  return refPagina.value
 }
 
-function calcImageSize(srcW, srcH, maxWidth) {
-  const maxW = maxWidth * MAX_IMG_WIDTH_RATIO
-  const scale = Math.min(maxW / srcW, MAX_IMG_HEIGHT / srcH)
+function calcularTamanoImagen(srcW, srcH, anchoMax) {
+  const maxW = anchoMax * RATIO_ANCHO_IMG_MAX
+  const escala = Math.min(maxW / srcW, ALTO_IMG_MAX / srcH)
   return {
-    width: srcW * scale,
-    height: srcH * scale
+    width: srcW * escala,
+    height: srcH * escala
   }
 }
 
-async function drawImageBlock(pageRef, yRef, pdfDoc, imageBuffer, mime, maxWidth, hasTextAfter = false) {
-  const raster = await prepareImageBuffer(imageBuffer, mime)
-  const meta = await sharp(raster).metadata()
-  const srcW = meta.width || 1
-  const srcH = meta.height || 1
-  const { width: drawW, height: drawH } = calcImageSize(srcW, srcH, maxWidth)
+async function dibujarBloqueImagen(refPagina, refY, docPdf, buferImagen, mime, anchoMax, hasTextAfter = false) {
+  const raster = await prepararBuferImagen(buferImagen, mime)
+  const metadatos = await sharp(raster).metadata()
+  const srcW = metadatos.width || 1
+  const srcH = metadatos.height || 1
+  const { width: dibujarW, height: dibujarH } = calcularTamanoImagen(srcW, srcH, anchoMax)
 
-  const frameW = drawW + IMAGE_FRAME_PAD * 2
-  const frameH = drawH + IMAGE_FRAME_PAD * 2
-  const blockHeight = frameH + IMAGE_BLOCK_GAP + (hasTextAfter ? TEXT_SECTION_GAP : 0)
+  const marcoW = dibujarW + PAD_MARCO_IMAGEN * 2
+  const marcoH = dibujarH + PAD_MARCO_IMAGEN * 2
+  const altoBloque = marcoH + ESPACIO_BLOQUE_IMAGEN + (hasTextAfter ? ESPACIO_SECCION_TEXTO : 0)
 
-  const page = ensureSpace(pageRef, yRef, blockHeight, pdfDoc)
+  const pagina = asegurarEspacio(refPagina, refY, altoBloque, docPdf)
 
-  const imgX = MARGIN + (maxWidth - drawW) / 2
-  const frameX = MARGIN + (maxWidth - frameW) / 2
-  const frameBottom = yRef.value - frameH
+  const imgX = MARGEN + (anchoMax - dibujarW) / 2
+  const marcoX = MARGEN + (anchoMax - marcoW) / 2
+  const marcoInferior = refY.value - marcoH
 
-  page.drawRectangle({
-    x: frameX,
-    y: frameBottom,
-    width: frameW,
-    height: frameH,
+  pagina.drawRectangle({
+    x: marcoX,
+    y: marcoInferior,
+    width: marcoW,
+    height: marcoH,
     color: rgb(0.975, 0.975, 0.975),
     borderColor: rgb(0.78, 0.78, 0.78),
     borderWidth: 0.8
   })
 
-  const embedded = meta.format === 'jpeg'
-    ? await pdfDoc.embedJpg(raster)
-    : await pdfDoc.embedPng(raster)
+  const incrustado = metadatos.format === 'jpeg'
+    ? await docPdf.embedJpg(raster)
+    : await docPdf.embedPng(raster)
 
-  page.drawImage(embedded, {
+  pagina.drawImage(incrustado, {
     x: imgX,
-    y: frameBottom + IMAGE_FRAME_PAD,
-    width: drawW,
-    height: drawH
+    y: marcoInferior + PAD_MARCO_IMAGEN,
+    width: dibujarW,
+    height: dibujarH
   })
 
-  yRef.value -= frameH + IMAGE_BLOCK_GAP
+  refY.value -= marcoH + ESPACIO_BLOQUE_IMAGEN
 
   if (hasTextAfter) {
-    page.drawLine({
-      start: { x: MARGIN, y: yRef.value + 10 },
-      end: { x: PAGE_WIDTH - MARGIN, y: yRef.value + 10 },
+    pagina.drawLine({
+      start: { x: MARGEN, y: refY.value + 10 },
+      end: { x: ANCHO_PAGINA - MARGEN, y: refY.value + 10 },
       thickness: 0.4,
       color: rgb(0.85, 0.85, 0.85)
     })
-    yRef.value -= TEXT_SECTION_GAP
+    refY.value -= ESPACIO_SECCION_TEXTO
   }
 }
 
-async function contentToPdf({ text, title, imageBuffer, imageMime }) {
-  const pdfDoc = await PDFDocument.create()
-  const fonts = await embedUtf8Fonts(pdfDoc)
-  const maxWidth = PAGE_WIDTH - MARGIN * 2
-  const bodyLines = await buildLineRuns(text, fonts, FONT_SIZE, maxWidth)
+async function contenidoAPdf({ text, titulo, buferImagen, imageMime }) {
+  const docPdf = await PDFDocument.create()
+  const fuentes = await incrustarFuentesUtf8(docPdf)
+  const anchoMax = ANCHO_PAGINA - MARGEN * 2
+  const lineasCuerpo = await construirCorridasLinea(text, fuentes, TAMANO_FUENTE, anchoMax)
 
-  const pageRef = { value: pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]) }
-  const yRef = { value: PAGE_HEIGHT - MARGIN }
+  const refPagina = { value: docPdf.addPage([ANCHO_PAGINA, ALTO_PAGINA]) }
+  const refY = { value: ALTO_PAGINA - MARGEN }
 
-  const titleRuns = await buildRichRuns(toPdfSafeText(title.replace(/\.pdf$/i, '')), fonts, true)
-  await embedRunImages(pdfDoc, titleRuns)
-  drawRichRuns(pageRef.value, titleRuns, MARGIN, yRef.value, TITLE_SIZE, rgb(0.1, 0.1, 0.1))
-  yRef.value -= TITLE_GAP
+  const corridasTitulo = await construirCorridasRicas(aTextoSeguroPdf(titulo.replace(/\.pdf$/i, '')), fuentes, true)
+  await incrustarImagenesCorrida(docPdf, corridasTitulo)
+  dibujarCorridasRicas(refPagina.value, corridasTitulo, MARGEN, refY.value, TAMANO_TITULO, rgb(0.1, 0.1, 0.1))
+  refY.value -= ESPACIO_TITULO
 
-  pageRef.value.drawLine({
-    start: { x: MARGIN, y: yRef.value + 8 },
-    end: { x: PAGE_WIDTH - MARGIN, y: yRef.value + 8 },
+  refPagina.value.drawLine({
+    start: { x: MARGEN, y: refY.value + 8 },
+    end: { x: ANCHO_PAGINA - MARGEN, y: refY.value + 8 },
     thickness: 0.5,
     color: rgb(0.75, 0.75, 0.75)
   })
-  yRef.value -= 16
+  refY.value -= 16
 
-  if (imageBuffer?.length) {
-    await drawImageBlock(pageRef, yRef, pdfDoc, imageBuffer, imageMime, maxWidth, bodyLines.length > 0)
+  if (buferImagen?.length) {
+    await dibujarBloqueImagen(refPagina, refY, docPdf, buferImagen, imageMime, anchoMax, lineasCuerpo.length > 0)
   }
 
-  for (const lineRuns of bodyLines) {
-    pageRef.value = ensureSpace(pageRef, yRef, LINE_HEIGHT, pdfDoc)
+  for (const lineRuns of lineasCuerpo) {
+    refPagina.value = asegurarEspacio(refPagina, refY, ALTO_LINEA, docPdf)
 
     if (lineRuns.length) {
-      await embedRunImages(pdfDoc, lineRuns)
-      drawRichRuns(pageRef.value, lineRuns, MARGIN, yRef.value, FONT_SIZE, rgb(0.15, 0.15, 0.15))
+      await incrustarImagenesCorrida(docPdf, lineRuns)
+      dibujarCorridasRicas(refPagina.value, lineRuns, MARGEN, refY.value, TAMANO_FUENTE, rgb(0.15, 0.15, 0.15))
     }
 
-    yRef.value -= LINE_HEIGHT
+    refY.value -= ALTO_LINEA
   }
 
-  const pageCount = pdfDoc.getPageCount()
-  return { pdfBytes: Buffer.from(await pdfDoc.save()), pageCount }
+  const conteoPaginas = docPdf.getPageCount()
+  return { pdfBytes: Buffer.from(await docPdf.save()), conteoPaginas }
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-  let pdfPath = ''
-  emojiPngCache.clear()
+  let rutaPdf = ''
+  cachePngEmoji.clear()
 
   try {
-    const content = resolveQuotedContent(m.quoted)
+    const contenido = resolverContenidoCitado(m.quoted)
 
-    if (!content) {
+    if (!contenido) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Respondé a un mensaje con *texto* o *imagen + texto* y usá ${usedPrefix + command} nombre*\n\nEjemplos:\n> ${usedPrefix + command} Apuntes\n> (foto con texto  ${usedPrefix + command} Informe)`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    if (!content.hasImage && !content.text) {
+    if (!contenido.hasImage && !contenido.text) {
       throw new Error('El mensaje no contiene texto válido')
     }
 
-    let imageBuffer = null
-    if (content.hasImage) {
-      imageBuffer = await m.quoted.download()
-      if (!imageBuffer?.length) throw new Error('No se pudo descargar la imagen')
+    let buferImagen = null
+    if (contenido.hasImage) {
+      buferImagen = await m.quoted.download()
+      if (!buferImagen?.length) throw new Error('No se pudo descargar la imagen')
     }
 
-    const rawText = content.text || ''
-    const text = toPdfSafeText(rawText).slice(0, MAX_CHARS)
+    const textoCrudo = contenido.text || ''
+    const text = aTextoSeguroPdf(textoCrudo).slice(0, MAX_CARACTERES)
 
-    if (!text.trim() && !imageBuffer) {
+    if (!text.trim() && !buferImagen) {
       throw new Error('El mensaje no tiene texto ni imagen usable')
     }
 
-    const fileName = sanitizePdfName(args)
-    const { pdfBytes, pageCount } = await contentToPdf({
+    const fileName = sanitizarNombrePdf(args)
+    const { bytesPdf, conteoPaginas } = await contenidoAPdf({
       text,
-      title: fileName,
-      imageBuffer,
-      imageMime: content.mime
+      titulo: fileName,
+      buferImagen,
+      imageMime: contenido.mime
     })
 
-    const tmpDir = join(process.cwd(), 'tmp')
-    if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+    const dirTmp = join(process.cwd(), 'tmp')
+    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
 
-    pdfPath = join(tmpDir, `tepdf_${Date.now()}_${fileName}`)
-    await writeFile(pdfPath, pdfBytes)
+    rutaPdf = join(dirTmp, `tepdf_${Date.now()}_${fileName}`)
+    await writeFile(rutaPdf, bytesPdf)
 
     const extras = []
-    if (imageBuffer) extras.push('imagen')
+    if (buferImagen) extras.push('imagen')
     if (text.trim()) extras.push('texto')
 
     await conn.sendMessage(m.chat, {
-      document: { url: pdfPath },
+      document: { url: rutaPdf },
       fileName,
       mimetype: 'application/pdf',
-      caption: `*[✓] PDF generado:* ${fileName}\n> Contenido: ${extras.join(' + ') || 'documento'}\n> Páginas: ${pageCount}`,
+      caption: `*[✓] PDF generado:* ${fileName}\n> Contenido: ${extras.join(' + ') || 'documento'}\n> Páginas: ${conteoPaginas}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
@@ -550,8 +550,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    if (pdfPath) {
-      try { await unlink(pdfPath) } catch {}
+    if (rutaPdf) {
+      try { await unlink(rutaPdf) } catch {}
     }
   }
 }

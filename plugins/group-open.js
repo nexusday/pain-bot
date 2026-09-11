@@ -2,18 +2,18 @@
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner, isPrems, usedPrefix, command }) => {
   // Verificación de admin
-  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
-  const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []  
-  const user = (m.isGroup ? findGroupParticipant(groupParticipants, m, conn) : {}) || {}  
-  const isRAdmin = user?.admin == 'superadmin' || false  
-  const isAdminManual = Boolean(isAdmin) || isRAdmin || user?.admin == 'admin' || false  
+  const metadatosVerificacionAdmin = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+  const participantesGrupo = (m.isGroup ? metadatosVerificacionAdmin.participants : []) || []  
+  const usuario = (m.isGroup ? findGroupParticipant(participantesGrupo, m, conn) : {}) || {}  
+  const esSuperAdmin = usuario?.admin == 'superadmin' || false  
+  const esAdminManual = Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false  
   
 
-  const isOwnerManual = global.owner.some(([number]) => number.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
-                  global.ownerLid?.some(([number]) => number.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
+  const esOwnerManual = global.owner.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
+                  global.ownerLid?.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
                   m.sender === conn.user.jid
   
-  if (!isAdminManual && !isRAdmin && !isOwnerManual) {
+  if (!esAdminManual && !esSuperAdmin && !esOwnerManual) {
     return conn.reply(m.chat, '[❗] Solo los administradores pueden usar este comando.', m)
   }
 
@@ -26,11 +26,11 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   
   
   try {
-    const groupMetadata = await conn.groupMetadata(m.chat)
-    const groupName = groupMetadata.subject
+    const metadatosGrupo = await conn.groupMetadata(m.chat)
+    const nombreGrupo = metadatosGrupo.subject
     
     
-    if (!groupMetadata.announce) {
+    if (!metadatosGrupo.announce) {
       return conn.sendMessage(m.chat, {
         text: `[❗] Este grupo ya está abierto.`,
         contextInfo: {
@@ -42,7 +42,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     await conn.groupSettingUpdate(m.chat, 'not_announcement')
     
     return conn.sendMessage(m.chat, {
-      text: `🌴 𝗚𝗿𝘂𝗽𝗼 𝗮𝗯𝗶𝗲𝗿𝘁𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n\n> *Por:*: @${m.sender.split('@')[0]}\n> *Grupo:* ${groupName}`,
+      text: `🌴 𝗚𝗿𝘂𝗽𝗼 𝗮𝗯𝗶𝗲𝗿𝘁𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n\n> *Por:*: @${m.sender.split('@')[0]}\n> *Grupo:* ${nombreGrupo}`,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]

@@ -6,13 +6,13 @@ import { webp2png } from '../lib/webp2mp4.js'
 
 const W = 900
 const H = 1560
-const RADIUS = 42
-const COVER = 700
-const COVER_X = Math.round((W - COVER) / 2)
-const COVER_Y = 110
-const COVER_R = 28
+const RADIO = 42
+const PORTADA = 700
+const PORTADA_X = Math.round((W - PORTADA) / 2)
+const PORTADA_Y = 110
+const PORTADA_R = 28
 
-function escapeXml(text) {
+function escaparXml(text) {
   return String(text || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -21,109 +21,109 @@ function escapeXml(text) {
     .replace(/'/g, '&apos;')
 }
 
-function truncate(text, max) {
+function truncar(text, max) {
   const t = String(text || '').trim()
   if (t.length <= max) return t
   return `${t.slice(0, Math.max(1, max - 1))}…`
 }
 
-function parseMeta(text = '') {
-  const raw = String(text || '').trim()
-  if (!raw) return { title: 'Song Title', artist: 'Artist Name' }
+function parsearMeta(text = '') {
+  const crudo = String(text || '').trim()
+  if (!crudo) return { title: 'Song Title', artist: 'Artist Name' }
 
-  if (raw.includes('|')) {
-    const [a, ...rest] = raw.split('|')
+  if (crudo.includes('|')) {
+    const [a, ...resto] = crudo.split('|')
     return {
-      title: truncate(a.trim() || 'Song Title', 42),
-      artist: truncate(rest.join('|').trim() || 'Artist Name', 36)
+      title: truncar(a.trim() || 'Song Title', 42),
+      artist: truncar(resto.join('|').trim() || 'Artist Name', 36)
     }
   }
 
   return {
-    title: truncate(raw, 42),
+    title: truncar(crudo, 42),
     artist: 'Artist Name'
   }
 }
 
-function isImageMedia(mime = '', mtype = '') {
+function esMedioImagen(mime = '', mtype = '') {
   return /image|webp|sticker/i.test(mime) || /imageMessage|stickerMessage/i.test(mtype)
 }
 
-function resolveMediaTarget(m) {
+function resolverObjetivoMedio(m) {
   if (m.quoted) {
     const mime = (m.quoted.msg || m.quoted).mimetype || m.quoted.mediaType || ''
     const mtype = m.quoted.mtype || ''
-    if (isImageMedia(mime, mtype) && m.quoted.download) return m.quoted
+    if (esMedioImagen(mime, mtype) && m.quoted.download) return m.quoted
   }
   const mime = (m.msg || m).mimetype || m.mediaType || ''
   const mtype = m.mtype || ''
-  if (isImageMedia(mime, mtype) && m.download) return m
+  if (esMedioImagen(mime, mtype) && m.download) return m
   return null
 }
 
-async function loadImageBuffer(media, mime) {
+async function cargarBuferImagen(medio, mime) {
   if (/webp/i.test(mime)) {
     try {
-      return await sharp(media).rotate().toBuffer()
+      return await sharp(medio).rotate().toBuffer()
     } catch {
-      const url = await webp2png(media)
+      const url = await webp2png(medio)
       if (!url) throw new Error('No se pudo convertir el sticker')
-      const res = await fetch(url)
-      return Buffer.from(await res.arrayBuffer())
+      const respuesta = await fetch(url)
+      return Buffer.from(await respuesta.arrayBuffer())
     }
   }
   if (/image\//i.test(mime)) {
-    return sharp(media).rotate().toBuffer()
+    return sharp(medio).rotate().toBuffer()
   }
   throw new Error('El archivo no es una imagen')
 }
 
-function formatTime(sec) {
-  const s = Math.max(0, Math.floor(sec))
+function formatearTiempo(seg) {
+  const s = Math.max(0, Math.floor(seg))
   const m = Math.floor(s / 60)
   const r = s % 60
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
 
-function fakeTimes(title) {
+function tiemposFalsos(titulo) {
   let hash = 0
-  for (const ch of String(title)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  for (const ch of String(titulo)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
   const total = 120 + (hash % 220) // 2:00 – 5:39
-  const current = Math.floor(total * (0.22 + ((hash >> 7) % 50) / 100)) // ~22%–71%
-  return { current, total, progress: current / total }
+  const actual = Math.floor(total * (0.22 + ((hash >> 7) % 50) / 100)) // ~22%–71%
+  return { actual, total, progress: actual / total }
 }
 
-async function makeRoundedCover(buffer, size, radius) {
-  const cover = await sharp(buffer)
-    .resize(size, size, { fit: 'cover', position: 'centre' })
+async function hacerPortadaRedondeada(bufer, tamano, radio) {
+  const portada = await sharp(bufer)
+    .resize(tamano, tamano, { fit: 'cover', position: 'centre' })
     .png()
     .toBuffer()
 
-  const mask = Buffer.from(
-    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="${size}" height="${size}" rx="${radius}" ry="${radius}" fill="#fff"/>
+  const mascara = Buffer.from(
+    `<svg width="${tamano}" height="${tamano}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="${tamano}" height="${tamano}" rx="${radio}" ry="${radio}" fill="#fff"/>
     </svg>`
   )
 
-  return sharp(cover)
-    .composite([{ input: mask, blend: 'dest-in' }])
+  return sharp(portada)
+    .composite([{ input: mascara, blend: 'dest-in' }])
     .png()
     .toBuffer()
 }
 
-function buildUiSvg(title, artist, current, total, progress) {
-  const barX = 90
-  const barW = W - barX * 2
-  const barY = 980
-  const filled = Math.max(8, Math.round(barW * progress))
-  const thumbX = barX + filled
+function construirSvgUi(titulo, artista, actual, total, progreso) {
+  const barraX = 90
+  const barraW = W - barraX * 2
+  const barraY = 980
+  const rellenado = Math.max(8, Math.round(barraW * progreso))
+  const pulgarX = barraX + rellenado
 
   const volY = 1280
   const volX = 140
   const volW = W - volX * 2
-  const volFilled = Math.round(volW * 0.62)
-  const volThumb = volX + volFilled
+  const volRellenado = Math.round(volW * 0.62)
+  const volPulgar = volX + volRellenado
 
   const ctrlY = 1120
   const cx = W / 2
@@ -145,8 +145,8 @@ function buildUiSvg(title, artist, current, total, progress) {
   <rect width="${W}" height="${H}" fill="url(#shade)"/>
 
   <!-- sombra del cover -->
-  <rect x="${COVER_X}" y="${COVER_Y}" width="${COVER}" height="${COVER}"
-    rx="${COVER_R}" ry="${COVER_R}" fill="#000" opacity="0.2" filter="url(#soft)"/>
+  <rect x="${PORTADA_X}" y="${PORTADA_Y}" width="${PORTADA}" height="${PORTADA}"
+    rx="${PORTADA_R}" ry="${PORTADA_R}" fill="#000" opacity="0.2" filter="url(#soft)"/>
 
   <!-- AirPlay -->
   <g transform="translate(${W - 120}, 860)" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.92">
@@ -157,15 +157,15 @@ function buildUiSvg(title, artist, current, total, progress) {
   </g>
 
   <!-- título / artista -->
-  <text x="90" y="880" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="600" fill="#ffffff">${escapeXml(title)}</text>
-  <text x="90" y="930" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#ffffff">${escapeXml(artist)}</text>
+  <text x="90" y="880" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="600" fill="#ffffff">${escaparXml(titulo)}</text>
+  <text x="90" y="930" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#ffffff">${escaparXml(artista)}</text>
 
   <!-- progress -->
-  <line x1="${barX}" y1="${barY}" x2="${barX + barW}" y2="${barY}" stroke="#ffffff" stroke-opacity="0.28" stroke-width="5" stroke-linecap="round"/>
-  <line x1="${barX}" y1="${barY}" x2="${thumbX}" y2="${barY}" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="${thumbX}" cy="${barY}" r="11" fill="#ffffff"/>
-  <text x="${barX}" y="${barY + 38}" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#cfcfcf">${formatTime(current)}</text>
-  <text x="${barX + barW}" y="${barY + 38}" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#cfcfcf" text-anchor="end">${formatTime(total)}</text>
+  <line x1="${barraX}" y1="${barraY}" x2="${barraX + barraW}" y2="${barraY}" stroke="#ffffff" stroke-opacity="0.28" stroke-width="5" stroke-linecap="round"/>
+  <line x1="${barraX}" y1="${barraY}" x2="${pulgarX}" y2="${barraY}" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="${pulgarX}" cy="${barraY}" r="11" fill="#ffffff"/>
+  <text x="${barraX}" y="${barraY + 38}" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#cfcfcf">${formatearTiempo(actual)}</text>
+  <text x="${barraX + barraW}" y="${barraY + 38}" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#cfcfcf" text-anchor="end">${formatearTiempo(total)}</text>
 
   <!-- controles -->
   <g fill="#ffffff">
@@ -198,20 +198,20 @@ function buildUiSvg(title, artist, current, total, progress) {
     </g>
   </g>
   <line x1="${volX}" y1="${volY}" x2="${volX + volW}" y2="${volY}" stroke="#ffffff" stroke-opacity="0.28" stroke-width="5" stroke-linecap="round"/>
-  <line x1="${volX}" y1="${volY}" x2="${volThumb}" y2="${volY}" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="${volThumb}" cy="${volY}" r="11" fill="#ffffff"/>
+  <line x1="${volX}" y1="${volY}" x2="${volPulgar}" y2="${volY}" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="${volPulgar}" cy="${volY}" r="11" fill="#ffffff"/>
 
   <!-- home indicator -->
   <rect x="${W / 2 - 70}" y="${H - 46}" width="140" height="8" rx="4" fill="#ffffff" opacity="0.85"/>
 </svg>`)
 }
 
-async function buildSpotifyCard(photoBuffer, title, artist) {
-  const { current, total, progress } = fakeTimes(title)
+async function construirTarjetaSpotify(buferFoto, titulo, artista) {
+  const { actual, total, progreso } = tiemposFalsos(titulo)
 
-  const cover = await makeRoundedCover(photoBuffer, COVER, COVER_R)
+  const portada = await hacerPortadaRedondeada(buferFoto, PORTADA, PORTADA_R)
 
-  const blurred = await sharp(photoBuffer)
+  const difuminado = await sharp(buferFoto)
     .resize(W, H, { fit: 'cover', position: 'centre' })
     .blur(28)
     .modulate({ brightness: 0.55, saturation: 1.05 })
@@ -220,25 +220,25 @@ async function buildSpotifyCard(photoBuffer, title, artist) {
 
   const dim = Buffer.from(
     `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" rx="${RADIUS}" ry="${RADIUS}" fill="#000" opacity="0.45"/>
+      <rect width="100%" height="100%" rx="${RADIO}" ry="${RADIO}" fill="#000" opacity="0.45"/>
     </svg>`
   )
 
-  const ui = buildUiSvg(title, artist, current, total, progress)
+  const ui = construirSvgUi(titulo, artista, actual, total, progreso)
 
  
-  const cardMask = Buffer.from(
+  const mascaraTarjeta = Buffer.from(
     `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" rx="${RADIUS}" ry="${RADIUS}" fill="#fff"/>
+      <rect width="100%" height="100%" rx="${RADIO}" ry="${RADIO}" fill="#fff"/>
     </svg>`
   )
 
-  return sharp(blurred)
+  return sharp(difuminado)
     .composite([
       { input: dim, top: 0, left: 0 },
-      { input: cover, top: COVER_Y, left: COVER_X },
+      { input: portada, top: PORTADA_Y, left: PORTADA_X },
       { input: ui, top: 0, left: 0 },
-      { input: cardMask, blend: 'dest-in' }
+      { input: mascaraTarjeta, blend: 'dest-in' }
     ])
     .png()
     .toBuffer()
@@ -246,8 +246,8 @@ async function buildSpotifyCard(photoBuffer, title, artist) {
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
-    const target = resolveMediaTarget(m)
-    if (!target) {
+    const objetivo = resolverObjetivoMedio(m)
+    if (!objetivo) {
       return conn.reply(
         m.chat,
         `*[❗] Responde a una foto* (o envíala con el comando) y escribe el título.*\n\n` +
@@ -260,22 +260,22 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       )
     }
 
-    const captionText = text || m.msg?.caption || m.text || ''
+    const textoLeyenda = text || m.msg?.caption || m.text || ''
    
-    const cleaned = String(captionText)
+    const limpiado = String(textoLeyenda)
       .replace(new RegExp(`^\\s*${usedPrefix}?${command}\\s*`, 'i'), '')
       .trim()
 
-    const { title, artist } = parseMeta(cleaned)
-    const mime = (target.msg || target).mimetype || target.mediaType || ''
-    const media = await target.download()
-    const photo = await loadImageBuffer(media, mime)
+    const { titulo, artista } = parsearMeta(limpiado)
+    const mime = (objetivo.msg || objetivo).mimetype || objetivo.mediaType || ''
+    const medio = await objetivo.download()
+    const foto = await cargarBuferImagen(medio, mime)
 
     await conn.sendMessage(m.chat, { react: { text: '🎧', key: m.key } }).catch(() => {})
 
-    const card = await buildSpotifyCard(photo, title, artist)
+    const tarjeta = await construirTarjetaSpotify(foto, titulo, artista)
 
-    await conn.sendFile(m.chat, card, 'spotify.png', '', m, null, global.rcanal)
+    await conn.sendFile(m.chat, tarjeta, 'spotify.png', '', m, null, global.rcanal)
   } catch (e) {
     console.error('[ssimg]', e)
     return conn.reply(
@@ -291,5 +291,6 @@ handler.help = ['#ssimg • #spotimg + {foto + título|artista} → tarjeta Spot
 handler.tags = ['tools', 'img']
 handler.command = ['ssimg', 'spotimg', 'spotifyimg', 'nowplaying', 'img']
 
-export { buildSpotifyCard }
 export default handler
+
+export { construirTarjetaSpotify as buildSpotifyCard }

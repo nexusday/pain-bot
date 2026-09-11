@@ -1,14 +1,14 @@
 import { downloadTikTok, searchTikTok } from './tiktok-2.js'
 
-const TT_URL_RE =
+const RE_URL_TT =
   /(?:https?:\/\/)?(?:www\.|vm\.|vt\.|m\.|t\.)?tiktok\.com\/[^\s]+/i
 
-function buildSearchCaption(video) {
-  const author = video.author?.nickname || video.author?.unique_id || 'Desconocido'
+function construirLeyendaBusqueda(video) {
+  const autor = video.author?.nickname || video.author?.unique_id || 'Desconocido'
   return `𝗥𝗘𝗦𝗨𝗟𝗧𝗔𝗗𝗢 𝗗𝗘 𝗧𝗜𝗞𝗧𝗢𝗞
 
 > *[+] Título:* ${video.title || 'Sin título'}
-> *[+] Autor:* ${author}
+> *[+] Autor:* ${autor}
 > *[+] Región:* ${video.region || 'Desconocida'}
 > *[+] Duración:* ${video.duration || 'N/A'}s
 
@@ -20,7 +20,7 @@ function buildSearchCaption(video) {
 > *└─* Descargas: ${video.download_count?.toLocaleString?.() || video.download_count || 'N/A'}`
 }
 
-function buildLinkCaption(video) {
+function construirLeyendaEnlace(video) {
   return `𝗧𝗜𝗞𝗧𝗢𝗞 𝗩𝗜𝗗𝗘𝗢
 
 > *[+] Título:* ${video.title || 'Sin título'}
@@ -28,12 +28,12 @@ function buildLinkCaption(video) {
 > *[+] Duración:* ${video.duration || 'N/A'}s`
 }
 
-async function sendVideo(conn, m, video, caption) {
+async function enviarVideo(conn, m, video, leyenda) {
   if (video.type === 'image' && Array.isArray(video.images) && video.images.length) {
     for (const img of video.images.slice(0, 6)) {
       await conn.sendMessage(
         m.chat,
-        { image: { url: img }, caption, contextInfo: { ...rcanal.contextInfo } },
+        { image: { url: img }, caption: leyenda, contextInfo: { ...rcanal.contextInfo } },
         { quoted: m }
       )
     }
@@ -46,7 +46,7 @@ async function sendVideo(conn, m, video, caption) {
     m.chat,
     {
       video: { url: video.play },
-      caption,
+      caption: leyenda,
       contextInfo: { ...rcanal.contextInfo }
     },
     { quoted: m }
@@ -67,20 +67,20 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     )
   }
 
-  const input = text.trim()
-  const isUrl = TT_URL_RE.test(input)
+  const entrada = text.trim()
+  const esUrl = RE_URL_TT.test(entrada)
 
   try {
     await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } }).catch(() => {})
 
-    if (isUrl) {
+    if (esUrl) {
     
-      const link = input.match(TT_URL_RE)?.[0] || input
+      const link = entrada.match(RE_URL_TT)?.[0] || entrada
       const video = await downloadTikTok(link)
-      await sendVideo(conn, m, video, buildLinkCaption(video))
+      await enviarVideo(conn, m, video, construirLeyendaEnlace(video))
     } else {
-      const results = await searchTikTok(input, 1)
-      const video = results[0]
+      const resultados = await searchTikTok(entrada, 1)
+      const video = resultados[0]
       if (!video) {
         return conn.sendMessage(
           m.chat,
@@ -91,7 +91,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
           { quoted: m }
         )
       }
-      await sendVideo(conn, m, video, buildSearchCaption(video))
+      await enviarVideo(conn, m, video, construirLeyendaBusqueda(video))
     }
 
     await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})

@@ -17,12 +17,12 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     }, { quoted: m })
   }
 
-  let link = args[0].trim()
+  let enlace = args[0].trim()
 
   
-  const inviteCode = link.match(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9]+)/)?.[1]
+  const codigoInvitacion = enlace.match(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9]+)/)?.[1]
 
-  if (!inviteCode) {
+  if (!codigoInvitacion) {
     return conn.sendMessage(m.chat, {
       text: '[❌] Link de invitación inválido. Usa el formato: https://chat.whatsapp.com/<código>',
       contextInfo: {
@@ -31,19 +31,19 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     }, { quoted: m })
   }
 
-  let groupInfo = null
+  let infoGrupo = null
 
   try {
     
 
-    groupInfo = await conn.groupGetInviteInfo(inviteCode)
+    infoGrupo = await conn.groupGetInviteInfo(codigoInvitacion)
     
     
     try {
-      const metadata = await conn.groupMetadata(groupInfo.id)
+      const metadatos = await conn.groupMetadata(infoGrupo.id)
     
       return conn.sendMessage(m.chat, {
-        text: `[❌] El bot ya está en ese grupo: ${metadata.subject}`,
+        text: `[❌] El bot ya está en ese grupo: ${metadatos.subject}`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -57,9 +57,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     }
     
     
-    await conn.groupAcceptInvite(inviteCode)
+    await conn.groupAcceptInvite(codigoInvitacion)
 
-    if (groupInfo.joinApprovalMode) {
+    if (infoGrupo.joinApprovalMode) {
       conn.sendMessage(m.chat, {
         text: '[✅] Solicitud de unión enviada. El bot está esperando aprobación de un administrador.',
         contextInfo: {
@@ -78,13 +78,13 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
   } catch (error) {
     console.error('Error al unirse al grupo:', error)
     
-    let errorMsg = error.message || 'Desconocido'
-    if (errorMsg === 'not-authorized') {
-      errorMsg = 'El bot fue eliminado del grupo por alguien y no puede unirse.'
+    let mensajeError = error.message || 'Desconocido'
+    if (mensajeError === 'not-authorized') {
+      mensajeError = 'El bot fue eliminado del grupo por alguien y no puede unirse.'
     }
     
     conn.sendMessage(m.chat, {
-      text: `[❌] Error al unirse al grupo: ${errorMsg}`,
+      text: `[❌] Error al unirse al grupo: ${mensajeError}`,
       contextInfo: {
         ...rcanal.contextInfo
       }

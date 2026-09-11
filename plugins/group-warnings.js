@@ -9,88 +9,88 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   if (!global.db.data.warnings) global.db.data.warnings = {}
   if (!global.db.data.warnings[m.chat]) global.db.data.warnings[m.chat] = {}
 
-  const groupMetadata = await conn.groupMetadata(m.chat)
-  const groupName = groupMetadata.subject
+  const metadatosGrupo = await conn.groupMetadata(m.chat)
+  const nombreGrupo = metadatosGrupo.subject
 
   if (m.mentionedJid && m.mentionedJid.length > 0) {
-    const who = m.mentionedJid[0]
-    const userWarnings = global.db.data.warnings[m.chat][who]
+    const quien = m.mentionedJid[0]
+    const advertenciasUsuario = global.db.data.warnings[m.chat][quien]
     
-    if (!userWarnings || userWarnings.count === 0) {
+    if (!advertenciasUsuario || advertenciasUsuario.count === 0) {
       return conn.sendMessage(m.chat, {
-        text: `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀\n\n> *Usuario:* @${who.split('@')[0]}\n> *Advertencias:* 0/3`,
+        text: `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀\n\n> *Usuario:* @${quien.split('@')[0]}\n> *Advertencias:* 0/3`,
         contextInfo: {
           ...rcanal.contextInfo,
-          mentionedJid: [who]
+          mentionedJid: [quien]
         }
       }, { quoted: m })
     }
 
-    let warningsText = `𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀 𝗱𝗲 𝗨𝘀𝘂𝗮𝗿𝗶𝗼\n> *Usuario:* @${who.split('@')[0]}> *Advertencias:* ${userWarnings.count}/3 ${userWarnings.count >= 2 ? '⚠️' : '📋'}`
+    let textoAdvertencias = `𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀 𝗱𝗲 𝗨𝘀𝘂𝗮𝗿𝗶𝗼\n> *Usuario:* @${quien.split('@')[0]}> *Advertencias:* ${advertenciasUsuario.count}/3 ${advertenciasUsuario.count >= 2 ? '⚠️' : '📋'}`
     
-    userWarnings.warnings.forEach((warn, index) => {
-      const date = new Date(warn.timestamp).toLocaleDateString('es-ES')
-      const adminName = warn.admin.split('@')[0]
-      warningsText += `> *${index + 1}.* ${warn.reason}\n`
-      warningsText += `> *Admin:* @${adminName} | ${date}\n`
+    advertenciasUsuario.warnings.forEach((adv, index) => {
+      const date = new Date(adv.timestamp).toLocaleDateString('es-ES')
+      const nombreAdmin = adv.admin.split('@')[0]
+      textoAdvertencias += `> *${index + 1}.* ${adv.reason}\n`
+      textoAdvertencias += `> *Admin:* @${nombreAdmin} | ${date}\n`
     })
     
-    warningsText += `> *Grupo:* ${groupName}\n`
-    if (userWarnings.count >= 2) {
-      warningsText += `> ⚠️ *¡Próxima advertencia = Expulsión!* ⚠️\n`
+    textoAdvertencias += `> *Grupo:* ${nombreGrupo}\n`
+    if (advertenciasUsuario.count >= 2) {
+      textoAdvertencias += `> ⚠️ *¡Próxima advertencia = Expulsión!* ⚠️\n`
     }
     
 
-    const mentionedUsers = [who, ...userWarnings.warnings.map(w => w.admin)]
+    const usuariosMencionados = [quien, ...advertenciasUsuario.warnings.map(w => w.admin)]
     
     return conn.sendMessage(m.chat, {
-      text: warningsText,
+      text: textoAdvertencias,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: mentionedUsers
+        mentionedJid: usuariosMencionados
       }
     }, { quoted: m })
   }
 
 
-  const allWarnings = global.db.data.warnings[m.chat]
-  const usersWithWarnings = Object.keys(allWarnings).filter(user => allWarnings[user].count > 0)
+  const todasLasAdvertencias = global.db.data.warnings[m.chat]
+  const usuariosConAdvertencias = Object.keys(todasLasAdvertencias).filter(usuario => todasLasAdvertencias[usuario].count > 0)
 
-  if (usersWithWarnings.length === 0) {
+  if (usuariosConAdvertencias.length === 0) {
     return conn.sendMessage(m.chat, {
-      text: `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼\n\n> *Grupo:* ${groupName}\n> *Usuarios con advertencias:* 0`,
+      text: `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼\n\n> *Grupo:* ${nombreGrupo}\n> *Usuarios con advertencias:* 0`,
       contextInfo: {
         ...rcanal.contextInfo
       }
     }, { quoted: m })
   }
 
-  let groupWarningsText = `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼\n\n> *Grupo:* ${groupName}\n> *Usuarios con advertencias:* ${usersWithWarnings.length}`
+  let textoAdvertenciasGrupo = `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮𝘀 𝗱𝗲𝗹 𝗚𝗿𝘂𝗽𝗼\n\n> *Grupo:* ${nombreGrupo}\n> *Usuarios con advertencias:* ${usuariosConAdvertencias.length}`
 
-  const mentionedUsers = []
+  const usuariosMencionados = []
   
-  for (let i = 0; i < usersWithWarnings.length; i++) {
-    const userId = usersWithWarnings[i]
-    const userWarnings = allWarnings[userId]
-    const userName = userId.split('@')[0]
+  for (let i = 0; i < usuariosConAdvertencias.length; i++) {
+    const idUsuario = usuariosConAdvertencias[i]
+    const advertenciasUsuario = todasLasAdvertencias[idUsuario]
+    const nombreUsuario = idUsuario.split('@')[0]
     
-    mentionedUsers.push(userId)
+    usuariosMencionados.push(idUsuario)
     
-    groupWarningsText += `> *${i + 1}.* @${userName}\n`
-    groupWarningsText += `> *Advertencias:* ${userWarnings.count}/3 ${userWarnings.count >= 2 ? '⚠️' : '📋'}\n`
+    textoAdvertenciasGrupo += `> *${i + 1}.* @${nombreUsuario}\n`
+    textoAdvertenciasGrupo += `> *Advertencias:* ${advertenciasUsuario.count}/3 ${advertenciasUsuario.count >= 2 ? '⚠️' : '📋'}\n`
     
-    if (i < usersWithWarnings.length - 1) {
-      groupWarningsText += `│\n`
+    if (i < usuariosConAdvertencias.length - 1) {
+      textoAdvertenciasGrupo += `│\n`
     }
   }
   
-  groupWarningsText += `\n\n> *Comando:* ${usedPrefix}warnings @usuario\n> *Si deseas ver de un usuario.`
+  textoAdvertenciasGrupo += `\n\n> *Comando:* ${usedPrefix}warnings @usuario\n> *Si deseas ver de un usuario.`
 
   return conn.sendMessage(m.chat, {
-    text: groupWarningsText,
+    text: textoAdvertenciasGrupo,
     contextInfo: {
       ...rcanal.contextInfo,
-      mentionedJid: mentionedUsers
+      mentionedJid: usuariosMencionados
     }
   }, { quoted: m })
 }

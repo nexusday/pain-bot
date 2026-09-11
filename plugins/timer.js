@@ -49,7 +49,7 @@ function formatMs(ms) {
   return parts.join(' ')
 }
 
-const handler = async (m, { conn, text, usedPrefix, command, groupMetadata }) => {
+const handler = async (m, { conn, text, usedPrefix, command, groupMetadata: metadatosGrupo }) => {
   try {
     if (!m.isGroup) return m.reply('Este comando solo funciona en grupos.')
     const cleaned = (text || '').trim()
@@ -87,9 +87,9 @@ const handler = async (m, { conn, text, usedPrefix, command, groupMetadata }) =>
     setTimeout(async () => {
       try {
       
-        const meta = groupMetadata || (await conn.groupMetadata(m.chat).catch(() => null)) || { participants: [] }
+        const meta = metadatosGrupo || (await conn.groupMetadata(m.chat).catch(() => null)) || { participants: [] }
         const participants = meta.participants || []
-        const users = participants.map(u => conn.decodeJid(u.id))
+        const usuarios = participants.map(u => conn.decodeJid(u.id))
 
         const finalText = (
           `${msg}`
@@ -103,7 +103,7 @@ const handler = async (m, { conn, text, usedPrefix, command, groupMetadata }) =>
             { extendedTextMessage: { text: finalText } },
             { quoted: null, userJid: conn.user.id }
           )
-          const mod = conn.cMod(m.chat, built, finalText, conn.user.jid, { mentions: users })
+          const mod = conn.cMod(m.chat, built, finalText, conn.user.jid, { mentions: usuarios })
           await conn.relayMessage(m.chat, mod.message, { messageId: mod.key?.id || undefined })
           return
         } catch {}
@@ -111,14 +111,14 @@ const handler = async (m, { conn, text, usedPrefix, command, groupMetadata }) =>
        
         const more = String.fromCharCode(8206)
         const masss = more.repeat(850)
-        await conn.sendMessage(m.chat, { text: `${masss}\n${finalText}`, mentions: users, contextInfo: { ...(global.rcanal?.contextInfo || {}) } }, { quoted: null })
+        await conn.sendMessage(m.chat, { text: `${masss}\n${finalText}`, mentions: usuarios, contextInfo: { ...(global.rcanal?.contextInfo || {}) } }, { quoted: null })
       } catch (err) {
         console.error('Error enviando temporizador:', err)
       }
     }, durationMs)
 
-  } catch (e) {
-    return conn.reply(m.chat, `⚠︎ Ocurrió un problema al crear el temporizador.\n${e?.message || e}`, m)
+  } catch (error) {
+    return conn.reply(m.chat, `⚠︎ Ocurrió un problema al crear el temporizador.\n${error?.message || error}`, m)
   }
 }
 

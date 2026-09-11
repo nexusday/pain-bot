@@ -1,11 +1,11 @@
 import fetch from 'node-fetch'
 
-const RESULTS_LIMIT = 4
+const LIMITE_RESULTADOS = 4
 
-function trimText(text = '', max = 120) {
-  const value = String(text).replace(/\s+/g, ' ').trim()
-  if (!value) return ''
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+function recortarTexto(text = '', max = 120) {
+  const valor = String(text).replace(/\s+/g, ' ').trim()
+  if (!valor) return ''
+  return valor.length > max ? `${valor.slice(0, max - 1)}…` : valor
 }
 
 const handler = async (m, { conn, text, usedPrefix, command }) => {
@@ -17,40 +17,40 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const query = text.trim()
+    const consulta = text.trim()
 
    
 
-    const searchUrl = `https://api.delirius.online/search/instagramreels?query=${encodeURIComponent(query)}&language=es`
-    const sres = await fetch(searchUrl).then(r => r.json())
+    const urlBusqueda = `https://api.delirius.online/search/instagramreels?query=${encodeURIComponent(consulta)}&language=es`
+    const resBusqueda = await fetch(urlBusqueda).then(r => r.json())
 
-    if (!sres?.status || !Array.isArray(sres.data) || !sres.data.length) {
+    if (!resBusqueda?.status || !Array.isArray(resBusqueda.data) || !resBusqueda.data.length) {
       throw '[❗] No se encontraron reels para esa búsqueda.'
     }
 
-    const results = sres.data.slice(0, RESULTS_LIMIT)
+    const resultados = resBusqueda.data.slice(0, LIMITE_RESULTADOS)
 
-    let list = `*Resultados de Instagram*\n\n> *Búsqueda:* ${query}\n> *Encontrados:* ${results.length}\n\n`
-    results.forEach((item, i) => {
-      list += `*${i + 1}.* ${trimText(item.title, 80)}\n> ${item.url}\n\n`
+    let lista = `*Resultados de Instagram*\n\n> *Búsqueda:* ${consulta}\n> *Encontrados:* ${resultados.length}\n\n`
+    resultados.forEach((elemento, i) => {
+      lista += `*${i + 1}.* ${recortarTexto(elemento.title, 80)}\n> ${elemento.url}\n\n`
     })
-    list += `> Para descargar usa:\n> ${usedPrefix}ig <enlace>`
+    lista += `> Para descargar usa:\n> ${usedPrefix}ig <enlace>`
 
     await conn.sendMessage(m.chat, {
-      text: list.trim(),
+      text: lista.trim(),
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
 
-    for (let i = 0; i < results.length; i++) {
-      const item = results[i]
-      const caption = `*${i + 1}.* ${trimText(item.title, 100)}\n\n${trimText(item.description, 160)}\n\n> ${item.url}\n\n> Descargar: ${usedPrefix}ig ${item.url}`
+    for (let i = 0; i < resultados.length; i++) {
+      const elemento = resultados[i]
+      const leyenda = `*${i + 1}.* ${recortarTexto(elemento.title, 100)}\n\n${recortarTexto(elemento.description, 160)}\n\n> ${elemento.url}\n\n> Descargar: ${usedPrefix}ig ${elemento.url}`
 
-      if (item.image) {
+      if (elemento.image) {
         try {
-          const thumb = (await conn.getFile(item.image)).data
+          const miniatura = (await conn.getFile(elemento.image)).data
           await conn.sendMessage(m.chat, {
-            image: thumb,
-            caption,
+            image: miniatura,
+            caption: leyenda,
             contextInfo: { ...rcanal?.contextInfo }
           }, { quoted: m })
           continue
@@ -58,7 +58,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }
 
       await conn.sendMessage(m.chat, {
-        text: caption,
+        text: leyenda,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
     }

@@ -6,8 +6,8 @@ import { spawn } from 'child_process'
 
 let handler = async (m, { conn }) => {
   
-  const target = m.mentionedJid && m.mentionedJid.length ? m.mentionedJid[0] : null
-  if (!target) return conn.sendMessage(m.chat, { text: `[❗] Debes mencionar a un usuario.\n\n> Ejemplo: /hug @usuario`, contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
+  const objetivo = m.mentionedJid && m.mentionedJid.length ? m.mentionedJid[0] : null
+  if (!objetivo) return conn.sendMessage(m.chat, { text: `[❗] Debes mencionar a un usuario.\n\n> Ejemplo: /hug @usuario`, contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
 
   
 
@@ -32,47 +32,47 @@ let handler = async (m, { conn }) => {
     'https://media.tenor.com/5fiWSpLaEe0AAAAM/anime-hug.gif'
 
   ]
-  const gifUrl = gifs[Math.floor(Math.random() * gifs.length)]
+  const urlGif = gifs[Math.floor(Math.random() * gifs.length)]
 
-  const sender = m.sender
-  const mention = [sender].concat(target ? [target] : [])
-  const userTag = '@' + (typeof sender === 'string' ? sender.split('@')[0] : String(sender))
-  const targetTag = '@' + (target ? (typeof target === 'string' ? target.split('@')[0] : String(target)) : 'desconocido')
-  const text = `${userTag} le dio un fuerte abrazo a ${targetTag} 🫂`
+  const remitente = m.sender
+  const mencion = [remitente].concat(objetivo ? [objetivo] : [])
+  const etiquetaUsuario = '@' + (typeof remitente === 'string' ? remitente.split('@')[0] : String(remitente))
+  const targetTag = '@' + (objetivo ? (typeof objetivo === 'string' ? objetivo.split('@')[0] : String(objetivo)) : 'desconocido')
+  const texto = `${etiquetaUsuario} le dio un fuerte abrazo a ${targetTag} 🫂`
 
-  const tmpName = `hug_${Date.now()}`
-  const gifPath = join(tmpdir(), `${tmpName}.gif`)
-  const mp4Path = join(tmpdir(), `${tmpName}.mp4`)
+  const nombreTmp = `hug_${Date.now()}`
+  const rutaGif = join(tmpdir(), `${nombreTmp}.gif`)
+  const rutaMp4 = join(tmpdir(), `${nombreTmp}.mp4`)
 
   try {
-    const res = await fetch(gifUrl)
+    const res = await fetch(urlGif)
     if (!res.ok) throw new Error('Failed to download gif')
     const buffer = await res.arrayBuffer()
-    writeFileSync(gifPath, Buffer.from(buffer))
+    writeFileSync(rutaGif, Buffer.from(buffer))
 
     await new Promise((resolve, reject) => {
-      const ff = spawn('ffmpeg', ['-y', '-i', gifPath, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', "scale=trunc(iw/2)*2:trunc(ih/2)*2", mp4Path])
+      const ff = spawn('ffmpeg', ['-y', '-i', rutaGif, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', "scale=trunc(iw/2)*2:trunc(ih/2)*2", rutaMp4])
       let stderr = ''
       ff.stderr.on('data', d => stderr += d.toString())
       ff.on('close', code => {
-        if (code === 0 && existsSync(mp4Path)) resolve()
+        if (code === 0 && existsSync(rutaMp4)) resolve()
         else reject(new Error('ffmpeg failed: ' + stderr))
       })
     })
 
-    const mp4Buffer = Buffer.from(await (await import('fs')).promises.readFile(mp4Path))
+    const bufferMp4 = Buffer.from(await (await import('fs')).promises.readFile(rutaMp4))
 
-    await conn.sendMessage(m.chat, { video: mp4Buffer, caption: text, mimetype: 'video/mp4', gifPlayback: true, contextInfo: { mentionedJid: mention } }, { quoted: m })
+    await conn.sendMessage(m.chat, { video: bufferMp4, caption: texto, mimetype: 'video/mp4', gifPlayback: true, contextInfo: { mentionedJid: mencion } }, { quoted: m })
   } catch (err) {
     console.error('hug plugin error:', err)
     try {
-      await conn.sendMessage(m.chat, { video: { url: gifUrl }, gifPlayback: true, caption: text, contextInfo: { mentionedJid: mention } }, { quoted: m })
+      await conn.sendMessage(m.chat, { video: { url: urlGif }, gifPlayback: true, caption: texto, contextInfo: { mentionedJid: mencion } }, { quoted: m })
     } catch (err2) {
-      try { await conn.sendMessage(m.chat, { image: { url: gifUrl }, caption: text, contextInfo: { mentionedJid: mention } }, { quoted: m }) } catch {}
+      try { await conn.sendMessage(m.chat, { image: { url: urlGif }, caption: texto, contextInfo: { mentionedJid: mencion } }, { quoted: m }) } catch {}
     }
   } finally {
-    try { if (existsSync(gifPath)) unlinkSync(gifPath) } catch {}
-    try { if (existsSync(mp4Path)) unlinkSync(mp4Path) } catch {}
+    try { if (existsSync(rutaGif)) unlinkSync(rutaGif) } catch {}
+    try { if (existsSync(rutaMp4)) unlinkSync(rutaMp4) } catch {}
   }
 }
 

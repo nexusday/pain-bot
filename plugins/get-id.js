@@ -1,12 +1,12 @@
 let handler = async (m, { conn, usedPrefix }) => {
 
-  let who = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.sender
-  let user = global.db.data.users[who]
+  let quien = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.sender
+  let usuario = global.db.data.users[quien]
   
-  let txt = `ᬊ *Nombre:* ${user?.name || "Sin Registrar"}\nᬊ *ID:* ${who}`
+  let texto = `ᬊ *Nombre:* ${usuario?.name || "Sin Registrar"}\nᬊ *ID:* ${quien}`
   
   await conn.sendMessage(m.chat, {
-    text: txt,
+    text: texto,
     contextInfo: {
       ...rcanal.contextInfo
     }

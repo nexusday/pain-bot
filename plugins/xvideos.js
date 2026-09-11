@@ -47,10 +47,10 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
         }
       }, { quoted: m })
       
-    } catch (e) {
-      console.error('Error en descarga XVideos:', e)
+    } catch (error) {
+      console.error('Error en descarga XVideos:', error)
       await conn.sendMessage(m.chat, {
-        text: `[❌] *Error:* ${e.message}\n[❌] *Verifica la URL*`,
+        text: `[❌] *Error:* ${error.message}\n[❌] *Verifica la URL*`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -77,14 +77,14 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }, { quoted: m })
   }
 
-  const list = results.slice(0, 10).map((res, i) => 
+  const lista = results.slice(0, 10).map((res, i) => 
     `*${i + 1}.*\n *Título:* ${res.title}\n *Link:* ${res.url}`
   ).join('\n\n')
 
-  const caption = `ʀᴇsᴜʟᴛᴀᴅᴏs ᴅᴇ ʙᴜsǫᴜᴇᴅᴀ\n\n *Búsqueda:* ${text}\n *Resultados:* ${results.length}\n\n${list}\n│\n *Escribe solo el número (1-10) para descargar*\n *Ejemplo: 3, 7, 1*\n *O usa directamente la URL*\n\n`
+  const leyenda = `ʀᴇsᴜʟᴛᴀᴅᴏs ᴅᴇ ʙᴜsǫᴜᴇᴅᴀ\n\n *Búsqueda:* ${text}\n *Resultados:* ${results.length}\n\n${lista}\n│\n *Escribe solo el número (1-10) para descargar*\n *Ejemplo: 3, 7, 1*\n *O usa directamente la URL*\n\n`
 
   const { key } = await conn.sendMessage(m.chat, { 
-    text: caption,
+    text: leyenda,
     contextInfo: {
       ...rcanal.contextInfo
     }
@@ -143,10 +143,10 @@ handler.before = async (m, { conn }) => {
       }
     }, { quoted: m })
     
-  } catch (e) {
-    console.error('Error en descarga XVideos:', e)
+  } catch (error) {
+    console.error('Error en descarga XVideos:', error)
     await conn.sendMessage(m.chat, {
-      text: `[❌] *Error:* ${e.message}\n *Inténtalo más tarde*`,
+      text: `[❌] *Error:* ${error.message}\n *Inténtalo más tarde*`,
       contextInfo: {
         ...rcanal.contextInfo
       }
@@ -170,7 +170,7 @@ async function searchXvideos(query) {
       const $ = cheerio.load(response.data)
 
       const results = []
-      $("div.mozaique > div").each((index, element) => {
+      $("div.mozaique > div").each((indice, element) => {
         const title = $(element).find("p.title a").attr("title")
         const videoUrl = "https://www.xvideos.com" + $(element).find("p.title a").attr("href")
         const duration = $(element).find("span.duration").text().trim()

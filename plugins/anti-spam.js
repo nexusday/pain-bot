@@ -10,30 +10,30 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     }
     
     
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
     
     if (!global.db.data.antiSpam) global.db.data.antiSpam = {}
     
-    if (action === 'on') {
+    if (accion === 'on') {
       global.db.data.antiSpam[m.chat] = true
       
-      let txt = `ִֶָ☾. *Anti-spam activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-spam activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'off') {
+    } else if (accion === 'off') {
       global.db.data.antiSpam[m.chat] = false
       
-      let txt = `ִֶָ☾. *Anti-spam desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-spam desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -49,8 +49,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }, { quoted: m })
     }
     
-  } catch (e) {
-    console.error('Error en antispam:', e)
+  } catch (error) {
+    console.error('Error en antispam:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al configurar el anti-spam.',
       contextInfo: {

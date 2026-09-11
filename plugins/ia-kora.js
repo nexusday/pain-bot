@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-const KORA_API_URL = 'https://api-kora.netlify.app/.netlify/functions/chat'
-const KORA_API_KEY = 'kora_ojrQBrFs0TdAzyC1w5gu4CCj7uUiZ8N4XHS7PHpa'
+const URL_API_KORA = 'https://api-kora.netlify.app/.netlify/functions/chat'
+const CLAVE_API_KORA = 'kora_ojrQBrFs0TdAzyC1w5gu4CCj7uUiZ8N4XHS7PHpa'
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text?.trim()) {
@@ -12,11 +12,11 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 
   try {
-    const { data, status } = await axios.post(KORA_API_URL, {
+    const { datos, status } = await axios.post(URL_API_KORA, {
       message: text.trim()
     }, {
       headers: {
-        Authorization: `Bearer ${KORA_API_KEY}`,
+        Authorization: `Bearer ${CLAVE_API_KORA}`,
         'Content-Type': 'application/json'
       },
       timeout: 60000
@@ -26,9 +26,9 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       throw new Error(`API código ${status}`)
     }
 
-    const response = (typeof data?.response === 'string' ? data.response.trim() : '') || ''
+    const respuestaApi = (typeof datos?.response === 'string' ? datos.response.trim() : '') || ''
 
-    if (!response) {
+    if (!respuestaApi) {
       return conn.sendMessage(m.chat, {
         text: '*[❗] Kora no devolvió una respuesta.*',
         contextInfo: { ...rcanal.contextInfo }
@@ -36,16 +36,16 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
     await conn.sendMessage(m.chat, {
-      text: `${response}`,
+      text: `${respuestaApi}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
     console.error('Error en ia-kora:', e)
 
-    const apiData = e?.response?.data
-    const detail = typeof apiData === 'string'
-      ? apiData
-      : apiData?.error || apiData?.message || e.message || 'Intenta de nuevo más tarde.'
+    const datosApi = e?.response?.data
+    const detalle = typeof datosApi === 'string'
+      ? datosApi
+      : datosApi?.error || datosApi?.message || e.message || 'Intenta de nuevo más tarde.'
 
     conn.sendMessage(m.chat, {
       text: `*[❌] Error al consultar a Kora.*`,

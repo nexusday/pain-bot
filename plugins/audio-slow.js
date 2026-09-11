@@ -4,12 +4,12 @@ import { join } from 'path'
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
 import { promisify } from 'util'
 
-const execPromise = promisify(exec)
+const ejecutarPromesa = promisify(exec)
 
 let handler = async (m, { conn, text }) => {
   
-  let inputPath = ''
-  let outputPath = ''
+  let rutaEntrada = ''
+  let rutaSalida = ''
 
   try {
     if (!m.quoted) return m.reply('[❗] Responde a un audio o nota de voz. Uso: /slow')
@@ -23,29 +23,29 @@ let handler = async (m, { conn, text }) => {
     }
 
     const q = await m.getQuotedObj()
-    const audioMeta = q.msg?.audioMessage || q.msg?.voiceMessage || {}
-    const mime = q.msg?.mimetype || q.mimetype || audioMeta.mimetype || ''
+    const metaAudio = q.msg?.audioMessage || q.msg?.voiceMessage || {}
+    const mime = q.msg?.mimetype || q.mimetype || metaAudio.mimetype || ''
 
     if (!mime.startsWith('audio/') && !q.mtype?.includes('audio')) {
       return m.reply('[❗] Responde a un audio o nota de voz')
     }
 
     
-    let media = null
-    try { media = await q.download?.() } catch (e) { media = null }
+    let medio = null
+    try { medio = await q.download?.() } catch (e) { medio = null }
 
-    if ((!media || media.length === 0) && conn.downloadM && q.msg) {
-      try { media = await conn.downloadM(q.msg.audioMessage || q.msg.voiceMessage || q.msg, 'audioMessage') } catch (e) { media = null }
+    if ((!medio || medio.length === 0) && conn.downloadM && q.msg) {
+      try { medio = await conn.downloadM(q.msg.audioMessage || q.msg.voiceMessage || q.msg, 'audioMessage') } catch (e) { medio = null }
     }
 
-    if ((!media || media.length === 0) && conn.getFile && q.msg) {
+    if ((!medio || medio.length === 0) && conn.getFile && q.msg) {
       try {
-        const file = await conn.getFile(q.msg.audioMessage || q.msg.voiceMessage || q.msg)
-        media = file?.data || null
-      } catch (e) { media = null }
+        const archivo = await conn.getFile(q.msg.audioMessage || q.msg.voiceMessage || q.msg)
+        medio = archivo?.data || null
+      } catch (e) { medio = null }
     }
 
-    if (!media || media.length === 0) {
+    if (!medio || medio.length === 0) {
       return m.reply('No se pudo descargar el audio')
     }
 
@@ -54,33 +54,33 @@ let handler = async (m, { conn, text }) => {
     let ext = 'ogg'
     try { ext = (mime.split('/')[1] || '').split(';')[0] || ext } catch (e) {}
     
-    inputPath = join(tmpdir(), `input_${id}.${ext}`)
-    outputPath = join(tmpdir(), `output_${id}.mp3`)
+    rutaEntrada = join(tmpdir(), `input_${id}.${ext}`)
+    rutaSalida = join(tmpdir(), `output_${id}.mp3`)
 
-    writeFileSync(inputPath, Buffer.from(media))
+    writeFileSync(rutaEntrada, Buffer.from(medio))
 
-   const ffmpegCommand = `ffmpeg -y -i "${inputPath}" \
+   const comandoFfmpeg = `ffmpeg -y -i "${rutaEntrada}" \
 -af "asetrate=44100*0.80,aresample=44100,bass=g=6" \
--c:a libmp3lame -b:a 128k -ac 2 "${outputPath}"`
+-c:a libmp3lame -b:a 128k -ac 2 "${rutaSalida}"`
 
     console.log('slow: ejecutando ffmpeg con tempo=', tempo,)
     
-    await execPromise(ffmpegCommand)
+    await ejecutarPromesa(comandoFfmpeg)
 
    
-    if (!existsSync(outputPath)) {
+    if (!existsSync(rutaSalida)) {
       throw new Error('FFmpeg no pudo generar el archivo de salida.')
     }
 
-    const finalAudioBuffer = readFileSync(outputPath)
+    const buferAudioFinal = readFileSync(rutaSalida)
 
-    if (finalAudioBuffer.length === 0) {
+    if (buferAudioFinal.length === 0) {
       throw new Error('El archivo generado por FFmpeg está vacío.')
     }
 
     
     await conn.sendMessage(m.chat, { 
-      audio: finalAudioBuffer, 
+      audio: buferAudioFinal, 
       mimetype: 'audio/mpeg',
       fileName: `slow-${id}.mp3`,
       ptt: false 
@@ -91,8 +91,8 @@ let handler = async (m, { conn, text }) => {
     try { m.reply(' FFmpeg: ' + (err.message || err)) } catch {}
   } finally {
     
-    try { if (inputPath && existsSync(inputPath)) unlinkSync(inputPath) } catch {}
-    try { if (outputPath && existsSync(outputPath)) unlinkSync(outputPath) } catch {}
+    try { if (rutaEntrada && existsSync(rutaEntrada)) unlinkSync(rutaEntrada) } catch {}
+    try { if (rutaSalida && existsSync(rutaSalida)) unlinkSync(rutaSalida) } catch {}
   }
 }
 

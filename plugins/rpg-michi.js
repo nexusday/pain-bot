@@ -9,9 +9,9 @@ import {
   formatMichiBalance,
 } from '../lib/michi-users.js'
 
-function clearPendingInvite(chat, invite) {
+function clearPendingInvite(idChat, invite) {
   if (invite?.timeout) clearTimeout(invite.timeout)
-  if (global.pendingInvites?.[chat]) delete global.pendingInvites[chat]
+  if (global.pendingInvites?.[idChat]) delete global.pendingInvites[idChat]
 }
 
 let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
@@ -130,18 +130,18 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
     }, 20000) 
 
     
-    const caption = `@${opponent.split('@')[0]} responde en *20 segundos*\n\n> *si* — Aceptar\n> *no* — Rechazar`
+    const leyenda = `@${opponent.split('@')[0]} responde en *20 segundos*\n\n> *si* — Aceptar\n> *no* — Rechazar`
 
     return sendMichiInvite(conn, m.chat, {
       challenger,
       opponent,
       quoted: m,
-      caption,
+      caption: leyenda,
       mentionedJid: [challenger, opponent],
     })
 
-  } catch (e) {
-    console.error('Error en comando michi:', e)
+  } catch (error) {
+    console.error('Error en comando michi:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al enviar la invitación.',
       contextInfo: {
@@ -222,7 +222,7 @@ export async function acceptInvite(m, conn, invite, participants = []) {
     game.startInactivityTimeout()
 
     
-    const caption = `╭─╮  𓍯  3 EN RAYA INICIADO  𓍯
+    const leyenda = `╭─╮  𓍯  3 EN RAYA INICIADO  𓍯
 │  ❌ @${invite.challenger.split('@')[0]}
 │  ⭕ @${invite.opponent.split('@')[0]}
 │
@@ -232,12 +232,12 @@ export async function acceptInvite(m, conn, invite, participants = []) {
 
     return sendMichiBoard(conn, m.chat, game, {
       quoted: m,
-      caption,
+      caption: leyenda,
       mentionedJid: [invite.challenger, invite.opponent],
       status: 'playing',
     })
-  } catch (e) {
-    console.error('Error al aceptar invitación:', e)
+  } catch (error) {
+    console.error('Error al aceptar invitación:', error)
     return conn.sendMessage(m.chat, {
       text: '❌ Error al iniciar el juego.',
       contextInfo: {
@@ -270,13 +270,13 @@ export async function rejectInvite(m, conn, invite) {
       }
     }, { quoted: m })
 
-  } catch (e) {
-    console.error('Error al rechazar invitación:', e)
+  } catch (error) {
+    console.error('Error al rechazar invitación:', error)
   }
 }
 export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished') {
   try {
-    const chatId = cancelledGame.chatId || m.chat
+    const idChat = cancelledGame.chatId || m.chat
     const game = cancelledGame
 
     
@@ -285,8 +285,8 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
     }
 
     
-    if (global.games && global.games[chatId]) {
-      delete global.games[chatId]
+    if (global.games && global.games[idChat]) {
+      delete global.games[idChat]
     }
 
     let message = ''
@@ -368,7 +368,7 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
       playersToMention = [game.player1, game.player2]
     }
 
-    return sendMichiBoard(conn, chatId, game, {
+    return sendMichiBoard(conn, idChat, game, {
       quoted: m,
       caption: message,
       mentionedJid: playersToMention,
@@ -378,8 +378,8 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
       winnerJid: game.winner || null,
     })
 
-  } catch (e) {
-    console.error('Error al finalizar juego:', e)
+  } catch (error) {
+    console.error('Error al finalizar juego:', error)
   }
 }
 

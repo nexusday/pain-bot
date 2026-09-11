@@ -3,10 +3,10 @@ import { viewHaremCharacter } from '../lib/characters/index.js'
 let handler = async (m, { conn, usedPrefix, args }) => {
   try {
     await viewHaremCharacter(m, conn, usedPrefix || '.', args?.[0] || '')
-  } catch (e) {
-    console.error('char-vharem:', e)
+  } catch (error) {
+    console.error('char-vharem:', error)
     await conn.sendMessage(m.chat, {
-      text: `*[❗] No se pudo ver el personaje.*\n> ${e?.message || e}`,
+      text: `*[❗] No se pudo ver el personaje.*\n> ${error?.message || error}`,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m }).catch(() => {})
   }

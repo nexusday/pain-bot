@@ -20,18 +20,18 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
     }
 
     
-    const connectedSubBots = global.conns.filter(subConn => 
-      subConn.user && 
-      subConn.user.jid && 
-      subConn.ws?.socket?.readyState === 1 
+    const subBotsConectados = global.conns.filter(connSub => 
+      connSub.user && 
+      connSub.user.jid && 
+      connSub.ws?.socket?.readyState === 1 
     )
 
-    if (connectedSubBots.length === 0) {
+    if (subBotsConectados.length === 0) {
       return m.reply('*[❗] No hay sub-bots conectados en este momento.*')
     }
 
     
-    const messageToSubBots = `╭─「 ✦ 𓆩📢𓆪 ᴍᴇɴsᴀᴊᴇ ᴅᴇʟ ᴏᴡɴᴇʀ ✦ 」─╮
+    const mensajeASubBots = `╭─「 ✦ 𓆩📢𓆪 ᴍᴇɴsᴀᴊᴇ ᴅᴇʟ ᴏᴡɴᴇʀ ✦ 」─╮
 
 ╰➺ ✧ *Owner:* @${m.sender.split('@')[0]}
 ╰➺ ✧ *Mensaje:* ${text}
@@ -41,34 +41,34 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
 > PAIN COMMUNITY`
 
     
-    let sentCount = 0
-    let failedCount = 0
+    let conteoEnviados = 0
+    let conteoFallidos = 0
 
     
-    for (const subConn of connectedSubBots) {
+    for (const connSub of subBotsConectados) {
       try {
-        await conn.sendMessage(subConn.user.jid, {
-          text: messageToSubBots,
+        await conn.sendMessage(connSub.user.jid, {
+          text: mensajeASubBots,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]
           }
         })
-        sentCount++
-        console.log(`✅ Mensaje enviado a sub-bot: ${subConn.user.jid}`)
+        conteoEnviados++
+        console.log(`✅ Mensaje enviado a sub-bot: ${connSub.user.jid}`)
       } catch (error) {
-        failedCount++
-        console.error(`❌ Error enviando mensaje a sub-bot ${subConn.user.jid}:`, error.message)
+        conteoFallidos++
+        console.error(`❌ Error enviando mensaje a sub-bot ${connSub.user.jid}:`, error.message)
       }
     }
 
     
-    const confirmationMessage = `╭─「 ✦ 𓆩📢𓆪 ᴍᴇɴsᴀᴊᴇs ᴇɴᴠɪᴀᴅᴏs ✦ 」─╮
+    const mensajeConfirmacion = `╭─「 ✦ 𓆩📢𓆪 ᴍᴇɴsᴀᴊᴇs ᴇɴᴠɪᴀᴅᴏs ✦ 」─╮
 
 ╰➺ ✧ *Owner:* @${m.sender.split('@')[0]}
-╰➺ ✧ *Sub-bots conectados:* ${connectedSubBots.length}
-╰➺ ✧ *Enviados exitosamente:* ${sentCount}
-╰➺ ✧ *Fallidos:* ${failedCount}
+╰➺ ✧ *Sub-bots conectados:* ${subBotsConectados.length}
+╰➺ ✧ *Enviados exitosamente:* ${conteoEnviados}
+╰➺ ✧ *Fallidos:* ${conteoFallidos}
 
 ╰➺ ✧ *Mensaje enviado:*
 ╰➺ ✧ ${text}
@@ -78,7 +78,7 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
 > PAIN COMMUNITY`
 
     await conn.sendMessage(m.chat, {
-      text: confirmationMessage,
+      text: mensajeConfirmacion,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]

@@ -5,17 +5,17 @@ let handler = async (m, { conn, text, args }) => {
       ? args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net' 
       : m.sender
 
-  let user = global.db.data.users[who]
-  if (!user) return conn.reply(m.chat, '[❗] Usuario no registrado en la base de datos.', m, rcanal, { mentions: [who] })
+  let usuario = global.db.data.users[who]
+  if (!usuario) return conn.reply(m.chat, '[❗] Usuario no registrado en la base de datos.', m, rcanal, { mentions: [who] })
 
-  let coins = user.coins || 0
+  let monedas = usuario.coins || 0
   let name = await conn.getName(who)
 
   return conn.sendMessage(m.chat, {
   text: `☾. Economía de usuario
 
 𓍯 Usuario: @${who.split('@')[0]}
-𓍯 Coins actuales: ${coins}`,
+𓍯 Coins actuales: ${monedas}`,
       contextInfo: {
       ...rcanal.contextInfo,
       mentionedJid: [who, m.sender]

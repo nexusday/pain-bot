@@ -3,11 +3,11 @@
  * Alias: delstickermeta (delmeta ahora cambia metadata de un sticker).
  */
 let handler = async (m, { conn }) => {
-  const user = global.db.data.users[m.sender]
-  if (!user) return
+  const usuario = global.db.data.users[m.sender]
+  if (!usuario) return
 
-  user.packname = ''
-  user.author = ''
+  usuario.packname = ''
+  usuario.author = ''
 
   return conn.reply(
     m.chat,

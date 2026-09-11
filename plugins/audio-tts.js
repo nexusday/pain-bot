@@ -8,59 +8,59 @@ import { tmpdir } from 'os'
 
 const require = createRequire(import.meta.url)
 const gTTS = require('node-gtts')
-const execPromise = promisify(exec)
+const ejecutarPromesa = promisify(exec)
 
-const MAX_CHARS = 800
+const MAX_CARACTERES = 800
 
-const LANGS = new Set([
+const IDIOMAS = new Set([
   'es', 'es-es', 'es-us', 'en', 'en-us', 'en-uk', 'en-au',
   'pt', 'pt-br', 'fr', 'de', 'it', 'ja', 'ko', 'ru', 'hi', 'id', 'ar', 'zh', 'zh-cn'
 ])
 
-function synthesize(filepath, text, lang) {
+function sintetizar(rutaArchivo, text, idioma) {
   return new Promise((resolve, reject) => {
-    const tts = gTTS(lang)
-    tts.save(filepath, text, (err) => {
+    const tts = gTTS(idioma)
+    tts.save(rutaArchivo, text, (err) => {
       if (err) reject(err)
       else resolve()
     })
   })
 }
 
-function resolveTtsInput(m, args) {
-  const joined = (args.join(' ') || '').trim()
+function resolverEntradaTts(m, args) {
+  const unido = (args.join(' ') || '').trim()
   const quoted = (m.quoted?.text || '').trim()
 
-  let lang = 'es'
+  let idioma = 'es'
   let text = ''
 
-  if (joined) {
-    const parts = joined.split(/\s+/)
-    if (parts.length > 1 && LANGS.has(parts[0].toLowerCase())) {
-      lang = parts[0].toLowerCase()
-      text = parts.slice(1).join(' ')
+  if (unido) {
+    const partes = unido.split(/\s+/)
+    if (partes.length > 1 && IDIOMAS.has(partes[0].toLowerCase())) {
+      idioma = partes[0].toLowerCase()
+      text = partes.slice(1).join(' ')
     } else {
-      text = joined
+      text = unido
     }
   } else if (quoted) {
     text = quoted
   }
 
-  return { lang, text: text.trim() }
+  return { idioma, text: text.trim() }
 }
 
-async function convertToOgg(inputPath, outputPath) {
-  const cmd = `ffmpeg -y -i "${inputPath}" -c:a libopus -b:a 128k -ac 1 "${outputPath}"`
-  await execPromise(cmd)
-  if (!existsSync(outputPath)) throw new Error('No se pudo convertir el audio')
+async function convertirAOgg(rutaEntrada, rutaSalida) {
+  const cmd = `ffmpeg -y -i "${rutaEntrada}" -c:a libopus -b:a 128k -ac 1 "${rutaSalida}"`
+  await ejecutarPromesa(cmd)
+  if (!existsSync(rutaSalida)) throw new Error('No se pudo convertir el audio')
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-  let mp3Path = ''
-  let oggPath = ''
+  let rutaMp3 = ''
+  let rutaOgg = ''
 
   try {
-    const { lang, text } = resolveTtsInput(m, args)
+    const { idioma, text } = resolverEntradaTts(m, args)
 
     if (!text) {
       return conn.sendMessage(m.chat, {
@@ -69,33 +69,33 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    if (text.length > MAX_CHARS) {
+    if (text.length > MAX_CARACTERES) {
       return conn.sendMessage(m.chat, {
-        text: `*[❗] Texto muy largo.* Máximo ${MAX_CHARS} caracteres (tienes ${text.length}).`,
+        text: `*[❗] Texto muy largo.* Máximo ${MAX_CARACTERES} caracteres (tienes ${text.length}).`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-    const tmpDir = join(tmpdir(), 'pain-tts')
-    if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+    const dirTmp = join(tmpdir(), 'pain-tts')
+    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
 
-    mp3Path = join(tmpDir, `tts_${id}.mp3`)
-    oggPath = join(tmpDir, `tts_${id}.ogg`)
+    rutaMp3 = join(dirTmp, `tts_${id}.mp3`)
+    rutaOgg = join(dirTmp, `tts_${id}.ogg`)
 
-    await synthesize(mp3Path, text, lang)
-    await convertToOgg(mp3Path, oggPath)
+    await sintetizar(rutaMp3, text, idioma)
+    await convertirAOgg(rutaMp3, rutaOgg)
 
-    const audio = await readFile(oggPath)
+    const audio = await readFile(rutaOgg)
     if (!audio.length) throw new Error('El audio generado está vacío')
 
-    const preview = text.length > 80 ? `${text.slice(0, 80)}...` : text
+    const vistaPrevia = text.length > 80 ? `${text.slice(0, 80)}...` : text
 
     await conn.sendMessage(m.chat, {
       audio,
       mimetype: 'audio/ogg; codecs=opus',
       ptt: true,
-      caption: `*[✓] Texto a voz*\n> Idioma: ${lang}\n> ${preview}`
+      caption: `*[✓] Texto a voz*\n> Idioma: ${idioma}\n> ${vistaPrevia}`
     }, { quoted: m })
   } catch (e) {
     console.error('[tts] Error:', e)
@@ -104,9 +104,9 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    for (const file of [mp3Path, oggPath]) {
-      if (file) {
-        try { await unlink(file) } catch {}
+    for (const archivo of [rutaMp3, rutaOgg]) {
+      if (archivo) {
+        try { await unlink(archivo) } catch {}
       }
     }
   }

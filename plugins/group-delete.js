@@ -2,18 +2,18 @@
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner, isPrems, usedPrefix, command }) => {
 
-  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
-  const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []  
-  const user = (m.isGroup ? findGroupParticipant(groupParticipants, m, conn) : {}) || {}  
-  const isRAdmin = user?.admin == 'superadmin' || false  
-  const isAdminManual = Boolean(isAdmin) || isRAdmin || user?.admin == 'admin' || false  
+  const metadatosVerificacionAdmin = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+  const participantesGrupo = (m.isGroup ? metadatosVerificacionAdmin.participants : []) || []  
+  const usuario = (m.isGroup ? findGroupParticipant(participantesGrupo, m, conn) : {}) || {}  
+  const esSuperAdmin = usuario?.admin == 'superadmin' || false  
+  const esAdminManual = Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false  
   
 
-  const isOwnerManual = global.owner.some(([number]) => number.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
-                  global.ownerLid?.some(([number]) => number.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
+  const esOwnerManual = global.owner.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
+                  global.ownerLid?.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
                   m.sender === conn.user.jid
   
-  if (!isAdminManual && !isRAdmin && !isOwnerManual) {
+  if (!esAdminManual && !esSuperAdmin && !esOwnerManual) {
     return conn.reply(m.chat, '[❗] Solo los administradores pueden usar este comando.', m)
   }
 
@@ -37,9 +37,9 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   
   try {
     
-    const messageId = m.msg?.contextInfo?.stanzaId || m.quoted?.id
+    const idMensaje = m.msg?.contextInfo?.stanzaId || m.quoted?.id
     
-    if (!messageId) {
+    if (!idMensaje) {
       return conn.sendMessage(m.chat, {
         text: '[❌] No se pudo obtener información del mensaje a eliminar.',
         contextInfo: {
@@ -53,7 +53,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
       delete: {
         remoteJid: m.chat,
         fromMe: false,
-        id: messageId,
+        id: idMensaje,
         participant: m.msg?.contextInfo?.participant || m.chat
       }
     })

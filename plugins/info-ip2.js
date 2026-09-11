@@ -11,11 +11,11 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const ipAddress = args[0].trim()
+    const direccionIp = args[0].trim()
 
     
-    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
-    if (!ipRegex.test(ipAddress)) {
+    const regexIp = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
+    if (!regexIp.test(direccionIp)) {
       return conn.sendMessage(m.chat, {
         text: '[❗] Formato de IP inválido. Use una dirección válida.',
         contextInfo: {
@@ -25,12 +25,12 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    const ipResponse = await fetch(`http://ipwhois.app/json/${ipAddress}`)
-    const ipData = await ipResponse.json()
+    const respuestaIp = await fetch(`http://ipwhois.app/json/${direccionIp}`)
+    const datosIp = await respuestaIp.json()
 
-    if (ipData.success === false) {
+    if (datosIp.success === false) {
       return conn.sendMessage(m.chat, {
-        text: `[❌] Error al consultar la IP: ${ipData.message || 'IP no encontrada'}`,
+        text: `[❌] Error al consultar la IP: ${datosIp.message || 'IP no encontrada'}`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -38,22 +38,22 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    let infoText = `𝗜𝗡𝗙𝗢 𝗜𝗣 - 𝟮\n\n`
-    infoText += `> *IP:* ${ipData.ip}\n`
-    infoText += `> *Tipo:* ${ipData.type || 'Desconocido'}\n`
-    infoText += `> *Continente:* ${ipData.continent || 'Desconocido'}\n`
-    infoText += `> *País:* ${ipData.country || 'Desconocido'} (${ipData.country_code || ''})\n`
-    infoText += `> *Región:* ${ipData.region || 'Desconocido'}\n`
-    infoText += `> *Ciudad:* ${ipData.city || 'Desconocida'}\n`
-    infoText += `> *Código Postal:* ${ipData.zip || 'Desconocido'}\n`
-    infoText += `> *Zona Horaria:* ${ipData.timezone || 'Desconocida'}\n`
-    infoText += `> *ISP:* ${ipData.isp || 'Desconocido'}\n`
-    infoText += `> *Organización:* ${ipData.org || 'Desconocida'}\n`
-    infoText += `> *ASN:* ${ipData.asn || 'Desconocido'}\n`
+    let textoInfo = `𝗜𝗡𝗙𝗢 𝗜𝗣 - 𝟮\n\n`
+    textoInfo += `> *IP:* ${datosIp.ip}\n`
+    textoInfo += `> *Tipo:* ${datosIp.type || 'Desconocido'}\n`
+    textoInfo += `> *Continente:* ${datosIp.continent || 'Desconocido'}\n`
+    textoInfo += `> *País:* ${datosIp.country || 'Desconocido'} (${datosIp.country_code || ''})\n`
+    textoInfo += `> *Región:* ${datosIp.region || 'Desconocido'}\n`
+    textoInfo += `> *Ciudad:* ${datosIp.city || 'Desconocida'}\n`
+    textoInfo += `> *Código Postal:* ${datosIp.zip || 'Desconocido'}\n`
+    textoInfo += `> *Zona Horaria:* ${datosIp.timezone || 'Desconocida'}\n`
+    textoInfo += `> *ISP:* ${datosIp.isp || 'Desconocido'}\n`
+    textoInfo += `> *Organización:* ${datosIp.org || 'Desconocida'}\n`
+    textoInfo += `> *ASN:* ${datosIp.asn || 'Desconocido'}\n`
 
     
     await conn.sendMessage(m.chat, {
-      text: infoText,
+      text: textoInfo,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]
@@ -71,7 +71,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   }
 }
 
-handler.help = ['ip2', 'whois', 'ipwhois2 �? Consulta información básica de una dirección IP sin ubicación']
+handler.help = ['ip2', 'whois', 'ipwhois2 �? Consulta información básica de una dirección IP sin ubicación']
 handler.tags = ['herramientas', 'utilidades']
 handler.command = ['ip2', 'whois', 'ipwhois2']
 

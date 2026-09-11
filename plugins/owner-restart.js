@@ -8,11 +8,11 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
   try {
 
     
-    const restartMessage = `🌴 𝗕𝗼𝘁 𝗿𝗲𝗶𝗻𝗶𝗰𝗶𝗮𝗱𝗼\n> *Iniciado por:* @${m.sender.split('@')[0]}`
+    const mensajeReinicio = `🌴 𝗕𝗼𝘁 𝗿𝗲𝗶𝗻𝗶𝗰𝗶𝗮𝗱𝗼\n> *Iniciado por:* @${m.sender.split('@')[0]}`
 
    
     await conn.sendMessage(m.chat, {
-      text: restartMessage,
+      text: mensajeReinicio,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]

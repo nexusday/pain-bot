@@ -14,49 +14,49 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   }, { quoted: m })
 
   try {
-    const apiUrl = `https://api.vreden.my.id/api/v1/artificial/animagine?prompt=${encodeURIComponent(text)}`
-    const res = await fetch(apiUrl)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
+    const urlApi = `https://api.vreden.my.id/api/v1/artificial/animagine?prompt=${encodeURIComponent(text)}`
+    const respuesta = await fetch(urlApi)
+    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`)
+    const datos = await respuesta.json()
 
-    if (!data?.status || !data.result || !data.result.image || !data.result.image.results) {
+    if (!datos?.status || !datos.result || !datos.result.image || !datos.result.image.results) {
       throw new Error('No se obtuvo imagen de la API.')
     }
 
-    const imageUrl = data.result.image.results
-    const meta = data.result
-    const caption = `𓍯  *Prompt:* ${meta.prompt || text}\n𓍯  *Modelo:* ${meta.model?.name || 'Desconocido'}\n𓍯  *Resolución:* ${meta.resolution || 'Desconocido'}\n𓍯  *Duración:* ${typeof meta.duration === 'number' ? meta.duration.toFixed(2) + 's' : meta.duration || 'Desconocido'}`
+    const urlImagen = datos.result.image.results
+    const metadatos = datos.result
+    const leyenda = `𓍯  *Prompt:* ${metadatos.prompt || text}\n𓍯  *Modelo:* ${metadatos.model?.name || 'Desconocido'}\n𓍯  *Resolución:* ${metadatos.resolution || 'Desconocido'}\n𓍯  *Duración:* ${typeof metadatos.duration === 'number' ? metadatos.duration.toFixed(2) + 's' : metadatos.duration || 'Desconocido'}`
 
     
-    let imgResp = await fetch(imageUrl)
-    if (!imgResp.ok) {
+    let respuestaImagen = await fetch(urlImagen)
+    if (!respuestaImagen.ok) {
       
-      imgResp = await fetch(imageUrl, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://api.vreden.my.id/' } })
+      respuestaImagen = await fetch(urlImagen, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://api.vreden.my.id/' } })
     }
-    if (!imgResp.ok) throw new Error(`No se pudo descargar la imagen (status ${imgResp.status})`)
+    if (!respuestaImagen.ok) throw new Error(`No se pudo descargar la imagen (status ${respuestaImagen.status})`)
 
-    const arrayBuffer = await imgResp.arrayBuffer()
-    const imageBuffer = Buffer.from(arrayBuffer)
+    const arrayBuffer = await respuestaImagen.arrayBuffer()
+    const buferImagen = Buffer.from(arrayBuffer)
 
     
     try {
-      await conn.sendMessage(m.chat, { image: imageBuffer, caption, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
+      await conn.sendMessage(m.chat, { image: buferImagen, caption: leyenda, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
       return
-    } catch (errSend) {
-      console.warn('Envio directo falló, intentando archivo temporal:', errSend.message)
+    } catch (errEnvio) {
+      console.warn('Envio directo falló, intentando archivo temporal:', errEnvio.message)
     }
 
     
     try {
-      const tmpDir = path.join(process.cwd(), 'tmp')
-      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
-      const tmpFile = path.join(tmpDir, `ia-anime-${Date.now()}.png`)
-      fs.writeFileSync(tmpFile, imageBuffer)
-      await conn.sendMessage(m.chat, { image: { url: tmpFile }, caption, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
-      try { fs.unlinkSync(tmpFile) } catch (e) { }
+      const dirTmp = path.join(process.cwd(), 'tmp')
+      if (!fs.existsSync(dirTmp)) fs.mkdirSync(dirTmp, { recursive: true })
+      const archivoTmp = path.join(dirTmp, `ia-anime-${Date.now()}.png`)
+      fs.writeFileSync(archivoTmp, buferImagen)
+      await conn.sendMessage(m.chat, { image: { url: archivoTmp }, caption: leyenda, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
+      try { fs.unlinkSync(archivoTmp) } catch (e) { }
       return
-    } catch (errFile) {
-      console.error('falló:', errFile)
+    } catch (errArchivo) {
+      console.error('falló:', errArchivo)
       
       throw new Error('No se pudo enviar la imagen generada.')
     }

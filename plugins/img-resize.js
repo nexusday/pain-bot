@@ -5,98 +5,98 @@ import fetch from 'node-fetch'
 import sharp from '../lib/sharp.js'
 import { webp2png } from '../lib/webp2mp4.js'
 
-const MAX_SIDE = 4096
-const MIN_SIDE = 16
+const LADO_MAX = 4096
+const LADO_MIN = 16
 
-function isImageMedia(mime = '', mtype = '') {
+function esMedioImagen(mime = '', mtype = '') {
   return /image|webp|sticker/i.test(mime) || /imageMessage|stickerMessage/i.test(mtype)
 }
 
-function resolveMediaTarget(m) {
+function resolverObjetivoMedio(m) {
   if (m.quoted) {
     const mime = (m.quoted.msg || m.quoted).mimetype || m.quoted.mediaType || ''
     const mtype = m.quoted.mtype || ''
-    if (isImageMedia(mime, mtype) && m.quoted.download) return m.quoted
+    if (esMedioImagen(mime, mtype) && m.quoted.download) return m.quoted
   }
 
   const mime = (m.msg || m).mimetype || m.mediaType || ''
   const mtype = m.mtype || ''
-  if (isImageMedia(mime, mtype) && m.download) return m
+  if (esMedioImagen(mime, mtype) && m.download) return m
 
   return null
 }
 
-function clampDims(width, height) {
-  let w = Math.max(MIN_SIDE, Math.min(MAX_SIDE, width))
-  let h = Math.max(MIN_SIDE, Math.min(MAX_SIDE, height))
+function limitarDims(ancho, alto) {
+  let w = Math.max(LADO_MIN, Math.min(LADO_MAX, ancho))
+  let h = Math.max(LADO_MIN, Math.min(LADO_MAX, alto))
 
-  if (width > MAX_SIDE || height > MAX_SIDE) {
-    const ratio = Math.min(MAX_SIDE / width, MAX_SIDE / height)
-    w = Math.max(MIN_SIDE, Math.round(width * ratio))
-    h = Math.max(MIN_SIDE, Math.round(height * ratio))
+  if (ancho > LADO_MAX || alto > LADO_MAX) {
+    const ratio = Math.min(LADO_MAX / ancho, LADO_MAX / alto)
+    w = Math.max(LADO_MIN, Math.round(ancho * ratio))
+    h = Math.max(LADO_MIN, Math.round(alto * ratio))
   }
 
   return { width: w, height: h }
 }
 
-function parseResizeArgs(args, origW, origH) {
-  const input = (args.join(' ') || '').trim().toLowerCase()
-  if (!input || !origW || !origH) return null
+function parsearArgsRedimension(args, anchoOrig, altoOrig) {
+  const entrada = (args.join(' ') || '').trim().toLowerCase()
+  if (!entrada || !anchoOrig || !altoOrig) return null
 
-  const pctMatch = input.match(/^(\d{1,3})%$/)
-  if (pctMatch) {
-    const pct = Math.min(500, Math.max(1, Number(pctMatch[1])))
-    return clampDims(
-      Math.round(origW * pct / 100),
-      Math.round(origH * pct / 100)
+  const coincidenciaPct = entrada.match(/^(\d{1,3})%$/)
+  if (coincidenciaPct) {
+    const pct = Math.min(500, Math.max(1, Number(coincidenciaPct[1])))
+    return limitarDims(
+      Math.round(anchoOrig * pct / 100),
+      Math.round(altoOrig * pct / 100)
     )
   }
 
-  const dimMatch = input.match(/^(\d*)x(\d*)$/i)
-  if (dimMatch) {
-    let width = dimMatch[1] ? Number(dimMatch[1]) : 0
-    let height = dimMatch[2] ? Number(dimMatch[2]) : 0
-    if (!width && !height) return null
+  const coincidenciaDim = entrada.match(/^(\d*)x(\d*)$/i)
+  if (coincidenciaDim) {
+    let ancho = coincidenciaDim[1] ? Number(coincidenciaDim[1]) : 0
+    let alto = coincidenciaDim[2] ? Number(coincidenciaDim[2]) : 0
+    if (!ancho && !alto) return null
 
-    if (width && !height) {
-      height = Math.round(origH * (width / origW))
-    } else if (height && !width) {
-      width = Math.round(origW * (height / origH))
+    if (ancho && !alto) {
+      alto = Math.round(altoOrig * (ancho / anchoOrig))
+    } else if (alto && !ancho) {
+      ancho = Math.round(anchoOrig * (alto / altoOrig))
     }
 
-    return clampDims(width, height)
+    return limitarDims(ancho, alto)
   }
 
-  if (/^\d+$/.test(input)) {
-    const width = Number(input)
-    const height = Math.round(origH * (width / origW))
-    return clampDims(width, height)
+  if (/^\d+$/.test(entrada)) {
+    const ancho = Number(entrada)
+    const alto = Math.round(altoOrig * (ancho / anchoOrig))
+    return limitarDims(ancho, alto)
   }
 
   return null
 }
 
-async function loadImageBuffer(media, mime) {
+async function cargarBuferImagen(medio, mime) {
   if (/webp/i.test(mime)) {
     try {
-      return await sharp(media).rotate().toBuffer()
+      return await sharp(medio).rotate().toBuffer()
     } catch {
-      const url = await webp2png(media)
+      const url = await webp2png(medio)
       if (!url) throw new Error('No se pudo convertir el sticker')
-      const res = await fetch(url)
-      return Buffer.from(await res.arrayBuffer())
+      const respuesta = await fetch(url)
+      return Buffer.from(await respuesta.arrayBuffer())
     }
   }
 
   if (/image\//i.test(mime)) {
-    return sharp(media).rotate().toBuffer()
+    return sharp(medio).rotate().toBuffer()
   }
 
   throw new Error('Formato no compatible')
 }
 
-async function resizeImage(buffer, dims) {
-  const out = await sharp(buffer)
+async function redimensionarImagen(bufer, dims) {
+  const resultado = await sharp(bufer)
     .resize({
       width: dims.width,
       height: dims.height,
@@ -106,36 +106,36 @@ async function resizeImage(buffer, dims) {
     .jpeg({ quality: 90 })
     .toBuffer()
 
-  const meta = await sharp(out).metadata()
-  return { buffer: out, width: meta.width, height: meta.height }
+  const metadatos = await sharp(resultado).metadata()
+  return { buffer: resultado, width: metadatos.width, height: metadatos.height }
 }
 
-function formatSize(bytes) {
+function formatearTamano(bytes) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-  let tmpPath = ''
+  let rutaTmp = ''
 
   try {
-    const target = resolveMediaTarget(m)
+    const objetivo = resolverObjetivoMedio(m)
 
-    if (!target) {
+    if (!objetivo) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Enviá una *imagen* o *sticker* con el comando, o respondé a uno con ${usedPrefix + command} tamaño*\n\nEjemplos:\n> ${usedPrefix + command} 800\n> ${usedPrefix + command} 800x600\n> ${usedPrefix + command} x600\n> ${usedPrefix + command} 50%`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const mime = (target.msg || target).mimetype || target.mediaType || ''
-    const media = await target.download()
-    if (!media?.length) throw new Error('No se pudo descargar la imagen')
+    const mime = (objetivo.msg || objetivo).mimetype || objetivo.mediaType || ''
+    const medio = await objetivo.download()
+    if (!medio?.length) throw new Error('No se pudo descargar la imagen')
 
-    const source = await loadImageBuffer(media, mime)
-    const sourceMeta = await sharp(source).metadata()
-    const dims = parseResizeArgs(args, sourceMeta.width, sourceMeta.height)
+    const fuente = await cargarBuferImagen(medio, mime)
+    const metaFuente = await sharp(fuente).metadata()
+    const dims = parsearArgsRedimension(args, metaFuente.width, metaFuente.height)
 
     if (!dims) {
       return conn.sendMessage(m.chat, {
@@ -144,19 +144,19 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const { buffer, width, height } = await resizeImage(source, dims)
+    const { bufer, ancho, alto } = await redimensionarImagen(fuente, dims)
 
-    const tmpDir = join(process.cwd(), 'tmp')
-    if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+    const dirTmp = join(process.cwd(), 'tmp')
+    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
 
-    tmpPath = join(tmpDir, `resize_${Date.now()}.jpg`)
-    await writeFile(tmpPath, buffer)
+    rutaTmp = join(dirTmp, `resize_${Date.now()}.jpg`)
+    await writeFile(rutaTmp, bufer)
 
-    const caption = `*[✓] Imagen redimensionada*\n> Original: ${sourceMeta.width}×${sourceMeta.height} (${formatSize(media.length)})\n> Nuevo: ${width}×${height} (${formatSize(buffer.length)})`
+    const leyenda = `*[✓] Imagen redimensionada*\n> Original: ${metaFuente.width}×${metaFuente.height} (${formatearTamano(medio.length)})\n> Nuevo: ${ancho}×${alto} (${formatearTamano(bufer.length)})`
 
     await conn.sendMessage(m.chat, {
-      image: { url: tmpPath },
-      caption,
+      image: { url: rutaTmp },
+      caption: leyenda,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (e) {
@@ -166,8 +166,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    if (tmpPath) {
-      try { await unlink(tmpPath) } catch {}
+    if (rutaTmp) {
+      try { await unlink(rutaTmp) } catch {}
     }
   }
 }

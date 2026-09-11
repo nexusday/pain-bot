@@ -39,11 +39,11 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     }
   }
 
-  const userData = global.db.data.users[targetUser]
-  ensureMsgStats(userData)
-  const rpg = getRpgSnapshot(userData)
-  const msgTotal = getTotalMsgCount(userData)
-  const msgGroup = m.isGroup ? getChatMsgCount(userData, m.chat, conn) : 0
+  const datosUsuario = global.db.data.users[targetUser]
+  ensureMsgStats(datosUsuario)
+  const rpg = getRpgSnapshot(datosUsuario)
+  const msgTotal = getTotalMsgCount(datosUsuario)
+  const msgGroup = m.isGroup ? getChatMsgCount(datosUsuario, m.chat, conn) : 0
 
   const createOwnerIds = (number) => {
     const cleanNumber = number.replace(/[^0-9]/g, '')
@@ -75,22 +75,22 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
   if (m.isGroup) {
     try {
-      const groupMetadata = conn.chats[m.chat]?.metadata || await conn.groupMetadata(m.chat).catch(_ => null)
-      if (groupMetadata) {
-        const participants = groupMetadata.participants || []
+      const metadatosGrupo = conn.chats[m.chat]?.metadata || await conn.groupMetadata(m.chat).catch(_ => null)
+      if (metadatosGrupo) {
+        const participants = metadatosGrupo.participants || []
 
         const viewerData = findGroupParticipant(participants, m, conn) || {}
         isRAdmin = viewerData?.admin == 'superadmin' || false
         isAdmin = isRAdmin || viewerData?.admin == 'admin' || false
-        isGroupCreator = groupMetadata.owner === m.sender ||
-                        groupMetadata.subjectOwner === m.sender ||
+        isGroupCreator = metadatosGrupo.owner === m.sender ||
+                        metadatosGrupo.subjectOwner === m.sender ||
                         viewerData?.admin === 'superadmin'
 
         const targetData = findGroupParticipant(participants, targetUser, conn) || {}
         targetIsRAdmin = targetData?.admin == 'superadmin' || false
         targetIsAdmin = targetIsRAdmin || targetData?.admin == 'admin' || false
-        targetIsGroupCreator = groupMetadata.owner === targetUser ||
-                               groupMetadata.subjectOwner === targetUser ||
+        targetIsGroupCreator = metadatosGrupo.owner === targetUser ||
+                               metadatosGrupo.subjectOwner === targetUser ||
                                targetData?.admin === 'superadmin'
       }
     } catch (error) {
@@ -122,10 +122,10 @@ let handler = async (m, { conn, usedPrefix, command }) => {
   }
 
   let bancoInfo = 'Sin banco'
-  let totalCoins = userData.coins || 0
-  if (userData.banco && global.bancos && global.bancos[userData.banco]) {
-    bancoInfo = global.bancos[userData.banco].nombre || 'Banco desconocido'
-    totalCoins += (userData.bancoDinero || 0)
+  let totalCoins = datosUsuario.coins || 0
+  if (datosUsuario.banco && global.bancos && global.bancos[datosUsuario.banco]) {
+    bancoInfo = global.bancos[datosUsuario.banco].nombre || 'Banco desconocido'
+    totalCoins += (datosUsuario.bancoDinero || 0)
   }
 
   const texto = `
@@ -134,11 +134,11 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
 
 ╭─╮  𓍯  𝙸𝙽𝙵𝙾𝚁𝙼𝙰𝙲𝙸𝙾𝙽 𝙿𝙴𝚁𝚂𝙾𝙽𝙰𝙻  𓍯  
-│  𓂃 ࣪ ִֶָ☾.  𝙽𝙾𝙼𝙱𝚁𝙴:  ${userData.name || 'No establecido'}
-│  𓂃 ࣪ ִֶָ☾.  𝙶𝙴𝙽𝙴𝚁𝙾:  ${userData.genre || 'No establecido'}
-│  𓂃 ࣪ ִֶָ☾.  𝙲𝚄𝙼𝙿𝙻𝙴𝙰𝙽𝙾𝚂:  ${userData.birth || 'No registrado'}
-│  𓂃 ࣪ ִֶָ☾.  𝙳𝙴𝚂𝙲𝚁𝙸𝙿𝙲𝙸𝙾𝙽:  ${userData.desc || 'Sin descripción'}
-│  𓂃 ࣪ ִֶָ☾.  𝙵𝙰𝚅𝙾𝚁𝙸𝚃𝙾:  ${userData.favourite || 'No establecido'}
+│  𓂃 ࣪ ִֶָ☾.  𝙽𝙾𝙼𝙱𝚁𝙴:  ${datosUsuario.name || 'No establecido'}
+│  𓂃 ࣪ ִֶָ☾.  𝙶𝙴𝙽𝙴𝚁𝙾:  ${datosUsuario.genre || 'No establecido'}
+│  𓂃 ࣪ ִֶָ☾.  𝙲𝚄𝙼𝙿𝙻𝙴𝙰𝙽𝙾𝚂:  ${datosUsuario.birth || 'No registrado'}
+│  𓂃 ࣪ ִֶָ☾.  𝙳𝙴𝚂𝙲𝚁𝙸𝙿𝙲𝙸𝙾𝙽:  ${datosUsuario.desc || 'Sin descripción'}
+│  𓂃 ࣪ ִֶָ☾.  𝙵𝙰𝚅𝙾𝚁𝙸𝚃𝙾:  ${datosUsuario.favourite || 'No establecido'}
 ╰─╯
 
 ╭─╮  𓍯  𝙴𝚂𝚃𝙰𝙳𝙸𝚂𝚃𝙸𝙲𝙰𝚂  𓍯  
@@ -156,7 +156,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 ╭─╮  𓍯  𝙸𝙽𝙵𝙾 𝙶𝙴𝙽𝙴𝚁𝙰𝙻  𓍯  
 │  𓂃 ࣪ ִֶָ☾.  𝙸𝙳:  ${targetUser}
 │  𓂃 ࣪ ִֶָ☾.  𝚁𝙾𝙻:  ${userRole}
-│  𓂃 ࣪ ִֶָ☾.  𝚁𝙴𝙶𝙸𝚂𝚃𝚁𝙰𝙳𝙾:  ${userData.registered ? 'Sí' : 'No'}
+│  𓂃 ࣪ ִֶָ☾.  𝚁𝙴𝙶𝙸𝚂𝚃𝚁𝙰𝙳𝙾:  ${datosUsuario.registered ? 'Sí' : 'No'}
 ╰─╯`.trim()
 
   const botNumber = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
@@ -171,7 +171,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       imgBot = pp
       hasUserPP = true
     }
-  } catch (e) {
+  } catch (error) {
     if (fs.existsSync(configPath)) {
       try {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
@@ -186,11 +186,11 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       caption: texto,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: [userData.partner || targetUser]
+        mentionedJid: [datosUsuario.partner || targetUser]
       }
     }, { quoted: m })
   } else {
-    await conn.sendFile(m.chat, imgBot, 'profile.jpg', texto, m, null, rcanal, { mentions: [userData.partner || targetUser] })
+    await conn.sendFile(m.chat, imgBot, 'profile.jpg', texto, m, null, rcanal, { mentions: [datosUsuario.partner || targetUser] })
   }
 }
 

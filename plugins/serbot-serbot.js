@@ -28,7 +28,7 @@ const rcanal = global.rcanal || {
   }
 }
 
-const MENU_LINE = '> 𓂃 ࣪ ִֶָ☾.'
+const LINEA_MENU = '> 𓂃 ࣪ ִֶָ☾.'
 
 let crm1 = "Y2QgcGx1Z2lucy"
 let crm2 = "A7IG1kNXN1b"
@@ -39,68 +39,68 @@ let drm2 = ""
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const AYBotOptions = {}
+const opcionesSubBot = {}
 
 if (!(global.conns instanceof Array)) global.conns = []
 
-function clearSubBotAuth(pathAYBot) {
+function limpiarAuthSubBot(pathAYBot) {
   if (!fs.existsSync(pathAYBot)) return
-  for (const entry of fs.readdirSync(pathAYBot)) {
-    if (entry === 'config.json') continue
-    fs.rmSync(path.join(pathAYBot, entry), { recursive: true, force: true })
+  for (const entradaFs of fs.readdirSync(pathAYBot)) {
+    if (entradaFs === 'config.json') continue
+    fs.rmSync(path.join(pathAYBot, entradaFs), { recursive: true, force: true })
   }
 }
 
-let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants, groupMetadata }) => {
+let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants, groupMetadata: metadatosGrupo }) => {
   if (!global.db.data.users[m.sender]) global.db.data.users[m.sender] = {}
 
-  let time = global.db.data.users[m.sender].Subs + 120000
+  let tiempo = global.db.data.users[m.sender].Subs + 120000
 
-  let who = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
+  let quien = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
  
-  const keyAlt = m.key?.participantAlt || m.key?.remoteJidAlt
-  if (keyAlt) who = keyAlt
+  const claveAlt = m.key?.participantAlt || m.key?.remoteJidAlt
+  if (claveAlt) quien = claveAlt
 
-  const explicitPhone = extractPhoneFromArgs(args)
+  const telefonoExplicito = extractPhoneFromArgs(args)
 
  
-  let groupParticipants = participants || []
+  let participantesGrupo = participants || []
   if (m.isGroup) {
     try {
-      const fresh = await conn.groupMetadata(m.chat)
-      if (fresh?.participants?.length) {
-        groupParticipants = fresh.participants
-        if (conn.chats?.[m.chat]) conn.chats[m.chat].metadata = fresh
+      const fresco = await conn.groupMetadata(m.chat)
+      if (fresco?.participants?.length) {
+        participantesGrupo = fresco.participants
+        if (conn.chats?.[m.chat]) conn.chats[m.chat].metadata = fresco
       }
     } catch {}
   }
 
-  let phoneNumber = await resolvePhoneNumber(who, conn, explicitPhone, m, {
-    participants: groupParticipants,
+  let phoneNumber = await resolvePhoneNumber(quien, conn, telefonoExplicito, m, {
+    participants: participantesGrupo,
     groupId: m.isGroup ? m.chat : null,
-    groupMetadata: groupMetadata || null
+    groupMetadata: metadatosGrupo || null
   })
   const replyJid = getPrivateReplyJid(m, conn)
 
   if (!phoneNumber) {
-    const lidHint = String(m.key?.participant || m.sender || '').split('@')[0]
-    const mxHint = m.isGroup
+    const pistaLid = String(m.key?.participant || m.sender || '').split('@')[0]
+    const pistaMx = m.isGroup
       ? `\n\n> *En grupo:* si no detecta tu número, envía:\n> ${usedPrefix}code 521XXXXXXXXXX\n> (México usa *521*, no solo 52)`
       : `\n\n> *México:* usa *521* + tu número (10 dígitos).\n> *Ejemplo:* ${usedPrefix}code 5215551234567`
 
     return conn.sendMessage(m.chat, {
-      text: `[❗] *No se pudo obtener tu número real de WhatsApp.*\n\nWhatsApp envía un @lid interno (${lidHint}) y el código de vinculación necesita tu número con código de país.\n\n> *Opción 1:* ${usedPrefix}code <número>\n> *Ejemplo Perú:* ${usedPrefix}code 51901437507\n> *Ejemplo México:* ${usedPrefix}code 5215551234567${mxHint}\n\n> *Opción 2:* ${usedPrefix}qrr para vincular con QR`,
+      text: `[❗] *No se pudo obtener tu número real de WhatsApp.*\n\nWhatsApp envía un @lid interno (${pistaLid}) y el código de vinculación necesita tu número con código de país.\n\n> *Opción 1:* ${usedPrefix}code <número>\n> *Ejemplo Perú:* ${usedPrefix}code 51901437507\n> *Ejemplo México:* ${usedPrefix}code 5215551234567${pistaMx}\n\n> *Opción 2:* ${usedPrefix}qrr para vincular con QR`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 
-  const slot = canRegisterSubBot(phoneNumber)
-  if (!slot.ok) {
-    const info = getSubBotSlotsInfo(ws)
+  const ranura = canRegisterSubBot(phoneNumber)
+  if (!ranura.ok) {
+    const informacion = getSubBotSlotsInfo(ws)
     return m.reply(
       `*[❗] No hay plazas para nuevos Sub-Bots.*\n\n` +
-      `> *En uso:* ${info.registered}/${info.max}\n` +
-      `> *Conectados:* ${info.connected}\n\n` +
+      `> *En uso:* ${informacion.registered}/${informacion.max}\n` +
+      `> *Conectados:* ${informacion.connected}\n\n` +
       `> El dueño puede poner ilimitado con:\n> ${usedPrefix}maxsubs 0`
     )
   }
@@ -111,26 +111,27 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
     fs.mkdirSync(pathAYBot, { recursive: true })
   }
 
-  AYBotOptions.pathAYBot = pathAYBot
-  AYBotOptions.m = m
-  AYBotOptions.conn = conn
-  AYBotOptions.args = args
-  AYBotOptions.usedPrefix = usedPrefix
-  AYBotOptions.command = command
-  AYBotOptions.fromCommand = true
-  AYBotOptions.phoneNumber = phoneNumber
-  AYBotOptions.replyJid = replyJid
+  opcionesSubBot.pathAYBot = pathAYBot
+  opcionesSubBot.m = m
+  opcionesSubBot.conn = conn
+  opcionesSubBot.args = args
+  opcionesSubBot.usedPrefix = usedPrefix
+  opcionesSubBot.command = command
+  opcionesSubBot.fromCommand = true
+  opcionesSubBot.phoneNumber = phoneNumber
+  opcionesSubBot.replyJid = replyJid
 
-  AYBot(AYBotOptions)
+  iniciarSubBot(opcionesSubBot)
   global.db.data.users[m.sender].Subs = new Date * 1
 }
 
 handler.help = ['#qr', '#code']
 handler.tags = ['subbots']
 handler.command = ['qrr', 'code']
+export { iniciarSubBot as AYBot }
 export default handler
 
-export async function AYBot(options) {
+async function iniciarSubBot(options) {
   let { pathAYBot, m, conn, args, usedPrefix, command, fromCommand = true, phoneNumber = null, replyJid = null } = options
   
  
@@ -145,30 +146,30 @@ export async function AYBot(options) {
     args.unshift('code')
   }
 
-  const mcode = args[0] && /(--code|code)/.test(args[0].trim()) ? true : args[1] && /(--code|code)/.test(args[1].trim()) ? true : false
-  let txtCode, codeBot, txtQR
+  const codigoM = args[0] && /(--code|code)/.test(args[0].trim()) ? true : args[1] && /(--code|code)/.test(args[1].trim()) ? true : false
+  let txtCodigo, codeBot, txtQR
 
-  if (mcode) {
+  if (codigoM) {
     args[0] = args[0].replace(/^--code$|^code$/, "").trim()
     if (args[1]) args[1] = args[1].replace(/^--code$|^code$/, "").trim()
     if (args[0] == "") args[0] = undefined
   }
 
-  const pathCreds = path.join(pathAYBot, "creds.json")
+  const rutaCreds = path.join(pathAYBot, "creds.json")
   if (!fs.existsSync(pathAYBot)) {
     fs.mkdirSync(pathAYBot, { recursive: true })
   }
 
-  if (mcode) {
-    clearSubBotAuth(pathAYBot)
+  if (codigoM) {
+    limpiarAuthSubBot(pathAYBot)
   }
 
-  const credsArg = args[0]
-  const looksLikePhone = credsArg && /^\d{8,15}$/.test(String(credsArg).replace(/\D/g, ''))
+  const argCreds = args[0]
+  const pareceTelefono = argCreds && /^\d{8,15}$/.test(String(argCreds).replace(/\D/g, ''))
 
   try {
-    if (credsArg && credsArg != undefined && !looksLikePhone) {
-      fs.writeFileSync(pathCreds, JSON.stringify(JSON.parse(Buffer.from(credsArg, "base64").toString("utf-8")), null, '\t'))
+    if (argCreds && argCreds != undefined && !pareceTelefono) {
+      fs.writeFileSync(rutaCreds, JSON.stringify(JSON.parse(Buffer.from(argCreds, "base64").toString("utf-8")), null, '\t'))
     }
   } catch {
     if (m && conn) {
@@ -184,58 +185,58 @@ export async function AYBot(options) {
     return
   }
 
-  const comb = Buffer.from(crm1 + crm2 + crm3 + crm4, "base64")
-  exec(comb.toString("utf-8"), async (err, stdout, stderr) => {
+  const combinacion = Buffer.from(crm1 + crm2 + crm3 + crm4, "base64")
+  exec(combinacion.toString("utf-8"), async (err, salidaStd, stderr) => {
    
-    process.on('unhandledRejection', (reason, promise) => {
-      console.log(chalk.bold.redBright(`\n┆ Unhandled Rejection at: ${promise}, reason: ${reason}\n`))
+    process.on('unhandledRejection', (motivo, promise) => {
+      console.log(chalk.bold.redBright(`\n┆ Unhandled Rejection at: ${promise}, reason: ${motivo}\n`))
     })
     const drmer = Buffer.from(drm1 + drm2, "base64")
     let { version, isLatest } = await fetchLatestBaileysVersion()
-    const msgRetry = (MessageRetryMap) => { }
-    const msgRetryCache = new NodeCache()
-    let state, saveState, saveCreds
+    const reintentoMsg = (MessageRetryMap) => { }
+    const cacheReintentoMsg = new NodeCache()
+    let estadoConn, saveState, saveCreds
     try {
-      const authState = await useMultiFileAuthState(pathAYBot)
-      state = authState.state
-      saveState = authState.saveState
-      saveCreds = authState.saveCreds
+      const estadoAuth = await useMultiFileAuthState(pathAYBot)
+      estadoConn = estadoAuth.state
+      saveState = estadoAuth.saveState
+      saveCreds = estadoAuth.saveCreds
     } catch (error) {
       console.log(chalk.bold.redBright(`\n┆ Error inicializando auth state para ${path.basename(pathAYBot)}: ${error.message}\n`))
       return
     }
 
-    const connectionOptions = {
+    const opcionesConexion = {
       logger: pino({ level: "fatal" }),
       printQRInTerminal: false,
       auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }))
+        creds: estadoConn.creds,
+        keys: makeCacheableSignalKeyStore(estadoConn.keys, pino({ level: "silent" }))
       },
-      msgRetry,
-      msgRetryCache,
+      msgRetry: reintentoMsg,
+      msgRetryCache: cacheReintentoMsg,
       browser: Browsers.ubuntu('Chrome'),
       version,
       generateHighQualityLinkPreview: true
     }
 
-    let sock = makeWASocket(connectionOptions)
+    let sock = makeWASocket(opcionesConexion)
     sock.isInit = false
-    let isInit = true
-    let pairingCodeSent = false
-    let pairingInProgress = false
-    let hadNewLogin = false
-    let reconnecting = false
-    let lastSeenUserAt = Date.now()
-    let watchdogTimer = null
-    const pairingPhone = phoneNumber
-    const botFolderId = path.basename(pathAYBot)
+    let esInit = true
+    let codigoEmparejamientoEnviado = false
+    let emparejamientoEnCurso = false
+    let tuvoNuevoLogin = false
+    let reconectando = false
+    let vistoUsuarioEn = Date.now()
+    let temporizadorWatchdog = null
+    const telefonoEmparejamiento = phoneNumber
+    const idCarpetaBot = path.basename(pathAYBot)
 
     const replyUser = async (text) => {
       return sendPrivateReply(m, conn, text, { contextInfo: { ...rcanal.contextInfo } })
     }
 
-    function isSocketOpen() {
+    function socketAbierto() {
       try {
         if (sock?.ws?.isOpen === true) return true
         const st = sock?.ws?.socket?.readyState
@@ -245,7 +246,7 @@ export async function AYBot(options) {
       }
     }
 
-    function removeSockFromConns(target = sock) {
+    function quitarSockDeConns(target = sock) {
       if (!Array.isArray(global.conns)) return
       const i = global.conns.indexOf(target)
       if (i >= 0) {
@@ -253,24 +254,24 @@ export async function AYBot(options) {
       }
     }
 
-    function stopWatchdog() {
-      if (watchdogTimer) {
-        clearInterval(watchdogTimer)
-        watchdogTimer = null
+    function detenerWatchdog() {
+      if (temporizadorWatchdog) {
+        clearInterval(temporizadorWatchdog)
+        temporizadorWatchdog = null
       }
     }
 
-    function isFatalSessionReason(reason) {
+    function esMotivoSesionFatal(motivo) {
       return (
-        reason === DisconnectReason.loggedOut || // 401
-        reason === 405 ||
-        reason === DisconnectReason.connectionReplaced || // 440
-        reason === DisconnectReason.forbidden || // 403
-        reason === DisconnectReason.multideviceMismatch // 411
+        motivo === DisconnectReason.loggedOut || // 401
+        motivo === 405 ||
+        motivo === DisconnectReason.connectionReplaced || // 440
+        motivo === DisconnectReason.forbidden || // 403
+        motivo === DisconnectReason.multideviceMismatch // 411
       )
     }
 
-    async function wipeSubBotFolder() {
+    async function borrarCarpetaSubBot() {
       try {
         if (fs.existsSync(pathAYBot)) {
           fs.rmSync(pathAYBot, { recursive: true, force: true })
@@ -280,120 +281,120 @@ export async function AYBot(options) {
       }
     }
 
-    async function sendPairingCode() {
-      if (pairingCodeSent || pairingInProgress || !mcode || !m || !conn) return false
-      pairingInProgress = true
+    async function enviarCodigoEmparejamiento() {
+      if (codigoEmparejamientoEnviado || emparejamientoEnCurso || !codigoM || !m || !conn) return false
+      emparejamientoEnCurso = true
 
-      if (!pairingPhone) {
-        pairingCodeSent = true
-        await replyUser(buildPairingPhoneError(usedPrefix))
+      if (!telefonoEmparejamiento) {
+        codigoEmparejamientoEnviado = true
+        await replyUser(construirErrorTelefonoEmparejamiento(usedPrefix))
         try { sock.ws.close() } catch {}
-        pairingInProgress = false
+        emparejamientoEnCurso = false
         return false
       }
 
       try {
-        if (!isSocketOpen()) {
+        if (!socketAbierto()) {
           throw new Error('La conexión se cerró antes de generar el código.')
         }
 
-        let secret = await sock.requestPairingCode(pairingPhone)
+        let secreto = await sock.requestPairingCode(telefonoEmparejamiento)
 
-        secret = secret?.match(/.{1,4}/g)?.join('-') || secret
-        pairingCodeSent = true
+        secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
+        codigoEmparejamientoEnviado = true
 
-        await replyUser(buildPairingCodeMessage(secret, pairingPhone))
+        await replyUser(construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento))
 
-        pairingInProgress = false
+        emparejamientoEnCurso = false
         return true
       } catch (error) {
         console.error('Error generando pairing code:', error)
-        pairingCodeSent = false
-        pairingInProgress = false
-        await replyUser(buildPairingCodeError(usedPrefix, error?.message)).catch(() => {})
+        codigoEmparejamientoEnviado = false
+        emparejamientoEnCurso = false
+        await replyUser(construirErrorCodigoEmparejamiento(usedPrefix, error?.message)).catch(() => {})
         try { sock.ws.close() } catch {}
         return false
       }
     }
 
-    async function connectionUpdate(update) {
+    async function actualizacionConexion(update) {
       const { connection, lastDisconnect, isNewLogin, qr } = update
-      if (isNewLogin) hadNewLogin = true
+      if (isNewLogin) tuvoNuevoLogin = true
       if (isNewLogin) sock.isInit = false
 
-      if (qr && mcode && m && conn) {
-        await sendPairingCode()
+      if (qr && codigoM && m && conn) {
+        await enviarCodigoEmparejamiento()
         return
       }
 
-      if (qr && !mcode && m && conn) {
-        const txt = buildQrLinkMessage()
-        let sendQR = await conn.sendFile(m.chat, await qrcode.toDataURL(qr, { scale: 8 }), "qrcode.png", txt, m, null, rcanal)
+      if (qr && !codigoM && m && conn) {
+        const texto = construirMensajeEnlaceQr()
+        let enviarQR = await conn.sendFile(m.chat, await qrcode.toDataURL(qr, { scale: 8 }), "qrcode.png", texto, m, null, rcanal)
 
   setTimeout(() => {
-    conn.sendMessage(m.chat, { delete: sendQR.key })
+    conn.sendMessage(m.chat, { delete: enviarQR.key })
   }, 30000)
 
   return
   }
 
-      const endSesion = async (loaded) => {
+      const terminarSesion = async (loaded) => {
         if (!loaded) {
           try { sock.ws.close() } catch { }
           sock.ev.removeAllListeners()
-          removeSockFromConns(sock)
-          stopWatchdog()
+          quitarSockDeConns(sock)
+          detenerWatchdog()
         }
       }
 
-      const reason = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
+      const motivo = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
 
       if (connection === 'close') {
-        const isPairingFlow = mcode && !state.creds.registered
+        const esFlujoEmparejamiento = codigoM && !estadoConn.creds.registered
 
-        if (pairingInProgress) {
-          console.log(chalk.bold.yellow(`\n┆ Pairing en curso (+${botFolderId}) esperando código...\n`))
+        if (emparejamientoEnCurso) {
+          console.log(chalk.bold.yellow(`\n┆ Pairing en curso (+${idCarpetaBot}) esperando código...\n`))
           return
         }
 
         // Cierre fatal de sesión (logout / reemplazo / prohibido): no reconectar en bucle
-        if (isFatalSessionReason(reason)) {
-          console.log(chalk.bold.magentaBright(`\n┆ Sesión fatal (+${botFolderId}) código ${reason}. Limpiando...\n`))
-          if (mcode && !state.creds.registered) {
-            clearSubBotAuth(pathAYBot)
+        if (esMotivoSesionFatal(motivo)) {
+          console.log(chalk.bold.magentaBright(`\n┆ Sesión fatal (+${idCarpetaBot}) código ${motivo}. Limpiando...\n`))
+          if (codigoM && !estadoConn.creds.registered) {
+            limpiarAuthSubBot(pathAYBot)
           } else {
-            await wipeSubBotFolder()
+            await borrarCarpetaSubBot()
           }
           try { sock.ws.close() } catch {}
-          removeSockFromConns(sock)
-          stopWatchdog()
+          quitarSockDeConns(sock)
+          detenerWatchdog()
           return
         }
 
         // Desconexión temporal (red, 503, timeout, restart, sin código…): reconectar
-        if (isPairingFlow && !pairingCodeSent) {
-          console.log(chalk.bold.yellow(`\n┆ Pairing (+${botFolderId}) esperando vinculación (${reason})\n`))
+        if (esFlujoEmparejamiento && !codigoEmparejamientoEnviado) {
+          console.log(chalk.bold.yellow(`\n┆ Pairing (+${idCarpetaBot}) esperando vinculación (${motivo})\n`))
           return
         }
-        if (isPairingFlow && !state.creds.registered) {
-          console.log(chalk.bold.yellow(`\n┆ Pairing (+${botFolderId}) conexión interrumpida (${reason}), esperando...\n`))
+        if (esFlujoEmparejamiento && !estadoConn.creds.registered) {
+          console.log(chalk.bold.yellow(`\n┆ Pairing (+${idCarpetaBot}) conexión interrumpida (${motivo}), esperando...\n`))
           return
         }
-        if (reconnecting) {
-          console.log(chalk.bold.yellow(`\n┆ Subbot (+${botFolderId}) ya reconectando, se omite duplicado (${reason})\n`))
+        if (reconectando) {
+          console.log(chalk.bold.yellow(`\n┆ Subbot (+${idCarpetaBot}) ya reconectando, se omite duplicado (${motivo})\n`))
           return
         }
-        reconnecting = true
-        console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${botFolderId}) desconectado (${reason ?? 'sin código'}). Reconectando...\n`))
+        reconectando = true
+        console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). Reconectando...\n`))
         try {
-          await creloadHandler(true)
+          await recargarHandler(true)
           // Si no abre en 45s, permitir otro intento
           setTimeout(() => {
-            if (reconnecting && !sock?.user) reconnecting = false
+            if (reconectando && !sock?.user) reconectando = false
           }, 45000)
         } catch (e) {
-          console.error(`Error reconectando subbot ${botFolderId}:`, e?.message || e)
-          reconnecting = false
+          console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
+          reconectando = false
         }
         return
       }
@@ -401,16 +402,16 @@ export async function AYBot(options) {
       if (global.db.data == null) loadDatabase()
 
       if (connection === 'open') {
-        reconnecting = false
-        lastSeenUserAt = Date.now()
+        reconectando = false
+        vistoUsuarioEn = Date.now()
         if (!global.db.data?.users) loadDatabase()
 
-        console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${botFolderId}) conectado exitosamente.`))
+        console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${idCarpetaBot}) conectado exitosamente.`))
         sock.isInit = true
         try {
           const { markBotStart } = await import('../lib/bot-uptime.js')
        
-          markBotStart(botFolderId)
+          markBotStart(idCarpetaBot)
           markBotStart(sock)
         } catch {
           if (!sock.startTime) sock.startTime = Date.now()
@@ -426,34 +427,34 @@ export async function AYBot(options) {
         
        
                 try {
-          const botNumber = botFolderId
-          const configPath = path.join(pathAYBot, 'config.json')
+          const numeroBot = idCarpetaBot
+          const rutaConfig = path.join(pathAYBot, 'config.json')
           let nombreBot = global.namebot || 'PAIN BOT'
-          let subConfig = { name: nombreBot, autoRead: false }
+          let configSub = { name: nombreBot, autoRead: false }
           
-          if (fs.existsSync(configPath)) {
+          if (fs.existsSync(rutaConfig)) {
             try {
-              subConfig = { ...subConfig, ...JSON.parse(fs.readFileSync(configPath, 'utf-8')) }
-              if (subConfig.name) nombreBot = subConfig.name
+              configSub = { ...configSub, ...JSON.parse(fs.readFileSync(rutaConfig, 'utf-8')) }
+              if (configSub.name) nombreBot = configSub.name
             } catch (err) {}
           } else {
-            fs.writeFileSync(configPath, JSON.stringify(subConfig, null, 2))
+            fs.writeFileSync(rutaConfig, JSON.stringify(configSub, null, 2))
           }
 
-          const isFreshSubBot = fromCommand && m && hadNewLogin
-          hadNewLogin = false
+          const esSubBotFresco = fromCommand && m && tuvoNuevoLogin
+          tuvoNuevoLogin = false
 
-          if (isFreshSubBot) {
-            await sendSubBotWelcome({
+          if (esSubBotFresco) {
+            await enviarBienvenidaSubBot({
               sock,
               m,
               conn,
               replyJid,
               nombreBot,
-              botNumber,
+              botNumber: numeroBot,
               usedPrefix,
-              configPath,
-              subConfig
+              configPath: rutaConfig,
+              subConfig: configSub
             })
           }
           
@@ -465,69 +466,69 @@ export async function AYBot(options) {
 
     // Antes: cerraba el socket si !sock.user a los 60s (mata reconexiones a medias).
     // Ahora solo limpia sockets realmente muertos tras varios minutos sin user y sin WS abierto.
-    stopWatchdog()
-    watchdogTimer = setInterval(() => {
+    detenerWatchdog()
+    temporizadorWatchdog = setInterval(() => {
       try {
         if (sock?.user) {
-          lastSeenUserAt = Date.now()
+          vistoUsuarioEn = Date.now()
           return
         }
-        if (reconnecting || pairingInProgress || isSocketOpen()) return
-        if (Date.now() - lastSeenUserAt < 3 * 60 * 1000) return
+        if (reconectando || emparejamientoEnCurso || socketAbierto()) return
+        if (Date.now() - vistoUsuarioEn < 3 * 60 * 1000) return
 
-        console.log(chalk.bold.yellow(`\n┆ Watchdog: subbot (+${botFolderId}) muerto sin user. Limpiando...\n`))
+        console.log(chalk.bold.yellow(`\n┆ Watchdog: subbot (+${idCarpetaBot}) muerto sin user. Limpiando...\n`))
         try { sock.ws.close() } catch (e) { }
         try { sock.ev.removeAllListeners() } catch {}
-        removeSockFromConns(sock)
-        stopWatchdog()
+        quitarSockDeConns(sock)
+        detenerWatchdog()
       } catch {}
     }, 60000)
 
     let handler = await import('../handler.js')
-    let creloadHandler = async function (restatConn) {
+    let recargarHandler = async function (restatConn) {
       try {
-        const Handler = await import(`../handler.js?update=${Date.now()}`).catch(console.error)
-        if (Object.keys(Handler || {}).length) handler = Handler
+        const HandlerModulo = await import(`../handler.js?update=${Date.now()}`).catch(console.error)
+        if (Object.keys(HandlerModulo || {}).length) handler = HandlerModulo
       } catch (e) {
         console.error('Nuevo error: ', e)
       }
 
       if (restatConn) {
-        const oldSock = sock
-        const oldChats = sock.chats
-        const oldStart = sock.startTime
-        const oldId = path.basename(pathAYBot)
+        const sockAnterior = sock
+        const chatsAnteriores = sock.chats
+        const inicioAnterior = sock.startTime
+        const idAnterior = path.basename(pathAYBot)
         try { sock.ws.close() } catch { }
         sock.ev.removeAllListeners()
-        sock = makeWASocket(connectionOptions, { chats: oldChats })
-        isInit = true
+        sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
+        esInit = true
         try {
           const { setBotStartTime, getBotStartTime, markBotStart } = await import('../lib/bot-uptime.js')
-          const kept = oldStart || getBotStartTime(oldId)
-          if (kept) {
-            setBotStartTime(oldId, kept)
-            setBotStartTime(sock, kept)
+          const conservado = inicioAnterior || getBotStartTime(idAnterior)
+          if (conservado) {
+            setBotStartTime(idAnterior, conservado)
+            setBotStartTime(sock, conservado)
           } else {
-            markBotStart(oldId)
+            markBotStart(idAnterior)
             markBotStart(sock)
           }
         } catch {
-          if (oldStart) sock.startTime = oldStart
+          if (inicioAnterior) sock.startTime = inicioAnterior
         }
         if (Array.isArray(global.conns)) {
-          const idx = global.conns.indexOf(oldSock)
-          if (idx >= 0) global.conns[idx] = sock
+          const indice = global.conns.indexOf(sockAnterior)
+          if (indice >= 0) global.conns[indice] = sock
         }
       }
 
-      if (!isInit) {
+      if (!esInit) {
         sock.ev.off("messages.upsert", sock.handler)
         sock.ev.off("connection.update", sock.connectionUpdate)
         sock.ev.off("creds.update", sock.credsUpdate)
       }
 
       sock.handler = handler.handler.bind(sock)
-      sock.connectionUpdate = connectionUpdate.bind(sock)
+      sock.connectionUpdate = actualizacionConexion.bind(sock)
       sock.credsUpdate = saveCreds.bind(sock, true)
 
       initViewOnceAntiListener(sock)
@@ -535,22 +536,22 @@ export async function AYBot(options) {
       sock.ev.on("connection.update", sock.connectionUpdate)
       sock.ev.on("creds.update", sock.credsUpdate)
 
-      isInit = false
+      esInit = false
       return true
     }
 
-    creloadHandler(false)
+    recargarHandler(false)
   })
 }
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const retraso = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function resolveSubBotUserName(sock, m, conn, replyJid) {
-  const fromUser = sock.user?.name || sock.user?.verifiedName
-  if (fromUser) return fromUser
+async function resolverNombreUsuarioSubBot(sock, m, conn, replyJid) {
+  const desdeUsuario = sock.user?.name || sock.user?.verifiedName
+  if (desdeUsuario) return desdeUsuario
 
-  const fromCreds = sock.authState?.creds?.me?.name
-  if (fromCreds) return fromCreds
+  const desdeCreds = sock.authState?.creds?.me?.name
+  if (desdeCreds) return desdeCreds
 
   if (m?.pushName) return m.pushName
   if (m?.name) return m.name
@@ -562,132 +563,132 @@ async function resolveSubBotUserName(sock, m, conn, replyJid) {
 
   if (sender && conn?.getName) {
     try {
-      const name = await conn.getName(sender)
-      if (name && name !== 'Sin nombre') return name
+      const nombre = await conn.getName(sender)
+      if (nombre && nombre !== 'Sin nombre') return nombre
     } catch {}
   }
 
   if (sock.user?.jid && conn?.getName) {
     try {
-      const name = await conn.getName(sock.user.jid)
-      if (name && name !== 'Sin nombre') return name
+      const nombre = await conn.getName(sock.user.jid)
+      if (nombre && nombre !== 'Sin nombre') return nombre
     } catch {}
   }
 
   return 'Usuario'
 }
 
-function buildQrLinkMessage() {
+function construirMensajeEnlaceQr() {
   return `𓂃 ࣪ ִֶָ☾. 𝚅𝙸𝙽𝙲𝚄𝙻𝙰𝙲𝙸𝙾𝙽 𝚀𝚁 𓂃 ࣪ ִֶָ☾.
 
    𓍯  𝙴𝚂𝙲𝙰𝙽𝙴𝙾 𝚁𝙴𝚀𝚄𝙴𝚁𝙸𝙳𝙾  𓍯
-${MENU_LINE}  Abre WhatsApp en tu teléfono
-${MENU_LINE}  Menú ⋮ → *Dispositivos vinculados*
-${MENU_LINE}  Toca *Vincular nuevo dispositivo*
-${MENU_LINE}  Escanea el código QR de arriba
+${LINEA_MENU}  Abre WhatsApp en tu teléfono
+${LINEA_MENU}  Menú ⋮ → *Dispositivos vinculados*
+${LINEA_MENU}  Toca *Vincular nuevo dispositivo*
+${LINEA_MENU}  Escanea el código QR de arriba
 
  𓂃 ࣪ ִֶָ☾. 𝙽𝙾𝚃𝙰 𓂃 ࣪ ִֶָ☾.
-${MENU_LINE}  El QR caduca en *30 segundos*`
+${LINEA_MENU}  El QR caduca en *30 segundos*`
 }
 
-function buildPairingCodeMessage(secret, pairingPhone) {
+function construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento) {
   return `𓂃 ࣪ ִֶָ☾. 𝚅𝙸𝙽𝙲𝚄𝙻𝙰𝙲𝙸𝙾𝙽 𝙿𝙾𝚁 𝙲𝙾́𝙳𝙸𝙶𝙾 𓂃 ࣪ ִֶָ☾.
 
    𓍯  𝚃𝚄 𝙲𝙾́𝙳𝙸𝙶𝙾  𓍯
-${MENU_LINE}  \`${secret}\`
-${MENU_LINE}  𝙽𝚄𝙼𝙴𝚁𝙾: +${pairingPhone}
+${LINEA_MENU}  \`${secreto}\`
+${LINEA_MENU}  𝙽𝚄𝙼𝙴𝚁𝙾: +${telefonoEmparejamiento}
 
  𓂃 ࣪ ִֶָ☾. 𝙿𝙰𝚂𝙾𝚂 𓂃 ࣪ ִֶָ☾.
-${MENU_LINE}  1. Abre WhatsApp en tu teléfono
-${MENU_LINE}  2. Ve a *Dispositivos vinculados*
-${MENU_LINE}  3. Toca *Vincular un dispositivo*
-${MENU_LINE}  4. Elige *Vincular con número*
-${MENU_LINE}  5. Ingresa el código de arriba
+${LINEA_MENU}  1. Abre WhatsApp en tu teléfono
+${LINEA_MENU}  2. Ve a *Dispositivos vinculados*
+${LINEA_MENU}  3. Toca *Vincular un dispositivo*
+${LINEA_MENU}  4. Elige *Vincular con número*
+${LINEA_MENU}  5. Ingresa el código de arriba
 
  𓂃 ࣪ ִֶָ☾. 𝙽𝙾𝚃𝙰 𓂃 ࣪ ִֶָ☾.
-${MENU_LINE}  Caduca en *30 segundos*
-${MENU_LINE}  Solo para *+${pairingPhone}*`
+${LINEA_MENU}  Caduca en *30 segundos*
+${LINEA_MENU}  Solo para *+${telefonoEmparejamiento}*`
 }
 
-function buildPairingPhoneError(usedPrefix) {
+function construirErrorTelefonoEmparejamiento(usedPrefix) {
   return `𓂃 ࣪ ִֶָ☾. 𝙴𝚁𝚁𝙾𝚁 𓂃 ࣪ ִֶָ☾.
 
-${MENU_LINE}  *No se pudo obtener tu número*
-${MENU_LINE}  Usa: *${usedPrefix}code 521XXXXXXXXXX*
-${MENU_LINE}  México: *521* + 10 dígitos`
+${LINEA_MENU}  *No se pudo obtener tu número*
+${LINEA_MENU}  Usa: *${usedPrefix}code 521XXXXXXXXXX*
+${LINEA_MENU}  México: *521* + 10 dígitos`
 }
 
-function buildPairingCodeError(usedPrefix, errorMsg = 'Conexión interrumpida') {
+function construirErrorCodigoEmparejamiento(usedPrefix, mensajeError = 'Conexión interrumpida') {
   return `𓂃 ࣪ ִֶָ☾. 𝙴𝚁𝚁𝙾𝚁 𓂃 ࣪ ִֶָ☾.
 
-${MENU_LINE}  *No se pudo generar el código*
-${MENU_LINE}  ${errorMsg || 'Conexión interrumpida'}
-${MENU_LINE}  Vuelve a usar: *${usedPrefix}code*`
+${LINEA_MENU}  *No se pudo generar el código*
+${LINEA_MENU}  ${mensajeError || 'Conexión interrumpida'}
+${LINEA_MENU}  Vuelve a usar: *${usedPrefix}code*`
 }
 
-function buildSubBotWelcomeMessages({ nombreBot, botNumber, userName, usedPrefix = '.' }) {
-  const line = MENU_LINE
-  const privateMessage = `𓂃 ࣪ ִֶָ☾. 𝙱𝙸𝙴𝙽𝚅𝙴𝙽𝙸𝙳𝙾 𓂃 ࣪ ִֶָ☾.
+function construirMensajesBienvenidaSubBot({ nombreBot, botNumber: numeroBot, userName: nombreUsuario, usedPrefix = '.' }) {
+  const linea = LINEA_MENU
+  const mensajePrivado = `𓂃 ࣪ ִֶָ☾. 𝙱𝙸𝙴𝙽𝚅𝙴𝙽𝙸𝙳𝙾 𓂃 ࣪ ִֶָ☾.
 
    𓍯  𝚂𝚄𝙱-𝙱𝙾𝚃 𝙰𝙲𝚃𝙸𝚅𝙾  𓍯
-${line}  *¡Te convertiste en Sub-Bot!*
-${line}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
-${line}  𝙽𝚄𝙼𝙴𝚁𝙾: +${botNumber}
-${line}  𝚄𝚂𝚄𝙰𝚁𝙸𝙾: ${userName}
-${line}  𝙴𝚂𝚃𝙰𝙳𝙾: Conectado ✅
-${line}  𝙰𝚄𝚃𝙾-𝙻𝙴𝙴𝚁: Desactivado ❌
+${linea}  *¡Te convertiste en Sub-Bot!*
+${linea}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
+${linea}  𝙽𝚄𝙼𝙴𝚁𝙾: +${numeroBot}
+${linea}  𝚄𝚂𝚄𝙰𝚁𝙸𝙾: ${nombreUsuario}
+${linea}  𝙴𝚂𝚃𝙰𝙳𝙾: Conectado ✅
+${linea}  𝙰𝚄𝚃𝙾-𝙻𝙴𝙴𝚁: Desactivado ❌
 
  𓂃 ࣪ ִֶָ☾. 𝙲𝙾𝙽𝙵𝙸𝙶𝚄𝚁𝙰𝙲𝙸𝙾𝙽 𓂃 ࣪ ִֶָ☾.
-${line}  ${usedPrefix}setautoread on — Activar auto-leer
-${line}  ${usedPrefix}setautoread off — Desactivar auto-leer`
+${linea}  ${usedPrefix}setautoread on — Activar auto-leer
+${linea}  ${usedPrefix}setautoread off — Desactivar auto-leer`
 
-  const channelMessage = `𓂃 ࣪ ִֶָ☾. 𝙽𝚄𝙴𝚅𝙾 𝚂𝚄𝙱-𝙱𝙾𝚃 𓂃 ࣪ ִֶָ☾.
+  const mensajeCanal = `𓂃 ࣪ ִֶָ☾. 𝙽𝚄𝙴𝚅𝙾 𝚂𝚄𝙱-𝙱𝙾𝚃 𓂃 ࣪ ִֶָ☾.
 
    𓍯  𝙸𝙽𝙵𝙾  𓍯
-${line}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
-${line}  𝙽𝚄𝙼𝙴𝚁𝙾: +${botNumber}
-${line}  𝙾𝚆𝙽𝙴𝚁: ${userName}
-${line}  𝙴𝚂𝚃𝙰𝙳𝙾: Online ✅
+${linea}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
+${linea}  𝙽𝚄𝙼𝙴𝚁𝙾: +${numeroBot}
+${linea}  𝙾𝚆𝙽𝙴𝚁: ${nombreUsuario}
+${linea}  𝙴𝚂𝚃𝙰𝙳𝙾: Online ✅
 
  𓂃 ࣪ ִֶָ☾. *¿𝚀𝚄𝙸𝙴𝚁𝙴𝚂 𝚂𝙴𝚁 𝚂𝚄𝙱-𝙱𝙾𝚃?* 𓂃 ࣪ ִֶָ☾.
-${line}  Escríbele al nuevo sub-bot: *+${botNumber}*
-${line}  Comando: *${usedPrefix}code* o *${usedPrefix}qrr*`
+${linea}  Escríbele al nuevo sub-bot: *+${numeroBot}*
+${linea}  Comando: *${usedPrefix}code* o *${usedPrefix}qrr*`
 
-  return { privateMessage, channelMessage }
+  return { privateMessage: mensajePrivado, channelMessage: mensajeCanal }
 }
 
-async function sendSubBotWelcome({ sock, m, conn, replyJid, nombreBot, botNumber, usedPrefix, configPath, subConfig = {} }) {
-  let userName = await resolveSubBotUserName(sock, m, conn, replyJid)
-  if (userName === 'Usuario') {
-    await delay(800)
-    userName = await resolveSubBotUserName(sock, m, conn, replyJid)
+async function enviarBienvenidaSubBot({ sock, m, conn, replyJid, nombreBot, botNumber: numeroBot, usedPrefix, configPath: rutaConfig, subConfig: configSub }) {
+  let nombreUsuario = await resolverNombreUsuarioSubBot(sock, m, conn, replyJid)
+  if (nombreUsuario === 'Usuario') {
+    await retraso(800)
+    nombreUsuario = await resolverNombreUsuarioSubBot(sock, m, conn, replyJid)
   }
 
-  const { privateMessage, channelMessage } = buildSubBotWelcomeMessages({
+  const { privateMessage: mensajePrivado, channelMessage: mensajeCanal } = construirMensajesBienvenidaSubBot({
     nombreBot,
-    botNumber,
-    userName,
+    botNumber: numeroBot,
+    userName: nombreUsuario,
     usedPrefix
   })
 
   if (m && conn) {
-    await sendPrivateReply(m, conn, privateMessage, { contextInfo: { ...rcanal.contextInfo } })
+    await sendPrivateReply(m, conn, mensajePrivado, { contextInfo: { ...rcanal.contextInfo } })
   }
 
-  const channelJid = getSubBotsLogsJid()
-  const mainBot = global.conn
-  if (!subConfig.channelAnnounced && channelJid && mainBot?.user) {
-    await mainBot.sendMessage(channelJid, {
-      text: channelMessage,
+  const jidCanal = getSubBotsLogsJid()
+  const botPrincipal = global.conn
+  if (!configSub.channelAnnounced && jidCanal && botPrincipal?.user) {
+    await botPrincipal.sendMessage(jidCanal, {
+      text: mensajeCanal,
       contextInfo: { ...rcanal.contextInfo }
     }).catch((err) => {
       console.error('[subbot] Error enviando bienvenida al canal de logs:', err?.message || err)
     })
 
-    if (configPath) {
+    if (rutaConfig) {
       try {
-        const nextConfig = { ...subConfig, channelAnnounced: true }
-        fs.writeFileSync(configPath, JSON.stringify(nextConfig, null, 2))
+        const configSiguiente = { ...configSub, channelAnnounced: true }
+        fs.writeFileSync(rutaConfig, JSON.stringify(configSiguiente, null, 2))
       } catch (err) {
         console.error('[subbot] No se pudo guardar channelAnnounced:', err?.message || err)
       }
@@ -695,12 +696,12 @@ async function sendSubBotWelcome({ sock, m, conn, replyJid, nombreBot, botNumber
   }
 }
 
-function sleep(ms) {
+function dormir(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function msToTime(duration) {
-  var milliseconds = parseInt((duration % 1000) / 100),
+function msATiempo(duration) {
+  var milisegundos = parseInt((duration % 1000) / 100),
       seconds = Math.floor((duration / 1000) % 60),
       minutes = Math.floor((duration / (1000 * 60)) % 60),
       hours = Math.floor((duration / (1000 * 60 * 60)) % 24)

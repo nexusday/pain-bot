@@ -10,30 +10,30 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     }
     
     
-    const action = args[0]?.toLowerCase()
+    const accion = args[0]?.toLowerCase()
     
     if (!global.db.data.antiDocument) global.db.data.antiDocument = {}
     
-    if (action === 'on') {
+    if (accion === 'on') {
       global.db.data.antiDocument[m.chat] = true
       
-      let txt = `ִֶָ☾. *Anti-documentos activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-documentos activado correctamente*\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
         }
       }, { quoted: m })
       
-    } else if (action === 'off') {
+    } else if (accion === 'off') {
       global.db.data.antiDocument[m.chat] = false
       
-      let txt = `ִֶָ☾. *Anti-documentos desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-documentos desactivado correctamente*\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
@@ -49,8 +49,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }, { quoted: m })
     }
     
-  } catch (e) {
-    console.error('Error en antidocument:', e)
+  } catch (error) {
+    console.error('Error en antidocument:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al configurar el anti-documentos.',
       contextInfo: {

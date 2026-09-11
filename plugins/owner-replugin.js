@@ -9,33 +9,33 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
   
   if (!args[0]) {
     try {
-      const pluginsDir = './plugins'
-      const files = fs.readdirSync(pluginsDir)
-      const jsFiles = files.filter(file => file.endsWith('.js'))
+      const dirPlugins = './plugins'
+      const archivos = fs.readdirSync(dirPlugins)
+      const archivosJs = archivos.filter(file => file.endsWith('.js'))
       
-      if (jsFiles.length === 0) {
+      if (archivosJs.length === 0) {
         return m.reply('*[❗] No se encontraron plugins en el directorio.*')
       }
 
-      let txt = `📁 𝗣𝗹𝘂𝗴𝗶𝗻𝘀 𝗱𝗶𝘀𝗽𝗼𝗻𝗶𝗯𝗹𝗲𝘀\n\n`
-      txt += `\n`
+      let texto = `📁 𝗣𝗹𝘂𝗴𝗶𝗻𝘀 𝗱𝗶𝘀𝗽𝗼𝗻𝗶𝗯𝗹𝗲𝘀\n\n`
+      texto += `\n`
       
-      jsFiles.forEach((file, index) => {
-        const filePath = join(pluginsDir, file)
-        const stats = fs.statSync(filePath)
-        const size = (stats.size / 1024).toFixed(2) 
+      archivosJs.forEach((file, index) => {
+        const rutaArchivo = join(dirPlugins, file)
+        const estadisticas = fs.statSync(rutaArchivo)
+        const tamano = (estadisticas.size / 1024).toFixed(2) 
         
-        txt += `*${index + 1}.* ${file}\n`
-        txt += `> • Tamaño: ${size} KB\n`
-        if (index < jsFiles.length - 1) txt += `│\n`
+        texto += `*${index + 1}.* ${file}\n`
+        texto += `> • Tamaño: ${tamano} KB\n`
+        if (index < archivosJs.length - 1) texto += `│\n`
       })
       
-      txt += `\n`
-      txt += `> *Total:* ${jsFiles.length} plugins\n`
-      txt += `> *Para reemplazar:* ${usedPrefix}replugin <nombre.js>`
+      texto += `\n`
+      texto += `> *Total:* ${archivosJs.length} plugins\n`
+      texto += `> *Para reemplazar:* ${usedPrefix}replugin <nombre.js>`
 
       await conn.sendMessage(m.chat, {
-        text: txt,
+        text: texto,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -49,23 +49,23 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
   }
 
   
-  let fileName = args[0]
+  let nombreArchivo = args[0]
   
  
-  if (!fileName.endsWith('.js')) {
-    fileName += '.js'
+  if (!nombreArchivo.endsWith('.js')) {
+    nombreArchivo += '.js'
   }
 
   
-  if (!/^[a-zA-Z0-9-_]+\.js$/.test(fileName)) {
+  if (!/^[a-zA-Z0-9-_]+\.js$/.test(nombreArchivo)) {
     return m.reply('*[❗] Nombre de archivo inválido. Solo letras, números, guiones y guiones bajos.*')
   }
 
-  const pluginPath = join('./plugins', fileName)
+  const rutaPlugin = join('./plugins', nombreArchivo)
 
  
-  if (!fs.existsSync(pluginPath)) {
-    return m.reply(`*[❗] El archivo ${fileName} no existe.*\n\nUsa ${usedPrefix}replugin para ver todos los plugins disponibles.`)
+  if (!fs.existsSync(rutaPlugin)) {
+    return m.reply(`*[❗] El archivo ${nombreArchivo} no existe.*\n\nUsa ${usedPrefix}replugin para ver todos los plugins disponibles.`)
   }
 
   
@@ -73,26 +73,26 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     return m.reply(`*[❗] Debes responder a un mensaje con el nuevo código del plugin.*
 
 *Ejemplo:*
-1. Escribe: ${usedPrefix}replugin ${fileName}
+1. Escribe: ${usedPrefix}replugin ${nombreArchivo}
 2. Responde a este mensaje con el código completo del nuevo plugin`)
   }
 
-  let newPluginContent = m.quoted.text
+  let contenidoPluginNuevo = m.quoted.text
 
   try {
     
-    const backupPath = pluginPath + '.backup'
-    if (!fs.existsSync(backupPath)) {
-      fs.copyFileSync(pluginPath, backupPath)
+    const rutaBackup = rutaPlugin + '.backup'
+    if (!fs.existsSync(rutaBackup)) {
+      fs.copyFileSync(rutaPlugin, rutaBackup)
     }
 
     
-    fs.writeFileSync(pluginPath, newPluginContent, 'utf8')
+    fs.writeFileSync(rutaPlugin, contenidoPluginNuevo, 'utf8')
     
-    let txt = `✅ 𝗣𝗹𝘂𝗴𝗶𝗻 𝗿𝗲𝗺𝗽𝗹𝗮𝘇𝗮𝗱𝗼 \n\n> *Archivo:* ${fileName}\n> *Ruta:* plugins/${fileName}\n> *Backup:* ${fileName}.backup\n> *Comando:* .${fileName.replace('.js', '')}`
+    let texto = `✅ 𝗣𝗹𝘂𝗴𝗶𝗻 𝗿𝗲𝗺𝗽𝗹𝗮𝘇𝗮𝗱𝗼 \n\n> *Archivo:* ${nombreArchivo}\n> *Ruta:* plugins/${nombreArchivo}\n> *Backup:* ${nombreArchivo}.backup\n> *Comando:* .${nombreArchivo.replace('.js', '')}`
 
     await conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo
       }

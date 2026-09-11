@@ -1,7 +1,7 @@
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
-    let user = global.db.data.users[m.sender]
-    if (!user) global.db.data.users[m.sender] = {}
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) global.db.data.users[m.sender] = {}
     
    
     const newName = args.join(' ').trim()
@@ -49,8 +49,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }
       
      
-     const existingUser = Object.entries(global.db.data.users).find(([jid, user]) => {
-       return jid !== m.sender && user.name && user.name.toLowerCase() === newName.toLowerCase()
+     const existingUser = Object.entries(global.db.data.users).find(([jid, usuario]) => {
+       return jid !== m.sender && usuario.name && usuario.name.toLowerCase() === newName.toLowerCase()
      })
      
      if (existingUser) {
@@ -63,24 +63,24 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
      }
     
    
-    const oldName = user.name || 'Sin nombre'
+    const oldName = usuario.name || 'Sin nombre'
     
     
     global.db.data.users[m.sender].name = newName
     
     
-    let txt = `🌴 𝗡𝘂𝗲𝘃𝗼 𝗻𝗼𝗺𝗯𝗿𝗲 𝗰𝗮𝗺𝗯𝗶𝗮𝗱𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n> *Anterior:* ${oldName}\n> *Nuevo:* ${newName}`
+    let texto = `🌴 𝗡𝘂𝗲𝘃𝗼 𝗻𝗼𝗺𝗯𝗿𝗲 𝗰𝗮𝗺𝗯𝗶𝗮𝗱𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n> *Anterior:* ${oldName}\n> *Nuevo:* ${newName}`
     
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]
       }
     }, { quoted: m })
     
-  } catch (e) {
-    console.error('Error en setname:', e)
+  } catch (error) {
+    console.error('Error en setname:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al cambiar el nombre.',
       contextInfo: {

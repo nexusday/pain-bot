@@ -2,18 +2,18 @@
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner, isPrems, usedPrefix, command }) => {
   
-  const adminCheckMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
-  const groupParticipants = (m.isGroup ? adminCheckMetadata.participants : []) || []  
-  const user = (m.isGroup ? findGroupParticipant(groupParticipants, m, conn) : {}) || {}  
-  const isRAdmin = user?.admin == 'superadmin' || false  
-  const isAdminManual = Boolean(isAdmin) || isRAdmin || user?.admin == 'admin' || false  
+  const metadatosVerificacionAdmin = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+  const participantesGrupo = (m.isGroup ? metadatosVerificacionAdmin.participants : []) || []  
+  const usuario = (m.isGroup ? findGroupParticipant(participantesGrupo, m, conn) : {}) || {}  
+  const esSuperAdmin = usuario?.admin == 'superadmin' || false  
+  const esAdminManual = Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false  
   
   
-  const isOwnerManual = global.owner.some(([number]) => number.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
-                  global.ownerLid?.some(([number]) => number.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
+  const esOwnerManual = global.owner.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender) || 
+                  global.ownerLid?.some(([numero]) => numero.replace(/[^0-9]/g, '') + '@lid' === m.sender) ||
                   m.sender === conn.user.jid
   
-  if (!isAdminManual && !isRAdmin && !isOwnerManual) {
+  if (!esAdminManual && !esSuperAdmin && !esOwnerManual) {
     return conn.reply(m.chat, '[❗] Solo los administradores pueden usar este comando.', m)
   }
 
@@ -34,15 +34,15 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }, { quoted: m })
   }
   
-  const who = m.mentionedJid[0]
-  const reason = args.slice(1).join(' ') || 'Sin motivo especificado'
+  const quien = m.mentionedJid[0]
+  const motivo = args.slice(1).join(' ') || 'Sin motivo especificado'
   
-  const ownerNumbers = global.owner.map(v => {
+  const numerosOwner = global.owner.map(v => {
     const id = typeof v === 'string' ? v.replace(/[^0-9]/g, '') : String(v).replace(/[^0-9]/g, '');
     return id + '@s.whatsapp.net';
   });
   
-  if (ownerNumbers.includes(who)) {
+  if (numerosOwner.includes(quien)) {
     return conn.sendMessage(m.chat, {
       text: '[❗] No puedes advertir a un propietario del bot.',
       contextInfo: {
@@ -51,16 +51,16 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }, { quoted: m })
   }
   
-  if (who === conn.user.jid) return conn.sendMessage(m.chat, {
+  if (quien === conn.user.jid) return conn.sendMessage(m.chat, {
     text: '[❗] No puedes advertir al bot.',
     contextInfo: {
       ...rcanal.contextInfo
     }
   }, { quoted: m })
   
-  const groupMetadata = await conn.groupMetadata(m.chat)
-  const isUserAdmin = groupMetadata.participants.find(p => p.id === who)?.admin
-  if (isUserAdmin && !isOwner) {
+  const metadatosGrupo = await conn.groupMetadata(m.chat)
+  const esUsuarioAdmin = metadatosGrupo.participants.find(p => p.id === quien)?.admin
+  if (esUsuarioAdmin && !isOwner) {
     return conn.sendMessage(m.chat, {
       text: '[❗] No puedes advertir a otro administrador.',
       contextInfo: {
@@ -71,42 +71,42 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
 
   if (!global.db.data.warnings) global.db.data.warnings = {}
   if (!global.db.data.warnings[m.chat]) global.db.data.warnings[m.chat] = {}
-  if (!global.db.data.warnings[m.chat][who]) {
-    global.db.data.warnings[m.chat][who] = {
+  if (!global.db.data.warnings[m.chat][quien]) {
+    global.db.data.warnings[m.chat][quien] = {
       count: 0,
       warnings: []
     }
   }
 
-  const userWarnings = global.db.data.warnings[m.chat][who]
-  userWarnings.count++
-  userWarnings.warnings.push({
-    reason: reason,
+  const advertenciasUsuario = global.db.data.warnings[m.chat][quien]
+  advertenciasUsuario.count++
+  advertenciasUsuario.warnings.push({
+    reason: motivo,
     admin: m.sender,
     date: new Date().toISOString(),
     timestamp: Date.now()
   })
 
-  const userName = await conn.getName(who)
-  const adminName = await conn.getName(m.sender)
-  const groupName = groupMetadata.subject
+  const nombreUsuario = await conn.getName(quien)
+  const nombreAdmin = await conn.getName(m.sender)
+  const nombreGrupo = metadatosGrupo.subject
 
-  if (userWarnings.count >= 3) {
+  if (advertenciasUsuario.count >= 3) {
     try {
-      await conn.groupParticipantsUpdate(m.chat, [who], 'remove')
+      await conn.groupParticipantsUpdate(m.chat, [quien], 'remove')
       
-      if (!global.db.data.users[who]) {
-        global.db.data.users[who] = {}
+      if (!global.db.data.users[quien]) {
+        global.db.data.users[quien] = {}
       }
-      global.db.data.users[who].banned = true
+      global.db.data.users[quien].banned = true
       
-      delete global.db.data.warnings[m.chat][who]
+      delete global.db.data.warnings[m.chat][quien]
       
       return conn.sendMessage(m.chat, {
-        text: `🌴 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 𝗘𝘅𝗽𝘂𝗹𝘀𝗮𝗱𝗼\n> *Usuario:* @${who.split('@')[0]}\n> *Por:* @${m.sender.split('@')[0]}\n> *Motivo:* ${reason}\n> *Advertencias:* 3/3`,
+        text: `🌴 𝗨𝘀𝘂𝗮𝗿𝗶𝗼 𝗘𝘅𝗽𝘂𝗹𝘀𝗮𝗱𝗼\n> *Usuario:* @${quien.split('@')[0]}\n> *Por:* @${m.sender.split('@')[0]}\n> *Motivo:* ${motivo}\n> *Advertencias:* 3/3`,
         contextInfo: {
           ...rcanal.contextInfo,
-          mentionedJid: [who, m.sender]
+          mentionedJid: [quien, m.sender]
         }
       }, { quoted: m })
       
@@ -121,13 +121,13 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }
   } else {
     
-    const remainingWarnings = 3 - userWarnings.count
+    const advertenciasRestantes = 3 - advertenciasUsuario.count
     
     return conn.sendMessage(m.chat, {
-      text: `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮 𝗮𝗴𝗿𝗲𝗴𝗮𝗱𝗮\n> *Usuario:* @${who.split('@')[0]}\n> *Por:* @${m.sender.split('@')[0]}\n> *Motivo:* ${reason}\n> *Advertencias:* ${userWarnings.count}/3\n│\n> *Le quedan:* ${remainingWarnings} advertencia(s)\n${userWarnings.count === 2 ? '> *¡ÚLTIMA ADVERTENCIA!*\n' : ''}> *Nota:* Al llegar a 3 advertencias serás expulsado automáticamente`,
+      text: `🌴 𝗔𝗱𝘃𝗲𝗿𝘁𝗲𝗻𝗰𝗶𝗮 𝗮𝗴𝗿𝗲𝗴𝗮𝗱𝗮\n> *Usuario:* @${quien.split('@')[0]}\n> *Por:* @${m.sender.split('@')[0]}\n> *Motivo:* ${motivo}\n> *Advertencias:* ${advertenciasUsuario.count}/3\n│\n> *Le quedan:* ${advertenciasRestantes} advertencia(s)\n${advertenciasUsuario.count === 2 ? '> *¡ÚLTIMA ADVERTENCIA!*\n' : ''}> *Nota:* Al llegar a 3 advertencias serás expulsado automáticamente`,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: [who, m.sender]
+        mentionedJid: [quien, m.sender]
       }
     }, { quoted: m })
   }

@@ -14,25 +14,25 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     const original = m.quoted.text.trim()
     if (!original) return m.reply('*[❗] El mensaje respondido no contiene texto válido.*')
 
-    const prompt = `Traduce al español el siguiente texto. Responde solo con la traducción, sin explicaciones ni marcas:\n\n${original}`
-    const apiUrl = `https://api.delirius.online/ia/chatgpt?q=${encodeURIComponent(prompt)}`
+    const indicacion = `Traduce al español el siguiente texto. Responde solo con la traducción, sin explicaciones ni marcas:\n\n${original}`
+    const urlApi = `https://api.delirius.online/ia/chatgpt?q=${encodeURIComponent(indicacion)}`
 
-    const { data } = await axios.get(apiUrl)
-    if (!data?.status) {
+    const { datos } = await axios.get(urlApi)
+    if (!datos?.status) {
       return conn.sendMessage(m.chat, { text: '*[❗] No se pudo obtener respuesta de la API de traducción.*', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
     }
 
-    let response = (typeof data.data === 'string' ? data.data.trim() : '') || ''
+    let respuestaApi = (typeof datos.data === 'string' ? datos.data.trim() : '') || ''
 
     
-    const thinkMatch = response.match(/<think>([\s\S]*?)<\/think>/)
-    if (thinkMatch) {
-      response = response.replace(/<think>[\s\S]*?<\/think>/, '').trim()
+    const coincidenciaPensamiento = respuestaApi.match(/<think>([\s\S]*?)<\/think>/)
+    if (coincidenciaPensamiento) {
+      respuestaApi = respuestaApi.replace(/<think>[\s\S]*?<\/think>/, '').trim()
     }
 
-    if (!response) response = 'No se obtuvo traducción.'
+    if (!respuestaApi) respuestaApi = 'No se obtuvo traducción.'
 
-    await conn.sendMessage(m.chat, { text: response, contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
+    await conn.sendMessage(m.chat, { text: respuestaApi, contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
 
   } catch (e) {
     console.error('Error en comando traducir:', e)

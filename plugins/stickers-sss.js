@@ -10,125 +10,125 @@ import {
   scoreStoredMessage
 } from '../lib/viewOnce.js'
 
-function prepareMediaMsg(mediaMsg) {
+function prepararMsgMedia(mediaMsg) {
   if (!mediaMsg) return mediaMsg
-  const copy = JSON.parse(JSON.stringify(mediaMsg))
-  delete copy.viewOnce
-  return copy
+  const copia = JSON.parse(JSON.stringify(mediaMsg))
+  delete copia.viewOnce
+  return copia
 }
 
-function loadQuotedFromStore(conn, m) {
-  const stanzaId = m.quoted?.id || m.msg?.contextInfo?.stanzaId
-  if (!stanzaId) return null
+function cargarCitadoDesdeStore(conn, m) {
+  const idEstrofa = m.quoted?.id || m.msg?.contextInfo?.stanzaId
+  if (!idEstrofa) return null
 
-  const remoteJid = m.msg?.contextInfo?.remoteJid || m.quoted?.chat || m.chat
-  const participant = m.msg?.contextInfo?.participant
+  const jidRemoto = m.msg?.contextInfo?.remoteJid || m.quoted?.chat || m.chat
+  const participante = m.msg?.contextInfo?.participant
 
-  const candidates = []
-  const seen = new Set()
+  const candidatos = []
+  const vistos = new Set()
 
-  const push = (entry) => {
-    if (!entry?.message || seen.has(entry)) return
-    seen.add(entry)
-    candidates.push(entry)
+  const agregar = (entrada) => {
+    if (!entrada?.message || vistos.has(entrada)) return
+    vistos.add(entrada)
+    candidatos.push(entrada)
   }
 
-  push(getCachedViewOnceRaw(stanzaId))
+  agregar(getCachedViewOnceRaw(idEstrofa))
   if (conn?.chats) {
-    push(conn.chats[remoteJid]?.messages?.[stanzaId])
-    push(conn.chats[m.chat]?.messages?.[stanzaId])
-    if (participant) push(conn.chats[participant]?.messages?.[stanzaId])
+    agregar(conn.chats[jidRemoto]?.messages?.[idEstrofa])
+    agregar(conn.chats[m.chat]?.messages?.[idEstrofa])
+    if (participante) agregar(conn.chats[participante]?.messages?.[idEstrofa])
 
     for (const chat of Object.values(conn.chats)) {
-      push(chat?.messages?.[stanzaId])
+      agregar(chat?.messages?.[idEstrofa])
     }
   }
 
-  candidates.sort((a, b) => scoreStoredMessage(b) - scoreStoredMessage(a))
-  return candidates[0] || null
+  candidatos.sort((a, b) => scoreStoredMessage(b) - scoreStoredMessage(a))
+  return candidatos[0] || null
 }
 
-function collectQuotedSources(m, quoted, stored) {
-  const sources = []
-  const rawQuoted = m?.msg?.contextInfo?.quotedMessage
-  if (rawQuoted) sources.push({ label: 'contextInfo.quotedMessage', raw: rawQuoted })
-  if (stored?.message) sources.push({ label: 'store.cachedMessage', raw: stored.message })
-  if (quoted?.vM?.message) sources.push({ label: 'quoted.vM.message', raw: quoted.vM.message })
-  return sources
+function recolectarFuentesCitadas(m, citado, almacenado) {
+  const fuentes = []
+  const citadoCrudo = m?.msg?.contextInfo?.quotedMessage
+  if (citadoCrudo) fuentes.push({ label: 'contextInfo.quotedMessage', raw: citadoCrudo })
+  if (almacenado?.message) fuentes.push({ label: 'store.cachedMessage', raw: almacenado.message })
+  if (citado?.vM?.message) fuentes.push({ label: 'quoted.vM.message', raw: citado.vM.message })
+  return fuentes
 }
 
-async function resolveViewOncePayload(m, quoted, fullQuoted, stored) {
-  const attempts = []
+async function resolverPayloadVerUnaVez(m, citado, citadoCompleto, almacenado) {
+  const intentos = []
 
-  for (const { label, raw } of collectQuotedSources(m, quoted, stored)) {
+  for (const { label, raw } of recolectarFuentesCitadas(m, citado, almacenado)) {
     const media = extractMediaContent(raw)
-    const isVO = detectViewOnce(raw, media?.mediaMsg, stored, m.quoted?.id)
-    attempts.push({
+    const esVO = detectViewOnce(raw, media?.mediaMsg, almacenado, m.quoted?.id)
+    intentos.push({
       label,
       keys: getMessageKeys(raw),
-      isViewOnce: isVO,
+      isViewOnce: esVO,
       mediaType: media?.type || null,
       viewOnceFlag: media?.mediaMsg?.viewOnce ?? null,
       knownViewOnceId: isKnownViewOnce(m.quoted?.id)
     })
 
-    if (isVO && media) {
-      return { ...media, source: label, quoted, fullQuoted, attempts }
+    if (esVO && media) {
+      return { ...media, source: etiqueta, quoted, fullQuoted, attempts }
     }
   }
 
-  if (fullQuoted?.message) {
-    const raw = fullQuoted.message
+  if (citadoCompleto?.message) {
+    const raw = citadoCompleto.message
     const media = extractMediaContent(raw)
-    const isVO = detectViewOnce(raw, media?.mediaMsg, stored, m.quoted?.id)
-    attempts.push({
+    const esVO = detectViewOnce(raw, media?.mediaMsg, almacenado, m.quoted?.id)
+    intentos.push({
       label: 'getQuotedObj().message',
       keys: getMessageKeys(raw),
-      isViewOnce: isVO,
+      isViewOnce: esVO,
       mediaType: media?.type || null,
-      mtype: fullQuoted.mtype,
+      mtype: citadoCompleto.mtype,
       viewOnceFlag: media?.mediaMsg?.viewOnce ?? null,
       knownViewOnceId: isKnownViewOnce(m.quoted?.id)
     })
 
-    if (isVO && media) {
-      return { ...media, source: 'getQuotedObj().message', quoted: fullQuoted, fullQuoted, attempts }
+    if (esVO && media) {
+      return { ...media, source: 'getQuotedObj().message', quoted: citadoCompleto, fullQuoted, attempts }
     }
   }
 
   return { attempts }
 }
 
-function logSssDebug(stage, data) {
-  console.log(chalk.cyan(`\n[sss] === ${stage} ===`))
+function registrarDebugSss(etapa, data) {
+  console.log(chalk.cyan(`\n[sss] === ${etapa} ===`))
   console.log(chalk.gray(JSON.stringify(data, null, 2)))
 }
 
-async function downloadViewOnceMedia(conn, payload) {
-  const downloadTarget = prepareMediaMsg(payload.mediaMsg)
-  const quoted = payload.fullQuoted || payload.quoted
+async function descargarMediaVerUnaVez(conn, payload) {
+  const destinoDescarga = prepararMsgMedia(payload.mediaMsg)
+  const citado = payload.fullQuoted || payload.quoted
 
   try {
-    if (quoted?.download) {
-      const buf = await quoted.download()
-      if (buf?.length) return buf
+    if (citado?.download) {
+      const bufer = await citado.download()
+      if (bufer?.length) return bufer
     }
-  } catch (e) {
-    logSssDebug('download quoted error', { error: e.message })
+  } catch (error) {
+    registrarDebugSss('download quoted error', { error: error.message })
   }
 
   if (conn.downloadM) {
-    return conn.downloadM(downloadTarget, payload.type)
+    return conn.downloadM(destinoDescarga, payload.type)
   }
 
   throw new Error('No hay método de descarga disponible')
 }
 
-function buildMentionData(rawMsg, conn) {
-  const caption = (rawMsg?.caption || '').trim()
-  let mentionedJid = rawMsg?.contextInfo?.mentionedJid || []
+function construirDatosMencion(rawMsg, conn) {
+  const leyenda = (rawMsg?.caption || '').trim()
+  let jidsMencionados = rawMsg?.contextInfo?.mentionedJid || []
 
-  mentionedJid = mentionedJid
+  jidsMencionados = jidsMencionados
     .map((jid) => {
       if (!jid) return ''
       if (typeof jid === 'object') return jid.jid || jid.lid || jid.id || ''
@@ -136,14 +136,14 @@ function buildMentionData(rawMsg, conn) {
     })
     .filter(Boolean)
 
-  if (!mentionedJid.length && caption) {
-    mentionedJid = conn.parseMention(caption)
+  if (!jidsMencionados.length && leyenda) {
+    jidsMencionados = conn.parseMention(leyenda)
   }
 
-  return { caption, mentionedJid }
+  return { caption: leyenda, mentionedJid: jidsMencionados }
 }
 
-function isOwner(m, conn) {
+function esOwner(m, conn) {
   const sender = m.sender
   return global.owner?.some(([n]) => sender?.includes(n.replace(/\D/g, '')))
     || global.ownerLid?.some(([n]) => sender?.includes(n))
@@ -161,54 +161,54 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       )
     }
 
-    let fullQuoted = null
+    let citadoCompleto = null
     try {
-      fullQuoted = m.getQuotedObj?.() ?? null
+      citadoCompleto = m.getQuotedObj?.() ?? null
     } catch {
-      fullQuoted = null
+      citadoCompleto = null
     }
-    const stored = loadQuotedFromStore(conn, m)
+    const almacenado = cargarCitadoDesdeStore(conn, m)
 
-    const rawImg = m?.msg?.contextInfo?.quotedMessage?.imageMessage
-    const rawVid = m?.msg?.contextInfo?.quotedMessage?.videoMessage
-    const storedImg = stored?.message?.imageMessage
-    const storedVid = stored?.message?.videoMessage
+    const imgCruda = m?.msg?.contextInfo?.quotedMessage?.imageMessage
+    const vidCrudo = m?.msg?.contextInfo?.quotedMessage?.videoMessage
+    const imgAlmacenada = almacenado?.message?.imageMessage
+    const vidAlmacenado = almacenado?.message?.videoMessage
 
-    logSssDebug('INICIO', {
+    registrarDebugSss('INICIO', {
       quotedId: m.quoted?.id,
       quotedMtype: m.quoted?.mtype,
       quotedMediaType: m.quoted?.mediaType,
       quotedType: m?.msg?.contextInfo?.quotedType ?? null,
       rawQuotedKeys: getMessageKeys(m?.msg?.contextInfo?.quotedMessage),
-      rawViewOnce: rawImg?.viewOnce ?? rawVid?.viewOnce ?? null,
-      storedKeys: getMessageKeys(stored?.message),
-      storedViewOnce: storedImg?.viewOnce ?? storedVid?.viewOnce ?? null,
-      storedKeyIsViewOnce: stored?.key?.isViewOnce ?? null,
+      rawViewOnce: imgCruda?.viewOnce ?? vidCrudo?.viewOnce ?? null,
+      storedKeys: getMessageKeys(almacenado?.message),
+      storedViewOnce: imgAlmacenada?.viewOnce ?? vidAlmacenado?.viewOnce ?? null,
+      storedKeyIsViewOnce: almacenado?.key?.isViewOnce ?? null,
       knownViewOnceId: isKnownViewOnce(m.quoted?.id),
-      storedFound: !!stored,
-      storedScore: scoreStoredMessage(stored),
-      fullQuotedMtype: fullQuoted?.mtype,
-      fullQuotedKeys: getMessageKeys(fullQuoted?.message),
+      storedFound: !!almacenado,
+      storedScore: scoreStoredMessage(almacenado),
+      fullQuotedMtype: citadoCompleto?.mtype,
+      fullQuotedKeys: getMessageKeys(citadoCompleto?.message),
       contextInfoKeys: m?.msg?.contextInfo ? Object.keys(m.msg.contextInfo) : []
     })
 
-    const result = await resolveViewOncePayload(m, m.quoted, fullQuoted, stored)
+    const resultado = await resolverPayloadVerUnaVez(m, m.quoted, citadoCompleto, almacenado)
 
-    logSssDebug('RESOLUCION', {
-      attempts: result.attempts,
-      found: !!(result.mediaMsg && result.type),
-      source: result.source || null,
-      type: result.type || null
+    registrarDebugSss('RESOLUCION', {
+      attempts: resultado.attempts,
+      found: !!(resultado.mediaMsg && resultado.type),
+      source: resultado.source || null,
+      type: resultado.type || null
     })
 
-    if (!result.mediaMsg || !result.type) {
-      const debugText = isOwner(m, conn)
+    if (!resultado.mediaMsg || !resultado.type) {
+      const textoDebug = esOwner(m, conn)
         ? `\n\n*[debug owner]*\n` +
           `quoted.mtype: ${m.quoted?.mtype}\n` +
           `keys raw: ${getMessageKeys(m?.msg?.contextInfo?.quotedMessage).join(', ') || 'ninguna'}\n` +
-          `keys store: ${getMessageKeys(stored?.message).join(', ') || 'ninguna'}\n` +
-          `getQuotedObj.mtype: ${fullQuoted?.mtype || 'null'}\n` +
-          `intentos: ${JSON.stringify(result.attempts, null, 2).slice(0, 1500)}`
+          `keys store: ${getMessageKeys(almacenado?.message).join(', ') || 'ninguna'}\n` +
+          `getQuotedObj.mtype: ${citadoCompleto?.mtype || 'null'}\n` +
+          `intentos: ${JSON.stringify(resultado.attempts, null, 2).slice(0, 1500)}`
         : ''
 
       return conn.reply(
@@ -219,44 +219,44 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       )
     }
 
-    const buffer = await downloadViewOnceMedia(conn, result)
-    if (!buffer?.length) throw new Error('No se pudo descargar el media')
+    const bufer = await descargarMediaVerUnaVez(conn, resultado)
+    if (!bufer?.length) throw new Error('No se pudo descargar el media')
 
-    logSssDebug('DESCARGA OK', { bytes: buffer.length, type: result.type, source: result.source })
+    registrarDebugSss('DESCARGA OK', { bytes: bufer.length, type: resultado.type, source: resultado.source })
 
-    const { caption, mentionedJid } = buildMentionData(result.mediaMsg, conn)
+    const { caption: leyenda, mentionedJid: jidsMencionados } = construirDatosMencion(resultado.mediaMsg, conn)
     const contextInfo = {
       ...rcanal.contextInfo,
-      ...(mentionedJid.length ? { mentionedJid } : {})
+      ...(jidsMencionados.length ? { mentionedJid: jidsMencionados } : {})
     }
     const extra = {
-      ...(caption ? { caption } : {}),
-      ...(mentionedJid.length ? { mentions: mentionedJid } : {}),
+      ...(leyenda ? { caption: leyenda } : {}),
+      ...(jidsMencionados.length ? { mentions: jidsMencionados } : {}),
       contextInfo
     }
 
-    if (result.type === 'video') {
+    if (resultado.type === 'video') {
       await conn.sendMessage(m.chat, {
-        video: buffer,
-        mimetype: result.mediaMsg.mimetype || 'video/mp4',
+        video: bufer,
+        mimetype: resultado.mediaMsg.mimetype || 'video/mp4',
         ...extra
       }, { quoted: m })
       return
     }
 
-    const stickerBuffer = await toWebp(buffer)
-    const imageUrl = await webp2png(stickerBuffer)
-    if (!imageUrl) throw new Error('No se pudo convertir a imagen')
+    const buferSticker = await toWebp(bufer)
+    const urlImagen = await webp2png(buferSticker)
+    if (!urlImagen) throw new Error('No se pudo convertir a imagen')
 
     await conn.sendMessage(m.chat, {
-      image: { url: imageUrl },
+      image: { url: urlImagen },
       ...extra
     }, { quoted: m })
-  } catch (e) {
-    console.error(chalk.red('[sss] Error:'), e)
+  } catch (error) {
+    console.error(chalk.red('[sss] Error:'), error)
     conn.reply(
       m.chat,
-      `*[❌] Error al procesar view once: ${e.message || 'desconocido'}*`,
+      `*[❌] Error al procesar view once: ${error.message || 'desconocido'}*`,
       m,
       rcanal
     )

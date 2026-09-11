@@ -6,103 +6,103 @@ import sharp from '../lib/sharp.js'
 import { PDFDocument } from 'pdf-lib'
 import { webp2png } from '../lib/webp2mp4.js'
 
-function isImageMedia(mime = '', mtype = '') {
+function esMedioImagen(mime = '', mtype = '') {
   return /image|webp|sticker/i.test(mime) || /imageMessage|stickerMessage/i.test(mtype)
 }
 
-function resolveMediaTarget(m) {
+function resolverObjetivoMedio(m) {
   if (m.quoted) {
     const mime = (m.quoted.msg || m.quoted).mimetype || m.quoted.mediaType || ''
     const mtype = m.quoted.mtype || ''
-    if (isImageMedia(mime, mtype) && m.quoted.download) return m.quoted
+    if (esMedioImagen(mime, mtype) && m.quoted.download) return m.quoted
   }
 
   const mime = (m.msg || m).mimetype || m.mediaType || ''
   const mtype = m.mtype || ''
-  if (isImageMedia(mime, mtype) && m.download) return m
+  if (esMedioImagen(mime, mtype) && m.download) return m
 
   return null
 }
 
-function sanitizePdfName(args) {
-  const raw = (args.join(' ') || 'documento')
+function sanitizarNombrePdf(args) {
+  const crudo = (args.join(' ') || 'documento')
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
     .trim()
     .slice(0, 80)
 
-  const name = raw || 'documento'
-  return name.toLowerCase().endsWith('.pdf') ? name : `${name}.pdf`
+  const nombre = crudo || 'documento'
+  return nombre.toLowerCase().endsWith('.pdf') ? nombre : `${nombre}.pdf`
 }
 
-async function toRasterBuffer(media, mime) {
+async function aBuferRaster(medio, mime) {
   if (/webp/i.test(mime)) {
     try {
-      return await sharp(media).rotate().jpeg({ quality: 92 }).toBuffer()
+      return await sharp(medio).rotate().jpeg({ quality: 92 }).toBuffer()
     } catch {
-      const url = await webp2png(media)
+      const url = await webp2png(medio)
       if (!url) throw new Error('No se pudo convertir el sticker')
-      const res = await fetch(url)
-      return Buffer.from(await res.arrayBuffer())
+      const respuesta = await fetch(url)
+      return Buffer.from(await respuesta.arrayBuffer())
     }
   }
 
   if (/image\/jpe?g/i.test(mime)) {
-    return sharp(media).rotate().jpeg({ quality: 92 }).toBuffer()
+    return sharp(medio).rotate().jpeg({ quality: 92 }).toBuffer()
   }
 
   if (/image\//i.test(mime)) {
-    return sharp(media).rotate().png().toBuffer()
+    return sharp(medio).rotate().png().toBuffer()
   }
 
   throw new Error('Formato no compatible')
 }
 
-async function imageBufferToPdf(buffer, mime) {
-  const raster = await toRasterBuffer(buffer, mime)
-  const meta = await sharp(raster).metadata()
-  const width = meta.width || 595
-  const height = meta.height || 842
+async function buferImagenAPdf(bufer, mime) {
+  const raster = await aBuferRaster(bufer, mime)
+  const metadatos = await sharp(raster).metadata()
+  const ancho = metadatos.width || 595
+  const alto = metadatos.height || 842
 
-  const pdfDoc = await PDFDocument.create()
-  const image = meta.format === 'jpeg'
-    ? await pdfDoc.embedJpg(raster)
-    : await pdfDoc.embedPng(raster)
+  const docPdf = await PDFDocument.create()
+  const imagen = metadatos.format === 'jpeg'
+    ? await docPdf.embedJpg(raster)
+    : await docPdf.embedPng(raster)
 
-  const page = pdfDoc.addPage([width, height])
-  page.drawImage(image, { x: 0, y: 0, width, height })
+  const pagina = docPdf.addPage([ancho, alto])
+  pagina.drawImage(imagen, { x: 0, y: 0, ancho, alto })
 
-  return pdfDoc.save()
+  return docPdf.save()
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-  let pdfPath = ''
+  let rutaPdf = ''
 
   try {
-    const target = resolveMediaTarget(m)
+    const objetivo = resolverObjetivoMedio(m)
 
-    if (!target) {
+    if (!objetivo) {
       return conn.sendMessage(m.chat, {
         text: `*[❗] Enviá una *imagen* o *sticker* con el comando, o respondé a uno con ${usedPrefix + command} nombre*\n\nEjemplos:\n> Foto + mensaje: ${usedPrefix + command} Mi documento\n> Responder imagen: ${usedPrefix + command} Apuntes`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    const mime = (target.msg || target).mimetype || target.mediaType || ''
-    const media = await target.download()
-    if (!media?.length) throw new Error('No se pudo descargar la imagen')
+    const mime = (objetivo.msg || objetivo).mimetype || objetivo.mediaType || ''
+    const medio = await objetivo.download()
+    if (!medio?.length) throw new Error('No se pudo descargar la imagen')
 
-    const fileName = sanitizePdfName(args)
-    const pdfBytes = Buffer.from(await imageBufferToPdf(media, mime))
-    if (!pdfBytes.length) throw new Error('El PDF generado está vacío')
+    const fileName = sanitizarNombrePdf(args)
+    const bytesPdf = Buffer.from(await buferImagenAPdf(medio, mime))
+    if (!bytesPdf.length) throw new Error('El PDF generado está vacío')
 
-    const tmpDir = join(process.cwd(), 'tmp')
-    if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+    const dirTmp = join(process.cwd(), 'tmp')
+    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
 
-    pdfPath = join(tmpDir, `pdf_${Date.now()}_${fileName}`)
-    await writeFile(pdfPath, pdfBytes)
+    rutaPdf = join(dirTmp, `pdf_${Date.now()}_${fileName}`)
+    await writeFile(rutaPdf, bytesPdf)
 
     await conn.sendMessage(m.chat, {
-      document: { url: pdfPath },
+      document: { url: rutaPdf },
       fileName,
       mimetype: 'application/pdf',
       caption: `*[✓] PDF generado:* ${fileName}`,
@@ -115,8 +115,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    if (pdfPath) {
-      try { await unlink(pdfPath) } catch {}
+    if (rutaPdf) {
+      try { await unlink(rutaPdf) } catch {}
     }
   }
 }

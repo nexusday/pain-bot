@@ -4,11 +4,11 @@ let handler = async (m, { conn }) => {
     .filter(([_, u]) => u.birth === hoy)
     .map(([k]) => `▪ @${k.split('@')[0]}`)
 
-  let msg = cumple.length
+  let mensaje = cumple.length
     ? `✿ Cumpleaños del día:\n\n${cumple.join('\n')}`
     : '[❗] Hoy no hay usuarios con cumpleaños registrados en este momento.'
 
-  conn.reply(m.chat, msg, m, rcanal, { mentions: cumple.map(v => v.replace(/[^\d]/g, '') + '@s.whatsapp.net') })
+  conn.reply(m.chat, mensaje, m, rcanal, { mentions: cumple.map(v => v.replace(/[^\d]/g, '') + '@s.whatsapp.net') })
 }
 handler.help = ['#birthdays • #cumpleaños • #births\n→ Revisa quién está por celebrar su día']
 handler.tags = ['perfiles']

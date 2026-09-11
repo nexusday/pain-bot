@@ -47,50 +47,50 @@ let handler = async (m, { conn }) => {
    
   ]
 
-  const sender = m.sender
-  const mention = [sender]
-  const userTag = '@' + sender.split('@')[0]
-  const text = `${userTag} está bailando 🎶`
+  const remitente = m.sender
+  const mencion = [remitente]
+  const etiquetaUsuario = '@' + remitente.split('@')[0]
+  const texto = `${etiquetaUsuario} está bailando 🎶`
 
-  let gifUrl = gifs[Math.floor(Math.random() * gifs.length)]
+  let urlGif = gifs[Math.floor(Math.random() * gifs.length)]
 
   
-  const tmpName = `danzar_${Date.now()}`
-  const gifPath = join(tmpdir(), `${tmpName}.gif`)
-  const mp4Path = join(tmpdir(), `${tmpName}.mp4`)
+  const nombreTmp = `danzar_${Date.now()}`
+  const rutaGif = join(tmpdir(), `${nombreTmp}.gif`)
+  const rutaMp4 = join(tmpdir(), `${nombreTmp}.mp4`)
 
   try {
-    const res = await fetch(gifUrl)
+    const res = await fetch(urlGif)
     if (!res.ok) throw new Error('Failed to download gif')
     const buffer = await res.arrayBuffer()
-    writeFileSync(gifPath, Buffer.from(buffer))
+    writeFileSync(rutaGif, Buffer.from(buffer))
 
     
     await new Promise((resolve, reject) => {
-      const ff = spawn('ffmpeg', ['-y', '-i', gifPath, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', "scale=trunc(iw/2)*2:trunc(ih/2)*2", mp4Path])
+      const ff = spawn('ffmpeg', ['-y', '-i', rutaGif, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', "scale=trunc(iw/2)*2:trunc(ih/2)*2", rutaMp4])
       let stderr = ''
       ff.stderr.on('data', d => stderr += d.toString())
       ff.on('close', code => {
-        if (code === 0 && existsSync(mp4Path)) resolve()
+        if (code === 0 && existsSync(rutaMp4)) resolve()
         else reject(new Error('ffmpeg failed: ' + stderr))
       })
     })
 
-    const mp4Buffer = Buffer.from(await (await import('fs')).promises.readFile(mp4Path))
+    const bufferMp4 = Buffer.from(await (await import('fs')).promises.readFile(rutaMp4))
 
-    await conn.sendMessage(m.chat, { video: mp4Buffer, caption: text, mimetype: 'video/mp4', gifPlayback: true, contextInfo: { mentionedJid: mention } }, { quoted: m })
+    await conn.sendMessage(m.chat, { video: bufferMp4, caption: texto, mimetype: 'video/mp4', gifPlayback: true, contextInfo: { mentionedJid: mencion } }, { quoted: m })
 
   } catch (err) {
     console.error('dance plugin error:', err)
     
     try {
-      await conn.sendMessage(m.chat, { video: { url: gifUrl }, gifPlayback: true, caption: text, contextInfo: { mentionedJid: mention } }, { quoted: m })
+      await conn.sendMessage(m.chat, { video: { url: urlGif }, gifPlayback: true, caption: texto, contextInfo: { mentionedJid: mencion } }, { quoted: m })
     } catch (err2) {
-      try { await conn.sendMessage(m.chat, { image: { url: gifUrl }, caption: text, contextInfo: { mentionedJid: mention } }, { quoted: m }) } catch {}
+      try { await conn.sendMessage(m.chat, { image: { url: urlGif }, caption: texto, contextInfo: { mentionedJid: mencion } }, { quoted: m }) } catch {}
     }
   } finally {
-    try { if (existsSync(gifPath)) unlinkSync(gifPath) } catch {}
-    try { if (existsSync(mp4Path)) unlinkSync(mp4Path) } catch {}
+    try { if (existsSync(rutaGif)) unlinkSync(rutaGif) } catch {}
+    try { if (existsSync(rutaMp4)) unlinkSync(rutaMp4) } catch {}
   }
 }
 

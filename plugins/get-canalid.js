@@ -14,83 +14,83 @@ let handler = async (m, { conn, args, usedPrefix, isOwner }) => {
     }, { quoted: m })
   }
 
-  const input = args.join(' ').trim()
-  let jid = ''
-  let name = ''
-  let invite = ''
-  let source = ''
+  const entrada = args.join(' ').trim()
+  let jidUsuario = ''
+  let nombre = ''
+  let invitacion = ''
+  let fuente = ''
 
-  if (input) {
-    const resolved = await resolveNewsletter(conn, input).catch(() => null)
-    if (!resolved?.jid) {
+  if (entrada) {
+    const resuelto = await resolveNewsletter(conn, entrada).catch(() => null)
+    if (!resuelto?.jid) {
       return conn.sendMessage(m.chat, {
         text: `[❌] No pude resolver ese canal.\n\nUsa un link tipo:\nhttps://whatsapp.com/channel/XXXXXXXX\n\nO el JID:\n120363423390538090@newsletter`,
         contextInfo: { ...global.rcanal?.contextInfo }
       }, { quoted: m })
     }
-    jid = resolved.jid
-    name = resolved.name || ''
-    invite = resolved.invite || ''
-    source = 'link'
+    jidUsuario = resuelto.jid
+    nombre = resuelto.name || ''
+    invitacion = resuelto.invite || ''
+    fuente = 'link'
   } else {
-    const fromMessage = extractNewsletterFromMessage(m)
-    if (fromMessage.jid) {
-      jid = fromMessage.jid
-      name = fromMessage.name || ''
-      source = fromMessage.source || 'mensaje'
+    const desdeMensaje = extractNewsletterFromMessage(m)
+    if (desdeMensaje.jid) {
+      jidUsuario = desdeMensaje.jid
+      nombre = desdeMensaje.name || ''
+      fuente = desdeMensaje.source || 'mensaje'
     } else if (isNewsletterJid(m.chat)) {
-      jid = m.chat
-      source = 'chat'
-      const resolved = await resolveNewsletter(conn, jid).catch(() => null)
-      if (resolved?.name) name = resolved.name
+      jidUsuario = m.chat
+      fuente = 'chat'
+      const resuelto = await resolveNewsletter(conn, jidUsuario).catch(() => null)
+      if (resuelto?.name) nombre = resuelto.name
     } else if (m.quoted) {
-      const fromQuoted = extractNewsletterFromMessage(m.quoted)
-      if (fromQuoted.jid) {
-        jid = fromQuoted.jid
-        name = fromQuoted.name || ''
-        source = 'respuesta'
+      const desdeCitado = extractNewsletterFromMessage(m.quoted)
+      if (desdeCitado.jid) {
+        jidUsuario = desdeCitado.jid
+        nombre = desdeCitado.name || ''
+        fuente = 'respuesta'
       }
     }
   }
 
-  if (!jid) {
+  if (!jidUsuario) {
     return conn.sendMessage(m.chat, {
       text: `[❗] No detecté ningún canal en este chat.\n\n*Opciones:*\n• ${usedPrefix}canalid https://whatsapp.com/channel/XXXX\n• Responde a un mensaje del canal con ${usedPrefix}canalid\n• Escribe ${usedPrefix}canalid dentro del canal\n\n_Los comentarios del canal no muestran el ID en consola; usa el link del canal._`,
       contextInfo: { ...global.rcanal?.contextInfo }
     }, { quoted: m })
   }
 
-  if (!name && typeof conn.newsletterMetadata === 'function') {
-    const resolved = await resolveNewsletter(conn, jid).catch(() => null)
-    if (resolved?.name) {
-      name = resolved.name
-      invite = invite || resolved.invite || ''
+  if (!nombre && typeof conn.newsletterMetadata === 'function') {
+    const resuelto = await resolveNewsletter(conn, jidUsuario).catch(() => null)
+    if (resuelto?.name) {
+      nombre = resuelto.name
+      invitacion = invitacion || resuelto.invite || ''
     }
   }
 
-  const lines = [
+  const lineas = [
     'ᬊ *Datos del canal / newsletter*',
     '',
-    `• *JID:* \`${jid}\``,
-    name ? ` *Nombre:* ${name}` : null,
-    invite ? ` *Invite:* ${invite}` : null,
-    source ? ` *Detectado por:* ${source}` : null,
+    `• *JID:* \`${jidUsuario}\``,
+    nombre ? ` *Nombre:* ${nombre}` : null,
+    invitacion ? ` *Invite:* ${invitacion}` : null,
+    fuente ? ` *Detectado por:* ${fuente}` : null,
     '',
     '*Pega esto en config.js:*',
     '```',
-    formatCanalConfig(jid, name || 'Canal'),
+    formatCanalConfig(jidUsuario, nombre || 'Canal'),
     '```',
     '',
     '*Para logs de sub-bots (anuncios):*',
     '```',
-    formatLogsSubbotsConfig(jid, name || 'Logs Sub-Bots'),
+    formatLogsSubbotsConfig(jidUsuario, nombre || 'Logs Sub-Bots'),
     '```',
     '',
     '_global.canal = etiqueta en mensajes | global.logssubbots = anuncios de sub-bots_'
   ].filter(Boolean)
 
   await conn.sendMessage(m.chat, {
-    text: lines.join('\n'),
+    text: lineas.join('\n'),
     contextInfo: { ...global.rcanal?.contextInfo }
   }, { quoted: m })
 }

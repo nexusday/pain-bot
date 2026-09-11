@@ -7,10 +7,10 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   }, { quoted: m })
   
   try {
-    const chatMessages = conn.chats[m.chat]?.messages || []
-    const messageKeys = Object.keys(chatMessages)
+    const mensajesChat = conn.chats[m.chat]?.messages || []
+    const clavesMensajes = Object.keys(mensajesChat)
     
-    if (messageKeys.length === 0) {
+    if (clavesMensajes.length === 0) {
       return conn.sendMessage(m.chat, {
         text: '[❗] No hay mensajes para eliminar.',
         contextInfo: {
@@ -19,28 +19,28 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
       }, { quoted: m })
     }
     
-    const messagesToDelete = messageKeys
+    const mensajesAEliminar = clavesMensajes
       .filter(key => key !== m.key.id) 
       .slice(-15) 
     
-    for (const messageId of messagesToDelete) {
+    for (const idMensaje of mensajesAEliminar) {
       try {
-        const message = chatMessages[messageId]
-        if (message) {
+        const mensaje = mensajesChat[idMensaje]
+        if (mensaje) {
           await conn.sendMessage(m.chat, {
             delete: {
               remoteJid: m.chat,
-              fromMe: message.key?.fromMe || false,
-              id: messageId,
-              participant: message.key?.participant || m.chat
+              fromMe: mensaje.key?.fromMe || false,
+              id: idMensaje,
+              participant: mensaje.key?.participant || m.chat
             }
           })
           
           
           await new Promise(resolve => setTimeout(resolve, 210));
         }
-      } catch (deleteError) {
-        console.error('Error eliminando mensaje:', messageId, deleteError)
+      } catch (errorEliminacion) {
+        console.error('Error eliminando mensaje:', idMensaje, errorEliminacion)
       }
     }
     

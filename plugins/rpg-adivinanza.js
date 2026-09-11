@@ -3,21 +3,21 @@ import { join } from 'path'
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
-    let user = global.db.data.users[m.sender]
-    if (!user) global.db.data.users[m.sender] = {}
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) global.db.data.users[m.sender] = {}
     
-    let coins = user.coins || 0
+    let monedas = usuario.coins || 0
     
     
     const cooldown = 3 * 60 * 1000 
-    const lastAdivinanza = user.lastAdivinanza || 0
-    const timeLeft = cooldown - (Date.now() - lastAdivinanza)
+    const lastAdivinanza = usuario.lastAdivinanza || 0
+    const tiempoRestante = cooldown - (Date.now() - lastAdivinanza)
     
-    if (timeLeft > 0) {
-      const minutes = Math.floor(timeLeft / 60000)
-      const seconds = Math.floor((timeLeft % 60000) / 1000)
+    if (tiempoRestante > 0) {
+      const minutos = Math.floor(tiempoRestante / 60000)
+      const segundos = Math.floor((tiempoRestante % 60000) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar\n> *${minutes} minuto${minutes !== 1 ? 's' : ''} y ${seconds} segundo${seconds !== 1 ? 's' : ''}* para volver a jugar a las adivinanzas.`,
+        text: `[❗] Debes esperar\n> *${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''}* para volver a jugar a las adivinanzas.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -58,18 +58,18 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     global.db.data.users[m.sender].lastAdivinanza = Date.now()
     
-    let txt = `🧩 𝗔𝗗𝗜𝗩𝗜𝗡𝗔𝗡𝗭𝗔𝗦\n> *Pregunta:* ${adivinanza.pregunta}\n> *Premio:* 250-500 ${global.moneda}\n> *Tiempo:* 60s\n> *Categoria:* ${adivinanza.categoria}`
+    let texto = `🧩 𝗔𝗗𝗜𝗩𝗜𝗡𝗔𝗡𝗭𝗔𝗦\n> *Pregunta:* ${adivinanza.pregunta}\n> *Premio:* 250-500 ${global.moneda}\n> *Tiempo:* 60s\n> *Categoria:* ${adivinanza.categoria}`
     
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
         mentionedJid: [m.sender]
       }
     }, { quoted: m })
     
-  } catch (e) {
-    console.error('Error en juego de adivinanzas:', e)
+  } catch (error) {
+    console.error('Error en juego de adivinanzas:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al ejecutar el juego de adivinanzas.',
       contextInfo: {

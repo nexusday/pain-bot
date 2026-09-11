@@ -7,82 +7,82 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
   try {
 
-    const isUrl = /https?:\/\/(open\.)?spotify\.com\/track\/[a-zA-Z0-9]+/.test(text)
-    let trackUrl = text
-    let info = null
+    const esUrl = /https?:\/\/(open\.)?spotify\.com\/track\/[a-zA-Z0-9]+/.test(text)
+    let urlPista = text
+    let informacion = null
 
     
-    if (!isUrl) {
-      const search = await axios.get(`${global.APIs.delirius.url}/search/spotify?q=${encodeURIComponent(text)}&limit=1`)
-      const result = Array.isArray(search.data?.data) ? search.data.data[0] : null
+    if (!esUrl) {
+      const busqueda = await axios.get(`${global.APIs.delirius.url}/search/spotify?q=${encodeURIComponent(text)}&limit=1`)
+      const resultado = Array.isArray(busqueda.data?.data) ? busqueda.data.data[0] : null
 
-      if (!result?.url) throw new Error("⚠︎ No se encontraron resultados.")
+      if (!resultado?.url) throw new Error("⚠︎ No se encontraron resultados.")
 
-      trackUrl = result.url
-      info = {
-        title: result.title || "Desconocido",
-        artist: result.artist || "Desconocido",
-        album: result.album || "Desconocido",
-        duration: result.duration || null,
-        popularity: result.popularity || null,
-        release: result.publish || null,
-        image: result.image || null,
-        url: result.url
+      urlPista = resultado.url
+      informacion = {
+        title: resultado.title || "Desconocido",
+        artist: resultado.artist || "Desconocido",
+        album: resultado.album || "Desconocido",
+        duration: resultado.duration || null,
+        popularity: resultado.popularity || null,
+        release: resultado.publish || null,
+        image: resultado.image || null,
+        url: resultado.url
       }
     }
 
     
-    const res = await axios.get(`${global.APIs.delirius.url}/download/spotifydl?url=${encodeURIComponent(trackUrl)}`)
-    const d = res.data?.data
+    const respuesta = await axios.get(`${global.APIs.delirius.url}/download/spotifydl?url=${encodeURIComponent(urlPista)}`)
+    const d = respuesta.data?.data
 
-    if (!res.data?.status || !d?.url) throw new Error("⚠︎ No se pudo obtener el audio.")
+    if (!respuesta.data?.status || !d?.url) throw new Error("⚠︎ No se pudo obtener el audio.")
 
-    const data = {
-      title: d.title || info?.title || "Desconocido",
-      artist: d.author || info?.artist || "Desconocido",
-      album: info?.album || "Desconocido",
-      duration: info?.duration || `${Math.floor(d.duration / 60000)}:${String(Math.floor((d.duration % 60000) / 1000)).padStart(2, '0')}`,
-      popularity: info?.popularity || "Desconocido",
-      release: info?.release || "Desconocido",
+    const datos = {
+      title: d.title || informacion?.title || "Desconocido",
+      artist: d.author || informacion?.artist || "Desconocido",
+      album: informacion?.album || "Desconocido",
+      duration: informacion?.duration || `${Math.floor(d.duration / 60000)}:${String(Math.floor((d.duration % 60000) / 1000)).padStart(2, '0')}`,
+      popularity: informacion?.popularity || "Desconocido",
+      release: informacion?.release || "Desconocido",
       type: d.type,
       source: d.source,
-      image: d.image || info?.image,
+      image: d.image || informacion?.image,
       download: d.url,
-      url: info?.url || trackUrl
+      url: informacion?.url || urlPista
     }
 
     
-    const caption = `╭───「 ✦ 𝗦𝗣𝗢𝗧𝗜𝗙𝗬 ✦ 」\n│\n` +
-      `│  *Título:* ${data.title}\n` +
-      `│  *Autor:* ${data.artist}\n` +
-      `${data.album && data.album !== "Desconocido" ? `│  *Álbum:* ${data.album}\n` : ''}` +
-      `${data.duration ? `│  *Duración:* ${data.duration}\n` : ''}` +
-      `${data.popularity && data.popularity !== "Desconocido" ? `│  *Popularidad:* ${data.popularity}\n` : ''}` +
-      `${data.release && data.release !== "Desconocido" ? `│  *Publicado:* ${data.release}\n` : ''}` +
-      `${data.url ? `│  *Enlace:* ${data.url}\n` : ''}` +
+    const leyenda = `╭───「 ✦ 𝗦𝗣𝗢𝗧𝗜𝗙𝗬 ✦ 」\n│\n` +
+      `│  *Título:* ${datos.title}\n` +
+      `│  *Autor:* ${datos.artist}\n` +
+      `${datos.album && datos.album !== "Desconocido" ? `│  *Álbum:* ${datos.album}\n` : ''}` +
+      `${datos.duration ? `│  *Duración:* ${datos.duration}\n` : ''}` +
+      `${datos.popularity && datos.popularity !== "Desconocido" ? `│  *Popularidad:* ${datos.popularity}\n` : ''}` +
+      `${datos.release && datos.release !== "Desconocido" ? `│  *Publicado:* ${datos.release}\n` : ''}` +
+      `${datos.url ? `│  *Enlace:* ${datos.url}\n` : ''}` +
       `╰───「 ✦ ${global.packname} ✦ 」`
 
 await conn.sendMessage(m.chat, {
-  text: caption,
+  text: leyenda,
   contextInfo: {
     externalAdReply: {
       showAdAttribution: true,
       containsAutoReply: true,
       renderLargerThumbnail: true,
       title: '🎵 Spotify Downloader',
-      body: `Autor: ${data.artist}`, 
+      body: `Autor: ${datos.artist}`, 
       mediaType: 1,
-      thumbnailUrl: data.image,
-      mediaUrl: data.url,
-      sourceUrl: data.url,
+      thumbnailUrl: datos.image,
+      mediaUrl: datos.url,
+      sourceUrl: datos.url,
     }
   }
 }, { quoted: m })
 
     
     await conn.sendMessage(m.chat, {
-      audio: { url: data.download },
-      fileName: `${data.title}.mp3`,
+      audio: { url: datos.download },
+      fileName: `${datos.title}.mp3`,
       mimetype: 'audio/mpeg'
     }, { quoted: m })
 

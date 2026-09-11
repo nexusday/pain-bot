@@ -8,13 +8,13 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
 
   try {
    
-    const groupMetadata = await conn.groupMetadata(m.chat)
-    const participants = groupMetadata.participants || []
+    const metadatosGrupo = await conn.groupMetadata(m.chat)
+    const participants = metadatosGrupo.participants || []
     
     
-    const allParticipants = participants.filter(p => p.id !== conn.user.jid)
+    const todosParticipantes = participants.filter(p => p.id !== conn.user.jid)
     
-    if (allParticipants.length < 2) {
+    if (todosParticipantes.length < 2) {
       return conn.sendMessage(m.chat, {
         text: '[❗] Se necesitan al menos 2 usuarios para crear parejas.',
         contextInfo: {
@@ -25,8 +25,8 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     
     
     const pairs = []
-    const maxPairs = Math.min(10, Math.floor(allParticipants.length / 2))
-    const shuffledParticipants = [...allParticipants].sort(() => Math.random() - 0.5)
+    const maxPairs = Math.min(10, Math.floor(todosParticipantes.length / 2))
+    const shuffledParticipants = [...todosParticipantes].sort(() => Math.random() - 0.5)
     
     for (let i = 0; i < maxPairs; i++) {
       const index1 = i * 2
@@ -50,28 +50,28 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     }
     
     
-    let txt = `💕 𝗧𝗼𝗽 𝗽𝗮𝗿𝗲𝗷𝗮𝘀 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼\n\n`
+    let texto = `💕 𝗧𝗼𝗽 𝗽𝗮𝗿𝗲𝗷𝗮𝘀 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼\n\n`
     
    
-    pairs.forEach((pair, index) => {
-      const position = index + 1
-      const emoji = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '💕'
-      txt += `*${position}.* @${pair.user1.id.split('@')[0]} 💕 @${pair.user2.id.split('@')[0]}\n`
+    pairs.forEach((pair, indice) => {
+      const posicion = indice + 1
+      const emoji = posicion === 1 ? '🥇' : posicion === 2 ? '🥈' : posicion === 3 ? '🥉' : '💕'
+      texto += `*${posicion}.* @${pair.user1.id.split('@')[0]} 💕 @${pair.user2.id.split('@')[0]}\n`
     })
     
     
-    const mentionedJid = pairs.flatMap(pair => [pair.user1.id, pair.user2.id])
+    const jidsMencionados = pairs.flatMap(pair => [pair.user1.id, pair.user2.id])
     
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: mentionedJid
+        mentionedJid: jidsMencionados
       }
     }, { quoted: m })
     
-  } catch (e) {
-    console.error('Error en top parejas:', e)
+  } catch (error) {
+    console.error('Error en top parejas:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al generar el top de parejas del grupo.',
       contextInfo: {

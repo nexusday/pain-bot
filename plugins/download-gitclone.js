@@ -11,49 +11,49 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   }
   
   try {
-    let [_, user, repo] = args[0].match(regex) || []
-    let sanitizedRepo = repo.replace(/.git$/, '')
-    let repoUrl = `https://api.github.com/repos/${user}/${sanitizedRepo}`
-    let zipUrl = `https://api.github.com/repos/${user}/${sanitizedRepo}/zipball`
+    let [_, usuario, repositorio] = args[0].match(regex) || []
+    let repoLimpio = repositorio.replace(/.git$/, '')
+    let urlRepo = `https://api.github.com/repos/${usuario}/${repoLimpio}`
+    let urlZip = `https://api.github.com/repos/${usuario}/${repoLimpio}/zipball`
     
     
-    let [repoResponse, zipResponse] = await Promise.all([
-      fetch(repoUrl),
-      fetch(zipUrl),
+    let [respuestaRepo, respuestaZip] = await Promise.all([
+      fetch(urlRepo),
+      fetch(urlZip),
     ])
     
-    if (!repoResponse.ok) {
+    if (!respuestaRepo.ok) {
       return m.reply(`[❌] Error: No se pudo acceder al repositorio.\n\n> Verifica que el repositorio exista y sea público.`)
     }
     
-    if (!zipResponse.ok) {
+    if (!respuestaZip.ok) {
       return m.reply(`[❌] Error: No se pudo descargar el archivo ZIP.\n\n> El repositorio podría ser privado o muy grande.`)
     }
     
-    let repoData = await repoResponse.json()
-    let contentDisposition = zipResponse.headers.get('content-disposition')
-    let filename = 'repository.zip'
+    let datosRepo = await respuestaRepo.json()
+    let disposicionContenido = respuestaZip.headers.get('content-disposition')
+    let nombreArchivo = 'repository.zip'
     
-    if (contentDisposition) {
-      const match = contentDisposition.match(/attachment; filename=(.*)/)
-      if (match) {
-        filename = match[1]
+    if (disposicionContenido) {
+      const coincidencia = disposicionContenido.match(/attachment; filename=(.*)/)
+      if (coincidencia) {
+        nombreArchivo = coincidencia[1]
       }
     }
     
     let txt = ` ִֶָ☾. Github Download 
 
-𓂃 ࣪ ִֶָ☾. *Nombre:* ${filename}
-𓂃 ࣪ ִֶָ☾. *Repositorio:* ${user}/${sanitizedRepo}
-𓂃 ࣪ ִֶָ☾. *Creador:* ${repoData.owner.login}
-𓂃 ࣪ ִֶָ☾. *Descripción:* ${repoData.description || 'Sin descripción disponible'}
+𓂃 ࣪ ִֶָ☾. *Nombre:* ${nombreArchivo}
+𓂃 ࣪ ִֶָ☾. *Repositorio:* ${usuario}/${repoLimpio}
+𓂃 ࣪ ִֶָ☾. *Creador:* ${datosRepo.owner.login}
+𓂃 ࣪ ִֶָ☾. *Descripción:* ${datosRepo.description || 'Sin descripción disponible'}
 𓂃 ࣪ ִֶָ☾. *URL:* ${args[0]}`
    
-    const imgResponse = await fetch('https://files.catbox.moe/t8ampx.jpg')
-    const imgBuffer = await imgResponse.buffer()
+    const respuestaImg = await fetch('https://files.catbox.moe/t8ampx.jpg')
+    const buferImg = await respuestaImg.buffer()
     
     await conn.sendMessage(m.chat, {
-      image: imgBuffer,
+      image: buferImg,
       caption: txt,
       contextInfo: {
         ...rcanal.contextInfo,
@@ -62,10 +62,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }, { quoted: m })
     
     
-    const zipBuffer = await zipResponse.buffer()
+    const buferZip = await respuestaZip.buffer()
     await conn.sendMessage(m.chat, {
-      document: zipBuffer,
-      fileName: filename,
+      document: buferZip,
+      fileName: nombreArchivo,
       mimetype: 'application/zip',
       contextInfo: {
         ...rcanal.contextInfo,

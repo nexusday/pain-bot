@@ -107,37 +107,37 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       clearTimeout(timeoutId)
 
       
-      let infoText = `🌴 𝗜𝗡𝗙𝗢 𝗪𝗘𝗕 🌴\n\n`
-      infoText += `> *URL:* ${url}\n\n`
-      infoText += `> *Dominio:* ${domain}\n\n`
-      infoText += `> *Protocolo:* ${isHttps ? 'HTTPS (Seguro)' : 'HTTP (No seguro)'}\n\n`
-      infoText += `> *Título:* ${title}\n\n`
-      infoText += `> *Descripción:* ${description}\n\n`
-      infoText += `> *Palabras clave:* ${keywords}\n\n`
-      infoText += `> *SEGURIDAD SSL/TLS:*\n`
-      infoText += `> ${hsts}\n`
-      infoText += `> ${csp}\n`
-      infoText += `> ${xFrame === '❌ Sin X-Frame-Options' ? xFrame : '✅ X-Frame-Options: ' + xFrame}\n`
-      infoText += `> ${xContentType === '❌ Sin X-Content-Type-Options' ? xContentType : '✅ X-Content-Type-Options: ' + xContentType}\n`
-      infoText += `> ${referrerPolicy === '❌ Sin Referrer-Policy' ? referrerPolicy : '✅ Referrer-Policy: ' + referrerPolicy}\n\n`
-      infoText += `> *ESTADÍSTICAS:* \n`
-      infoText += `> Tamaño: ${sizeKB} KB\n`
-      infoText += `> Imágenes: ${images}\n`
-      infoText += `> Enlaces: ${links}\n`
-      infoText += `> Scripts: ${scripts}\n`
-      infoText += `> CSS: ${styles}\n`
-      infoText += `> *ADICIONAL:*\n`
-      infoText += `> Servidor: ${server}\n`
-      infoText += `> Content-Type: ${contentType}\n`
-      infoText += `> Content-Length: ${contentLength}\n`
-      infoText += `> Status: ${response.status} ${response.statusText}`
+      let textoInfo = `🌴 𝗜𝗡𝗙𝗢 𝗪𝗘𝗕 🌴\n\n`
+      textoInfo += `> *URL:* ${url}\n\n`
+      textoInfo += `> *Dominio:* ${domain}\n\n`
+      textoInfo += `> *Protocolo:* ${isHttps ? 'HTTPS (Seguro)' : 'HTTP (No seguro)'}\n\n`
+      textoInfo += `> *Título:* ${title}\n\n`
+      textoInfo += `> *Descripción:* ${description}\n\n`
+      textoInfo += `> *Palabras clave:* ${keywords}\n\n`
+      textoInfo += `> *SEGURIDAD SSL/TLS:*\n`
+      textoInfo += `> ${hsts}\n`
+      textoInfo += `> ${csp}\n`
+      textoInfo += `> ${xFrame === '❌ Sin X-Frame-Options' ? xFrame : '✅ X-Frame-Options: ' + xFrame}\n`
+      textoInfo += `> ${xContentType === '❌ Sin X-Content-Type-Options' ? xContentType : '✅ X-Content-Type-Options: ' + xContentType}\n`
+      textoInfo += `> ${referrerPolicy === '❌ Sin Referrer-Policy' ? referrerPolicy : '✅ Referrer-Policy: ' + referrerPolicy}\n\n`
+      textoInfo += `> *ESTADÍSTICAS:* \n`
+      textoInfo += `> Tamaño: ${sizeKB} KB\n`
+      textoInfo += `> Imágenes: ${images}\n`
+      textoInfo += `> Enlaces: ${links}\n`
+      textoInfo += `> Scripts: ${scripts}\n`
+      textoInfo += `> CSS: ${styles}\n`
+      textoInfo += `> *ADICIONAL:*\n`
+      textoInfo += `> Servidor: ${server}\n`
+      textoInfo += `> Content-Type: ${contentType}\n`
+      textoInfo += `> Content-Length: ${contentLength}\n`
+      textoInfo += `> Status: ${response.status} ${response.statusText}`
 
     
       if (screenshotBuffer) {
         try {
           await conn.sendMessage(m.chat, {
             image: screenshotBuffer,
-            caption: infoText,
+            caption: textoInfo,
             contextInfo: {
               ...rcanal.contextInfo,
               mentionedJid: [m.sender]
@@ -147,7 +147,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
           console.log('Error al enviar captura con info:', screenshotError.message)
           
           await conn.sendMessage(m.chat, {
-            text: infoText,
+            text: textoInfo,
             contextInfo: {
               ...rcanal.contextInfo,
               mentionedJid: [m.sender]
@@ -157,7 +157,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       } else {
         
         await conn.sendMessage(m.chat, {
-          text: infoText,
+          text: textoInfo,
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [m.sender]

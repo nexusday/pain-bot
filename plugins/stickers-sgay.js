@@ -11,10 +11,10 @@ import {
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
-    const target = resolveMediaTarget(m)
-    const msgText = resolveText(m, text, usedPrefix, command)
+    const destino = resolveMediaTarget(m)
+    const textoMsg = resolveText(m, text, usedPrefix, command)
 
-    if (!target) {
+    if (!destino) {
       return conn.reply(
         m.chat,
         `*[❗] Responde a una foto (o envíala con el comando) y escribe el texto.*\n\n` +
@@ -28,8 +28,8 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       )
     }
 
-    const finalText = msgText || DEFAULT_TEXT
-    if (finalText.length > MAX_TEXT) {
+    const textoFinal = textoMsg || DEFAULT_TEXT
+    if (textoFinal.length > MAX_TEXT) {
       return conn.reply(
         m.chat,
         `*[❗] Texto muy largo.* Máximo ${MAX_TEXT} caracteres.`,
@@ -38,23 +38,23 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       )
     }
 
-    const mime = (target.msg || target).mimetype || target.mediaType || ''
-    const media = await target.download()
-    const photo = await loadImageBuffer(media, mime)
+    const tipoMime = (destino.msg || destino).mimetype || destino.mediaType || ''
+    const media = await destino.download()
+    const foto = await loadImageBuffer(media, tipoMime)
 
     await conn.sendMessage(m.chat, { react: { text: '', key: m.key } }).catch(() => {})
 
-    const filtered = await applyGayFilter(photo, finalText)
-    const webp = await toWebp(filtered)
+    const filtrado = await applyGayFilter(foto, textoFinal)
+    const webp = await toWebp(filtrado)
     const { packname, author } = resolveStickerMeta(m, conn)
-    const finalSticker = await addExif(webp, packname, author)
+    const stickerFinal = await addExif(webp, packname, author)
 
-    await conn.sendFile(m.chat, finalSticker, 'sticker.webp', '', m, null, global.rcanal)
-  } catch (e) {
-    console.error('[sgay]', e)
+    await conn.sendFile(m.chat, stickerFinal, 'sticker.webp', '', m, null, global.rcanal)
+  } catch (error) {
+    console.error('[sgay]', error)
     return conn.reply(
       m.chat,
-      `*[❌] Error al crear el sticker.*\n> ${e?.message || e}`,
+      `*[❌] Error al crear el sticker.*\n> ${error?.message || error}`,
       m,
       global.rcanal
     )

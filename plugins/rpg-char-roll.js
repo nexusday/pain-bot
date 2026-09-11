@@ -3,10 +3,10 @@ import { rollCharacter } from '../lib/characters/index.js'
 let handler = async (m, { conn, usedPrefix }) => {
   try {
     await rollCharacter(m, conn, usedPrefix || '.')
-  } catch (e) {
-    console.error('char-roll:', e)
+  } catch (error) {
+    console.error('char-roll:', error)
     await conn.sendMessage(m.chat, {
-      text: `*[❗] No se pudo tirar el personaje.*\n> ${e?.message || e}`,
+      text: `*[❗] No se pudo tirar el personaje.*\n> ${error?.message || error}`,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m }).catch(() => {})
     await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } }).catch(() => {})

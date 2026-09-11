@@ -106,8 +106,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    let user = global.db.data.users[m.sender]
-    if (!user) {
+    let usuario = global.db.data.users[m.sender]
+    if (!usuario) {
       global.db.data.users[m.sender] = {
         coins: 100,
         exp: 0,
@@ -115,16 +115,16 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         registered: true,
         name: m.name || m.pushName || 'Usuario'
       }
-      user = global.db.data.users[m.sender]
+      usuario = global.db.data.users[m.sender]
     }
 
-    if (!user.lastRuleta) user.lastRuleta = 0
-    const timeSinceLastPlay = Date.now() - user.lastRuleta
+    if (!usuario.lastRuleta) usuario.lastRuleta = 0
+    const timeSinceLastPlay = Date.now() - usuario.lastRuleta
 
     if (timeSinceLastPlay < cooldownTime) {
-      const seconds = Math.ceil((cooldownTime - timeSinceLastPlay) / 1000)
+      const segundos = Math.ceil((cooldownTime - timeSinceLastPlay) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar *${seconds} segundo${seconds !== 1 ? 's' : ''}* para volver a jugar.`,
+        text: `[❗] Debes esperar *${segundos} segundo${segundos !== 1 ? 's' : ''}* para volver a jugar.`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
@@ -146,37 +146,37 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    if ((user.coins || 0) < amount) {
+    if ((usuario.coins || 0) < amount) {
       return conn.sendMessage(m.chat, {
-        text: `[❌] No tienes suficientes ${global.moneda}.\n> Tienes: ${user.coins || 0} ${global.moneda}`,
+        text: `[❌] No tienes suficientes ${global.moneda}.\n> Tienes: ${usuario.coins || 0} ${global.moneda}`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    user.lastRuleta = Date.now()
-    user.coins -= amount
+    usuario.lastRuleta = Date.now()
+    usuario.coins -= amount
 
     const { result, won } = resolveSpin(betInfo)
     const winnings = won ? amount * betInfo.multiplier : 0
 
-    if (winnings > 0) user.coins += winnings
+    if (winnings > 0) usuario.coins += winnings
 
-    const txt = `🎡 *RULETA*
+    const texto = `🎡 *RULETA*
 
 > Apuesta: *${betInfo.label}* — ${amount} ${global.moneda}
 Resultado: ${resultDisplay(result)}
 
 ${won ? `✅ *¡Ganaste!* +${winnings} ${global.moneda} (x${betInfo.multiplier})` : `❌ *Perdiste* —${amount} ${global.moneda}`}
 
-Total: ${user.coins} ${global.moneda}
+Total: ${usuario.coins} ${global.moneda}
 > Próximo giro: 25 seg`
 
     return conn.sendMessage(m.chat, {
-      text: txt,
+      text: texto,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
-  } catch (e) {
-    console.error('Error en ruleta:', e)
+  } catch (error) {
+    console.error('Error en ruleta:', error)
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al ejecutar la ruleta.',
       contextInfo: { ...rcanal.contextInfo }

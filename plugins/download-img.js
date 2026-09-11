@@ -8,19 +8,19 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
   try {
 
-    const urls = await getGoogleImageSearch(text)
+    const urls = await obtenerBusquedaImagenGoogle(text)
 
     if (urls.length < 2) return conn.sendMessage(m.chat, {
       text: '[❗] No se encontraron suficientes imágenes para un álbum',
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
 
-    const caption = `𓂃 ࣪ ִֶָ☾. Resultados de búsqueda para: *${text}*`
+    const leyenda = `𓂃 ࣪ ִֶָ☾. Resultados de búsqueda para: *${text}*`
 
     for (let url of urls.slice(0, 3)) {
       await conn.sendMessage(m.chat, {
         image: { url },
-        caption,
+        caption: leyenda,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
@@ -41,19 +41,19 @@ handler.command = ['imagen', 'image']
 
 export default handler
 
-async function getGoogleImageSearch(query) {
+async function obtenerBusquedaImagenGoogle(consulta) {
   const apis = [
-    `${global.APIs.delirius.url}/search/gimage?query=${encodeURIComponent(query)}`,
-    `${global.APIs.siputzx.url}/api/images?query=${encodeURIComponent(query)}`
+    `${global.APIs.delirius.url}/search/gimage?query=${encodeURIComponent(consulta)}`,
+    `${global.APIs.siputzx.url}/api/images?query=${encodeURIComponent(consulta)}`
   ]
 
   for (const url of apis) {
     try {
-      const res = await fetch(url)
-      const data = await res.json()
+      const respuesta = await fetch(url)
+      const datos = await respuesta.json()
 
-      if (Array.isArray(data?.data)) {
-        const urls = data.data
+      if (Array.isArray(datos?.data)) {
+        const urls = datos.data
           .map(d => d.url)
           .filter(u => typeof u === 'string' && u.startsWith('http'))
 
@@ -64,3 +64,5 @@ async function getGoogleImageSearch(query) {
 
   return []
 }
+
+export { obtenerBusquedaImagenGoogle as getGoogleImageSearch }
