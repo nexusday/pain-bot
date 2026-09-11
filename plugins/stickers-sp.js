@@ -1,6 +1,6 @@
 import sharp from '../lib/sharp.js'
 import fetch from 'node-fetch'
-import { readFileSync, existsSync } from 'fs'
+import { existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { addExif } from '../lib/sticker.js'
@@ -8,6 +8,7 @@ import { resolveStickerMeta } from './stickers-sticker.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FONTS_DIR = join(__dirname, '../lib/fonts')
+const RUTA_FUENTE_BOLD = join(FONTS_DIR, 'NotoSans-Bold.ttf')
 
 const SIZE = 512
 const PADDING = 36
@@ -23,28 +24,28 @@ const BG = '#FFFFFF'
 const FG = '#000000'
 const BLUR_BRAT = 2.4
 
+const FAMILIA_TEXTO = 'Noto Sans, DejaVu Sans, Liberation Sans, Arial, sans-serif'
 
-let bratFuenteBase64 = null
-function cargarFuenteBrat() {
-  if (bratFuenteBase64 !== null) return bratFuenteBase64
-  const ruta = join(FONTS_DIR, 'NotoSans-Bold.ttf')
-  bratFuenteBase64 = existsSync(ruta) ? readFileSync(ruta).toString('base64') : ''
-  return bratFuenteBase64
-}
+async function svgAPngBrat(svg) {
+  const { Resvg } = await import('@resvg/resvg-js')
+  const fontFiles = []
+  if (existsSync(RUTA_FUENTE_BOLD)) fontFiles.push(RUTA_FUENTE_BOLD)
+  
+  const regular = join(FONTS_DIR, 'NotoSans-Regular.ttf')
+  if (existsSync(regular)) fontFiles.push(regular)
 
-function cssFuenteBrat() {
-  const b64 = cargarFuenteBrat()
-  if (!b64) return ''
-  return (
-    `@font-face{font-family:'BratSans';src:url(data:font/ttf;base64,${b64}) format('truetype');` +
-    `font-weight:700;font-style:normal}`
-  )
-}
-
-function familiaFuenteBrat() {
-  return cargarFuenteBrat()
-    ? 'BratSans, DejaVu Sans, Liberation Sans, Arial, sans-serif'
-    : 'DejaVu Sans, Liberation Sans, Arial Narrow, Arial, Helvetica, sans-serif'
+  const resvg = new Resvg(svg, {
+    fitTo: { mode: 'width', value: SIZE },
+    background: BG,
+    font: {
+      loadSystemFonts: true,
+      fontFiles,
+      fontDirs: existsSync(FONTS_DIR) ? [FONTS_DIR] : [],
+      defaultFontFamily: 'Noto Sans',
+      sansSerifFamily: 'Noto Sans'
+    }
+  })
+  return Buffer.from(resvg.render().asPng())
 }
 
 const WA_EMOJI_CDN = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
@@ -185,13 +186,13 @@ function tokenizar(texto) {
 function atributosFuente(tamanoFuente, { medir = false } = {}) {
   const relleno = medir ? '#000000' : FG
   return (
-    `font-family="${familiaFuenteBrat()}" ` +
+    `font-family="${FAMILIA_TEXTO}" ` +
     `font-size="${tamanoFuente}" font-weight="700" fill="${relleno}" ` +
     `letter-spacing="${Math.max(-4, -tamanoFuente * 0.035).toFixed(2)}"`
   )
 }
 
-
+/** Ancho aproximado Noto Sans Bold. */
 function estimarAnchoNotoBold(texto, tamanoFuente) {
   let ancho = 0
   const grafemas = dividirGrafemas(texto)
@@ -222,48 +223,9 @@ function estimarAnchoNotoBold(texto, tamanoFuente) {
 async function medirAnchoTexto(texto, tamanoFuente) {
   const clave = `${tamanoFuente}::${texto}`
   if (cacheAnchoTexto.has(clave)) return cacheAnchoTexto.get(clave)
-
-  
-  if (cargarFuenteBrat()) {
-    const medido = estimarAnchoNotoBold(texto, tamanoFuente)
-    cacheAnchoTexto.set(clave, medido)
-    return medido
-  }
-
-  const rellenoX = 8
-  const altura = Math.ceil(tamanoFuente * 2.2)
-  const estimacion = Math.ceil(tamanoFuente * Math.max(1, texto.length) * 1.1 + rellenoX * 2)
-  const ancho = Math.min(1200, Math.max(64, estimacion))
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${altura}">
-  <rect width="100%" height="100%" fill="#ffffff"/>
-  <text x="${rellenoX}" y="${Math.round(tamanoFuente * 1.35)}" ${atributosFuente(tamanoFuente, { medir: true })}>${escaparXml(texto)}</text>
-</svg>`
-
-  try {
-    const { data, info } = await sharp(Buffer.from(svg))
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-
-    let minX = info.width
-    let maxX = -1
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) {
-        const x = (i / 4) % info.width
-        if (x < minX) minX = x
-        if (x > maxX) maxX = x
-      }
-    }
-
-    const medido = maxX >= minX ? maxX - minX + 1 + 4 : Math.ceil(tamanoFuente * texto.length * 0.55)
-    cacheAnchoTexto.set(clave, medido)
-    return medido
-  } catch {
-    const alternativa = Math.ceil(tamanoFuente * texto.length * 0.62)
-    cacheAnchoTexto.set(clave, alternativa)
-    return alternativa
-  }
+  const medido = estimarAnchoNotoBold(texto, tamanoFuente)
+  cacheAnchoTexto.set(clave, medido)
+  return medido
 }
 
 function anchoEmoji(tamanoFuente) {
@@ -425,9 +387,9 @@ async function construirSvg(lineas, tamanoFuente, alturaLinea) {
     y += alturaLinea
   }
 
-
+  
   return `<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <rect width="100%" height="100%" fill="none"/>
+  <rect width="100%" height="100%" fill="${BG}"/>
   ${partes.join('\n  ')}
 </svg>`
 }
@@ -448,21 +410,16 @@ async function textoAStickerBrat(textoCrudo) {
   const svg = await construirSvg(lineas, tamanoFuente, alturaLinea)
 
   
-  const capaTexto = await sharp(Buffer.from(svg))
-    .ensureAlpha()
-    .blur(BLUR_BRAT)
-    .png()
-    .toBuffer()
+  let png
+  try {
+    png = await svgAPngBrat(svg)
+  } catch (e) {
+    console.warn('[brat] resvg falló, usando sharp:', e?.message || e)
+    png = await sharp(Buffer.from(svg)).png().toBuffer()
+  }
 
-  return sharp({
-    create: {
-      width: SIZE,
-      height: SIZE,
-      channels: 3,
-      background: BG
-    }
-  })
-    .composite([{ input: capaTexto, blend: 'over' }])
+  return sharp(png)
+    .blur(BLUR_BRAT)
     .webp({ quality: 92 })
     .toBuffer()
 }
@@ -494,8 +451,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     const { packname, author } = resolveStickerMeta(m, conn)
-    if (!cargarFuenteBrat()) {
-      console.warn('[brat] Falta lib/fonts/NotoSans-Bold.ttf — en Linux el texto puede salir invisible')
+    if (!existsSync(RUTA_FUENTE_BOLD)) {
+      console.warn('[brat] Falta lib/fonts/NotoSans-Bold.ttf en el server')
     }
     const webp = await textoAStickerBrat(texto)
     const stickerFinal = await addExif(webp, packname, author)
