@@ -5,16 +5,18 @@ import { resolveStickerMeta } from './stickers-sticker.js'
 
 
 const SIZE = 512
-const PADDING = 40
+const PADDING = 36
 const MAX_WIDTH = SIZE - PADDING * 2
 const MAX_HEIGHT = SIZE - PADDING * 2
 
-const SAFE_INSET = 26
+const SAFE_INSET = 20
 const CONTENT_WIDTH = MAX_WIDTH - SAFE_INSET
 const MAX_TEXT = 320
-const LINE_RATIO = 1.25
-const BG = '#F0F0F0'
+const LINE_RATIO = 1.05
+
+const BG = '#FFFFFF'
 const FG = '#000000'
+const BLUR_BRAT = 2.4
 
 const WA_EMOJI_CDN = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
 const WA_EMOJI_FALLBACK = 'https://emoji-cdn.mqrio.dev'
@@ -151,8 +153,14 @@ function tokenizar(texto) {
   return tokens
 }
 
-function atributosFuente(tamanoFuente) {
-  return `font-family="Arial, Helvetica, DejaVu Sans, sans-serif" font-size="${tamanoFuente}" font-weight="700" fill="${FG}"`
+function atributosFuente(tamanoFuente, { medir = false } = {}) {
+  
+  const relleno = medir ? '#000000' : FG
+  return (
+    `font-family="Arial Narrow, Arial, Helvetica Neue, Helvetica, sans-serif" ` +
+    `font-size="${tamanoFuente}" font-weight="700" fill="${relleno}" ` +
+    `letter-spacing="${Math.max(-4, -tamanoFuente * 0.035).toFixed(2)}"`
+  )
 }
 
 
@@ -167,7 +175,7 @@ async function medirAnchoTexto(texto, tamanoFuente) {
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${altura}">
   <rect width="100%" height="100%" fill="#ffffff"/>
-  <text x="${rellenoX}" y="${Math.round(tamanoFuente * 1.35)}" ${atributosFuente(tamanoFuente)}>${escaparXml(texto)}</text>
+  <text x="${rellenoX}" y="${Math.round(tamanoFuente * 1.35)}" ${atributosFuente(tamanoFuente, { medir: true })}>${escaparXml(texto)}</text>
 </svg>`
 
   try {
@@ -274,7 +282,7 @@ async function ajustarDiseno(texto) {
     lineas = await envolverTexto(texto, tamanoFuente)
   }
 
-  return { lines, fontSize, lineHeight: tamanoFuente * LINE_RATIO }
+  return { lineas, tamanoFuente, alturaLinea: tamanoFuente * LINE_RATIO }
 }
 
 async function lineaASvg(tokens, tamanoFuente, y) {
@@ -357,8 +365,9 @@ async function construirSvg(lineas, tamanoFuente, alturaLinea) {
     y += alturaLinea
   }
 
+
   return `<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <rect width="100%" height="100%" fill="${BG}"/>
+  <rect width="100%" height="100%" fill="none"/>
   ${partes.join('\n  ')}
 </svg>`
 }
@@ -369,18 +378,32 @@ function resolverTexto(m, args) {
   return desdeArgs || desdeCita
 }
 
-async function textoAStickerLirico(textoCrudo) {
+async function textoAStickerBrat(textoCrudo) {
   const texto = dividirGrafemas(normalizarEntrada(textoCrudo))
     .map(g => (esGrafemaEmoji(g) ? g : g.toLowerCase()))
     .join('')
 
   await precargarEmojis(texto)
-  const { lines, fontSize, lineHeight } = await ajustarDiseno(texto)
+  const { lineas, tamanoFuente, alturaLinea } = await ajustarDiseno(texto)
   const svg = await construirSvg(lineas, tamanoFuente, alturaLinea)
 
-  return sharp(Buffer.from(svg))
-    .resize(SIZE, SIZE)
-    .webp({ quality: 95 })
+  
+  const capaTexto = await sharp(Buffer.from(svg))
+    .ensureAlpha()
+    .blur(BLUR_BRAT)
+    .png()
+    .toBuffer()
+
+  return sharp({
+    create: {
+      width: SIZE,
+      height: SIZE,
+      channels: 3,
+      background: BG
+    }
+  })
+    .composite([{ input: capaTexto, blend: 'over' }])
+    .webp({ quality: 92 })
     .toBuffer()
 }
 
@@ -391,10 +414,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (!texto) {
       return conn.reply(
         m.chat,
-        `*[❗] Escribe el texto del sticker.*\n\n` +
+        `*[❗] Escribe el texto Brat.*\n\n` +
           `Ejemplos:\n` +
-          `> ${usedPrefix + command} hola es una chica\n` +
-          `> ${usedPrefix + command} te quiero ❤️\n` +
+          `> ${usedPrefix + command} 365 party girl\n` +
+          `> ${usedPrefix + command} so brat\n` +
           `> (responde un mensaje con ${usedPrefix + command})`,
         m,
         global.rcanal
@@ -411,23 +434,23 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     const { packname, author } = resolveStickerMeta(m, conn)
-    const webp = await textoAStickerLirico(texto)
+    const webp = await textoAStickerBrat(texto)
     const stickerFinal = await addExif(webp, packname, author)
 
     await conn.sendFile(m.chat, stickerFinal, 'sticker.webp', '', m, null, global.rcanal)
   } catch (error) {
-    console.error('[sp]', error)
+    console.error('[brat]', error)
     return conn.reply(
       m.chat,
-      `*[❌] Error al crear el sticker.*\n> ${error?.message || error}`,
+      `*[❌] Error al crear el sticker Brat.*\n> ${error?.message || error}`,
       m,
       global.rcanal
     )
   }
 }
 
-handler.help = ['#sp + {texto} → sticker lyrics con emojis estilo WhatsApp']
+handler.help = ['#brat + {texto} → sticker estilo Brat (fondo blanco, texto negro borroso)']
 handler.tags = ['stickers']
-handler.command = ['sp', 'stickerplain', 'memetext']
+handler.command = ['brat', 'sp', 'stickerplain', 'memetext', 'bratgen']
 
 export default handler
