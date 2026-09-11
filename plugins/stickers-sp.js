@@ -1,52 +1,21 @@
 import sharp from '../lib/sharp.js'
 import fetch from 'node-fetch'
-import { existsSync } from 'fs'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
 import { addExif } from '../lib/sticker.js'
 import { resolveStickerMeta } from './stickers-sticker.js'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const FONTS_DIR = join(__dirname, '../lib/fonts')
-const RUTA_FUENTE_BOLD = join(FONTS_DIR, 'NotoSans-Bold.ttf')
 
 const SIZE = 512
 const PADDING = 36
 const MAX_WIDTH = SIZE - PADDING * 2
 const MAX_HEIGHT = SIZE - PADDING * 2
-
 const SAFE_INSET = 20
 const CONTENT_WIDTH = MAX_WIDTH - SAFE_INSET
 const MAX_TEXT = 320
 const LINE_RATIO = 1.05
-
 const BG = '#FFFFFF'
 const FG = '#000000'
 const BLUR_BRAT = 2.4
-
-const FAMILIA_TEXTO = 'Noto Sans, DejaVu Sans, Liberation Sans, Arial, sans-serif'
-
-async function svgAPngBrat(svg) {
-  const { Resvg } = await import('@resvg/resvg-js')
-  const fontFiles = []
-  if (existsSync(RUTA_FUENTE_BOLD)) fontFiles.push(RUTA_FUENTE_BOLD)
-  
-  const regular = join(FONTS_DIR, 'NotoSans-Regular.ttf')
-  if (existsSync(regular)) fontFiles.push(regular)
-
-  const resvg = new Resvg(svg, {
-    fitTo: { mode: 'width', value: SIZE },
-    background: BG,
-    font: {
-      loadSystemFonts: true,
-      fontFiles,
-      fontDirs: existsSync(FONTS_DIR) ? [FONTS_DIR] : [],
-      defaultFontFamily: 'Noto Sans',
-      sansSerifFamily: 'Noto Sans'
-    }
-  })
-  return Buffer.from(resvg.render().asPng())
-}
+const FAMILIA =
+  'Arial, Helvetica, DejaVu Sans, Liberation Sans, FreeSans, Nimbus Sans L, sans-serif'
 
 const WA_EMOJI_CDN = 'https://cdn.jsdelivr.net/gh/realityripple/emoji/whatsapp'
 const WA_EMOJI_FALLBACK = 'https://emoji-cdn.mqrio.dev'
@@ -183,49 +152,51 @@ function tokenizar(texto) {
   return tokens
 }
 
-function atributosFuente(tamanoFuente, { medir = false } = {}) {
-  const relleno = medir ? '#000000' : FG
+function atributosFuente(tamanoFuente) {
   return (
-    `font-family="${FAMILIA_TEXTO}" ` +
-    `font-size="${tamanoFuente}" font-weight="700" fill="${relleno}" ` +
-    `letter-spacing="${Math.max(-4, -tamanoFuente * 0.035).toFixed(2)}"`
+    `font-family="${FAMILIA}" font-size="${tamanoFuente}" font-weight="700" fill="${FG}"`
   )
-}
-
-/** Ancho aproximado Noto Sans Bold. */
-function estimarAnchoNotoBold(texto, tamanoFuente) {
-  let ancho = 0
-  const grafemas = dividirGrafemas(texto)
-  for (const g of grafemas) {
-    if (!g) continue
-    if (/\s/.test(g)) {
-      ancho += tamanoFuente * 0.28
-      continue
-    }
-    const cp = g.codePointAt(0)
-    if (
-      (cp >= 0x00c0 && cp <= 0x024f) ||
-      (cp >= 0x1e00 && cp <= 0x1eff)
-    ) {
-      ancho += tamanoFuente * 0.56
-      continue
-    }
-    if (/[ilI1|!.,:;']/.test(g)) ancho += tamanoFuente * 0.28
-    else if (/[mwMW@%ÁÉÍÓÚÑáéíóúñ]/.test(g)) ancho += tamanoFuente * 0.72
-    else if (/[A-Z]/.test(g)) ancho += tamanoFuente * 0.58
-    else ancho += tamanoFuente * 0.52
-  }
-  const tracking = Math.max(-4, -tamanoFuente * 0.035)
-  if (grafemas.length > 1) ancho += tracking * (grafemas.length - 1)
-  return Math.max(1, Math.ceil(ancho))
 }
 
 async function medirAnchoTexto(texto, tamanoFuente) {
   const clave = `${tamanoFuente}::${texto}`
   if (cacheAnchoTexto.has(clave)) return cacheAnchoTexto.get(clave)
-  const medido = estimarAnchoNotoBold(texto, tamanoFuente)
-  cacheAnchoTexto.set(clave, medido)
-  return medido
+
+  const rellenoX = 8
+  const altura = Math.ceil(tamanoFuente * 2.2)
+  const estimacion = Math.ceil(tamanoFuente * Math.max(1, texto.length) * 1.1 + rellenoX * 2)
+  const ancho = Math.min(1200, Math.max(64, estimacion))
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${altura}">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="${rellenoX}" y="${Math.round(tamanoFuente * 1.35)}" ${atributosFuente(tamanoFuente)}>${escaparXml(texto)}</text>
+</svg>`
+
+  try {
+    const { data, info } = await sharp(Buffer.from(svg))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    let minX = info.width
+    let maxX = -1
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < 248 || data[i + 1] < 248 || data[i + 2] < 248) {
+        const x = (i / 4) % info.width
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+      }
+    }
+
+    const medido =
+      maxX >= minX ? maxX - minX + 1 + 4 : Math.ceil(tamanoFuente * texto.length * 0.55)
+    cacheAnchoTexto.set(clave, medido)
+    return medido
+  } catch {
+    const alternativa = Math.ceil(tamanoFuente * texto.length * 0.62)
+    cacheAnchoTexto.set(clave, alternativa)
+    return alternativa
+  }
 }
 
 function anchoEmoji(tamanoFuente) {
@@ -280,7 +251,6 @@ async function envolverTexto(texto, tamanoFuente) {
 }
 
 async function ajustarDiseno(texto) {
-
   let tamanoFuente = 108
   let lineas = []
 
@@ -318,7 +288,6 @@ async function lineaASvg(tokens, tamanoFuente, y) {
   const natural = anchos.reduce((a, b) => a + b, 0)
   const cantidadEspacios = Math.max(0, tokens.length - 1)
   const espacioMin = Math.max(8, tamanoFuente * 0.22)
-  
   const espacioMax = tamanoFuente * 0.55
 
   let espacio = espacioMin
@@ -327,7 +296,6 @@ async function lineaASvg(tokens, tamanoFuente, y) {
     espacio = Math.min(espacioMax, Math.max(espacioMin, ideal))
   }
 
- 
   let total = natural + espacio * cantidadEspacios
   if (total > CONTENT_WIDTH && cantidadEspacios > 0) {
     espacio = Math.max(4, (CONTENT_WIDTH - natural) / cantidadEspacios)
@@ -342,7 +310,6 @@ async function lineaASvg(tokens, tamanoFuente, y) {
     const anchoT = anchos[i]
     const esUltimo = i === tokens.length - 1
 
-   
     if (esUltimo) {
       const inicioMax = PADDING + CONTENT_WIDTH - anchoT
       if (x > inicioMax) x = Math.max(PADDING, inicioMax)
@@ -387,7 +354,6 @@ async function construirSvg(lineas, tamanoFuente, alturaLinea) {
     y += alturaLinea
   }
 
-  
   return `<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <rect width="100%" height="100%" fill="${BG}"/>
   ${partes.join('\n  ')}
@@ -409,18 +375,10 @@ async function textoAStickerBrat(textoCrudo) {
   const { lineas, tamanoFuente, alturaLinea } = await ajustarDiseno(texto)
   const svg = await construirSvg(lineas, tamanoFuente, alturaLinea)
 
-  
-  let png
-  try {
-    png = await svgAPngBrat(svg)
-  } catch (e) {
-    console.warn('[brat] resvg falló, usando sharp:', e?.message || e)
-    png = await sharp(Buffer.from(svg)).png().toBuffer()
-  }
-
-  return sharp(png)
+  return sharp(Buffer.from(svg))
+    .resize(SIZE, SIZE)
     .blur(BLUR_BRAT)
-    .webp({ quality: 92 })
+    .webp({ quality: 95 })
     .toBuffer()
 }
 
@@ -451,9 +409,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     const { packname, author } = resolveStickerMeta(m, conn)
-    if (!existsSync(RUTA_FUENTE_BOLD)) {
-      console.warn('[brat] Falta lib/fonts/NotoSans-Bold.ttf en el server')
-    }
     const webp = await textoAStickerBrat(texto)
     const stickerFinal = await addExif(webp, packname, author)
 
