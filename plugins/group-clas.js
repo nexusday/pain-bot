@@ -100,6 +100,24 @@ function resumenEquipos(data) {
   return texto.trim()
 }
 
+function poolOcupados(data) {
+  const lista = []
+  data.equipos.forEach((eq, i) => {
+    for (const jid of eq.miembros || []) {
+      lista.push({ jid, equipo: i + 1 })
+    }
+  })
+  return lista
+}
+
+function trocear(lista, tamano = 25) {
+  const chunks = []
+  for (let i = 0; i < lista.length; i += tamano) {
+    chunks.push(lista.slice(i, i + tamano))
+  }
+  return chunks.length ? chunks : [[]]
+}
+
 function ayuda(usedPrefix, command) {
   return `*[❗] Clasificación de equipos*
 
@@ -109,15 +127,15 @@ function ayuda(usedPrefix, command) {
 
 *Ver:*
 > ${usedPrefix + command} lista
-> ${usedPrefix + command} ver
+> ${usedPrefix + command} libres
+> ${usedPrefix + command} ocupados
 
-*Quitar de un equipo:*
+*Ceder cupo (sale uno, entra el libre):*
+> ${usedPrefix + command} cupo @conEquipo @libre
+
+*Quitar / mover / add:*
 > ${usedPrefix + command} quitar @usuario
-
-*Mover a otro equipo:*
 > ${usedPrefix + command} mover @usuario 2
-
-*Agregar a un equipo:*
 > ${usedPrefix + command} add @usuario 1
 
 *Borrar todo:*
@@ -192,6 +210,146 @@ let handler = async (m, { conn, args, text, participants, isAdmin, usedPrefix, c
       await enviarEquipo(conn, m.chat, data.equipos[i], i + 1, m)
     }
     return
+  }
+
+  if (['libres', 'libre', 'sin', 'disponibles', 'sinEquipo', 'sinequipo'].includes(sub)) {
+    const libres = poolDisponible(partes, conn, data)
+    if (!libres.length) {
+      return conn.reply(
+        m.chat,
+        `✅ No hay nadie libre. Todos tienen equipo (*${data.equipos.length}* equipos).`,
+        m
+      )
+    }
+    const chunks = trocear(libres, 25)
+    for (let c = 0; c < chunks.length; c++) {
+      const parte = chunks[c]
+      let texto =
+        c === 0
+          ? `*SIN EQUIPO* (${libres.length})\n\n`
+          : `*SIN EQUIPO* (cont. ${c + 1}/${chunks.length})\n\n`
+      parte.forEach((jid, i) => {
+        texto += `${c * 25 + i + 1}. ${etiqueta(jid)}\n`
+      })
+      await conn.sendMessage(
+        m.chat,
+        {
+          text: texto.trim(),
+          contextInfo: {
+            ...global.rcanal?.contextInfo,
+            mentionedJid: parte
+          }
+        },
+        { quoted: m }
+      )
+    }
+    return
+  }
+
+  if (['ocupados', 'ocupado', 'con', 'cone', 'asignados', 'tienen', 'equipados'].includes(sub)) {
+    const ocupados = poolOcupados(data)
+    if (!ocupados.length) {
+      return conn.reply(m.chat, '[❗] Nadie tiene equipo todavía.', m)
+    }
+    const chunks = trocear(ocupados, 25)
+    for (let c = 0; c < chunks.length; c++) {
+      const parte = chunks[c]
+      let texto =
+        c === 0
+          ? `*CON EQUIPO* (${ocupados.length})\n\n`
+          : `*CON EQUIPO* (cont. ${c + 1}/${chunks.length})\n\n`
+      parte.forEach((item, i) => {
+        texto += `${c * 25 + i + 1}. ${etiqueta(item.jid)} → *Equipo ${item.equipo}*\n`
+      })
+      await conn.sendMessage(
+        m.chat,
+        {
+          text: texto.trim(),
+          contextInfo: {
+            ...global.rcanal?.contextInfo,
+            mentionedJid: parte.map(x => x.jid)
+          }
+        },
+        { quoted: m }
+      )
+    }
+    return
+  }
+
+  if (['cupo', 'ceder', 'cambiarcupo', 'darcupo', 'swap', 'reemplazar'].includes(sub)) {
+    const menciones = m.mentionedJid || []
+    let sale = null
+    let entra = null
+
+    if (menciones.length >= 2) {
+      sale = menciones[0]
+      entra = menciones[1]
+    } else if (menciones.length === 1) {
+      sale = m.sender
+      entra = menciones[0]
+    } else {
+      return conn.reply(
+        m.chat,
+        `*[❗] Ceder cupo:*\n` +
+          `> ${usedPrefix + command} cupo @conEquipo @libre\n` +
+          `> ${usedPrefix + command} cupo @libre *(tú cedes tu cupo)*`,
+        m
+      )
+    }
+
+    if (jidsSeSolapan([sale], [entra])) {
+      return conn.reply(m.chat, '[❗] Son la misma persona.', m)
+    }
+
+    const halladoSale = encontrarEquipoDe(data, sale, conn, partes)
+    if (!halladoSale) {
+      return conn.reply(
+        m.chat,
+        `[❗] ${etiqueta(sale)} no tiene equipo (no puede ceder cupo).`,
+        m
+      )
+    }
+    if (encontrarEquipoDe(data, entra, conn, partes)) {
+      return conn.reply(
+        m.chat,
+        `[❗] ${etiqueta(entra)} ya tiene equipo. Solo puede entrar alguien *libre*.`,
+        m
+      )
+    }
+
+    const libres = poolDisponible(partes, conn, data)
+    const entraEnGrupo = partes.some(p =>
+      jidsSeSolapan(jidsParticipante(p, conn), [entra])
+    )
+    if (!entraEnGrupo) {
+      return conn.reply(m.chat, '[❗] Esa persona no está en el grupo.', m)
+    }
+    const esLibre = libres.some(j => jidsSeSolapan([j], [entra]))
+    if (!esLibre) {
+      return conn.reply(m.chat, '[❗] Esa persona no está libre.', m)
+    }
+
+    const idx = halladoSale.equipo.miembros.indexOf(halladoSale.miembroJid)
+    if (idx >= 0) halladoSale.equipo.miembros[idx] = entra
+    else halladoSale.equipo.miembros.push(entra)
+
+    await guardarDb()
+    const numEq = halladoSale.indice + 1
+    return conn.sendMessage(
+      m.chat,
+      {
+        text:
+          `✅ *Cupo cedido*\n\n` +
+          `› Sale: ${etiqueta(sale)}\n` +
+          `› Entra: ${etiqueta(entra)}\n` +
+          `› Equipo: *${numEq}*`,
+        contextInfo: {
+          ...global.rcanal?.contextInfo,
+          mentionedJid: [sale, entra]
+        }
+      },
+      { quoted: m }
+    )
   }
 
   if (['reset', 'resetear', 'borrar', 'clear', 'limpiar'].includes(sub)) {
@@ -405,7 +563,8 @@ let handler = async (m, { conn, args, text, participants, isAdmin, usedPrefix, c
 
 handler.help = [
   '#clas 3|13 → crear equipos',
-  '#clas lista → ver equipos',
+  '#clas lista / libres / ocupados',
+  '#clas cupo @conEquipo @libre',
   '#clas quitar @user',
   '#clas mover @user N',
   '#clas reset'
