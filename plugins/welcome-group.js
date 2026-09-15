@@ -47,7 +47,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       texto += `╰➺ *Imágenes:* Foto del grupo (personalizables)\n`
       texto += `│\n`
       texto += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
-      texto += `\n> PAIN COMMUNITY`
+      
       
       await conn.sendMessage(m.chat, {
         text: texto,
