@@ -73,7 +73,13 @@ async function resolverPayloadVerUnaVez(m, citado, citadoCompleto, almacenado) {
     })
 
     if (esVO && media) {
-      return { ...media, source: etiqueta, quoted, fullQuoted, attempts }
+      return {
+        ...media,
+        source: label,
+        quoted: citado,
+        fullQuoted: citadoCompleto,
+        attempts: intentos
+      }
     }
   }
 
@@ -92,11 +98,17 @@ async function resolverPayloadVerUnaVez(m, citado, citadoCompleto, almacenado) {
     })
 
     if (esVO && media) {
-      return { ...media, source: 'getQuotedObj().message', quoted: citadoCompleto, fullQuoted, attempts }
+      return {
+        ...media,
+        source: 'getQuotedObj().message',
+        quoted: citadoCompleto,
+        fullQuoted: citadoCompleto,
+        attempts: intentos
+      }
     }
   }
 
-  return { attempts }
+  return { attempts: intentos }
 }
 
 function registrarDebugSss(etapa, data) {
