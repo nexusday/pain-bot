@@ -1,6 +1,4 @@
 import chalk from 'chalk'
-import { webp2png } from '../lib/webp2mp4.js'
-import { toWebp } from './stickers-sticker.js'
 import {
   detectViewOnce,
   extractMediaContent,
@@ -256,12 +254,9 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       return
     }
 
-    const buferSticker = await toWebp(bufer)
-    const urlImagen = await webp2png(buferSticker)
-    if (!urlImagen) throw new Error('No se pudo convertir a imagen')
-
     await conn.sendMessage(m.chat, {
-      image: { url: urlImagen },
+      image: bufer,
+      mimetype: resultado.mediaMsg.mimetype || 'image/jpeg',
       ...extra
     }, { quoted: m })
   } catch (error) {
