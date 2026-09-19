@@ -5,14 +5,73 @@ import {
   jidsSeSolapan,
   resolveTargetJids
 } from '../lib/group-participant.js'
+import { resolvePhoneNumber } from '../lib/resolve-phone.js'
 
-function resolverObjetivo(m, args) {
-  if (m.mentionedJid?.length) return m.mentionedJid[0]
-  if (m.quoted?.sender) return m.quoted.sender
-  if (m.msg?.contextInfo?.participant) return m.msg.contextInfo.participant
+function esJidLid(jid = '') {
+  const j = String(jid || '')
+  return j.endsWith('@lid') || j.endsWith('@hosted.lid')
+}
+
+function agregarJid(set, conn, jid) {
+  if (!jid || typeof jid !== 'string') return
+  try {
+    set.add(conn?.decodeJid?.(jid) || jid)
+  } catch {
+    set.add(jid)
+  }
+}
+
+async function expandirCandidatos(conn, chatId, candidatos, m, participants) {
+  const set = new Set()
+  for (const j of candidatos) agregarJid(set, conn, j)
+
+  const base = [...set]
+  for (const j of base) {
+    if (!esJidLid(j)) continue
+
+    try {
+      const pn = await conn?.signalRepository?.lidMapping?.getPNForLID?.(j)
+      if (pn) agregarJid(set, conn, pn)
+    } catch {}
+
+    try {
+      const real = await String.prototype.resolveLidToRealJid.call(j, chatId, conn, 2, 0)
+      if (real) agregarJid(set, conn, real)
+    } catch {}
+
+    try {
+      const phone = await resolvePhoneNumber(j, conn, null, m, {
+        participants,
+        groupId: chatId
+      })
+      if (phone) agregarJid(set, conn, `${phone}@s.whatsapp.net`)
+    } catch {}
+  }
+
+  return [...set]
+}
+
+async function recolectarCandidatosObjetivo(m, args, conn, participants) {
+  const crudos = []
+
+  if (m.mentionedJid?.length) crudos.push(...m.mentionedJid)
+
+  const ctx = m.msg?.contextInfo || {}
+  if (ctx.participant) crudos.push(ctx.participant)
+  if (typeof m.quoted?.sender === 'string') crudos.push(m.quoted.sender)
+
   if (args?.[0]) {
     const id = String(args[0]).replace(/[^0-9]/g, '')
-    if (id) return id + '@s.whatsapp.net'
+    if (id) crudos.push(`${id}@s.whatsapp.net`)
+  }
+
+  return expandirCandidatos(conn, m.chat, crudos.filter(Boolean), m, participants)
+}
+
+function encontrarParticipantePorCandidatos(participants, candidatos, conn) {
+  for (const c of candidatos) {
+    const p = findGroupParticipant(participants, c, conn)
+    if (p) return p
   }
   return null
 }
@@ -31,14 +90,24 @@ function idsOwners() {
 }
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPrefix, command }) => {
-  const metadatos =
-    (m.isGroup
-      ? (conn.chats[m.chat] || {}).metadata ||
-        (await conn.groupMetadata(m.chat).catch(_ => null))
-      : {}) || {}
-  const partes = (m.isGroup ? metadatos.participants : []) || participants || []
+  if (!m.isGroup) {
+    return conn.sendMessage(
+      m.chat,
+      {
+        text: '[❗] Este comando solo puede ser usado en grupos.',
+        contextInfo: { ...rcanal.contextInfo }
+      },
+      { quoted: m }
+    )
+  }
 
-  const usuario = (m.isGroup ? findGroupParticipant(partes, m, conn) : null) || {}
+  const metadatos =
+    (conn.chats[m.chat] || {}).metadata ||
+    (await conn.groupMetadata(m.chat).catch(_ => null)) ||
+    {}
+  const partes = metadatos.participants || participants || []
+
+  const usuario = findGroupParticipant(partes, m, conn) || {}
   const esSuperAdmin = usuario?.admin == 'superadmin' || false
   const esAdminManual =
     Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false
@@ -57,19 +126,11 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
     return conn.reply(m.chat, '[❗] Solo los administradores pueden usar este comando.', m)
   }
 
-  if (!m.isGroup) {
-    return conn.sendMessage(
-      m.chat,
-      {
-        text: '[❗] Este comando solo puede ser usado en grupos.',
-        contextInfo: { ...rcanal.contextInfo }
-      },
-      { quoted: m }
-    )
-  }
-
   const botPart = findBotParticipant(partes, conn)
-  const botEsAdmin = Boolean(isBotAdmin) || botPart?.admin === 'admin' || botPart?.admin === 'superadmin'
+  const botEsAdmin =
+    Boolean(isBotAdmin) ||
+    botPart?.admin === 'admin' ||
+    botPart?.admin === 'superadmin'
   if (!botEsAdmin) {
     return conn.sendMessage(
       m.chat,
@@ -81,8 +142,8 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
     )
   }
 
-  const quienRaw = resolverObjetivo(m, args)
-  if (!quienRaw) {
+  const candidatos = await recolectarCandidatosObjetivo(m, args, conn, partes)
+  if (!candidatos.length) {
     return conn.sendMessage(
       m.chat,
       {
@@ -96,23 +157,25 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
     )
   }
 
-  const participanteObjetivo = findGroupParticipant(partes, quienRaw, conn)
-  const idsObjetivo = resolveTargetJids(quienRaw, partes, conn)
-  const quien =
-    participanteObjetivo?.id ||
-    idsObjetivo[0] ||
-    quienRaw
-
+  const participanteObjetivo = encontrarParticipantePorCandidatos(partes, candidatos, conn)
   if (!participanteObjetivo) {
     return conn.sendMessage(
       m.chat,
       {
-        text: '[❗] No encontré a ese usuario en el grupo.',
+        text:
+          '[❗] No encontré a ese usuario en el grupo.\n' +
+          '> Prueba mencionándolo: ' + usedPrefix + command + ' @usuario',
         contextInfo: { ...rcanal.contextInfo }
       },
       { quoted: m }
     )
   }
+
+  const idsObjetivo = [
+    ...jidsParticipante(participanteObjetivo, conn),
+    ...resolveTargetJids(candidatos[0], partes, conn)
+  ]
+  const quien = participanteObjetivo.id
 
   const esAdminObjetivo =
     participanteObjetivo?.admin === 'admin' ||
@@ -159,7 +222,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
   if (!global.db.data.users[quien]) global.db.data.users[quien] = {}
   global.db.data.users[quien].banned = true
 
-  const nombreGrupo = metadatos.subject || (await conn.groupMetadata(m.chat).catch(() => ({})))?.subject || ''
+  const nombreGrupo = metadatos.subject || ''
 
   return conn.sendMessage(
     m.chat,
