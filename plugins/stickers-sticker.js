@@ -128,12 +128,14 @@ async function aWebp(bufer) {
 
   const ejecutarFfmpeg = (calidad = 50, duracionSeg = 7) =>
     new Promise((resolver, rechazar) => {
+    
+      const escala =
+        "scale='if(gt(iw,ih),512,-2)':'if(gt(ih,iw),512,-2)':flags=lanczos"
       const opciones = esEntradaAnimada
         ? [
             '-vcodec', 'libwebp',
-            // Sin palettegen: más fiable para animación en WA. Pad con -1:-1.
             '-vf',
-            'scale=512:512:force_original_aspect_ratio=decrease,fps=15,pad=512:512:-1:-1:color=white@0.0,setsar=1',
+            `${escala},fps=15,setsar=1`,
             '-loop', '0',
             '-ss', '0',
             '-t', String(duracionSeg),
@@ -145,11 +147,11 @@ async function aWebp(bufer) {
         : [
             '-vcodec', 'libwebp',
             '-vf',
-            'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:-1:-1:color=0x00000000,setsar=1',
+            `${escala},setsar=1`,
             '-frames:v', '1',
             '-lossless', '0',
             '-compression_level', '6',
-            '-q:v', '60'
+            '-q:v', '75'
           ]
 
       fluent(entrada)
@@ -169,7 +171,7 @@ async function aWebp(bufer) {
   try {
     let resultado = await ejecutarFfmpeg(50, 7)
 
-    // WhatsApp anima bien bajo ~1MB; si pesa mucho, recomprimir / acortar
+  
     if (esEntradaAnimada && resultado.length > 900 * 1024) {
       resultado = await ejecutarFfmpeg(35, 6)
     }
