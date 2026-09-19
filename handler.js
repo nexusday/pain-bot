@@ -20,6 +20,7 @@ import { sendMichiBoard } from './lib/michi-board.js'
 import { isInviteOpponent } from './lib/michi-users.js'
 import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker, formatLevelUpMessage } from './lib/rpg-level.js'
 import { trackUserMessage } from './lib/msg-activity.js'
+import { getStaffOwnerIds } from './lib/staff.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -135,8 +136,17 @@ const listaOwnerLid = Array.isArray(global.ownerLid) ? global.ownerLid : []
 const listaMods = Array.isArray(global.mods) ? global.mods : []
 const listaPrems = Array.isArray(global.prems) ? global.prems : []
 
+const numBotActual = String(conn.user?.jid || conn.user?.id || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+const numBotPrincipal = String(global.conn?.user?.jid || global.conn?.user?.id || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+const esEsteSubBot = Boolean(numBotActual && numBotPrincipal && numBotActual !== numBotPrincipal)
+
 const todosIdsOwner = [
-  conn.decodeJid(global.conn.user.id),
+  // Número de ESTE bot (principal o subbot)
+  conn.decodeJid(conn.user.id),
+  // En subbots: el número del principal también cuenta como owner
+  ...(esEsteSubBot && global.conn?.user?.id
+    ? [conn.decodeJid(global.conn.user.id)]
+    : []),
   ...listaOwner.flatMap((entrada) => {
     const numero = Array.isArray(entrada) ? entrada[0] : entrada
     return crearIdsOwner(numero)
@@ -144,7 +154,9 @@ const todosIdsOwner = [
   ...listaOwnerLid.flatMap((entrada) => {
     const numero = Array.isArray(entrada) ? entrada[0] : entrada
     return crearIdsOwner(numero)
-  })
+  }),
+  // Staff solo de este bot (main ≠ subs)
+  ...getStaffOwnerIds(conn)
 ]
 
 const isROwner = todosIdsOwner.includes(m.sender)

@@ -58,6 +58,15 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     ...global.owner.flatMap(([number]) => createOwnerIds(number)),
     ...(global.ownerLid || []).flatMap(([number]) => createOwnerIds(number))
   ]
+  try {
+    if (global.conn?.user?.id && conn.user?.jid !== global.conn.user?.jid) {
+      allOwnerIds.push(conn.decodeJid(global.conn.user.id))
+    }
+  } catch {}
+  try {
+    const { getStaffOwnerIds } = await import('../lib/staff.js')
+    allOwnerIds.push(...getStaffOwnerIds(conn))
+  } catch {}
 
   const isROwner = allOwnerIds.includes(targetUser)
   const isOwner = isROwner || m.fromMe

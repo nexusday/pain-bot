@@ -90,7 +90,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
     )
   }
 
-  if (isOwnerJid(ids)) {
+  if (isOwnerJid(ids, conn)) {
     return conn.sendMessage(
       m.chat,
       {

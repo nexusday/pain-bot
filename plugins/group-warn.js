@@ -65,7 +65,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isOwner, usedPrefix
   const { quien, participante, ids } = objetivo
   const motivo = warnReasonFromArgs(args, m)
 
-  if (isOwnerJid(ids)) {
+  if (isOwnerJid(ids, conn)) {
     return conn.sendMessage(
       m.chat,
       {
