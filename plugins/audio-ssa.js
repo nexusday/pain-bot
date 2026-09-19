@@ -162,7 +162,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     if (!m.quoted) {
       return conn.reply(
         m.chat,
-        `*[❗] Responde a un audio / nota de voz de una sola vez* con ${usedPrefix + command}.*`,
+        `*[❗] Responde a un audio / nota de voz de una sola vez con ${usedPrefix + command}.*`,
         m,
         rcanal
       )
@@ -208,7 +208,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     if (!resultado.mediaMsg || resultado.type !== 'audio') {
       return conn.reply(
         m.chat,
-        `*[❗] No se detectó audio de una sola vez*.\n> Respondé al audio/nota de voz.`,
+        `*[❗] No se detectó audio de una sola vez.*\n> Respondé al audio/nota de voz.`,
         m,
         rcanal
       )
