@@ -128,26 +128,27 @@ async function aWebp(bufer) {
 
   const ejecutarFfmpeg = (calidad = 50, duracionSeg = 7) =>
     new Promise((resolver, rechazar) => {
-    
-      const escala =
-        "scale='if(gt(iw,ih),512,-2)':'if(gt(ih,iw),512,-2)':flags=lanczos"
+      
+      const vfEstatico =
+        'scale=512:512:force_original_aspect_ratio=increase:flags=lanczos,crop=512:512,setsar=1'
+      const vfAnimado =
+        'scale=512:512:force_original_aspect_ratio=increase:flags=lanczos,crop=512:512,fps=15,setsar=1'
+
       const opciones = esEntradaAnimada
         ? [
             '-vcodec', 'libwebp',
-            '-vf',
-            `${escala},fps=15,setsar=1`,
+            '-vf', vfAnimado,
             '-loop', '0',
             '-ss', '0',
             '-t', String(duracionSeg),
             '-preset', 'default',
             '-an',
-            '-vsync', '0',
+            '-vsync', 'cfr',
             '-q:v', String(calidad)
           ]
         : [
             '-vcodec', 'libwebp',
-            '-vf',
-            `${escala},setsar=1`,
+            '-vf', vfEstatico,
             '-frames:v', '1',
             '-lossless', '0',
             '-compression_level', '6',
