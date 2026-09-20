@@ -88,9 +88,23 @@ function reconstruirPorLineas(palabras) {
   }).join('\n')
 }
 
-function extraerTextoLimpio(datos) {
+function palabrasDesdeOcr(datos = {}) {
+  if (Array.isArray(datos.words) && datos.words.length) return datos.words
+
+  const out = []
+  for (const bloque of datos.blocks || []) {
+    for (const parrafo of bloque.paragraphs || []) {
+      for (const linea of parrafo.lines || []) {
+        for (const palabra of linea.words || []) out.push(palabra)
+      }
+    }
+  }
+  return out
+}
+
+function extraerTextoLimpio(datos = {}) {
   const confianzaMin = 58
-  const palabras = (datos.words || []).filter((w) => {
+  const palabras = palabrasDesdeOcr(datos).filter((w) => {
     const confianza = w.confidence ?? 0
     const token = (w.text || '').trim()
     return confianza >= confianzaMin && esTokenLegible(token)
@@ -207,8 +221,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     const idioma = resolverIdioma(args)
     const trabajador = await obtenerTrabajador(idioma)
-    const { datos } = await trabajador.recognize(rutaTmp)
-    const text = extraerTextoLimpio(datos)
+    const { data } = await trabajador.recognize(rutaTmp)
+    const text = extraerTextoLimpio(data || {})
 
     if (!text) {
       return conn.sendMessage(m.chat, {

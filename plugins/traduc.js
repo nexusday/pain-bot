@@ -17,12 +17,12 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     const indicacion = `Traduce al español el siguiente texto. Responde solo con la traducción, sin explicaciones ni marcas:\n\n${original}`
     const urlApi = `https://api.delirius.online/ia/chatgpt?q=${encodeURIComponent(indicacion)}`
 
-    const { datos } = await axios.get(urlApi)
-    if (!datos?.status) {
+    const { data } = await axios.get(urlApi, { timeout: 60000 })
+    if (!data?.status) {
       return conn.sendMessage(m.chat, { text: '*[❗] No se pudo obtener respuesta de la API de traducción.*', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
     }
 
-    let respuestaApi = (typeof datos.data === 'string' ? datos.data.trim() : '') || ''
+    let respuestaApi = (typeof data.data === 'string' ? data.data.trim() : '') || ''
 
     
     const coincidenciaPensamiento = respuestaApi.match(/<think>([\s\S]*?)<\/think>/)
