@@ -1,10 +1,10 @@
-import axios from 'axios'
+import { consultarIaDelirius } from '../lib/delirius-ia.js'
 
 let handler = async (m, { conn, usedPrefix, command }) => {
   try {
     if (!m.quoted || !m.quoted.text) {
       return conn.sendMessage(m.chat, {
-        text: `*[❗] Debes responder a un mensaje que contenga texto para traducir.*\n\nEjemplo: ${usedPrefix + command} (responde al mensaje)` ,
+        text: `*[❗] Debes responder a un mensaje que contenga texto para traducir.*\n\nEjemplo: ${usedPrefix + command} (responde al mensaje)`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -15,28 +15,33 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     if (!original) return m.reply('*[❗] El mensaje respondido no contiene texto válido.*')
 
     const indicacion = `Traduce al español el siguiente texto. Responde solo con la traducción, sin explicaciones ni marcas:\n\n${original}`
-    const urlApi = `https://api.delirius.online/ia/chatgpt?q=${encodeURIComponent(indicacion)}`
+    let respuestaApi = await consultarIaDelirius(indicacion, {
+      systemPrompt: 'Eres un traductor. Solo devuelve la traducción al español.',
+      intentosPorProveedor: 2
+    })
 
-    const { data } = await axios.get(urlApi, { timeout: 60000 })
-    if (!data?.status) {
-      return conn.sendMessage(m.chat, { text: '*[❗] No se pudo obtener respuesta de la API de traducción.*', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
-    }
-
-    let respuestaApi = (typeof data.data === 'string' ? data.data.trim() : '') || ''
-
-    
     const coincidenciaPensamiento = respuestaApi.match(/<think>([\s\S]*?)<\/think>/)
     if (coincidenciaPensamiento) {
       respuestaApi = respuestaApi.replace(/<think>[\s\S]*?<\/think>/, '').trim()
     }
 
-    if (!respuestaApi) respuestaApi = 'No se obtuvo traducción.'
+    if (!respuestaApi) {
+      return conn.sendMessage(m.chat, {
+        text: '*[❗] No se pudo obtener respuesta de la API de traducción.*',
+        contextInfo: { ...rcanal.contextInfo }
+      }, { quoted: m })
+    }
 
-    await conn.sendMessage(m.chat, { text: respuestaApi, contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
-
+    await conn.sendMessage(m.chat, {
+      text: respuestaApi,
+      contextInfo: { ...rcanal.contextInfo }
+    }, { quoted: m })
   } catch (e) {
     console.error('Error en comando traducir:', e)
-    return conn.sendMessage(m.chat, { text: '*[❗] Ocurrió un error al traducir el mensaje.*', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
+    return conn.sendMessage(m.chat, {
+      text: '*[❗] Ocurrió un error al traducir el mensaje.*',
+      contextInfo: { ...rcanal.contextInfo }
+    }, { quoted: m })
   }
 }
 

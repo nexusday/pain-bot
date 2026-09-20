@@ -1,17 +1,4 @@
-import axios from 'axios'
-
-async function consultarChatgpt(texto) {
-  for (let i = 0; i < 2; i++) {
-    const { data } = await axios.get(
-      `https://api.delirius.online/ia/chatgpt?q=${encodeURIComponent(texto)}`,
-      { timeout: 60000 }
-    )
-    if (!data?.status) continue
-    const t = typeof data.data === 'string' ? data.data.trim() : ''
-    if (t && !/^error:/i.test(t)) return t
-  }
-  return ''
-}
+import { consultarIaDelirius } from '../lib/delirius-ia.js'
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text?.trim()) {
@@ -22,8 +9,10 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 
   try {
-    
-    const respuestaApi = await consultarChatgpt(text.trim())
+    const respuestaApi = await consultarIaDelirius(text.trim(), {
+      systemPrompt: 'Eres Microsoft Copilot. Responde claro y útil en el idioma del usuario.',
+      intentosPorProveedor: 2
+    })
 
     if (!respuestaApi) {
       return conn.sendMessage(m.chat, {

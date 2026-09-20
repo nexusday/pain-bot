@@ -1,49 +1,121 @@
 import axios from 'axios'
-import cheerio from 'cheerio'
 
-let handler = async (m, { conn, text, args, usedPrefix, command }) => {
-  if (!text) return conn.sendMessage(m.chat, {
-    text: `[❗] Ingresa lo que deseas buscar en Pinterest\n> Ejemplo: ${usedPrefix + command}pinterest wallpaper`,
-    contextInfo: { ...rcanal?.contextInfo }
-  }, { quoted: m })
+const CABECERAS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+  Accept: 'application/json, text/plain, */*'
+}
+
+function esLinkPinterest(texto = '') {
+  return /https?:\/\/(www\.)?(pinterest\.[a-z.]+|pin\.it)\//i.test(texto)
+}
+
+async function buscarPinterest(consulta) {
+  const url = `https://api.delirius.online/search/pinterest?text=${encodeURIComponent(consulta)}`
+  const { data, status } = await axios.get(url, {
+    timeout: 45000,
+    headers: CABECERAS,
+    validateStatus: () => true
+  })
+  if (status >= 400 || !data?.status) return []
+
+  const lista = Array.isArray(data.results)
+    ? data.results
+    : Array.isArray(data.data)
+      ? data.data
+      : []
+
+  return lista
+    .map(item => {
+      if (typeof item === 'string') return item
+      return (
+        item?.image_large_url ||
+        item?.images?.orig?.url ||
+        item?.image ||
+        item?.url ||
+        item?.media?.url ||
+        null
+      )
+    })
+    .filter(Boolean)
+}
+
+async function descargarPin(urlPin) {
+  const url = `https://api.delirius.online/download/pinterestdl?url=${encodeURIComponent(urlPin)}`
+  const { data, status } = await axios.get(url, {
+    timeout: 45000,
+    headers: CABECERAS,
+    validateStatus: () => true
+  })
+  if (status >= 400 || !data?.status) return null
+
+  const d = data.data || data.result || data
+  const media =
+    d?.download ||
+    d?.url ||
+    d?.media ||
+    d?.image ||
+    d?.imageLargeUrl ||
+    d?.image_large_url ||
+    d?.video ||
+    null
+
+  if (!media) return null
+  return {
+    title: d.title || d.description || 'Pinterest',
+    download: media
+  }
+}
+
+let handler = async (m, { conn, text, usedPrefix, command }) => {
+  if (!text?.trim()) {
+    return conn.sendMessage(m.chat, {
+      text: `[❗] Ingresa lo que deseas buscar en Pinterest\n> Ejemplo: ${usedPrefix + command} wallpaper`,
+      contextInfo: { ...rcanal?.contextInfo }
+    }, { quoted: m })
+  }
 
   try {
-    if (text.includes("https://")) {
-      let i = await descargarPin(args[0])
-      if (!i?.download) throw new Error('[❗] No se pudo obtener contenido del enlace.')
+    const consulta = text.trim()
 
-      let esVideo = i.download.includes(".mp4")
-      await conn.sendMessage(m.chat, {
-        [esVideo ? "video" : "image"]: { url: i.download },
-        caption: `> *Título:* ${i.title || 'Sin título'}\n> *Tipo:* ${esVideo ? 'Video' : 'Imagen'}`,
-        contextInfo: { ...rcanal?.contextInfo }
-      }, { quoted: m })
-
-    } else {
-
-      const resultados = await buscarPines(text)
-      if (!resultados.length) {
+    if (esLinkPinterest(consulta)) {
+      const link = consulta.split(/\s+/)[0]
+      const i = await descargarPin(link)
+      if (!i?.download) {
         return conn.sendMessage(m.chat, {
-          text: `[❗] No se encontraron resultados para: "${text}"`,
+          text: '[❗] No se pudo obtener el contenido de ese enlace de Pinterest.',
           contextInfo: { ...rcanal?.contextInfo }
         }, { quoted: m })
       }
 
-      const medios = resultados.slice(0, 3).map(img => ({
-        image: { url: img.image_large_url },
-        caption: `> *Búsqueda:* ${text}`,
+      const esVideo = /\.mp4($|\?)/i.test(i.download) || /video/i.test(i.download)
+      await conn.sendMessage(m.chat, {
+        [esVideo ? 'video' : 'image']: { url: i.download },
+        caption: `> *Título:* ${i.title || 'Sin título'}\n> *Tipo:* ${esVideo ? 'Video' : 'Imagen'}`,
         contextInfo: { ...rcanal?.contextInfo }
-      }))
-
-      for (let medio of medios) {
-        await conn.sendMessage(m.chat, medio, { quoted: m })
-      }
+      }, { quoted: m })
+      return
     }
 
+    const resultados = await buscarPinterest(consulta)
+    if (!resultados.length) {
+      return conn.sendMessage(m.chat, {
+        text: `[❗] No se encontraron resultados para: "${consulta}"`,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
+    }
+
+    for (const urlImg of resultados.slice(0, 3)) {
+      await conn.sendMessage(m.chat, {
+        image: { url: urlImg },
+        caption: `> *Búsqueda:* ${consulta}`,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
+    }
   } catch (e) {
     console.error('Error en Pinterest:', e)
     conn.sendMessage(m.chat, {
-      text: '[❗] Se produjo un error al procesar Pinterest\n> Usa *.report* para informarlo.',
+      text: '[❗] Se produjo un error al procesar Pinterest. Inténtalo de nuevo.',
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
   }
@@ -51,75 +123,7 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
 
 handler.help = ['pinterest <búsqueda | link>']
 handler.tags = ['downloader']
-handler.command = ['pinterest']
+handler.command = ['pinterest', 'pin']
 handler.group = true
 
 export default handler
-
-
-async function descargarPin(url) {
-  try {
-    let respuesta = await axios.get(url, { headers: { "User-Agent": "Mozilla/5.0" } })
-    let $ = cheerio.load(respuesta.data)
-
-    let etiqueta = $('script[data-test-id="video-snippet"]')
-    if (etiqueta.length) {
-      let resultado = JSON.parse(etiqueta.text())
-      return {
-        title: resultado.name,
-        download: resultado.contentUrl
-      }
-    } else {
-      let jsonDatos = JSON.parse($("script[data-relay-response='true']").eq(0).text())
-      let resultado = jsonDatos.response.data["v3GetPinQuery"].data
-      return {
-        title: resultado.title,
-        download: resultado.imageLargeUrl
-      }
-    }
-  } catch {
-    return { msg: "Error, inténtalo de nuevo más tarde" }
-  }
-}
-
-const buscarPines = async (tituloBusqueda) => {
-  const link = `https://id.pinterest.com/resource/BaseSearchResource/get/?source_url=%2Fsearch%2Fpins%2F%3Fq%3D${encodeURIComponent(tituloBusqueda)}%26rs%3Dtyped&data=%7B%22options%22%3A%7B%22applied_unified_filters%22%3Anull%2C%22appliedProductFilters%22%3A%22---%22%2C%22article%22%3Anull%2C%22auto_correction_disabled%22%3Afalse%2C%22corpus%22%3Anull%2C%22customized_rerank_type%22%3Anull%2C%22domains%22%3Anull%2C%22dynamicPageSizeExpGroup%22%3A%22control%22%2C%22filters%22%3Anull%2C%22journey_depth%22%3Anull%2C%22page_size%22%3Anull%2C%22price_max%22%3Anull%2C%22price_min%22%3Anull%2C%22query_pin_sigs%22%3Anull%2C%22query%22%3A%22${encodeURIComponent(tituloBusqueda)}%22%2C%22redux_normalize_feed%22%3Atrue%2C%22request_params%22%3Anull%2C%22rs%22%3A%22typed%22%2C%22scope%22%3A%22pins%22%2C%22selected_one_bar_modules%22%3Anull%2C%22seoDrawerEnabled%22%3Afalse%2C%22source_id%22%3Anull%2C%22source_module_id%22%3Anull%2C%22source_url%22%3A%22%2Fsearch%2Fpins%2F%3Fq%3D${encodeURIComponent(tituloBusqueda)}%26rs%3Dtyped%22%2C%22top_pin_id%22%3Anull%2C%22top_pin_ids%22%3Anull%7D%2C%22context%22%3A%7B%7D%7D`
-  const cabeceras = {
-    'accept': 'application/json, text/javascript, */*; q=0.01',
-    'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-    'priority': 'u=1, i',
-    'referer': 'https://id.pinterest.com/',
-    'screen-dpr': '1',
-    'sec-ch-ua': '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133")',
-    'sec-ch-ua-full-version-list': '"Not(A:Brand";v="99.0.0.0", "Google Chrome";v="133.0.6943.142", "Chromium";v="133.0.6943.142")',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-ch-ua-platform-version': '"10.0.0"',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-    'x-app-version': 'c056fb7',
-    'x-pinterest-appstate': 'active',
-    'x-pinterest-pws-handler': 'www/index.js',
-    'x-pinterest-source-url': '/',
-    'x-requested-with': 'XMLHttpRequest'
-  }
-
-  try {
-    const respuesta = await axios.get(link, { cabeceras })
-    if (respuesta.data?.resource_response?.data?.results) {
-      return respuesta.data.resource_response.data.results.map(elemento => {
-        if (elemento.images) {
-          return {
-            image_large_url: elemento.images.orig?.url || null,
-            image_medium_url: elemento.images['564x']?.url || null,
-            image_small_url: elemento.images['236x']?.url || null
-          }
-        }
-        return null
-      }).filter(img => img !== null)
-    }
-    return []
-  } catch (error) {
-    console.error('Error Pinterest API:', error)
-    return []
-  }
-}

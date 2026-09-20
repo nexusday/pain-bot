@@ -1,29 +1,4 @@
-import axios from 'axios'
-
-async function consultarRipleai(texto) {
-  const { data } = await axios.get(
-    `https://api.delirius.online/ia/ripleai?query=${encodeURIComponent(texto)}`,
-    { timeout: 45000 }
-  )
-  if (!data?.status) return ''
-  if (typeof data.data?.result === 'string') return data.data.result.trim()
-  if (typeof data.data === 'string') return data.data.trim()
-  if (typeof data.text === 'string') return data.text.trim()
-  return ''
-}
-
-async function consultarChatgpt(texto) {
-  for (let i = 0; i < 2; i++) {
-    const { data } = await axios.get(
-      `https://api.delirius.online/ia/chatgpt?q=${encodeURIComponent(texto)}`,
-      { timeout: 60000 }
-    )
-    if (!data?.status) continue
-    const t = typeof data.data === 'string' ? data.data.trim() : ''
-    if (t && !/^error:/i.test(t)) return t
-  }
-  return ''
-}
+import { consultarIaDelirius } from '../lib/delirius-ia.js'
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text?.trim()) {
@@ -34,18 +9,11 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 
   try {
-    const consulta = text.trim()
-    let respuestaApi = ''
-
-    try {
-      respuestaApi = await consultarRipleai(consulta)
-    } catch (e) {
-      console.warn('ripleai falló, usando chatgpt:', e?.message || e)
-    }
-
-    if (!respuestaApi) {
-      respuestaApi = await consultarChatgpt(consulta)
-    }
+    const respuestaApi = await consultarIaDelirius(text.trim(), {
+      systemPrompt: 'Eres Replia, una IA amigable. Responde natural y en el idioma del usuario.',
+      intentosPorProveedor: 2,
+      incluirRipleai: true
+    })
 
     if (!respuestaApi) {
       return conn.sendMessage(m.chat, {
