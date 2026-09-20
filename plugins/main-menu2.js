@@ -15,6 +15,50 @@ import {
   resolveMenuContext,
 } from '../lib/menu-categories.js'
 
+/** chatId -> { key, at } del último menú interactivo enviado/editado */
+const menusActivos = new Map()
+const TTL_MENU_MS = 30 * 60 * 1000
+
+function recordarMenuActivo(chatId, key) {
+  if (!chatId || !key?.id) return
+  menusActivos.set(chatId, { key, at: Date.now() })
+}
+
+function obtenerMenuActivo(chatId) {
+  const entry = menusActivos.get(chatId)
+  if (!entry?.key?.id) return null
+  if (Date.now() - entry.at > TTL_MENU_MS) {
+    menusActivos.delete(chatId)
+    return null
+  }
+  return entry.key
+}
+
+function obtenerContextInfoSeleccion(m) {
+  return (
+    m?.msg?.contextInfo ||
+    m?.message?.interactiveResponseMessage?.contextInfo ||
+    m?.message?.listResponseMessage?.contextInfo ||
+    m?.message?.buttonsResponseMessage?.contextInfo ||
+    m?.message?.templateButtonReplyMessage?.contextInfo ||
+    null
+  )
+}
+
+/** Clave del mensaje del menú a editar (el que tiene la foto + botón). */
+function resolverClaveEdicionMenu(m) {
+  const ctx = obtenerContextInfoSeleccion(m)
+  const stanzaId = ctx?.stanzaId || m?.quoted?.id
+  if (stanzaId) {
+    return {
+      remoteJid: m.chat,
+      fromMe: true,
+      id: stanzaId,
+    }
+  }
+  return obtenerMenuActivo(m.chat)
+}
+
 async function resolverImagenMenu(conn, imgPrincipal) {
   try {
     const tipo = await conn.getFile(imgPrincipal, true)
@@ -31,7 +75,9 @@ async function resolverImagenMenu(conn, imgPrincipal) {
 async function enviarMenuInteractivo(conn, m, contexto, categorias, encabezado) {
   const medios = await resolverImagenMenu(conn, contexto.mainImg)
   const contenido = buildInteractiveMenuContent(contexto, categorias, encabezado, medios, m.sender)
-  await conn.sendMessageLia(m.chat, contenido, { quoted: m })
+  const enviado = await conn.sendMessageLia(m.chat, contenido, { quoted: m })
+  if (enviado?.key) recordarMenuActivo(m.chat, enviado.key)
+  return enviado
 }
 
 async function enviarRespuestaCategoria(conn, m, contexto, categorias, categoria) {
@@ -50,7 +96,20 @@ async function enviarRespuestaCategoria(conn, m, contexto, categorias, categoria
   try {
     const medios = await resolverImagenMenu(conn, categoria.img)
     const contenido = buildCategoryInteractiveContent(contexto, categorias, leyenda, medios, m.sender)
-    await conn.sendMessageLia(m.chat, contenido, { quoted: m })
+    const claveEdit = resolverClaveEdicionMenu(m)
+
+    if (claveEdit) {
+      try {
+        await conn.sendMessageLia(m.chat, { ...contenido, edit: claveEdit })
+        recordarMenuActivo(m.chat, claveEdit)
+        return
+      } catch (errorEdit) {
+        console.warn('[menú] Edición falló, enviando mensaje nuevo:', errorEdit?.message || errorEdit)
+      }
+    }
+
+    const enviado = await conn.sendMessageLia(m.chat, contenido, { quoted: m })
+    if (enviado?.key) recordarMenuActivo(m.chat, enviado.key)
   } catch (errorInteractivo) {
     console.error('Categoría interactiva falló:', errorInteractivo)
     await conn.sendFile(m.chat, categoria.img, 'menu-cat.jpg', leyenda, m, null, {
