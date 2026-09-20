@@ -45,18 +45,52 @@ function obtenerContextInfoSeleccion(m) {
   )
 }
 
-/** Clave del mensaje del menú a editar (el que tiene la foto + botón). */
-function resolverClaveEdicionMenu(m) {
+/** Clave del mensaje del menú (foto + botón) para reemplazarlo. */
+function resolverClaveMenuAnterior(m) {
+  const guardado = obtenerMenuActivo(m.chat)
   const ctx = obtenerContextInfoSeleccion(m)
   const stanzaId = ctx?.stanzaId || m?.quoted?.id
+
+  if (guardado?.id && (!stanzaId || guardado.id === stanzaId)) {
+    return guardado
+  }
+
   if (stanzaId) {
     return {
-      remoteJid: m.chat,
+      remoteJid: guardado?.remoteJid || m.chat,
       fromMe: true,
       id: stanzaId,
+      ...(guardado?.participant ? { participant: guardado.participant } : {}),
     }
   }
-  return obtenerMenuActivo(m.chat)
+
+  return guardado
+}
+
+/**
+ * WhatsApp no actualiza bien la edición de mensajes con imagen + nativeFlow
+ * (a menudo "acepta" el edit y no cambia nada en el chat).
+ * Por eso: enviar el menú nuevo y borrar el anterior → un solo mensaje visible.
+ */
+async function reemplazarMenuInteractivo(conn, m, contenido) {
+  const claveAnterior = resolverClaveMenuAnterior(m)
+  const enviado = await conn.sendMessageLia(
+    m.chat,
+    contenido,
+    claveAnterior ? {} : { quoted: m },
+  )
+
+  if (enviado?.key) recordarMenuActivo(m.chat, enviado.key)
+
+  if (claveAnterior?.id && claveAnterior.id !== enviado?.key?.id) {
+    try {
+      await conn.sendMessage(m.chat, { delete: claveAnterior })
+    } catch (errorBorrar) {
+      console.warn('[menú] No se pudo borrar el menú anterior:', errorBorrar?.message || errorBorrar)
+    }
+  }
+
+  return enviado
 }
 
 async function resolverImagenMenu(conn, imgPrincipal) {
@@ -96,20 +130,7 @@ async function enviarRespuestaCategoria(conn, m, contexto, categorias, categoria
   try {
     const medios = await resolverImagenMenu(conn, categoria.img)
     const contenido = buildCategoryInteractiveContent(contexto, categorias, leyenda, medios, m.sender)
-    const claveEdit = resolverClaveEdicionMenu(m)
-
-    if (claveEdit) {
-      try {
-        await conn.sendMessageLia(m.chat, { ...contenido, edit: claveEdit })
-        recordarMenuActivo(m.chat, claveEdit)
-        return
-      } catch (errorEdit) {
-        console.warn('[menú] Edición falló, enviando mensaje nuevo:', errorEdit?.message || errorEdit)
-      }
-    }
-
-    const enviado = await conn.sendMessageLia(m.chat, contenido, { quoted: m })
-    if (enviado?.key) recordarMenuActivo(m.chat, enviado.key)
+    await reemplazarMenuInteractivo(conn, m, contenido)
   } catch (errorInteractivo) {
     console.error('Categoría interactiva falló:', errorInteractivo)
     await conn.sendFile(m.chat, categoria.img, 'menu-cat.jpg', leyenda, m, null, {
