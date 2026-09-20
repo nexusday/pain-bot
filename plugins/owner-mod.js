@@ -41,8 +41,8 @@ function ayuda(usedPrefix, command, conn) {
     `> ${usedPrefix + command} lista\n\n` +
     `• En el *principal* el staff solo vale para el principal.\n` +
     `• En un *subbot* el staff solo vale para ese subbot.\n` +
-    `• Los owners de config.js son owners en todos los bots.\n` +
-    `• No se pueden quitar owners de config`
+    `• Los owners de *config* son owners en todos los bots.\n` +
+    `• No se pueden quitar owners de *config*`
 }
 
 async function recolectarIdsCompletos(m, args, conn, participants) {
@@ -195,7 +195,7 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
     if (isConfigOwnerIds(ids)) {
       return conn.reply(
         m.chat,
-        '[❗] No puedes quitar *owners de config*. Solo se gestiona el staff de *staff*.',
+        '[❗] No puedes quitar *owners de config*. Solo se gestiona el *staff*.',
         m
       )
     }
@@ -269,9 +269,8 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
         (guardado.numbers?.length ? `› Número(s): ${guardado.numbers.join(', ')}\n` : '') +
         (guardado.lids?.length ? `› LID(s): ${guardado.lids.join(', ')}\n` : '') +
         `› IDs guardados: *${guardado.ids.length}*\n` +
-        `› Scope: *${clave}*\n` +
-        `› Archivo: *storage/staff.json*\n` +
-        `› Owner solo de *${scopeLabel}* (no de otros bots).`,
+        `› Ámbito: *${scopeLabel}*\n` +
+        `› Guardado en *staff* (solo este bot).`,
       contextInfo: {
         ...global.rcanal?.contextInfo,
         mentionedJid: [tag]

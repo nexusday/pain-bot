@@ -45,8 +45,14 @@ if (!(global.conns instanceof Array)) global.conns = []
 
 function limpiarAuthSubBot(pathAYBot) {
   if (!fs.existsSync(pathAYBot)) return
+  const preservar = new Set([
+    'config.json',
+    'staff.json',
+    'staff.json.bak',
+    'staff.json.tmp'
+  ])
   for (const entradaFs of fs.readdirSync(pathAYBot)) {
-    if (entradaFs === 'config.json') continue
+    if (preservar.has(entradaFs)) continue
     fs.rmSync(path.join(pathAYBot, entradaFs), { recursive: true, force: true })
   }
 }
