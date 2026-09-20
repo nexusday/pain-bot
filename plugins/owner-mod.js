@@ -26,8 +26,8 @@ function esJidLid(jid = '') {
 function ayuda(usedPrefix, command, conn) {
   const donde = etiquetaScope(conn)
   const quien = esBotPrincipal(conn)
-    ? 'Solo *owners de config.js*'
-    : 'Owners de *config.js* o el *dueño de este subbot*'
+    ? 'Solo *owners de config*'
+    : 'Owners de *config* o el *dueño de este subbot*'
   return `*[👑] Staff / Mod* _(ámbito: ${donde})_\n\n` +
     `*Quién puede:* ${quien}\n\n` +
     `*Agregar:*\n` +
@@ -42,7 +42,7 @@ function ayuda(usedPrefix, command, conn) {
     `• En el *principal* el staff solo vale para el principal.\n` +
     `• En un *subbot* el staff solo vale para ese subbot.\n` +
     `• Los owners de config.js son owners en todos los bots.\n` +
-    `• No se pueden quitar owners de config.js.`
+    `• No se pueden quitar owners de config`
 }
 
 async function recolectarIdsCompletos(m, args, conn, participants) {
@@ -116,8 +116,8 @@ async function nombreDesdeEntrada(m, conn, ids) {
 let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
   if (!canUseMod(m, conn)) {
     const msg = esBotPrincipal(conn)
-      ? '[❗] Solo los *owners de config.js* pueden usar `/mod` en el bot principal.'
-      : '[❗] Solo el *dueño de este subbot* o un *owner de config.js* pueden usar `/mod` aquí.'
+      ? '[❗] Solo los *owners de config* pueden usar `/mod` en el bot principal.'
+      : '[❗] Solo el *dueño de este subbot* o un *owner de config* pueden usar `/mod` aquí.'
     return conn.reply(m.chat, msg, m)
   }
 
@@ -135,7 +135,7 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
   if (['lista', 'list', 'ver'].includes(sub)) {
     const staff = listStaff(conn)
     if (!staff.length) {
-      return conn.reply(m.chat, `[❗] No hay staff para *${scopeLabel}* en staff.json.`, m)
+      return conn.reply(m.chat, `[❗] No hay staff para *${scopeLabel}* en staff.`, m)
     }
     let texto = `👑 *STAFF — ${scopeLabel}* (${staff.length})\n\n`
     const mentions = []
@@ -195,7 +195,7 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
     if (isConfigOwnerIds(ids)) {
       return conn.reply(
         m.chat,
-        '[❗] No puedes quitar *owners de config.js*. Solo se gestiona el staff de *staff.json*.',
+        '[❗] No puedes quitar *owners de config*. Solo se gestiona el staff de *staff*.',
         m
       )
     }
@@ -225,7 +225,7 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
   if (isConfigOwnerIds(ids)) {
     return conn.reply(
       m.chat,
-      '[❗] Esa persona ya es *owner de config.js* (vale en todos los bots). No hace falta agregarla al staff.',
+      '[❗] Esa persona ya es *owner de config* (vale en todos los bots). No hace falta agregarla al staff.',
       m
     )
   }
@@ -264,7 +264,7 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
     m.chat,
     {
       text:
-        `${created ? '✅ *Staff agregado*' : '🔄 *Staff actualizado*'} _(ámbito: ${scopeLabel})_\n\n` +
+        `${created ? '✅ *Staff agregado*' : '*Staff actualizado*'} _(ámbito: ${scopeLabel})_\n\n` +
         `› Nombre: *${guardado.name}*\n` +
         (guardado.numbers?.length ? `› Número(s): ${guardado.numbers.join(', ')}\n` : '') +
         (guardado.lids?.length ? `› LID(s): ${guardado.lids.join(', ')}\n` : '') +
