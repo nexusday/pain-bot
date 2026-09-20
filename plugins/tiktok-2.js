@@ -305,7 +305,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       m.chat,
       {
         text: `*[❗] Ingresa un término o un enlace de TikTok.*\nEjemplo:\n> ${usedPrefix + command} https://www.tiktok.com/...\n> ${usedPrefix + command} baile`,
-        contextInfo: { ...rcanal.contextInfo }
+          contextInfo: { ...rcanal.contextInfo }
       },
       { quoted: m }
     )
@@ -334,10 +334,10 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
           await conn.sendMessage(
             m.chat,
             {
-              audio: { url: video.music },
-              mimetype: 'audio/mp4',
-              fileName: 'tiktok_audio.mp4',
-              contextInfo: { ...rcanal.contextInfo }
+            audio: { url: video.music },
+            mimetype: 'audio/mp4',
+            fileName: 'tiktok_audio.mp4',
+            contextInfo: { ...rcanal.contextInfo }
             },
             { quoted: m }
           )
@@ -346,9 +346,9 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
         await conn.sendMessage(
           m.chat,
           {
-            video: { url: video.play },
+          video: { url: video.play },
             caption: leyenda,
-            contextInfo: { ...rcanal.contextInfo }
+          contextInfo: { ...rcanal.contextInfo }
           },
           { quoted: m }
         )
@@ -360,9 +360,9 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
         await conn.sendMessage(
           m.chat,
           {
-            video: { url: vid.play },
+        video: { url: vid.play },
             caption: construirLeyenda(vid, `𝗧𝗜𝗞𝗧𝗢𝗞 ${i + 1}`),
-            contextInfo: { ...rcanal.contextInfo }
+        contextInfo: { ...rcanal.contextInfo }
           },
           { quoted: m }
         )
@@ -377,7 +377,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       m.chat,
       {
         text: `*[❗] Ocurrió un error al procesar TikTok.*\n> ${e?.message || e}`,
-        contextInfo: { ...rcanal.contextInfo }
+      contextInfo: { ...rcanal.contextInfo }
       },
       { quoted: m }
     )

@@ -52,10 +52,6 @@ global.logssubbots = '120363430965244922@newsletter'
 // true = botones/listas con @itsliaaa/baileys | false = solo @whiskeysockets/baileys
 global.baileysInteractive = true
 
-// Snake: URL HTTP(S) que el celular usa para guardar puntos.
-// Ptero: la allocation del panel. WhatsApp prefiere HTTPS; HTTP suele fallar en el WebView.
-global.snakePublicUrl = process.env.SNAKE_PUBLIC_URL || process.env.PUBLIC_URL || ''
-
 global.mods =   []
 global.prems = []
 

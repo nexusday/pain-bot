@@ -45,10 +45,6 @@ global.logssubbots = ''
 // Botones/listas interactivas con @itsliaaa/baileys (conexión sigue con @whiskeysockets/baileys)
 global.baileysInteractive = true
 
-// Snake URL. Preferí HTTPS: WhatsApp bloquea HTTP en el WebView del celular.
-// HTTP IP:puerto de Ptero a veces no guarda puntos aunque el health responda.
-global.snakePublicUrl = process.env.SNAKE_PUBLIC_URL || process.env.PUBLIC_URL || ''
-
 global.mods =   []
 global.prems = []
 
