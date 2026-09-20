@@ -12,6 +12,7 @@ process.on('unhandledRejection', (reason) => {
 import { PROJECT_TMP, cleanupTmpFiles, startTmpCleanupInterval } from './lib/tmp-cleanup.js'
 import './config.js'
 import './lib/bot-uptime.js'
+import { iniciarSnakeApi } from './lib/snake-api.js'
 import { createRequire } from 'module'
 import path, { join } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
@@ -44,6 +45,12 @@ const {
 } = await import('@whiskeysockets/baileys')
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 3000
+
+try {
+  iniciarSnakeApi(Number(PORT) || 3000)
+} catch (e) {
+  console.error('[snake-api] no pudo iniciar:', e?.message || e)
+}
 
 protoType()
 serialize()

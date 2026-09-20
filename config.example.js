@@ -45,6 +45,9 @@ global.logssubbots = ''
 // Botones/listas interactivas con @itsliaaa/baileys (conexión sigue con @whiskeysockets/baileys)
 global.baileysInteractive = true
 
+// Snake URL (HTTP IP:puerto del panel Ptero). No uses SQL ni localhost.
+global.snakePublicUrl = process.env.SNAKE_PUBLIC_URL || process.env.PUBLIC_URL || ''
+
 global.mods =   []
 global.prems = []
 

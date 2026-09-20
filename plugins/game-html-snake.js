@@ -2,11 +2,15 @@ import { sendHtmlWhatsApp } from '../lib/wa-html.js'
 import { htmlSnake } from '../lib/html-games/snake.js'
 import {
   statsSnakeDe,
-  registrarScoreSnake,
   topSnakeBest,
   topSnakeTotal,
   construirTextoTopSnake
 } from '../lib/snake-scores.js'
+import {
+  crearSesionSnake,
+  dominiosTrustedSnake,
+  obtenerSnakePublicUrl
+} from '../lib/snake-api.js'
 
 function prefijoDe(usedPrefix) {
   const p = String(usedPrefix || '.').trim()
@@ -39,73 +43,63 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     return conn.sendMessage(
       m.chat,
       {
-        text: texto + extra + `\n\n> Jugar: ${usedPrefix}snake\n> Guardar puntos: ${usedPrefix}snakeok <puntos>`,
+        text: texto + extra + `\n\n> Jugar: ${usedPrefix}snake\n> Los puntos se guardan solos al terminar.`,
         contextInfo: { ...rcanal.contextInfo }
       },
       { quoted: m }
     )
   }
 
-  // /snakeok 120
+  // /snakeok — desactivado (anti-trampa)
   if (['snakeok', 'snakesave', 'snakeclaim', 'guardarsnake'].includes(cmd)) {
-    const puntos = args[0]
-    if (puntos === undefined || puntos === '') {
+    return conn.reply(
+      m.chat,
+      `*[❗] Ya no se usan puntos manuales.*\n\n` +
+        `Juega con *${usedPrefix}snake* y al terminar la partida se guarda sola en el top.\n` +
+        `> Ver ranking: ${usedPrefix}topsnake`,
+      m
+    )
+  }
+
+  // /snake → juego personal + sesión firmada
+  try {
+    const nombre =
+      m.pushName ||
+      m.name ||
+      global.db?.data?.users?.[m.sender]?.name ||
+      m.sender?.split('@')[0] ||
+      'Jugador'
+    const stats = statsSnakeDe(m.sender)
+    const top = topSnakeBest(5)
+    const publicUrl = obtenerSnakePublicUrl()
+
+    if (!publicUrl) {
       return conn.reply(
         m.chat,
-        `*[❗] Uso:*\n> ${usedPrefix}snakeok <puntos>\n\nEjemplo:\n> ${usedPrefix}snakeok 120\n\n_(Al terminar la partida te aparece el comando exacto.)_`,
+        `*[❗] No se detectó IP de red para Snake.*\n\n` +
+          `El juego corre en el celular y debe hablar con el bot por HTTP.\n` +
+          `> Misma WiFi: debería auto-detectar la IP LAN\n` +
+          `> O en config.js: global.snakePublicUrl = 'http://TU-IP:3000'`,
         m
       )
     }
 
-    const nombre = m.pushName || m.name || global.db?.data?.users?.[m.sender]?.name || 'Jugador'
-    const r = await registrarScoreSnake(m.sender, puntos, nombre)
-
-    if (!r.ok) {
-      if (r.error === 'cooldown') {
-        return conn.reply(m.chat, `[⏳] Espera *${r.wait}s* para guardar otra partida.`, m)
-      }
-      if (r.error === 'alto') {
-        return conn.reply(m.chat, `[❗] Máximo *${r.max}* puntos por partida.`, m)
-      }
-      if (r.error === 'paso') {
-        return conn.reply(m.chat, `[❗] Los puntos van de *${r.step}* en *${r.step}* (10, 20, 30...).`, m)
-      }
-      return conn.reply(m.chat, '[❗] Puntuación inválida.', m)
-    }
-
-    const top = topSnakeBest(10)
-    const puesto = top.findIndex(x => x.jid === m.sender) + 1
-
-    return conn.sendMessage(
-      m.chat,
-      {
-        text:
-          `${r.newRecord ? '🏆 *Nuevo récord*' : '✅ *Partida guardada*'}\n\n` +
-          `› Puntos: *${r.score}*\n` +
-          `› Récord: *${r.best}*\n` +
-          `› Total acumulado: *${r.total}*\n` +
-          `› Partidas: *${r.games}*\n` +
-          (puesto ? `› Puesto global: *#${puesto}*\n` : '') +
-          `\n> Ver top: ${usedPrefix}topsnake`,
-        contextInfo: { ...rcanal.contextInfo }
-      },
-      { quoted: m }
-    )
-  }
-
-  // /snake → juego personal
-  try {
-    const nombre = m.pushName || m.name || global.db?.data?.users?.[m.sender]?.name || m.sender?.split('@')[0] || 'Jugador'
-    const stats = statsSnakeDe(m.sender)
-    const top = topSnakeBest(5)
+    const sesion = crearSesionSnake({ jid: m.sender, name: nombre })
+    const trusted = dominiosTrustedSnake()
 
     await sendHtmlWhatsApp(conn, m.chat, {
       html: htmlSnake({
         playerName: nombre,
         best: stats.best,
         prefix: prefijoDe(usedPrefix),
-        top
-      })
+        top,
+        api: {
+          base: sesion.apiBase,
+          sessionId: sesion.sessionId,
+          token: sesion.token
+        }
+      }),
+      trustedSources: trusted
     })
   } catch (e) {
     console.error('[snake html]', e?.message || e)
@@ -114,8 +108,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 }
 
 handler.help = [
-  'snake - Juego personal en el chat',
-  'snakeok <puntos> - Guardar puntos al top global',
+  'snake - Juego personal (auto-guarda al top)',
   'topsnake - Top 10 récords',
   'topsnake total - Top 10 acumulado'
 ]
