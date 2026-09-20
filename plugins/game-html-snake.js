@@ -86,6 +86,15 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     const sesion = crearSesionSnake({ jid: m.sender, name: nombre })
     const trusted = dominiosTrustedSnake()
+    const isHttp = /^http:\/\//i.test(publicUrl)
+
+    if (isHttp) {
+      console.warn(
+        `[snake] URL en HTTP (${publicUrl}). WhatsApp suele bloquear fetch cleartext; ` +
+          `si falla el guardado, pon HTTPS (Cloudflare Tunnel) en snakePublicUrl.`
+      )
+    }
+    console.log(`[snake] trusted_sources: ${trusted.join(' | ')}`)
 
     await sendHtmlWhatsApp(conn, m.chat, {
       html: htmlSnake({

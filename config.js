@@ -52,10 +52,8 @@ global.logssubbots = '120363430965244922@newsletter'
 // true = botones/listas con @itsliaaa/baileys | false = solo @whiskeysockets/baileys
 global.baileysInteractive = true
 
-// Snake: URL que el celular usa para hablar con el bot (HTTP). No es SQL.
-// Ptero: deja vacío si existen SERVER_IP + SERVER_PORT, o pon la allocation del panel:
-//   global.snakePublicUrl = 'http://IP.DEL.NODO:PUERTO'
-// Ejemplo: 'http://45.12.34.56:25565'
+// Snake: URL HTTP(S) que el celular usa para guardar puntos.
+// Ptero: la allocation del panel. WhatsApp prefiere HTTPS; HTTP suele fallar en el WebView.
 global.snakePublicUrl = process.env.SNAKE_PUBLIC_URL || process.env.PUBLIC_URL || ''
 
 global.mods =   []
