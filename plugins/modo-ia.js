@@ -84,6 +84,18 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
           }
         }, { quoted: m })
       }
+
+      if (isModeActive('modoCustom', m.chat)) {
+        let texto = `❄ 𝗬𝗔 𝗛𝗔𝗬 𝗨𝗡 𝗠𝗢𝗗𝗢 𝗨𝗦𝗔𝗗𝗢, 𝗣𝗢𝗥 𝗙𝗔𝗩𝗢𝗥 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗟𝗢\n\n> *Modo que ya esta activado:* 𝗠𝗼𝗱𝗼 𝗽𝗲𝗿𝘀𝗼𝗻𝗮𝗹𝗶𝘇𝗮𝗱𝗼\n\n> Para desactivarlo usa: ${usedPrefix}modo off`
+        
+        return conn.sendMessage(m.chat, {
+          text: texto,
+          contextInfo: {
+            ...rcanal.contextInfo,
+            mentionedJid: [m.sender]
+          }
+        }, { quoted: m })
+      }
       
       setModeState('modoIA', m.chat, true)
       await global.db.write()

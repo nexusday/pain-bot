@@ -35,6 +35,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
       if (isModeActive('modoIlegal', m.chat)) return avisarModoActivo('𝗠𝗼𝗱𝗼 𝗶𝗹𝗲𝗴𝗮𝗹', 'modoilegal')
       if (isModeActive('modoHuman', m.chat)) return avisarModoActivo('𝗠𝗼𝗱𝗼 𝗛𝘂𝗺𝗮𝗻𝗼', 'modohuman')
       if (isModeActive('modoSad', m.chat)) return avisarModoActivo('𝗠𝗼𝗱𝗼 𝗦𝗮𝗱', 'modosad')
+      if (isModeActive('modoCustom', m.chat)) return avisarModoActivo('𝗠𝗼𝗱𝗼 𝗽𝗲𝗿𝘀𝗼𝗻𝗮𝗹𝗶𝘇𝗮𝗱𝗼', 'modo')
 
       setModeState('modoPsico', m.chat, true)
       await global.db.write()
