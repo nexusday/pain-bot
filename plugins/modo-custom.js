@@ -3,22 +3,44 @@ import {
   obtenerCfgModoCustom,
   guardarCfgModoCustom
 } from '../lib/Modos/modo-custom.js'
+import {
+  normalizarListaAcciones,
+  etiquetaAcciones,
+  ACCIONES_VALIDAS
+} from '../lib/Modos/modo-custom-acciones.js'
 
 function parsearModoCustom(text = '') {
   const crudo = String(text || '').trim()
   if (!crudo) return null
 
-  const idx = crudo.indexOf('|')
-  if (idx === -1) return null
+  // nombre|prompt|acciones(opcional)
+  const campos = []
+  let buf = crudo
+  while (campos.length < 2) {
+    const i = buf.indexOf('|')
+    if (i === -1) {
+      campos.push(buf.trim())
+      buf = ''
+      break
+    }
+    campos.push(buf.slice(0, i).trim())
+    buf = buf.slice(i + 1)
+  }
+  if (buf) campos.push(buf.trim())
 
-  const name = crudo.slice(0, idx).trim()
-  const prompt = crudo.slice(idx + 1).trim()
+  const name = campos[0] || ''
+  const prompt = campos[1] || ''
+  const actionsRaw = campos[2] || ''
+
   if (!name || !prompt) return null
   if (name.length > 40) return { error: 'nombre_largo' }
   if (prompt.length < 8) return { error: 'prompt_corto' }
   if (prompt.length > 1500) return { error: 'prompt_largo' }
 
-  return { name, prompt }
+  const actions = normalizarListaAcciones(actionsRaw)
+  if (actionsRaw && !actions.length) return { error: 'acciones_invalidas' }
+
+  return { name, prompt, actions }
 }
 
 let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
@@ -98,7 +120,7 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
       const activo = isModeActive('modoCustom', m.chat)
       if (!cfgActual) {
         return conn.sendMessage(m.chat, {
-          text: `[❗] No hay modo personalizado configurado.\n\nUso:\n> ${usedPrefix + command} nombre|prompt\n> ${usedPrefix + command} off`,
+          text: `[❗] No hay modo personalizado configurado.\n\nUso:\n> ${usedPrefix + command} nombre|prompt\n> ${usedPrefix + command} nombre|prompt|all\n> ${usedPrefix + command} nombre|prompt|ban,del,mute,unmute,warn,delwarn\n> ${usedPrefix + command} off`,
           contextInfo: { ...rcanal.contextInfo }
         }, { quoted: m })
       }
@@ -107,12 +129,12 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
           `*Modo personalizado*\n\n` +
           `> *Estado:* ${activo ? 'activado' : 'desactivado'}\n` +
           `> *Nombre:* ${cfgActual.name}\n` +
+          `> *Acciones:* ${etiquetaAcciones(cfgActual.actions)}\n` +
           `> *Prompt:* ${cfgActual.prompt.slice(0, 280)}${cfgActual.prompt.length > 280 ? '…' : ''}`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-    // Activar / actualizar: /modo peruano|habla con jerga peruana...
     const parseado = parsearModoCustom(text)
     if (parseado?.error === 'nombre_largo') {
       return conn.sendMessage(m.chat, {
@@ -132,6 +154,12 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
+    if (parseado?.error === 'acciones_invalidas') {
+      return conn.sendMessage(m.chat, {
+        text: `[❗] Acciones no válidas.\n\nPermitidas: ${ACCIONES_VALIDAS.join(', ')} o *all*\nEjemplo: ban,del,mute,unmute,warn,delwarn\nAtajo: all`,
+        contextInfo: { ...rcanal.contextInfo }
+      }, { quoted: m })
+    }
 
     if (parseado?.name && parseado?.prompt) {
       if (isModeActive('modoIA', m.chat)) return avisarModoActivo('𝗠𝗼𝗱𝗼 𝗜𝗔', 'modoia')
@@ -144,6 +172,7 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
       guardarCfgModoCustom(m.chat, {
         name: parseado.name,
         prompt: parseado.prompt,
+        actions: parseado.actions || [],
         by: m.sender
       })
       setModeState('modoCustom', m.chat, true)
@@ -154,12 +183,20 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
         clearCustomMemory(m.chat)
       } catch {}
 
+      const accionesTxt = parseado.actions?.length
+        ? parseado.actions.join(', ')
+        : 'ninguna (solo chat)'
+
       return conn.sendMessage(m.chat, {
         text:
           `*Modo personalizado activado*\n\n` +
           `> *Nombre:* ${parseado.name}\n` +
-          `> Misma lógica que humano: puede ignorar, reaccionar o responder.\n` +
-          `> *Prompt:* ${parseado.prompt.slice(0, 220)}${parseado.prompt.length > 220 ? '…' : ''}\n` +
+          `> *Acciones:* ${accionesTxt}\n` +
+          `> Lógica human: ignora / reacciona / responde.\n` +
+          (parseado.actions?.length
+            ? `> Si un *admin* pide ban/mute/warn/del (mencionando o respondiendo), el modo lo ejecuta y responde con su personaje.\n`
+            : '') +
+          `> *Prompt:* ${parseado.prompt.slice(0, 200)}${parseado.prompt.length > 200 ? '…' : ''}\n` +
           `> *Por:* @${m.sender.split('@')[0]}\n\n` +
           `Desactivar: ${usedPrefix + command} off`,
         contextInfo: {
@@ -173,15 +210,20 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
     return conn.sendMessage(m.chat, {
       text:
         `*[❗] Modo personalizado*\n\n` +
-        `*Activar:*\n` +
+        `*Formato:*\n` +
         `> ${usedPrefix + command} nombre|prompt\n` +
-        `> Ejemplo: ${usedPrefix + command} peruano|habla como peruano, usa jerga (causa, pe, oe), tono cercano\n\n` +
-        `*Otros:*\n` +
-        `> ${usedPrefix + command} off\n` +
-        `> ${usedPrefix + command} ver\n` +
-        `> ${usedPrefix + command} clear\n\n` +
+        `> ${usedPrefix + command} nombre|prompt|acciones\n\n` +
+        `*Ejemplo chat:*\n` +
+        `> ${usedPrefix + command} peruano|habla como peruano, jerga causa/pe\n\n` +
+        `*Ejemplo asistente admin:*\n` +
+        `> ${usedPrefix + command} asistente|humor seco y directo|ban,del,mute,unmute,warn,delwarn\n` +
+        `> ${usedPrefix + command} asistente|humor seco|all\n\n` +
+        `*Acciones:* ${ACCIONES_VALIDAS.join(', ')}\n` +
+        `> Atajo: *all* (activa todas)\n` +
+        `> Solo un *admin* puede activarlas hablando (responder o mencionar al objetivo).\n\n` +
+        `*Otros:* ${usedPrefix + command} off | ver | clear\n\n` +
         `> *Estado:* ${activo ? 'activado' : 'desactivado'}` +
-        (cfgActual ? `\n> *Actual:* ${cfgActual.name}` : ''),
+        (cfgActual ? `\n> *Actual:* ${cfgActual.name} (${etiquetaAcciones(cfgActual.actions)})` : ''),
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } catch (error) {
@@ -194,7 +236,7 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
 }
 
 handler.command = ['modo', 'modocustom', 'modopersonalizado', 'custommode']
-handler.help = ['#modo nombre|prompt → modo personalizado (lógica human)']
+handler.help = ['#modo nombre|prompt|all']
 handler.tags = ['grupo', 'modos']
 handler.group = true
 handler.admin = true
