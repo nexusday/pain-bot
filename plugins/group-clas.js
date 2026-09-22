@@ -1,4 +1,5 @@
 import { findGroupParticipant, jidsParticipante, jidsSeSolapan } from '../lib/group-participant.js'
+import { isSenderBotOwner } from '../lib/resolve-group-target.js'
 
 function asegurarDb(chatId) {
   if (!global.db.data.clasificacion) global.db.data.clasificacion = {}
@@ -150,17 +151,7 @@ function esAdminOOwner(m, conn, isAdmin, participants) {
   const esAdminManual =
     Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false
 
-  const esOwnerManual =
-    global.owner?.some(
-      ([numero]) =>
-        String(numero).replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender
-    ) ||
-    global.ownerLid?.some(
-      ([numero]) => String(numero).replace(/[^0-9]/g, '') + '@lid' === m.sender
-    ) ||
-    m.sender === conn.user?.jid
-
-  return esAdminManual || esSuperAdmin || esOwnerManual
+  return esAdminManual || esSuperAdmin || isSenderBotOwner(m, conn)
 }
 
 async function enviarEquipo(conn, chat, equipo, indiceVisible, quoted) {

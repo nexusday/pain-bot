@@ -4,7 +4,7 @@ import {
   jidsParticipante,
   jidsSeSolapan
 } from '../lib/group-participant.js'
-import { resolveGroupTarget, isOwnerJid } from '../lib/resolve-group-target.js'
+import { resolveGroupTarget, isOwnerJid, isSenderBotOwner } from '../lib/resolve-group-target.js'
 
 function eliminarSolapados(listaSilenciados, idsObjetivo) {
   return (listaSilenciados || []).filter(j => !jidsSeSolapan([j], idsObjetivo))
@@ -35,15 +35,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, participants
       usuario?.admin === 'admin' ||
       usuario?.admin === 'superadmin'
 
-    const esOwnerManual =
-      global.owner?.some(
-        ([numero]) =>
-          String(numero).replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender
-      ) ||
-      global.ownerLid?.some(
-        ([numero]) => String(numero).replace(/[^0-9]/g, '') + '@lid' === m.sender
-      ) ||
-      m.sender === conn.user?.jid
+    const esOwnerManual = isSenderBotOwner(m, conn)
 
     if (!esAdminManual && !esOwnerManual) {
       return conn.sendMessage(

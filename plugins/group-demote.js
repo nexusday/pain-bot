@@ -4,7 +4,7 @@
   jidsParticipante,
   jidsSeSolapan
 } from '../lib/group-participant.js'
-import { resolveGroupTarget } from '../lib/resolve-group-target.js'
+import { resolveGroupTarget, isSenderBotOwner } from '../lib/resolve-group-target.js'
 
 let handler = async (m, { conn, args, participants, isAdmin, usedPrefix, command }) => {
   if (!m.isGroup) {
@@ -29,15 +29,7 @@ let handler = async (m, { conn, args, participants, isAdmin, usedPrefix, command
   const esAdminManual =
     Boolean(isAdmin) || esSuperAdmin || usuario?.admin == 'admin' || false
 
-  const esOwnerManual =
-    global.owner?.some(
-      ([numero]) =>
-        String(numero).replace(/[^0-9]/g, '') + '@s.whatsapp.net' === m.sender
-    ) ||
-    global.ownerLid?.some(
-      ([numero]) => String(numero).replace(/[^0-9]/g, '') + '@lid' === m.sender
-    ) ||
-    m.sender === conn.user?.jid
+  const esOwnerManual = isSenderBotOwner(m, conn)
 
   if (!esAdminManual && !esSuperAdmin && !esOwnerManual) {
     return conn.reply(m.chat, '[❗] Solo los administradores pueden usar este comando.', m)
