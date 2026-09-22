@@ -214,7 +214,6 @@ const handler = async (m, { conn, usedPrefix }) => {
 }
 
 async function manejarSeleccionCategoriaMenu(m, { conn, usedPrefix }) {
-  if (m.fromMe) return false
 
   const idFila = extractMenuSelectionId(m)
   const esRespuestaInteractiva = [
