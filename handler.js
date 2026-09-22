@@ -13,7 +13,7 @@ import { handleModoDescargas } from './lib/Modos/modo-descargas.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
 import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
-import { findGroupParticipant, findBotParticipant } from './lib/group-participant.js'
+import { findGroupParticipant, findBotParticipant, candidatosJidRemitente, jidsSeSolapan } from './lib/group-participant.js'
 import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
@@ -127,7 +127,8 @@ const crearIdsOwner = (numero) => {
   if (!numeroLimpio) return []
   return [
     numeroLimpio + '@s.whatsapp.net',
-    numeroLimpio + '@lid'
+    numeroLimpio + '@lid',
+    numeroLimpio + '@hosted.lid'
   ]
 }
 
@@ -159,10 +160,17 @@ const todosIdsOwner = [
   ...getStaffOwnerIds(conn)
 ]
 
-const isROwner = todosIdsOwner.includes(m.sender)
-const isOwner = isROwner || m.fromMe  
-const isMods = isOwner || listaMods.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)  
-const isPrems = isROwner || listaPrems.map(v => String(v).replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || _user?.prem == true  
+// Baileys 7: m.sender suele ser el PN (participantAlt), mientras ownerLid
+// guarda el @lid. Hay que cruzar TODOS los candidatos del mensaje.
+const idsRemitente = candidatosJidRemitente(m, this)
+const isROwner = jidsSeSolapan(idsRemitente, todosIdsOwner)
+const isOwner = isROwner || m.fromMe
+const isMods = isOwner || listaMods.some(v =>
+  jidsSeSolapan(idsRemitente, crearIdsOwner(v))
+)
+const isPrems = isROwner || listaPrems.some(v =>
+  jidsSeSolapan(idsRemitente, crearIdsOwner(v))
+) || _user?.prem == true  
 
 if (opts['queque'] && m.text && !(isMods || isPrems)) {  
   let cola = this.msgqueque, tiempo = 1000 * 5  
