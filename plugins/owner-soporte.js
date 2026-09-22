@@ -64,7 +64,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
       `✅ *Soporte actualizado*\n\n` +
         `› Link: ${guardado.link}\n` +
         `› Botón: ${guardado.buttonText}\n\n` +
-        `_Se mostrará en los avisos de alquiler (sin plan / expirado)._`,
+        `_Se mostrará en el menú (debajo de Ver categorías) y en avisos de alquiler._`,
       m
     )
   } catch {
