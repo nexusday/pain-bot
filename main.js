@@ -138,6 +138,9 @@ global.loadDatabase = async function loadDatabase() {
     modoSub: global.db.data?.modoSub && typeof global.db.data.modoSub === 'object' && !Array.isArray(global.db.data.modoSub)
       ? global.db.data.modoSub
       : {},
+    stickerBan: global.db.data?.stickerBan && typeof global.db.data.stickerBan === 'object' && !Array.isArray(global.db.data.stickerBan)
+      ? global.db.data.stickerBan
+      : {},
   }
   global.db.chain = lodash.chain(global.db.data) 
 }
