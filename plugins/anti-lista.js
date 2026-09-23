@@ -41,6 +41,7 @@ let handler = async (m, { conn, usedPrefix }) => {
     linea('antiprefijo', estadoBool(db.antiprefijo, chat)),
     linea('antibot', estadoBool(db.antiBot, chat)),
     linea('antiestados', estadoBool(db.antiEstados, chat)),
+    linea('antidelete', estadoBool(db.antiDelete, chat)),
     linea('soloadmin', estadoBool(db.soloAdmin, chat))
   ]
 

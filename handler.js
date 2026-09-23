@@ -9,6 +9,10 @@ import fetch from 'node-fetch'
 import { handleAIModes } from './lib/eventHandlers.js'
 import { handleAntiSystems } from './lib/antiHandlers.js'
 import { manejarAntiEstados } from './lib/Antis/anti-estados.js'
+import {
+  iniciarAntiDelete,
+  guardarMensajeAntiDelete
+} from './lib/Antis/anti-delete.js'
 import { handleGroupEvents } from './lib/event.js'
 import { handleModoDescargas } from './lib/Modos/modo-descargas.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
@@ -50,6 +54,7 @@ try {
 m = smsg(this, m) || m
 if (!m) return
 const conn = this
+iniciarAntiDelete(this)
 
 if (!m.messageStubType && m.isGroup && !m.fromMe) {
   await runAntiViewOnce(this, m)
@@ -63,6 +68,12 @@ if (!m.messageStubType && m.isGroup && !m.fromMe) {
     }
   } catch {}
 }
+
+try {
+  if (m.isGroup) {
+    guardarMensajeAntiDelete(m, this)
+  }
+} catch {}
 
 if (m.messageStubType) return
 m.exp = 0
