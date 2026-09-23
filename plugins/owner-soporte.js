@@ -4,8 +4,17 @@ import {
   clearSupportLink,
   normalizeGroupLink
 } from '../lib/soporte.js'
+import { esBotPrincipal } from '../lib/staff.js'
 
 let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
+  if (!esBotPrincipal(conn)) {
+    return conn.reply(
+      m.chat,
+      '[❗] `/soporte` solo se configura en el *bot principal*.\n> En subbots el botón usa el link del principal.',
+      m
+    )
+  }
+
   if (!isOwner) {
     return conn.sendMessage(m.chat, {
       text: '[❗] Solo los dueños pueden usar este comando.',
@@ -64,7 +73,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
       `✅ *Soporte actualizado*\n\n` +
         `› Link: ${guardado.link}\n` +
         `› Botón: ${guardado.buttonText}\n\n` +
-        `_Se mostrará en el menú (debajo de Ver categorías) y en avisos de alquiler._`,
+        `_Se mostrará en el menú (principal y subbots) y en avisos de alquiler._`,
       m
     )
   } catch {
@@ -73,7 +82,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
 }
 
 handler.help = [
-  '#soporte <link grupo> → link de soporte (alquiler)',
+  '#soporte <link grupo> → link de soporte (solo bot principal)',
   '#soporte del → quitar link'
 ]
 handler.tags = ['owner']
