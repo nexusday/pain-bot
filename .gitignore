@@ -3,8 +3,6 @@ yarn.lock
 Serbot/
 storage/databases/database.json
 storage/staff.json
-storage/staff.json.bak
-storage/staff.json.tmp
 storage/maxsubs.json
 storage/soporte.json
 storage/sticker-ban/

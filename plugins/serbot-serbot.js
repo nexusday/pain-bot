@@ -48,10 +48,7 @@ function limpiarAuthSubBot(pathAYBot) {
   const preservar = new Set([
     'config.json',
     'staff.json',
-    'staff.json.bak',
-    'staff.json.tmp',
-    'soporte.json',
-    'soporte.json.tmp'
+    'soporte.json'
   ])
   for (const entradaFs of fs.readdirSync(pathAYBot)) {
     if (preservar.has(entradaFs)) continue
