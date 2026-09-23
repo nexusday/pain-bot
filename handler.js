@@ -8,6 +8,7 @@ import fetch from 'node-fetch'
 
 import { handleAIModes } from './lib/eventHandlers.js'
 import { handleAntiSystems } from './lib/antiHandlers.js'
+import { manejarAntiEstados } from './lib/Antis/anti-estados.js'
 import { handleGroupEvents } from './lib/event.js'
 import { handleModoDescargas } from './lib/Modos/modo-descargas.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
@@ -52,6 +53,15 @@ const conn = this
 
 if (!m.messageStubType && m.isGroup && !m.fromMe) {
   await runAntiViewOnce(this, m)
+  try {
+    if (global.db?.data?.antiEstados?.[m.chat]) {
+      const partes =
+        (this.chats[m.chat] || {}).metadata?.participants || []
+      const u = findGroupParticipant(partes, m, this) || {}
+      const esAdminEarly = u?.admin === 'admin' || u?.admin === 'superadmin'
+      await manejarAntiEstados(m, this, esAdminEarly)
+    }
+  } catch {}
 }
 
 if (m.messageStubType) return
