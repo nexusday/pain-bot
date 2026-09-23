@@ -1,8 +1,11 @@
 import {
   extraerHashesStickerCompleto,
+  descargarBufferSticker,
   guardarStickerBan,
   quitarStickerBan,
   obtenerStickerBan,
+  leerArchivoStickerBan,
+  resolverJidMencionSetBy,
   coincideStickerBan,
   esAdminOOwnerGrupo,
   ejecutarBanPorSticker,
@@ -47,15 +50,36 @@ let handler = async (m, { conn, args, participants, isAdmin, usedPrefix }) => {
         m
       )
     }
-    return conn.reply(
+
+    const jidPor = await resolverJidMencionSetBy(
+      actual.setByPn || actual.setBy,
       m.chat,
-      `*[🔖] Sticker Ban*\n\n` +
-        `› Estado: *activo*\n` +
-        `› Por: @${String(actual.setBy || '').split('@')[0] || '—'}\n` +
-        `› Fecha: ${actual.setAt ? new Date(actual.setAt).toLocaleString() : '—'}\n\n` +
-        `> Para banear: responde un mensaje con ese sticker.\n` +
-        `> Quitar: ${usedPrefix}sban del`,
-      m
+      conn,
+      partes
+    )
+    const tagPor = jidPor
+      ? `@${String(jidPor).split('@')[0]}`
+      : (actual.name || '—')
+
+    const stickerBuf = leerArchivoStickerBan(m.chat)
+    if (stickerBuf) {
+      await conn.sendMessage(m.chat, { sticker: stickerBuf }, { quoted: m }).catch(() => {})
+    }
+
+    return conn.sendMessage(
+      m.chat,
+      {
+        text:
+          `*[🔖] Sticker Ban*\n\n` +
+          `› Estado: *activo*\n` +
+          `› Por: ${tagPor}${actual.name ? ` (${actual.name})` : ''}\n` +
+          `› Fecha: ${actual.setAt ? new Date(actual.setAt).toLocaleString() : '—'}\n\n` +
+          (stickerBuf ? '' : `> ⚠️ Sticker no guardado; vuelve a configurar con ${usedPrefix}sban\n\n`) +
+          `> Para banear: responde un mensaje con ese sticker.\n` +
+          `> Quitar: ${usedPrefix}sban del`,
+        mentions: jidPor ? [jidPor] : []
+      },
+      { quoted: m }
     )
   }
 
@@ -93,11 +117,24 @@ let handler = async (m, { conn, args, participants, isAdmin, usedPrefix }) => {
     )
   }
 
+  const stickerBuffer = await descargarBufferSticker(m)
+  const setByPn =
+    m.key?.participantAlt ||
+    m.key?.remoteJidAlt ||
+    (String(m.sender || '').endsWith('@s.whatsapp.net') ? m.sender : '') ||
+    ''
+
   guardarStickerBan(m.chat, hashes, {
     setBy: m.sender,
-    name: m.pushName || ''
+    setByPn: String(setByPn).endsWith('@s.whatsapp.net') ? setByPn : '',
+    name: m.pushName || '',
+    stickerBuffer
   })
   try { await global.db.write?.() } catch {}
+
+  if (stickerBuffer) {
+    await conn.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m }).catch(() => {})
+  }
 
   return conn.reply(
     m.chat,
