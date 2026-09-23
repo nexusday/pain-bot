@@ -1,5 +1,5 @@
 import {
-  extraerHashesSticker,
+  extraerHashesStickerCompleto,
   guardarStickerBan,
   quitarStickerBan,
   obtenerStickerBan,
@@ -68,15 +68,32 @@ let handler = async (m, { conn, args, participants, isAdmin, usedPrefix }) => {
     return conn.reply(m.chat, '✅ Sticker ban *eliminado* de este grupo.', m)
   }
 
-  const hashesMsg = extraerHashesSticker(m)
-  const hashesQuoted = m.quoted ? extraerHashesSticker(m.quoted) : []
-  const hashes = hashesMsg.length ? hashesMsg : hashesQuoted
+  const hashes = await extraerHashesStickerCompleto(m, conn)
 
   if (!hashes.length) {
-    return conn.reply(m.chat, ayuda(usedPrefix), m)
+    console.error('[sban] sin hashes', {
+      mtype: m.mtype,
+      hasQuoted: !!m.quoted,
+      quotedMtype: m.quoted?.mtype,
+      quotedMediaType: m.quoted?.mediaType,
+      hasCtx: !!m.msg?.contextInfo,
+      quotedKeys: m.msg?.contextInfo?.quotedMessage
+        ? Object.keys(m.msg.contextInfo.quotedMessage)
+        : [],
+      quotedFileSha: !!(m.quoted?.fileSha256 || m.msg?.contextInfo?.quotedMessage?.stickerMessage?.fileSha256)
+    })
+    return conn.reply(
+      m.chat,
+      `*[❗] No detecté el sticker.*\n\n` +
+        `Responde *directamente* a un sticker y escribe:\n` +
+        `> ${usedPrefix}sban\n\n` +
+        `O envía el sticker con caption *${usedPrefix}sban*.\n\n` +
+        ayuda(usedPrefix),
+      m
+    )
   }
 
-  const guardado = guardarStickerBan(m.chat, hashes, {
+  guardarStickerBan(m.chat, hashes, {
     setBy: m.sender,
     name: m.pushName || ''
   })
@@ -98,7 +115,7 @@ handler.all = async function (m, { conn, participants }) {
     if (m.mtype !== 'stickerMessage' && !m.message?.stickerMessage) return
     if (!m.quoted && !m.msg?.contextInfo?.participant) return
 
-    const hashes = extraerHashesSticker(m)
+    const hashes = await extraerHashesStickerCompleto(m, conn)
     if (!hashes.length) return
     if (!coincideStickerBan(m.chat, hashes)) return
 
@@ -110,7 +127,6 @@ handler.all = async function (m, { conn, participants }) {
 
     const resultado = await ejecutarBanPorSticker(m, conn, partes)
     if (!resultado.ok) {
-     
       if (
         ['sin_permiso', 'no_match', 'no_sticker', 'baileys', 'no_grupo', 'falta_reply'].includes(
           resultado.detail
