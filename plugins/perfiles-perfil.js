@@ -201,6 +201,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
   const favorito = datosUsuario.favourite && datosUsuario.favourite !== 'No establecido' ? datosUsuario.favourite : '—'
   const moneda = global.moneda || 'coins'
   const sep = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
+  const tip = (v) => `\`${String(v).replace(/`/g, "'")}\``
 
   const texto = `
 ㅤ
@@ -209,29 +210,39 @@ _${userRole}_
 
 ${sep}
 *esencia*
-${genero}  ·  ${cumple}
-${desc}
-♡  ${favorito}
+${tip(genero)}  ·  ${tip(cumple)}
+${tip(desc)}
+♡  ${tip(favorito)}
 
 ${sep}
 *progreso*
-nivel *${rpg.level}*
-${rpg.bar}
-\`${rpg.ratio}\` xp
+nivel  ${tip(rpg.level)}
+${tip(rpg.bar)}
+${tip(rpg.ratio)}  xp
 
-*${formatNumber(totalCoins)}* ${moneda}
-banco · ${bancoInfo}
+${tip(formatNumber(totalCoins))}  ${moneda}
+banco  ·  ${tip(bancoInfo)}
 
 ${sep}
 *eco*
-comandos  ·  ${formatNumber(rpg.commandCount)}
-stickers  ·  ${formatNumber(rpg.stickerCount)}
-mensajes  ·  ${formatNumber(msgTotal)}${m.isGroup ? `\nen este grupo  ·  ${formatNumber(msgGroup)}` : ''}
+comandos  ·  ${tip(formatNumber(rpg.commandCount))}
+stickers  ·  ${tip(formatNumber(rpg.stickerCount))}
+mensajes  ·  ${tip(formatNumber(msgTotal))}${m.isGroup ? `\nen este grupo  ·  ${tip(formatNumber(msgGroup))}` : ''}
 
 ${sep}
 *vínculo*
 ${lineaVinculo}
-${datosUsuario.registered ? 'registrado' : 'sin registro'}
+${tip(datosUsuario.registered ? 'registrado' : 'sin registro')}
+
+${sep}
+*editar*
+> ${usedPrefix}setname <nombre>
+> ${usedPrefix}setgenre <hombre/mujer>
+> ${usedPrefix}setbirth <fecha>
+> ${usedPrefix}setdesc <texto>
+> ${usedPrefix}setfav <favorito>
+> ${usedPrefix}marry @user
+> ${usedPrefix}divorce
 ㅤ`.trim()
 
   const botNumber = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
