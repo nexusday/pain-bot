@@ -10,10 +10,9 @@
     "plugins": "plugins"
   },
   "scripts": {
-    "start": "node scripts/ensure-sharp.js && node scripts/ensure-deps.js && node index.js",
+    "start": "node scripts/ensure-sharp.js && node index.js",
     "start:raw": "node index.js",
     "fix:sharp": "node scripts/ensure-sharp.js",
-    "fix:deps": "node scripts/ensure-deps.js",
     "sync:chars": "node scripts/sync-characters-catalog.js --batch 200 --concurrency 5 --delay 200",
     "sync:chars:fast": "node scripts/sync-characters-catalog.js --batch 400 --concurrency 8 --delay 120",
     "sync:chars:reset": "node scripts/sync-characters-catalog.js --reset --batch 200 --concurrency 5 --delay 200",
@@ -79,7 +78,6 @@
     "url-regex-safe": "^3.0.0",
     "ws": "^8.17.1",
     "yargs": "^17.6.0",
-    "youtube-dl-exec": "^3.1.15",
     "yt-search": "^2.10.3"
   },
   "optionalDependencies": {

@@ -387,8 +387,8 @@ async function iniciarSubBot(options) {
         }
         if (reconectando) {
           console.log(chalk.bold.yellow(`\n┆ Subbot (+${idCarpetaBot}) ya reconectando, se omite duplicado (${motivo})\n`))
-          return
-        }
+            return
+          }
         reconectando = true
         console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). Reconectando...\n`))
         try {
