@@ -77,7 +77,7 @@ async function reemplazarMenuInteractivo(conn, m, contenido) {
   const enviado = await conn.sendMessageLia(
     m.chat,
     contenido,
-    claveAnterior ? {} : { quoted: m },
+    { quoted: m },
   )
 
   if (enviado?.key) recordarMenuActivo(m.chat, enviado.key)
