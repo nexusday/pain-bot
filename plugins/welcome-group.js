@@ -1,451 +1,425 @@
-let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }) => {
+import fs from 'fs'
+import path from 'path'
+
+const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
+const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
+
+function dirImagenGrupo(chatId) {
+  const safe = String(chatId).replace(/[^a-zA-Z0-9._@-]/g, '_')
+  const dir = path.join(process.cwd(), 'storage', 'welcome', safe)
+  fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+function rutaImagenTipo(chatId, tipo) {
+  return path.join(dirImagenGrupo(chatId), tipo === 'goodbye' ? 'goodbye.jpg' : 'welcome.jpg')
+}
+
+/** Buffer local, URL http o null */
+function payloadImagen(rutaOUrl) {
+  if (!rutaOUrl || !String(rutaOUrl).trim()) return null
+  const v = String(rutaOUrl).trim()
+  if (/^https?:\/\//i.test(v)) return { url: v }
   try {
-    if (!m.isGroup) {
-      return conn.sendMessage(m.chat, {
-        text: '《✧》Este comando solo funciona en grupos.'
-      }, { quoted: m })
-    }    
-    
-    const accion = args[0]?.toLowerCase()
-    
-    if (!global.db.data.bienvenidas) global.db.data.bienvenidas = {}
-    
-    if (global.db.data.bienvenidas[m.chat] === true) {
-      global.db.data.bienvenidas[m.chat] = {
-        enabled: true,
-        welcomeMsg: '',
-        goodbyeMsg: '',
-        welcomeImg: '',
-        goodbyeImg: ''
-      }
-    } else if (global.db.data.bienvenidas[m.chat] === false) {
-      global.db.data.bienvenidas[m.chat] = {
-        enabled: false,
-        welcomeMsg: '',
-        goodbyeMsg: '',
-        welcomeImg: '',
-        goodbyeImg: ''
-      }
-    } else if (!global.db.data.bienvenidas[m.chat] || typeof global.db.data.bienvenidas[m.chat] !== 'object') {
-      global.db.data.bienvenidas[m.chat] = {
-        enabled: false,
-        welcomeMsg: '',
-        goodbyeMsg: '',
-        welcomeImg: '',
-        goodbyeImg: ''
-      }
+    if (fs.existsSync(v)) return fs.readFileSync(v)
+  } catch {}
+  return null
+}
+
+function borrarArchivoSiExiste(ruta) {
+  try {
+    if (ruta && fs.existsSync(ruta)) fs.unlinkSync(ruta)
+  } catch {}
+}
+
+function mensajeBienvenidaPorDefecto() {
+  return `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *bienvenida*
+_\${group}_
+
+${SEP}
+*hola*
+\${participant}
+
+miembros  ·  \`\${memberCount}\`
+fecha  ·  \`\${date}\`
+hora  ·  \`\${time}\`
+
+pase y siéntete en casa
+ㅤ`.trim()
+}
+
+function mensajeDespedidaPorDefecto() {
+  return `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *despedida*
+_\${group}_
+
+${SEP}
+*adiós*
+\${participant}
+
+miembros  ·  \`\${memberCount}\`
+fecha  ·  \`\${date}\`
+hora  ·  \`\${time}\`
+
+que te vaya bien
+ㅤ`.trim()
+}
+
+function asegurarConfig(chatId) {
+  if (!global.db.data.bienvenidas) global.db.data.bienvenidas = {}
+  const actual = global.db.data.bienvenidas[chatId]
+
+  if (actual === true) {
+    global.db.data.bienvenidas[chatId] = {
+      enabled: true,
+      welcomeMsg: '',
+      goodbyeMsg: '',
+      welcomeImg: '',
+      goodbyeImg: '',
     }
-    
-    if (accion === 'on') {
-      global.db.data.bienvenidas[m.chat].enabled = true
-      
-      let texto = `╭─「 *BIENVENIDAS ACTIVADAS* 」─╮\n`
-      texto += `│\n`
-      texto += `╰➺ *Estado:* Activado\n`
-      texto += `╰➺ *Funciones:* Bienvenidas + Despedidas\n`
-      texto += `╰➺ *Mensajes:* Por defecto (personalizables)\n`
-      texto += `╰➺ *Imágenes:* Foto del grupo (personalizables)\n`
-      texto += `│\n`
-      texto += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
-      
-      
-      await conn.sendMessage(m.chat, {
-        text: texto,
-        contextInfo: {
-          mentionedJid: [m.sender]
-        }
-      }, { quoted: m })
-      
-      const vistaPreviaBienvenida = global.db.data.bienvenidas[m.chat].welcomeMsg || 
-        `╭─「 *BIENVENIDO* 」─╮\n` +
-        `│\n` +
-        `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
-        `╰➺ *Grupo:* ${await conn.getName(m.chat) || 'Grupo'}\n` +
-        `╰➺ *Miembros:* ${(await conn.groupMetadata(m.chat)).participants.length}\n` +
-        `│\n` +
-        `╰➺ *Fecha:* ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n` +
-        `╰➺ *Hora:* ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}\n` +
-        `│\n` +
-        `╰➺ *Bienvenido al grupo!*\n` +
-        `> PAIN COMMUNITY`
-      
-      const vistaPreviaDespedida = global.db.data.bienvenidas[m.chat].goodbyeMsg || 
-        `╭─「 *ADIOS* 」─╮\n` +
-        `│\n` +
-        `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
-        `╰➺ *Grupo:* ${await conn.getName(m.chat) || 'Grupo'}\n` +
-        `╰➺ *Miembros:* ${(await conn.groupMetadata(m.chat)).participants.length}\n` +
-        `│\n` +
-        `╰➺ *Fecha:* ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n` +
-        `╰➺ *Hora:* ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}\n` +
-        `│\n` +
-        `╰➺ *¡Que tengas un buen día!*\n` +
-        `> PAIN COMMUNITY`
-      
-      await conn.sendMessage(m.chat, {
-        text: `《✧》*VISTA PREVIA ACTIVADA*\n\n*Mensaje de bienvenida:*\n${vistaPreviaBienvenida}\n\n*Mensaje de despedida:*\n${vistaPreviaDespedida}\n\n*Nota:* Las imágenes se mostrarán automáticamente con la foto del grupo.\n\n> Para personalizar las bienvenidas y despedidas usa el comando ${usedPrefix}welcome`
-      })
-      
-      return
-      
-    } else if (accion === 'off') {
-      global.db.data.bienvenidas[m.chat].enabled = false
-      
-      let texto = `╭─「 *BIENVENIDAS DESACTIVADAS* 」─╮\n`
-      texto += `│\n`
-      texto += `╰➺ *Estado:* Desactivado\n`
-      texto += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
-      texto += `\n> PAIN COMMUNITY`
-      
-      return conn.sendMessage(m.chat, {
-        text: texto,
-        contextInfo: {
-          mentionedJid: [m.sender]
-        }
-      }, { quoted: m })
-      
-    } else if (accion === 'msg') {
-      const tipo = args[1]?.toLowerCase()
-      const mensaje = m.text.replace(new RegExp(`^${usedPrefix}welcome\\s+msg\\s+${tipo}\\s+`, 'i'), '')
-      
-      if (!tipo || !mensaje) {
-        return conn.sendMessage(m.chat, {
-          text: `《✧》*Uso:* ${usedPrefix}welcome msg <tipo> <mensaje>\n\n*Tipos:*\n• welcome - Mensaje de bienvenida\n• goodbye - Mensaje de despedida\n\n*Variables disponibles:*\n• \${user} - Nombre del usuario\n• \${participant} - @usuario\n• \${group} - Nombre del grupo\n• \${memberCount} - Número de miembros\n• \${date} - Fecha actual\n• \${time} - Hora actual\n\n*Ejemplo:*\n${usedPrefix}welcome msg welcome ¡Hola \${user}! Bienvenido a \${group}`
-        }, { quoted: m })
-      }
-      
-      if (!global.db.data.bienvenidas[m.chat].enabled) {
-        return conn.sendMessage(m.chat, {
-          text: '《✧》*SISTEMA DESACTIVADO*\n\nPara personalizar mensajes, primero activa el sistema:\n\n.welcome on'
-        }, { quoted: m })
-      }
-      
-      if (tipo === 'welcome') {
-        global.db.data.bienvenidas[m.chat].welcomeMsg = mensaje
-        
-        const mensajeVistaPrevia = mensaje
-          .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
-          .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
-          .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
-          .replace(/\${memberCount}/g, (await conn.groupMetadata(m.chat)).participants.length)
-          .replace(/\${date}/g, new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }))
-          .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
-        
-        await conn.sendMessage(m.chat, {
-          text: `《✧》*MENSAJE DE BIENVENIDA CONFIGURADO*\n\n*Mensaje:* ${mensaje}\n\n*Ahora se enviará así cuando alguien entre al grupo:*`
-        }, { quoted: m })
-        
-        try {
-          const fotoPerfil = await conn.profilePictureUrl(m.chat, 'image')
-          await conn.sendMessage(m.chat, {
-            image: { url: fotoPerfil },
-            caption: mensajeVistaPrevia,
-            contextInfo: {
-              mentionedJid: [m.sender]
-            }
-          })
-        } catch (ppError) {
-          await conn.sendMessage(m.chat, {
-            text: mensajeVistaPrevia,
-            contextInfo: {
-              mentionedJid: [m.sender]
-            }
-          })
-        }
-        
-      } else if (tipo === 'goodbye') {
-        global.db.data.bienvenidas[m.chat].goodbyeMsg = mensaje
-        
-        const mensajeVistaPrevia = mensaje
-          .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
-          .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
-          .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
-          .replace(/\${memberCount}/g, (await conn.groupMetadata(m.chat)).participants.length)
-          .replace(/\${date}/g, new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }))
-          .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
-        
-        await conn.sendMessage(m.chat, {
-          text: `《✧》*MENSAJE DE DESPEDIDA CONFIGURADO*\n\n*Mensaje:* ${mensaje}\n\n*Ahora se enviará así cuando alguien salga del grupo:*`
-        }, { quoted: m })
-        
-        try {
-          const fotoPerfil = await conn.profilePictureUrl(m.chat, 'image')
-          await conn.sendMessage(m.chat, {
-            image: { url: fotoPerfil },
-            caption: mensajeVistaPrevia,
-            contextInfo: {
-              mentionedJid: [m.sender]
-            }
-          })
-        } catch (ppError) {
-          await conn.sendMessage(m.chat, {
-            text: mensajeVistaPrevia,
-            contextInfo: {
-              mentionedJid: [m.sender]
-            }
-          })
-        }
-        
-      } else {
-        return conn.sendMessage(m.chat, {
-          text: '《✧》Tipo inválido. Usa: welcome o goodbye'
-        }, { quoted: m })
-      }
-      
-    } else if (accion === 'img') {
-      const tipo = args[1]?.toLowerCase()
-      const urlImagen = args[2]
-      
-      if (!tipo || !urlImagen) {
-        return conn.sendMessage(m.chat, {
-          text: `《✧》*Uso:* ${usedPrefix}welcome img <tipo> <url>\n\n*Tipos:*\n• welcome - Imagen de bienvenida\n• goodbye - Imagen de despedida\n• reset - Quitar imagen personalizada\n\n*Ejemplo:*\n${usedPrefix}welcome img welcome https://ejemplo.com/imagen.jpg`
-        }, { quoted: m })
-      }
-      
-      if (!global.db.data.bienvenidas[m.chat].enabled) {
-        return conn.sendMessage(m.chat, {
-          text: '《✧》*SISTEMA DESACTIVADO*\n\nPara personalizar imágenes, primero activa el sistema:\n\n.welcome on'
-        }, { quoted: m })
-      }
-      
-      if (tipo === 'welcome') {
-        if (urlImagen === 'reset') {
-          global.db.data.bienvenidas[m.chat].welcomeImg = ''
-          
-          return conn.sendMessage(m.chat, {
-            text: '《✧》Imagen de bienvenida reseteada. Se usará la foto del grupo.'
-          }, { quoted: m })
-        }
-        
-        global.db.data.bienvenidas[m.chat].welcomeImg = urlImagen
-        
-        const welcomeMsg = global.db.data.bienvenidas[m.chat].welcomeMsg || 
-          `╭─「 *BIENVENIDO* 」─╮\n` +
-          `│\n` +
-          `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
-          `╰➺ *Grupo:* ${await conn.getName(m.chat) || 'Grupo'}\n` +
-          `╰➺ *Miembros:* ${(await conn.groupMetadata(m.chat)).participants.length}\n` +
-          `│\n` +
-          `╰➺ *Fecha:* ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n` +
-          `╰➺ *Hora:* ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}\n` +
-          `│\n` +
-          `╰➺ *Bienvenido al grupo!*\n` +
-          `> PAIN COMMUNITY`
-        
-        const mensajeBienvenidaFinal = welcomeMsg
-          .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
-          .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
-          .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
-          .replace(/\${memberCount}/g, (await conn.groupMetadata(m.chat)).participants.length)
-          .replace(/\${date}/g, new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }))
-          .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
-        
-        await conn.sendMessage(m.chat, {
-          text: `《✧》*IMAGEN DE BIENVENIDA CONFIGURADA*\n\n*URL:* ${urlImagen}\n\n*Ahora se enviará así cuando alguien entre al grupo:*`
-        }, { quoted: m })
-        
-        try {
-          await conn.sendMessage(m.chat, {
-            image: { url: urlImagen },
-            caption: mensajeBienvenidaFinal,
-            contextInfo: {
-              mentionedJid: [m.sender]
-            }
-          })
-        } catch (imgError) {
-          return conn.sendMessage(m.chat, {
-            text: `《✧》*ERROR AL CARGAR IMAGEN*\n\n*URL:* ${urlImagen}\n\n*Error:* La imagen no se puede cargar. Verifica que la URL sea válida.`
-          }, { quoted: m })
-        }
-        
-      } else if (tipo === 'goodbye') {
-        if (urlImagen === 'reset') {
-          global.db.data.bienvenidas[m.chat].goodbyeImg = ''
-          
-          return conn.sendMessage(m.chat, {
-            text: '《✧》Imagen de despedida reseteada. Se usará la foto del grupo.'
-          }, { quoted: m })
-        }
-        global.db.data.bienvenidas[m.chat].goodbyeImg = urlImagen
-        
-        const goodbyeMsg = global.db.data.bienvenidas[m.chat].goodbyeMsg || 
-          `╭─「 *ADIOS* 」─╮\n` +
-          `│\n` +
-          `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
-          `╰➺ *Grupo:* ${await conn.getName(m.chat) || 'Grupo'}\n` +
-          `╰➺ *Miembros:* ${(await conn.groupMetadata(m.chat)).participants.length}\n` +
-          `│\n` +
-          `╰➺ *Fecha:* ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n` +
-          `╰➺ *Hora:* ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}\n` +
-          `│\n` +
-          `╰➺ *¡Que tengas un buen día!*\n` +
-          `> PAIN COMMUNITY`
-        
-        const mensajeDespedidaFinal = goodbyeMsg
-          .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
-          .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
-          .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
-          .replace(/\${memberCount}/g, (await conn.groupMetadata(m.chat)).participants.length)
-          .replace(/\${date}/g, new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }))
-          .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
-        
-        await conn.sendMessage(m.chat, {
-          text: `《✧》*IMAGEN DE DESPEDIDA CONFIGURADA*\n\n*URL:* ${urlImagen}\n\n*Ahora se enviará así cuando alguien salga del grupo:*`
-        }, { quoted: m })
-        
-        try {
-          await conn.sendMessage(m.chat, {
-            image: { url: urlImagen },
-            caption: mensajeDespedidaFinal,
-            contextInfo: {
-              mentionedJid: [m.sender]
-            }
-          })
-        } catch (imgError) {
-          return conn.sendMessage(m.chat, {
-            text: `《✧》*ERROR AL CARGAR IMAGEN*\n\n*URL:* ${urlImagen}\n\n*Error:* La imagen no se puede cargar. Verifica que la URL sea válida.`
-          }, { quoted: m })
-        }
-        
-      } else {
-        return conn.sendMessage(m.chat, {
-          text: '《✧》Tipo inválido. Usa: welcome o goodbye'
-        }, { quoted: m })
-      }
-      
-    } else if (accion === 'status' || accion === 'estado') {
-      const configuracion = global.db.data.bienvenidas[m.chat]
-      const estaActivo = configuracion.enabled === true
-      const estado = estaActivo ? 'ACTIVADO' : 'DESACTIVADO'
-      
-      let texto = `╭─「 *ESTADO DE BIENVENIDAS* 」─╮\n`
-      texto += `│\n`
-      texto += `╰➺ *Estado:* ${estado}\n`
-      texto += `╰➺ *Grupo:* ${m.chat}\n`
-      texto += `│\n`
-      texto += `╰➺ *Mensaje Bienvenida:* ${configuracion.welcomeMsg || 'Por defecto'}\n`
-      texto += `╰➺ *Mensaje Despedida:* ${configuracion.goodbyeMsg || 'Por defecto'}\n`
-      texto += `╰➺ *Imagen Bienvenida:* ${configuracion.welcomeImg || 'Foto del grupo'}\n`
-      texto += `╰➺ *Imagen Despedida:* ${configuracion.goodbyeImg || 'Foto del grupo'}\n`
-      texto += `│\n`
-      texto += `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n`
-      texto += `\n> PAIN COMMUNITY`
-      
-      return conn.sendMessage(m.chat, {
-        text: texto,
-        contextInfo: {
-          mentionedJid: [m.sender]
-        }
-      }, { quoted: m })
-      
-    } else if (accion === 'reset') {
-      global.db.data.bienvenidas[m.chat] = {
-        enabled: false,
-        welcomeMsg: '',
-        goodbyeMsg: '',
-        welcomeImg: '',
-        goodbyeImg: ''
-      }
-      
-      return conn.sendMessage(m.chat, {
-        text: '《✧》*CONFIGURACIÓN RESETEADA*\n\n*Mensajes:* Por defecto\n*Imágenes:* Foto del grupo\n*Estado:* Desactivado'
-      }, { quoted: m })
-      
-    } else if (accion === 'debug' || accion === 'test') {
-      const configuracion = global.db.data.bienvenidas[m.chat]
-      let infoDepuracion = `《✧》*DEBUG - CONFIGURACIÓN ACTUAL*\n\n`
-      infoDepuracion += `*Grupo:* ${m.chat}\n`
-      infoDepuracion += `*Tipo de configuración:* ${typeof configuracion}\n`
-      infoDepuracion += `*Configuración completa:* ${JSON.stringify(configuracion, null, 2)}\n\n`
-      
-      if (configuracion && typeof configuracion === 'object') {
-        infoDepuracion += `*Estado:* ${configuracion.enabled ? 'ACTIVADO' : 'DESACTIVADO'}\n`
-        infoDepuracion += `*Mensaje bienvenida:* ${configuracion.welcomeMsg || 'Por defecto'}\n`
-        infoDepuracion += `*Mensaje despedida:* ${configuracion.goodbyeMsg || 'Por defecto'}\n`
-        infoDepuracion += `*Imagen bienvenida:* ${configuracion.welcomeImg || 'Foto del grupo'}\n`
-        infoDepuracion += `*Imagen despedida:* ${configuracion.goodbyeImg || 'Foto del grupo'}\n`
-      } else {
-        infoDepuracion += `*Error:* Configuración no válida\n`
-      }
-      
-      return conn.sendMessage(m.chat, {
-        text: infoDepuracion
-      }, { quoted: m })
-      
-    } else if (accion === 'testimg') {
-      const configuracion = global.db.data.bienvenidas[m.chat]
-      
-      if (!configuracion || !configuracion.enabled) {
-        return conn.sendMessage(m.chat, {
-          text: '《✧》El sistema no está activado. Usa .welcome on primero.'
-        }, { quoted: m })
-      }
-      
-      if (!configuracion.welcomeImg || configuracion.welcomeImg === '') {
-        return conn.sendMessage(m.chat, {
-          text: '《✧》No hay imagen personalizada configurada. Usa .welcome img welcome <url> primero.'
-        }, { quoted: m })
-      }
-      
-      const mensajePrueba = configuracion.welcomeMsg || 
-        `╭─「 *BIENVENIDO* 」─╮\n` +
-        `│\n` +
-        `╰➺ *Usuario:* @${m.sender.split('@')[0]}\n` +
-        `╰➺ *Grupo:* ${await conn.getName(m.chat) || 'Grupo'}\n` +
-        `╰➺ *Miembros:* ${(await conn.groupMetadata(m.chat)).participants.length}\n` +
-        `│\n` +
-        `╰➺ *Fecha:* ${new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}\n` +
-        `╰➺ *Hora:* ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}\n` +
-        `│\n` +
-        `╰➺ *Bienvenido al grupo!*\n` +
-        `> PAIN COMMUNITY`
-      
-      const mensajePruebaFinal = mensajePrueba
-        .replace(/\${user}/g, await conn.getName(m.sender) || 'Usuario')
-        .replace(/\${participant}/g, `@${m.sender.split('@')[0]}`)
-        .replace(/\${group}/g, await conn.getName(m.chat) || 'Grupo')
-        .replace(/\${memberCount}/g, (await conn.groupMetadata(m.chat)).participants.length)
-        .replace(/\${date}/g, new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }))
-        .replace(/\${time}/g, new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }))
-      
-      try {
-        await conn.sendMessage(m.chat, {
-          text: `《✧》*PRUEBA DE IMAGEN PERSONALIZADA*\n\n*URL:* ${configuracion.welcomeImg}\n\n*Enviando mensaje de prueba:*`
-        }, { quoted: m })
-        
-        await conn.sendMessage(m.chat, {
-          image: { url: configuracion.welcomeImg },
-          caption: mensajePruebaFinal,
-          contextInfo: {
-            mentionedJid: [m.sender]
-          }
-        })
-        
-        await conn.sendMessage(m.chat, {
-          text: '《✧》*PRUEBA COMPLETADA*\n\nSi ves la imagen personalizada arriba, el sistema funciona correctamente.'
-        })
-        
-      } catch (error) {
-        return conn.sendMessage(m.chat, {
-          text: `《✧》*ERROR EN PRUEBA*\n\n*Error:* ${error.message}\n\n*URL:* ${configuracion.welcomeImg}`
-        }, { quoted: m })
-      }
-      
-    } else {
-      return conn.sendMessage(m.chat, {
-        text: `《✧》*SISTEMA DE BIENVENIDAS - PAIN BOT*\n\n*COMANDOS PRINCIPALES:*\n• ${usedPrefix}welcome on - Activar sistema\n• ${usedPrefix}welcome off - Desactivar sistema\n• ${usedPrefix}welcome status - Ver estado\n• ${usedPrefix}welcome reset - Resetear configuración\n• ${usedPrefix}welcome debug - Debug configuración\n• ${usedPrefix}welcome testimg - Probar imagen personalizada\n\n*PERSONALIZACIÓN (Solo cuando está ACTIVADO):*\n• ${usedPrefix}welcome msg welcome <mensaje> - Mensaje bienvenida\n• ${usedPrefix}welcome msg goodbye <mensaje> - Mensaje despedida\n• ${usedPrefix}welcome img welcome <url> - Imagen bienvenida\n• ${usedPrefix}welcome img goodbye <url> - Imagen despedida\n\n*VARIABLES DISPONIBLES:*\n• \${user} - Nombre del usuario (ej: Juan)\n• \${participant} - Usuario con @ (ej: @123456789)\n• \${group} - Nombre del grupo (ej: Grupo de amigos)\n• \${memberCount} - Número de miembros (ej: 25)\n• \${date} - Fecha actual (ej: 29 de agosto de 2025)\n• \${time} - Hora actual (ej: 18:50)\n\n*EJEMPLOS DE USO:*\n• ${usedPrefix}welcome msg welcome Hola \${user}, bienvenido a \${group}!\n• ${usedPrefix}welcome msg goodbye Adios \${user}, gracias por estar en \${group}\n\n*FUNCIONA AUTOMÁTICAMENTE:*\n• Cuando alguien entra al grupo\n• Cuando alguien sale del grupo\n\n*NOTA:* Para personalizar mensajes e imágenes, primero activa el sistema con .welcome on`
-      }, { quoted: m })
+  } else if (actual === false) {
+    global.db.data.bienvenidas[chatId] = {
+      enabled: false,
+      welcomeMsg: '',
+      goodbyeMsg: '',
+      welcomeImg: '',
+      goodbyeImg: '',
     }
-    
-  } catch (e) {
-    console.error('Error en bienvenidas:', e)
-    return conn.sendMessage(m.chat, {
-      text: '《✧》Ocurrió un error al configurar las bienvenidas.'
-    }, { quoted: m })
+  } else if (!actual || typeof actual !== 'object') {
+    global.db.data.bienvenidas[chatId] = {
+      enabled: false,
+      welcomeMsg: '',
+      goodbyeMsg: '',
+      welcomeImg: '',
+      goodbyeImg: '',
+    }
+  }
+  return global.db.data.bienvenidas[chatId]
+}
+
+async function datosVistaPrevia(conn, m) {
+  const meta = await conn.groupMetadata(m.chat).catch(() => null)
+  return {
+    user: (await conn.getName(m.sender)) || 'Usuario',
+    participant: `@${String(m.sender).split('@')[0]}`,
+    group: (await conn.getName(m.chat)) || 'Grupo',
+    memberCount: meta?.participants?.length || 0,
+    date: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }),
+    time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
   }
 }
 
-handler.help = ['bienvenidas']
+function aplicarVars(plantilla, data) {
+  return String(plantilla || '')
+    .replace(/\${user}/g, data.user)
+    .replace(/\${participant}/g, data.participant)
+    .replace(/\${group}/g, data.group)
+    .replace(/\${memberCount}/g, data.memberCount)
+    .replace(/\${date}/g, data.date)
+    .replace(/\${time}/g, data.time)
+}
+
+async function enviarTexto(conn, m, text, mentions = []) {
+  return conn.sendMessage(m.chat, {
+    text,
+    contextInfo: {
+      ...(global.rcanal?.contextInfo || {}),
+      ...(mentions.length ? { mentionedJid: mentions } : {}),
+    },
+  }, { quoted: m })
+}
+
+async function enviarVistaConImagen(conn, m, caption, rutaOUrl, mentions = [m.sender]) {
+  try {
+    let image = payloadImagen(rutaOUrl)
+    if (!image) {
+      const pp = await conn.profilePictureUrl(m.chat, 'image').catch(() => null)
+      if (pp) image = { url: pp }
+    }
+    if (image) {
+      await conn.sendMessage(m.chat, {
+        image,
+        caption,
+        contextInfo: {
+          ...(global.rcanal?.contextInfo || {}),
+          mentionedJid: mentions,
+        },
+      }, { quoted: m })
+      return
+    }
+  } catch {}
+  await enviarTexto(conn, m, caption, mentions)
+}
+
+function guia(usedPrefix) {
+  return `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *bienvenidas*
+_configuración del grupo_
+
+${SEP}
+*comandos*
+> ${usedPrefix}welcome on
+> ${usedPrefix}welcome off
+> ${usedPrefix}welcome status
+> ${usedPrefix}welcome reset
+
+${SEP}
+*mensajes*
+> ${usedPrefix}welcome msg welcome <texto>
+> ${usedPrefix}welcome msg goodbye <texto>
+
+${SEP}
+*imágenes*
+_(responde a una foto)_
+> ${usedPrefix}welcome img welcome
+> ${usedPrefix}welcome img goodbye
+> ${usedPrefix}welcome img welcome reset
+> ${usedPrefix}welcome img goodbye reset
+
+${SEP}
+*variables*
+${tip('${user}')}  ·  nombre
+${tip('${participant}')}  ·  @mención
+${tip('${group}')}  ·  grupo
+${tip('${memberCount}')}  ·  miembros
+${tip('${date}')}  ·  fecha
+${tip('${time}')}  ·  hora
+
+${SEP}
+*ejemplo*
+> ${usedPrefix}welcome msg welcome hola \${participant}, bienvenido a \${group}
+
+activa primero con ${tip(usedPrefix + 'welcome on')}
+ㅤ`.trim()
+}
+
+let handler = async (m, { conn, args, usedPrefix, command }) => {
+  try {
+    if (!m.isGroup) {
+      return enviarTexto(conn, m, 'Este comando solo funciona en grupos.')
+    }
+
+    const accion = args[0]?.toLowerCase()
+    const cfg = asegurarConfig(m.chat)
+
+    if (accion === 'on') {
+      cfg.enabled = true
+      const data = await datosVistaPrevia(conn, m)
+      const bienvenida = aplicarVars(cfg.welcomeMsg || mensajeBienvenidaPorDefecto(), data)
+      const despedida = aplicarVars(cfg.goodbyeMsg || mensajeDespedidaPorDefecto(), data)
+
+      await enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *bienvenidas*
+_activadas_
+
+${SEP}
+estado  ·  ${tip('activado')}
+bienvenida + despedida
+
+${SEP}
+*vista previa — bienvenida*
+${bienvenida}
+
+${SEP}
+*vista previa — despedida*
+${despedida}
+
+${SEP}
+> ${usedPrefix}welcome msg welcome <texto>
+> ${usedPrefix}welcome img welcome
+ㅤ`.trim(), [m.sender])
+      return
+    }
+
+    if (accion === 'off') {
+      cfg.enabled = false
+      return enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *bienvenidas*
+_desactivadas_
+
+${SEP}
+estado  ·  ${tip('apagado')}
+ㅤ`.trim(), [m.sender])
+    }
+
+    if (accion === 'msg') {
+      const tipo = args[1]?.toLowerCase()
+      const mensaje = m.text.replace(new RegExp(`^\\s*${usedPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}?${command}\\s+msg\\s+${tipo}\\s+`, 'i'), '').trim()
+
+      if (!tipo || !mensaje || !['welcome', 'goodbye'].includes(tipo)) {
+        return enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *mensaje*
+
+${SEP}
+> ${usedPrefix}welcome msg welcome <texto>
+> ${usedPrefix}welcome msg goodbye <texto>
+
+${SEP}
+*variables*
+${tip('${user}')}  ${tip('${participant}')}
+${tip('${group}')}  ${tip('${memberCount}')}
+${tip('${date}')}  ${tip('${time}')}
+ㅤ`.trim())
+      }
+
+      if (!cfg.enabled) {
+        return enviarTexto(conn, m, `Activa primero:\n> ${usedPrefix}welcome on`)
+      }
+
+      if (tipo === 'welcome') cfg.welcomeMsg = mensaje
+      else cfg.goodbyeMsg = mensaje
+
+      const data = await datosVistaPrevia(conn, m)
+      const preview = aplicarVars(mensaje, data)
+      await enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *${tipo === 'welcome' ? 'bienvenida' : 'despedida'}*
+_mensaje guardado_
+
+${SEP}
+${tip(mensaje)}
+ㅤ`.trim())
+      await enviarVistaConImagen(conn, m, preview, tipo === 'welcome' ? cfg.welcomeImg : cfg.goodbyeImg)
+      return
+    }
+
+    if (accion === 'img') {
+      const tipo = args[1]?.toLowerCase()
+      const extra = String(args[2] || '').toLowerCase()
+
+      if (!tipo || !['welcome', 'goodbye'].includes(tipo)) {
+        return enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *imagen*
+
+${SEP}
+responde a una foto con:
+> ${usedPrefix}welcome img welcome
+> ${usedPrefix}welcome img goodbye
+
+reset:
+> ${usedPrefix}welcome img welcome reset
+ㅤ`.trim())
+      }
+
+      if (!cfg.enabled) {
+        return enviarTexto(conn, m, `Activa primero:\n> ${usedPrefix}welcome on`)
+      }
+
+      if (extra === 'reset') {
+        const rutaVieja = tipo === 'welcome' ? cfg.welcomeImg : cfg.goodbyeImg
+        borrarArchivoSiExiste(rutaVieja)
+        borrarArchivoSiExiste(rutaImagenTipo(m.chat, tipo))
+        if (tipo === 'welcome') cfg.welcomeImg = ''
+        else cfg.goodbyeImg = ''
+        return enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *imagen*
+_reseteada_
+
+${SEP}
+ahora se usa la foto del grupo
+ㅤ`.trim())
+      }
+
+      const q = m.quoted || m
+      const tipoMime = (q.msg || q).mimetype || q.mimetype || ''
+      if (!/image\/(jpe?g|png|webp)/i.test(tipoMime)) {
+        return enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *imagen*
+
+${SEP}
+responde a una *foto* con:
+> ${usedPrefix}welcome img ${tipo}
+ㅤ`.trim())
+      }
+
+      let buffer
+      try {
+        buffer = await q.download?.()
+      } catch {}
+      if (!buffer?.length) {
+        return enviarTexto(conn, m, 'No pude descargar la imagen. Intenta de nuevo.')
+      }
+
+      const ruta = rutaImagenTipo(m.chat, tipo)
+      const anterior = tipo === 'welcome' ? cfg.welcomeImg : cfg.goodbyeImg
+      if (anterior && anterior !== ruta) borrarArchivoSiExiste(anterior)
+
+      fs.writeFileSync(ruta, buffer)
+      if (tipo === 'welcome') cfg.welcomeImg = ruta
+      else cfg.goodbyeImg = ruta
+
+      const data = await datosVistaPrevia(conn, m)
+      const plantilla = tipo === 'welcome'
+        ? (cfg.welcomeMsg || mensajeBienvenidaPorDefecto())
+        : (cfg.goodbyeMsg || mensajeDespedidaPorDefecto())
+      const preview = aplicarVars(plantilla, data)
+
+      await enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *imagen*
+_guardada_
+
+${SEP}
+${tipo === 'welcome' ? 'bienvenida' : 'despedida'}  ·  ${tip('foto del chat')}
+ㅤ`.trim())
+      await enviarVistaConImagen(conn, m, preview, ruta)
+      return
+    }
+
+    if (accion === 'status' || accion === 'estado') {
+      const activo = cfg.enabled === true
+      return enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *estado*
+_bienvenidas_
+
+${SEP}
+estado  ·  ${tip(activo ? 'activado' : 'apagado')}
+msg bienvenida  ·  ${tip(cfg.welcomeMsg ? 'personalizado' : 'por defecto')}
+msg despedida  ·  ${tip(cfg.goodbyeMsg ? 'personalizado' : 'por defecto')}
+img bienvenida  ·  ${tip(cfg.welcomeImg ? 'personalizada' : 'foto del grupo')}
+img despedida  ·  ${tip(cfg.goodbyeImg ? 'personalizada' : 'foto del grupo')}
+ㅤ`.trim(), [m.sender])
+    }
+
+    if (accion === 'reset') {
+      global.db.data.bienvenidas[m.chat] = {
+        enabled: false,
+        welcomeMsg: '',
+        goodbyeMsg: '',
+        welcomeImg: '',
+        goodbyeImg: '',
+      }
+      return enviarTexto(conn, m, `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *reset*
+_listo_
+
+${SEP}
+mensajes  ·  ${tip('por defecto')}
+imágenes  ·  ${tip('foto del grupo')}
+estado  ·  ${tip('apagado')}
+ㅤ`.trim())
+    }
+
+    return enviarTexto(conn, m, guia(usedPrefix))
+  } catch (e) {
+    console.error('Error en bienvenidas:', e)
+    return enviarTexto(conn, m, 'Ocurrió un error al configurar las bienvenidas.')
+  }
+}
+
+handler.help = ['welcome', 'welcome on/off', 'welcome status']
 handler.tags = ['grupo']
 handler.command = ['welcome', 'bienvenidas', 'bienvenida']
 handler.group = true
@@ -453,3 +427,8 @@ handler.admin = true
 handler.botAdmin = true
 
 export default handler
+
+export {
+  mensajeBienvenidaPorDefecto as defaultWelcomeMessage,
+  mensajeDespedidaPorDefecto as defaultGoodbyeMessage,
+}
