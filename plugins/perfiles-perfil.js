@@ -197,6 +197,8 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
   const nombre = String(datosUsuario.name || 'sin nombre').trim() || 'sin nombre'
   const genero = datosUsuario.genre && datosUsuario.genre !== 'No establecido' ? datosUsuario.genre : '—'
   const cumple = datosUsuario.birth && datosUsuario.birth !== 'No registrado' ? datosUsuario.birth : '—'
+  const edadNum = Number(datosUsuario.age)
+  const edad = Number.isFinite(edadNum) && edadNum > 0 ? `${edadNum} años` : '—'
   const desc = datosUsuario.desc && datosUsuario.desc !== 'Sin descripción' ? datosUsuario.desc : 'sin descripción aún'
   const favorito = datosUsuario.favourite && datosUsuario.favourite !== 'No establecido' ? datosUsuario.favourite : '—'
   const moneda = global.moneda || 'coins'
@@ -209,13 +211,15 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
 _${userRole}_
 
 ${sep}
-*esencia*
-${tip(genero)}  ·  ${tip(cumple)}
+*sobre ti*
+${tip(genero)}  ·  ${tip(edad)}  ·  ${tip(cumple)}
 ${tip(desc)}
 ♡  ${tip(favorito)}
+${lineaVinculo}
+${tip(datosUsuario.registered ? 'registrado' : 'sin registro')}
 
 ${sep}
-*progreso*
+*nivel y dinero*
 nivel  ${tip(rpg.level)}
 ${tip(rpg.bar)}
 ${tip(rpg.ratio)}  xp
@@ -224,20 +228,16 @@ ${tip(formatNumber(totalCoins))}  ${moneda}
 banco  ·  ${tip(bancoInfo)}
 
 ${sep}
-*eco*
+*actividad*
 comandos  ·  ${tip(formatNumber(rpg.commandCount))}
 stickers  ·  ${tip(formatNumber(rpg.stickerCount))}
 mensajes  ·  ${tip(formatNumber(msgTotal))}${m.isGroup ? `\nen este grupo  ·  ${tip(formatNumber(msgGroup))}` : ''}
 
 ${sep}
-*vínculo*
-${lineaVinculo}
-${tip(datosUsuario.registered ? 'registrado' : 'sin registro')}
-
-${sep}
-*editar*
+*editar perfil*
 > ${usedPrefix}setname <nombre>
 > ${usedPrefix}setgenre <hombre/mujer>
+> ${usedPrefix}setage <edad>
 > ${usedPrefix}setbirth <fecha>
 > ${usedPrefix}setdesc <texto>
 > ${usedPrefix}setfav <favorito>
