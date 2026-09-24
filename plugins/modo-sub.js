@@ -352,6 +352,46 @@ export function debeOmitirPorModoSub(conn, idChat, { allowModoSubCommand = false
   return true
 }
 
+function mismoSocketConn(a, b) {
+  if (!a || !b) return false
+  if (a === b) return true
+  const A = numerosIdentidadBot(a)
+  const B = numerosIdentidadBot(b)
+  for (const n of A) if (B.has(n)) return true
+  return false
+}
+
+/**
+ * Un solo bot “dueño” del grupo para antis / borrados.
+ * 1) Si hay /modosub N → ese bot
+ * 2) Si está en all → principal (si está en el grupo), si no el sub con número más bajo
+ */
+export function elegirBotResponsableGrupo(idChat, participants = []) {
+  const bots = listarBotsEnGrupo(participants)
+  if (!bots.length) return null
+
+  const activo = obtenerBotActivoDelGrupo(idChat)
+  if (activo) {
+    const elegido = bots.find(b =>
+      b.number === activo ||
+      esteBotCoincideConActivo(b.conn, activo, participants)
+    )
+    if (elegido) return elegido.conn
+  }
+
+  const principal = bots.find(b => b.type === 'principal')
+  if (principal) return principal.conn
+
+  return [...bots].sort((a, b) => String(a.number).localeCompare(String(b.number)))[0]?.conn || null
+}
+
+/** ¿Este socket es el que debe aplicar anti-media / borrados en el grupo? */
+export function esteBotEsResponsableDelGrupo(conn, idChat, participants = []) {
+  const responsable = elegirBotResponsableGrupo(idChat, participants)
+  if (!responsable) return true
+  return mismoSocketConn(conn, responsable)
+}
+
 let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, participants, groupMetadata }) => {
   if (!m.isGroup) {
     return m.reply('[❗] Este comando solo funciona en grupos.')
@@ -433,6 +473,8 @@ export {
   numerosIdentidadBot as botIdentityNumbers,
   numeroPublicoBot as publicBotNumber,
   esteBotCoincideConActivo as thisBotMatchesActive,
+  elegirBotResponsableGrupo as pickGroupResponsibleBot,
+  esteBotEsResponsableDelGrupo as isGroupResponsibleBot,
   esConnBotPrincipal as isMainBotConn,
   listarBotsEnGrupo as listBotsInGroup,
   obtenerBotActivoDelGrupo as getActiveBotForGroup,
