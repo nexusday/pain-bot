@@ -1,8 +1,9 @@
 import yts from 'yt-search'
+import fetch from 'node-fetch'
 import { join, extname, dirname } from 'path'
 import { existsSync, readdirSync, readFileSync, unlinkSync, mkdirSync } from 'fs'
 import { fileURLToPath } from 'url'
-import { ejecutarYtDlp } from '../lib/ytdlp.js'
+import { ejecutarYtDlp, esBloqueoBotYouTube, rutaCookiesYouTube } from '../lib/ytdlp.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DIR_TMP = join(__dirname, '../tmp')
@@ -73,6 +74,13 @@ function mimePorArchivo(ruta) {
   return { mime: 'audio/mpeg', ext: 'mp3' }
 }
 
+function archivoGenerado(id) {
+  const archivo = readdirSync(DIR_TMP)
+    .filter(n => n.startsWith(`play3_${id}.`))
+    .sort((a, b) => a.length - b.length)[0]
+  return archivo ? join(DIR_TMP, archivo) : null
+}
+
 async function resolverVideo(texto) {
   const consulta = String(texto || '').trim()
   if (!consulta) throw '[❗] Ingresa el nombre o enlace de YouTube.'
@@ -117,30 +125,64 @@ async function resolverVideo(texto) {
   }
 }
 
+const CLIENTES = [
+  'ios,tv,mweb',
+  'tv_embedded,ios',
+  'mweb,web',
+]
 
-async function descargarAudioRapido(url, id) {
+async function descargarConYtDlp(url, id) {
   asegurarTmp()
   const plantilla = join(DIR_TMP, `play3_${id}.%(ext)s`)
+  let ultimoError = null
 
-  await ejecutarYtDlp(url, {
-    output: plantilla,
-    format: 'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best',
-    noPlaylist: true,
-    noWarnings: true,
-    quiet: true,
-    noCheckCertificates: true,
-    restrictFilenames: true,
-    concurrentFragments: 8,
-    retries: 2,
-    fragmentRetries: 2,
-  })
+  for (const clientes of CLIENTES) {
+    try {
+      await ejecutarYtDlp(url, {
+        output: plantilla,
+        format: 'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best',
+        quiet: true,
+        extractorArgs: `youtube:player_client=${clientes}`,
+      })
+      const ruta = archivoGenerado(id)
+      if (ruta) return { ruta, via: 'yt-dlp' }
+    } catch (e) {
+      ultimoError = e
+      if (!esBloqueoBotYouTube(e)) throw e
+    }
+  }
 
-  const archivo = readdirSync(DIR_TMP)
-    .filter(n => n.startsWith(`play3_${id}.`))
-    .sort((a, b) => a.length - b.length)[0]
+  throw ultimoError || new Error('yt-dlp falló')
+}
 
-  if (!archivo) throw new Error('yt-dlp no generó el archivo de audio.')
-  return join(DIR_TMP, archivo)
+/** Fallback si YouTube bloquea la IP del VPS (mismo backend que /play). */
+async function descargarConApi(url) {
+  const apiDescarga = `https://api.delirius.online/download/ytmp3?url=${encodeURIComponent(url)}`
+  const res = await fetch(apiDescarga).then(r => r.json()).catch(() => null)
+  if (!res?.status || !res.data) throw new Error('API alternativa también falló')
+
+  const urlAudio = typeof res.data.download === 'string'
+    ? res.data.download
+    : res.data.download?.url
+
+  if (!urlAudio) throw new Error('API sin URL de audio')
+
+  return {
+    url: urlAudio,
+    title: res.data.title || null,
+    via: 'api',
+  }
+}
+
+async function descargarAudio(url, id) {
+  try {
+    return await descargarConYtDlp(url, id)
+  } catch (e) {
+    if (!esBloqueoBotYouTube(e)) throw e
+    console.warn('[play3] YouTube bloqueó yt-dlp (IP VPS). Usando API alternativa...')
+    const alt = await descargarConApi(url)
+    return alt
+  }
 }
 
 async function enviarInfo(conn, m, video, informacion) {
@@ -186,34 +228,49 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
  𓍯  *Duración:* ${video.timestamp}
  𓍯  *Enlace:* ${video.url}`
 
-   
-    const promesaDescarga = descargarAudioRapido(video.url, id)
+    const promesaDescarga = descargarAudio(video.url, id)
     const promesaInfo = enviarInfo(conn, m, video, informacion)
 
-    ;[rutaAudio] = await Promise.all([promesaDescarga, promesaInfo])
+    const [descarga] = await Promise.all([promesaDescarga, promesaInfo])
 
-    const buffer = readFileSync(rutaAudio)
-    if (!buffer?.length) throw new Error('El archivo de audio está vacío.')
-
-    const { mime, ext } = mimePorArchivo(rutaAudio)
-
-    await conn.sendMessage(m.chat, {
-      audio: buffer,
-      fileName: `${nombreSeguro(video.title)}.${ext}`,
-      mimetype: mime,
-      ptt: false,
-    }, { quoted: m })
+    if (descarga.ruta) {
+      rutaAudio = descarga.ruta
+      const buffer = readFileSync(rutaAudio)
+      if (!buffer?.length) throw new Error('El archivo de audio está vacío.')
+      const { mime, ext } = mimePorArchivo(rutaAudio)
+      await conn.sendMessage(m.chat, {
+        audio: buffer,
+        fileName: `${nombreSeguro(video.title)}.${ext}`,
+        mimetype: mime,
+        ptt: false,
+      }, { quoted: m })
+    } else {
+      await conn.sendMessage(m.chat, {
+        audio: { url: descarga.url },
+        fileName: `${nombreSeguro(descarga.title || video.title)}.mp3`,
+        mimetype: 'audio/mpeg',
+        ptt: false,
+      }, { quoted: m })
+    }
 
     conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})
   } catch (e) {
     console.error('Error en play3:', e)
     conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } }).catch(() => {})
+
+    let msg = typeof e === 'string' ? e : `[❌] No se pudo descargar.\n> ${e?.stderr || e?.message || e}`
+    if (esBloqueoBotYouTube(e) && !rutaCookiesYouTube()) {
+      msg = `[❌] YouTube bloqueó la IP del VPS.
+
+> Sube cookies en:
+> \`storage/youtube-cookies.txt\`
+> (extensión *Get cookies.txt LOCALLY* estando logueado en YouTube)
+
+> Luego reinicia el bot y prueba de nuevo.`
+    }
+
     await conn.sendMessage(m.chat, {
-      text: typeof e === 'string'
-        ? e
-        : e?.code === 'ENOENT'
-          ? '[❌] Falta *yt-dlp* en el servidor. Reinicia el bot (se descarga solo) o instálalo en el VPS.'
-          : `[❌] No se pudo descargar.\n> ${e?.stderr || e?.message || e}`,
+      text: msg,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m })
   } finally {

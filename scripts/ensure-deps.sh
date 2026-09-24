@@ -60,7 +60,7 @@ if [ -n "$YTDLP" ]; then
   echo "[deps] ✓ yt-dlp ($YTDLP)"
 else
   echo "[deps] ✗ yt-dlp no encontrado — descargando binario oficial..."
-  URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+  URL="https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp"
   TMP="$YTDLP_LOCAL.part"
 
   if tiene curl; then

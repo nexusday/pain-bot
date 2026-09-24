@@ -10,4 +10,8 @@ storage/msgdels/
 package-lock.json
 tmp/
 bin/
+cookies.txt
+storage/cookies.txt
+storage/youtube-cookies.txt
+
 
