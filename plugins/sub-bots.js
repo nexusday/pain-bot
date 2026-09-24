@@ -11,6 +11,10 @@ const DIR_RAIZ = path.join(__dirname, '..')
 const DIR_IMG = join(DIR_RAIZ, 'storage', 'img')
 const IMG_POR_DEFECTO = 'https://files.catbox.moe/iomah1.jpg'
 
+const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
+const MARCA = '𓂃 ࣪ ִֶָ☾.'
+const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
+
 function resolverImagenBot(rutaConfig) {
   const candidatos = ['menu.jpg', 'menu2.jpg', 'menu3.jpg']
   const localPath = candidatos
@@ -36,7 +40,16 @@ function resolverImagenBot(rutaConfig) {
   return IMG_POR_DEFECTO
 }
 
-let handler = async (m, { conn }) => {
+function leerNombreConfig(ruta, fallback) {
+  if (!fs.existsSync(ruta)) return fallback
+  try {
+    const configuracion = JSON.parse(fs.readFileSync(ruta, 'utf-8'))
+    if (configuracion.name) return configuracion.name
+  } catch {}
+  return fallback
+}
+
+let handler = async (m, { conn, usedPrefix }) => {
   try {
     if (!global.conns || !Array.isArray(global.conns)) {
       global.conns = []
@@ -72,81 +85,77 @@ let handler = async (m, { conn }) => {
       }
     }
 
-    let nombreBot = global.namebot || 'PAIN BOT'
-    if (fs.existsSync(rutaConfig)) {
-      try {
-        const configuracion = JSON.parse(fs.readFileSync(rutaConfig, 'utf-8'))
-        if (configuracion.name) nombreBot = configuracion.name
-      } catch {}
-    }
-
+    const nombreBot = leerNombreConfig(rutaConfig, global.namebot || 'PAIN BOT')
     const totalSubBots = usuariosUnicos.size
     const totalBots = totalSubBots + 1
     const totalGrupos = idsGruposUnicos.size
     const memoriaMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
 
-    const numPrincipal = cleanBotNum(connBotPrincipal?.user?.jid || connBotPrincipal?.user?.id) || 'Desconocido'
-    const estadoBotPrincipal = connBotPrincipal?.user?.jid ? 'Conectado' : 'Desconectado'
-    const formatearUptimeBotPrincipal = formatBotUptime(connBotPrincipal || numPrincipal)
+    const numPrincipal = cleanBotNum(connBotPrincipal?.user?.jid || connBotPrincipal?.user?.id) || '—'
+    const estadoBotPrincipal = connBotPrincipal?.user?.jid ? 'conectado' : 'desconectado'
+    const uptimePrincipal = formatBotUptime(connBotPrincipal || numPrincipal)
+    const tipoActual = isMainBotConn(conn) ? 'principal' : 'sub-bot'
+    const pref = usedPrefix || '.'
 
-    let texto = `ɪɴғᴏ ᴅᴇ ʙᴏᴛs\n\n`
-    texto += ` *Bot actual:* ${nombreBot}\n`
-    texto += ` *Número:* +${botActual || 'Desconocido'}\n`
-    texto += ` *Tipo:* ${isMainBotConn(conn) ? 'Principal' : 'Sub-Bot'}\n`
-    texto += ` *Memoria:* ${memoriaMB} MB\n\n`
-
-    texto += `ᴇsᴛᴀᴅɪsᴛɪᴄᴀs\n\n`
-    texto += ` *Total de bots:* ${totalBots}\n`
-    texto += ` *Bot principal:* 1\n`
-    texto += ` *Sub-bots activos:* ${totalSubBots}\n`
-    texto += ` *Grupos (únicos):* ${totalGrupos}\n\n`
-
-    texto += `ʙᴏᴛ ᴘʀɪɴᴄɪᴘᴀʟ\n\n`
-    texto += ` *Número:* +${numPrincipal}\n`
-    texto += ` *Estado:* ${estadoBotPrincipal}\n`
-    texto += ` *Tiempo activo:* ${formatearUptimeBotPrincipal}\n\n`
-
+    let bloqueSubs = ''
     if (totalSubBots > 0) {
-      texto += `sᴜʙ-ʙᴏᴛs ᴀᴄᴛɪᴠᴏs\n\n`
+      const lineas = []
       let i = 1
       for (const [jidUsuario, connSub] of usuariosUnicos) {
         const numeroSubBot = cleanBotNum(jidUsuario)
         const rutaConfigSubBot = join('./Serbot', numeroSubBot, 'config.json')
-        let nombreSubBot = `Sub-Bot ${i}`
-
-        if (fs.existsSync(rutaConfigSubBot)) {
-          try {
-            const configSubBot = JSON.parse(fs.readFileSync(rutaConfigSubBot, 'utf-8'))
-            if (configSubBot.name) nombreSubBot = configSubBot.name
-          } catch {}
-        }
-
-        const estadoSubBot = connSub.ws?.socket?.readyState === ws.OPEN ? 'Activo' : 'Inactivo'
-        let nombreUsuario = connSub.user?.name
+        const nombreSubBot = leerNombreConfig(rutaConfigSubBot, `sub-bot ${i}`)
+        const estadoSubBot = connSub.ws?.socket?.readyState === ws.OPEN ? 'activo' : 'inactivo'
+        const nombreUsuario = connSub.user?.name
           || connSub.authState?.creds?.me?.name
-          || 'Anónimo'
+          || 'anónimo'
         const uptimeSub = formatBotUptime(connSub)
 
-        texto += `*${i}.* ${nombreSubBot}\n`
-        texto += ` *Número:* +${numeroSubBot}\n`
-        texto += ` *Usuario:* ${nombreUsuario}\n`
-        texto += ` *Estado:* ${estadoSubBot}\n`
-        texto += ` *Tiempo activo:* ${uptimeSub}\n`
-        if (i < totalSubBots) texto += `\n`
+        lineas.push(
+          `*${i}.* ${nombreSubBot}\n` +
+          `> ${tip(`+${numeroSubBot}`)}  ·  ${tip(estadoSubBot)}\n` +
+          `> ${tip(nombreUsuario)}  ·  ${tip(uptimeSub)}`
+        )
         i++
       }
-      texto += `\n`
+      bloqueSubs = lineas.join('\n\n')
     } else {
-      texto += `sᴜʙ-ʙᴏᴛs\n\n`
-      texto += ` *Sin sub-bots activos*\n`
-      texto += ` *Usa .code o .qrr para crear uno*\n\n`
+      bloqueSubs =
+        `${tip('sin sub-bots activos')}\n` +
+        `> ${tip(`${pref}code`)}  ·  ${tip(`${pref}qrr`)}`
     }
 
-    texto += `ʀᴇsᴜᴍᴇɴ\n\n`
-    texto += ` *Bots totales:* ${totalBots}\n\n`
+    const texto = `
+ㅤ
+${MARCA}  *bots*
+_${nombreBot} · ${tipoActual}_
 
-    texto += `ʜᴏsᴛɪɴɢ ᴏғɪᴄɪᴀʟ\n\n`
-    texto += ` *URL:* https://nexcodea.com`
+${SEP}
+*este bot*
+número  ·  ${tip(`+${botActual || '—'}`)}
+memoria  ·  ${tip(`${memoriaMB} MB`)}
+
+${SEP}
+*resumen*
+bots  ·  ${tip(totalBots)}
+principal  ·  ${tip(1)}
+sub-bots  ·  ${tip(totalSubBots)}
+grupos  ·  ${tip(totalGrupos)}
+
+${SEP}
+*bot principal*
+número  ·  ${tip(`+${numPrincipal}`)}
+estado  ·  ${tip(estadoBotPrincipal)}
+uptime  ·  ${tip(uptimePrincipal)}
+
+${SEP}
+*sub-bots*
+${bloqueSubs}
+
+${SEP}
+*hosting*
+> ${tip('https://nexcodea.com')}
+ㅤ`.trim()
 
     const imgBot = resolverImagenBot(rutaConfig)
     const optsEnvio = {
