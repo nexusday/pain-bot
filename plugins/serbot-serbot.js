@@ -28,7 +28,9 @@ const rcanal = global.rcanal || {
   }
 }
 
-const LINEA_MENU = '> 𓂃 ࣪ ִֶָ☾.'
+const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
+const MARCA = '𓂃 ࣪ ִֶָ☾.'
+const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
 
 let crm1 = "Y2QgcGx1Z2lucy"
 let crm2 = "A7IG1kNXN1b"
@@ -89,12 +91,31 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
 
   if (!phoneNumber) {
     const pistaLid = String(m.key?.participant || m.sender || '').split('@')[0]
-    const pistaMx = m.isGroup
-      ? `\n\n> *En grupo:* si no detecta tu número, envía:\n> ${usedPrefix}code 521XXXXXXXXXX\n> (México usa *521*, no solo 52)`
-      : `\n\n> *México:* usa *521* + tu número (10 dígitos).\n> *Ejemplo:* ${usedPrefix}code 5215551234567`
+    const ejemploMx = `${usedPrefix}code 5215551234567`
+    const ejemploPe = `${usedPrefix}code 51901662987`
 
     return conn.sendMessage(m.chat, {
-      text: `[❗] *No se pudo obtener tu número real de WhatsApp.*\n\nWhatsApp envía un @lid interno (${pistaLid}) y el código de vinculación necesita tu número con código de país.\n\n> *Opción 1:* ${usedPrefix}code <número>\n> *Ejemplo Perú:* ${usedPrefix}code 51901437507\n> *Ejemplo México:* ${usedPrefix}code 5215551234567${pistaMx}\n\n> *Opción 2:* ${usedPrefix}qrr para vincular con QR`,
+      text: `
+ㅤ
+${MARCA}  *código*
+_no se detectó tu número_
+
+${SEP}
+*qué pasó*
+whatsapp envió un id interno
+${tip(`@lid · ${pistaLid}`)}
+y hace falta tu número real con país
+
+${SEP}
+*cómo hacerlo*
+> ${tip(`${usedPrefix}code <número>`)}
+> ${tip(ejemploPe)}  ·  perú
+> ${tip(ejemploMx)}  ·  méxico *(521)*
+
+${SEP}
+*otra opción*
+> ${tip(`${usedPrefix}qrr`)}  ·  vincular con qr
+ㅤ`.trim(),
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
@@ -102,12 +123,21 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   const ranura = canRegisterSubBot(phoneNumber)
   if (!ranura.ok) {
     const informacion = getSubBotSlotsInfo(ws)
-    return m.reply(
-      `*[❗] No hay plazas para nuevos Sub-Bots.*\n\n` +
-      `> *En uso:* ${informacion.registered}/${informacion.max}\n` +
-      `> *Conectados:* ${informacion.connected}\n\n` +
-      `> El dueño puede poner ilimitado con:\n> ${usedPrefix}maxsubs 0`
-    )
+    return m.reply(`
+ㅤ
+${MARCA}  *código*
+_sin plazas disponibles_
+
+${SEP}
+*estado*
+en uso  ·  ${tip(`${informacion.registered}/${informacion.max}`)}
+conectados  ·  ${tip(informacion.connected)}
+
+${SEP}
+*nota*
+el dueño puede dejarlo ilimitado
+> ${tip(`${usedPrefix}maxsubs 0`)}
+ㅤ`.trim())
   }
 
   let id = phoneNumber
@@ -179,9 +209,15 @@ async function iniciarSubBot(options) {
   } catch {
     if (m && conn) {
       conn.sendMessage(m.chat, {
-        text: `[❌] *Uso correcto del comando:*
-> *${usedPrefix}code* - Código de vinculación
-> *${usedPrefix}qrr* - Código QR`,
+        text: `
+ㅤ
+${MARCA}  *vincular*
+_uso del comando_
+
+${SEP}
+> ${tip(`${usedPrefix}code`)}  ·  código
+> ${tip(`${usedPrefix}qrr`)}  ·  qr
+ㅤ`.trim(),
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -587,80 +623,112 @@ async function resolverNombreUsuarioSubBot(sock, m, conn, replyJid) {
 }
 
 function construirMensajeEnlaceQr() {
-  return `𓂃 ࣪ ִֶָ☾. 𝚅𝙸𝙽𝙲𝚄𝙻𝙰𝙲𝙸𝙾𝙽 𝚀𝚁 𓂃 ࣪ ִֶָ☾.
+  return `
+ㅤ
+${MARCA}  *vincular qr*
+_escanea para conectar_
 
-   𓍯  𝙴𝚂𝙲𝙰𝙽𝙴𝙾 𝚁𝙴𝚀𝚄𝙴𝚁𝙸𝙳𝙾  𓍯
-${LINEA_MENU}  Abre WhatsApp en tu teléfono
-${LINEA_MENU}  Menú ⋮ → *Dispositivos vinculados*
-${LINEA_MENU}  Toca *Vincular nuevo dispositivo*
-${LINEA_MENU}  Escanea el código QR de arriba
+${SEP}
+*pasos*
+abre whatsapp en tu teléfono
+menú ⋮  →  *dispositivos vinculados*
+toca  *vincular nuevo dispositivo*
+escanea el código qr de arriba
 
- 𓂃 ࣪ ִֶָ☾. 𝙽𝙾𝚃𝙰 𓂃 ࣪ ִֶָ☾.
-${LINEA_MENU}  El QR caduca en *30 segundos*`
+${SEP}
+*nota*
+el qr caduca en ${tip('30 segundos')}
+ㅤ`.trim()
 }
 
 function construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento) {
-  return `𓂃 ࣪ ִֶָ☾. 𝚅𝙸𝙽𝙲𝚄𝙻𝙰𝙲𝙸𝙾𝙽 𝙿𝙾𝚁 𝙲𝙾́𝙳𝙸𝙶𝙾 𓂃 ࣪ ִֶָ☾.
+  return `
+ㅤ
+${MARCA}  *vincular código*
+_solo para tu número_
 
-   𓍯  𝚃𝚄 𝙲𝙾́𝙳𝙸𝙶𝙾  𓍯
-${LINEA_MENU}  \`${secreto}\`
-${LINEA_MENU}  𝙽𝚄𝙼𝙴𝚁𝙾: +${telefonoEmparejamiento}
+${SEP}
+*tu código*
+${tip(secreto)}
+número  ·  ${tip(`+${telefonoEmparejamiento}`)}
 
- 𓂃 ࣪ ִֶָ☾. 𝙿𝙰𝚂𝙾𝚂 𓂃 ࣪ ִֶָ☾.
-${LINEA_MENU}  1. Abre WhatsApp en tu teléfono
-${LINEA_MENU}  2. Ve a *Dispositivos vinculados*
-${LINEA_MENU}  3. Toca *Vincular un dispositivo*
-${LINEA_MENU}  4. Elige *Vincular con número*
-${LINEA_MENU}  5. Ingresa el código de arriba
+${SEP}
+*pasos*
+1. abre whatsapp en tu teléfono
+2. ve a *dispositivos vinculados*
+3. toca *vincular un dispositivo*
+4. elige *vincular con número*
+5. ingresa el código de arriba
 
- 𓂃 ࣪ ִֶָ☾. 𝙽𝙾𝚃𝙰 𓂃 ࣪ ִֶָ☾.
-${LINEA_MENU}  Caduca en *30 segundos*
-${LINEA_MENU}  Solo para *+${telefonoEmparejamiento}*`
+${SEP}
+*nota*
+caduca en ${tip('30 segundos')}
+solo para ${tip(`+${telefonoEmparejamiento}`)}
+ㅤ`.trim()
 }
 
 function construirErrorTelefonoEmparejamiento(usedPrefix) {
-  return `𓂃 ࣪ ִֶָ☾. 𝙴𝚁𝚁𝙾𝚁 𓂃 ࣪ ִֶָ☾.
+  return `
+ㅤ
+${MARCA}  *código*
+_no se pudo obtener tu número_
 
-${LINEA_MENU}  *No se pudo obtener tu número*
-${LINEA_MENU}  Usa: *${usedPrefix}code 521XXXXXXXXXX*
-${LINEA_MENU}  México: *521* + 10 dígitos`
+${SEP}
+usa
+> ${tip(`${usedPrefix}code 521XXXXXXXXXX`)}
+méxico  ·  ${tip('521 + 10 dígitos')}
+ㅤ`.trim()
 }
 
-function construirErrorCodigoEmparejamiento(usedPrefix, mensajeError = 'Conexión interrumpida') {
-  return `𓂃 ࣪ ִֶָ☾. 𝙴𝚁𝚁𝙾𝚁 𓂃 ࣪ ִֶָ☾.
+function construirErrorCodigoEmparejamiento(usedPrefix, mensajeError = 'conexión interrumpida') {
+  return `
+ㅤ
+${MARCA}  *código*
+_no se pudo generar_
 
-${LINEA_MENU}  *No se pudo generar el código*
-${LINEA_MENU}  ${mensajeError || 'Conexión interrumpida'}
-${LINEA_MENU}  Vuelve a usar: *${usedPrefix}code*`
+${SEP}
+${tip(mensajeError || 'conexión interrumpida')}
+vuelve a usar
+> ${tip(`${usedPrefix}code`)}
+ㅤ`.trim()
 }
 
 function construirMensajesBienvenidaSubBot({ nombreBot, botNumber: numeroBot, userName: nombreUsuario, usedPrefix = '.' }) {
-  const linea = LINEA_MENU
-  const mensajePrivado = `𓂃 ࣪ ִֶָ☾. 𝙱𝙸𝙴𝙽𝚅𝙴𝙽𝙸𝙳𝙾 𓂃 ࣪ ִֶָ☾.
+  const mensajePrivado = `
+ㅤ
+${MARCA}  *bienvenido*
+_sub-bot activo_
 
-   𓍯  𝚂𝚄𝙱-𝙱𝙾𝚃 𝙰𝙲𝚃𝙸𝚅𝙾  𓍯
-${linea}  *¡Te convertiste en Sub-Bot!*
-${linea}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
-${linea}  𝙽𝚄𝙼𝙴𝚁𝙾: +${numeroBot}
-${linea}  𝚄𝚂𝚄𝙰𝚁𝙸𝙾: ${nombreUsuario}
-${linea}  𝙴𝚂𝚃𝙰𝙳𝙾: Conectado ✅
-${linea}  𝙰𝚄𝚃𝙾-𝙻𝙴𝙴𝚁: Desactivado ❌
+${SEP}
+*tu bot*
+nombre  ·  ${tip(nombreBot)}
+número  ·  ${tip(`+${numeroBot}`)}
+usuario  ·  ${tip(nombreUsuario)}
+estado  ·  ${tip('conectado')}
+auto-leer  ·  ${tip('desactivado')}
 
- 𓂃 ࣪ ִֶָ☾. 𝙲𝙾𝙽𝙵𝙸𝙶𝚄𝚁𝙰𝙲𝙸𝙾𝙽 𓂃 ࣪ ִֶָ☾.
-${linea}  ${usedPrefix}setautoread on — Activar auto-leer
-${linea}  ${usedPrefix}setautoread off — Desactivar auto-leer`
+${SEP}
+*configuración*
+> ${tip(`${usedPrefix}setautoread on`)}
+> ${tip(`${usedPrefix}setautoread off`)}
+ㅤ`.trim()
 
-  const mensajeCanal = `𓂃 ࣪ ִֶָ☾. 𝙽𝚄𝙴𝚅𝙾 𝚂𝚄𝙱-𝙱𝙾𝚃 𓂃 ࣪ ִֶָ☾.
+  const mensajeCanal = `
+ㅤ
+${MARCA}  *nuevo sub-bot*
+_conectado_
 
-   𓍯  𝙸𝙽𝙵𝙾  𓍯
-${linea}  𝙽𝙾𝙼𝙱𝚁𝙴: ${nombreBot}
-${linea}  𝙽𝚄𝙼𝙴𝚁𝙾: +${numeroBot}
-${linea}  𝙾𝚆𝙽𝙴𝚁: ${nombreUsuario}
-${linea}  𝙴𝚂𝚃𝙰𝙳𝙾: Online ✅
+${SEP}
+nombre  ·  ${tip(nombreBot)}
+número  ·  ${tip(`+${numeroBot}`)}
+owner  ·  ${tip(nombreUsuario)}
+estado  ·  ${tip('online')}
 
- 𓂃 ࣪ ִֶָ☾. *¿𝚀𝚄𝙸𝙴𝚁𝙴𝚂 𝚂𝙴𝚁 𝚂𝚄𝙱-𝙱𝙾𝚃?* 𓂃 ࣪ ִֶָ☾.
-${linea}  Escríbele al nuevo sub-bot: *+${numeroBot}*
-${linea}  Comando: *${usedPrefix}code* o *${usedPrefix}qrr*`
+${SEP}
+*¿quieres ser sub-bot?*
+escríbele a ${tip(`+${numeroBot}`)}
+> ${tip(`${usedPrefix}code`)}  ·  ${tip(`${usedPrefix}qrr`)}
+ㅤ`.trim()
 
   return { privateMessage: mensajePrivado, channelMessage: mensajeCanal }
 }
