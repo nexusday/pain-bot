@@ -192,7 +192,11 @@ const handler = async (m, { conn, usedPrefix }) => {
           await conn.sendListLia(
             m.chat,
             '𓂃 ࣪ ִֶָ☾. 𝙼𝙴𝙽𝚄',
-            '𓂃 ࣪ ִֶָ☾. 𝙴𝙻𝙸𝙶𝙴 𝚄𝙽𝙰 𝙲𝙰𝚃𝙴𝙶𝙾𝚁Í𝙰 𝚙𝚊𝚛𝚊 𝚟𝚎𝚛 𝚜𝚞𝚜 𝚌𝚘𝚖𝚊𝚗𝚍𝚘𝚜.',
+            `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *menú completo*  𓂃 ࣪ ִֶָ☾.
+_elige una sección para ver sus comandos_
+ㅤ`.trim(),
             MENU_BUTTON_TEXT,
             buildListSections(categorias),
             m,

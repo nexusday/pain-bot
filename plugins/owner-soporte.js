@@ -73,7 +73,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
       `✅ *Soporte actualizado*\n\n` +
         `› Link: ${guardado.link}\n` +
         `› Botón: ${guardado.buttonText}\n\n` +
-        `_Se mostrará en el menú (principal y subbots) y en avisos de alquiler._`,
+        `_Se mostrará en el menú (principal y subbots) y en avisos de acceso._`,
       m
     )
   } catch {

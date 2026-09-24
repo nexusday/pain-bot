@@ -15,7 +15,7 @@ function rutaImagenTipo(chatId, tipo) {
   return path.join(dirImagenGrupo(chatId), tipo === 'goodbye' ? 'goodbye.jpg' : 'welcome.jpg')
 }
 
-/** Buffer local, URL http o null */
+
 function payloadImagen(rutaOUrl) {
   if (!rutaOUrl || !String(rutaOUrl).trim()) return null
   const v = String(rutaOUrl).trim()
