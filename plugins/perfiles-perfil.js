@@ -190,7 +190,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
     } else {
       const parejaUser = resolveDbUser(datosUsuario.partner, conn, groupParts).user
       const nombre = parejaUser?.name && parejaUser.name !== 'Usuario' ? parejaUser.name : null
-      lineaVinculo = nombre ? `junto a ${nombre}` : 'en pareja'
+      lineaVinculo = nombre ? `casado/a con ${nombre}` : 'en pareja'
     }
   }
 
