@@ -413,6 +413,9 @@ async function iniciarSubBot(options) {
 
         console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${idCarpetaBot}) conectado exitosamente.`))
         sock.isInit = true
+        sock.phoneNumber = idCarpetaBot
+        sock.botNumber = idCarpetaBot
+        sock.pathAYBot = pathAYBot
         try {
           const { markBotStart } = await import('../lib/bot-uptime.js')
        

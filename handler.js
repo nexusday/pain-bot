@@ -40,7 +40,7 @@ if (!chatUpdate) return
 let m = chatUpdate.messages[chatUpdate.messages.length - 1]
 if (!m) return
 
-// .modosub: los bots inactivos salen aquí (sin pushMessage, DB, plugins ni finally)
+
 try {
   if (global.db.data == null) await global.loadDatabase()
   if (shouldSkipGroupMessageEarly(this, m)) return

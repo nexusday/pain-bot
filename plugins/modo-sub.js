@@ -1,18 +1,104 @@
 import ws from 'ws'
 import fs from 'fs'
-import { join } from 'path'
+import { join, basename } from 'path'
 
 export function limpiarNumBot(jidONum = '') {
   return String(jidONum).split('@')[0].split(':')[0].replace(/\D/g, '')
 }
 
+/**
+ * Todas las identidades numéricas de un socket (PN + LID + carpeta Serbot).
+ * WhatsApp LID hace que user.jid ya no sea el teléfono: sin esto, modosub
+ * compara mal y el bot "activo" se salta a sí mismo.
+ */
+export function numerosIdentidadBot(conn) {
+  const nums = new Set()
+  const agregar = (v) => {
+    const n = limpiarNumBot(v)
+    if (n && n.length >= 6) nums.add(n)
+  }
+  if (!conn) return nums
+  agregar(conn.user?.jid)
+  agregar(conn.user?.id)
+  agregar(conn.user?.lid)
+  agregar(conn.authState?.creds?.me?.id)
+  agregar(conn.authState?.creds?.me?.jid)
+  agregar(conn.authState?.creds?.me?.lid)
+  agregar(conn.phoneNumber)
+  agregar(conn.botNumber)
+  if (conn.pathAYBot) {
+    try { agregar(basename(conn.pathAYBot)) } catch {}
+  }
+  return nums
+}
 
 export function esConnBotPrincipal(conn) {
   if (!conn) return false
   if (conn === global.conn) return true
-  const mio = limpiarNumBot(conn.user?.jid || conn.user?.id)
-  const principalConn = limpiarNumBot(global.conn?.user?.jid || global.conn?.user?.id)
-  return Boolean(mio && principalConn && mio === principalConn)
+  const mios = numerosIdentidadBot(conn)
+  const principales = numerosIdentidadBot(global.conn)
+  for (const n of mios) {
+    if (principales.has(n)) return true
+  }
+  return false
+}
+
+/** ¿Este socket es el bot activo del grupo? (null activo = modo all → sí). */
+export function esteBotCoincideConActivo(conn, activo, participants = []) {
+  if (!activo) return true
+  const ids = numerosIdentidadBot(conn)
+  if (ids.has(activo)) return true
+
+  for (const p of participants || []) {
+    const digitosPart = [
+      p?.phoneNumber,
+      p?.id,
+      p?.jid,
+      p?.lid,
+    ].map(limpiarNumBot).filter(n => n.length >= 6)
+
+    const esEsteBot = digitosPart.some(d => ids.has(d))
+    if (!esEsteBot) continue
+    if (digitosPart.includes(activo)) return true
+  }
+  return false
+}
+
+/** Número estable para modosub (preferir teléfono real, no LID). */
+export function numeroPublicoBot(connBot, participants = []) {
+  if (connBot?.phoneNumber) {
+    const n = limpiarNumBot(connBot.phoneNumber)
+    if (n.length >= 6) return n
+  }
+  if (connBot?.botNumber) {
+    const n = limpiarNumBot(connBot.botNumber)
+    if (n.length >= 6) return n
+  }
+  if (connBot?.pathAYBot) {
+    try {
+      const n = limpiarNumBot(basename(connBot.pathAYBot))
+      if (n.length >= 6) return n
+    } catch {}
+  }
+
+  const ids = numerosIdentidadBot(connBot)
+  for (const p of participants || []) {
+    const phone = limpiarNumBot(p?.phoneNumber)
+    if (phone.length < 6) continue
+    const digitosPart = [p?.id, p?.jid, p?.lid, p?.phoneNumber].map(limpiarNumBot)
+    if (digitosPart.some(d => ids.has(d))) return phone
+  }
+
+  const jid = String(connBot?.user?.jid || connBot?.user?.id || '')
+  if (jid && !jid.includes('@lid')) {
+    const n = limpiarNumBot(jid)
+    if (n.length >= 6) return n
+  }
+
+  for (const n of ids) {
+    if (n.length >= 8 && n.length <= 15) return n
+  }
+  return [...ids][0] || ''
 }
 
 function decodificarJid(conn, jid) {
@@ -23,30 +109,20 @@ function decodificarJid(conn, jid) {
   }
 }
 
-function mismoUsuario(a, b) {
-  const na = limpiarNumBot(a)
-  const nb = limpiarNumBot(b)
-  return na.length > 5 && na === nb
-}
-
 function botEnParticipantes(connBot, participants = []) {
   if (!connBot?.user) return false
-  const jidBot = decodificarJid(connBot, connBot.user.jid || connBot.user.id)
-  const numBot = limpiarNumBot(jidBot)
-  if (!numBot) return false
+  const idsBot = numerosIdentidadBot(connBot)
+  if (!idsBot.size) return false
 
   for (const p of participants) {
-    const ids = [
+    const digitos = [
       p.id,
       p.jid,
       p.lid,
       p.phoneNumber
-    ].filter(Boolean).map(j => {
-      const crudo = String(j)
-      return crudo.includes('@') ? decodificarJid(connBot, crudo) : `${crudo.replace(/\D/g, '')}@s.whatsapp.net`
-    })
+    ].map(limpiarNumBot).filter(n => n.length >= 6)
 
-    if (ids.some(id => mismoUsuario(id, jidBot) || limpiarNumBot(id) === numBot)) return true
+    if (digitos.some(d => idsBot.has(d))) return true
   }
   return false
 }
@@ -54,7 +130,7 @@ function botEnParticipantes(connBot, participants = []) {
 function obtenerNombreVisibleBot(connBot, esPrincipal) {
   if (esPrincipal) return global.namebot || 'Bot Principal'
   try {
-    const num = limpiarNumBot(connBot.user?.jid)
+    const num = numeroPublicoBot(connBot) || limpiarNumBot(connBot.user?.jid)
     const rutaConfig = join('./Serbot', num, 'config.json')
     if (fs.existsSync(rutaConfig)) {
       const config = JSON.parse(fs.readFileSync(rutaConfig, 'utf-8'))
@@ -75,7 +151,7 @@ export function listarBotsEnGrupo(participants = []) {
     bots.push({
       index: bots.length + 1,
       type: 'principal',
-      number: limpiarNumBot(principalConn.user.jid || principalConn.user.id),
+      number: numeroPublicoBot(principalConn, participants),
       name: obtenerNombreVisibleBot(principalConn, true),
       conn: principalConn
     })
@@ -92,7 +168,7 @@ export function listarBotsEnGrupo(participants = []) {
     bots.push({
       index: bots.length + 1,
       type: 'subbot',
-      number: limpiarNumBot(sub.user.jid || sub.user.id),
+      number: numeroPublicoBot(sub, participants),
       name: obtenerNombreVisibleBot(sub, false),
       conn: sub
     })
@@ -119,16 +195,12 @@ export function establecerBotActivoDelGrupo(idChat, numeroBotOTodos) {
   return num
 }
 
-/** Números de principal + subbots conectados. */
+/** Números de principal + subbots conectados (PN + LID + carpeta). */
 export function listarNumerosBotsConocidos() {
   const nums = new Set()
-  const agregar = (jid) => {
-    const n = limpiarNumBot(jid)
-    if (n && n.length >= 6) nums.add(n)
-  }
-  agregar(global.conn?.user?.jid || global.conn?.user?.id)
+  for (const n of numerosIdentidadBot(global.conn)) nums.add(n)
   for (const c of global.conns || []) {
-    agregar(c?.user?.jid || c?.user?.id)
+    for (const n of numerosIdentidadBot(c)) nums.add(n)
   }
   return nums
 }
@@ -238,8 +310,8 @@ export function debeOmitirMensajeGrupoTemprano(conn, msgCrudo) {
   if (!String(idChat).endsWith('@g.us')) return false
   if (!global.db?.data) return false
 
-  const miNum = limpiarNumBot(conn?.user?.jid || conn?.user?.id)
-  if (!miNum) return false
+  const misIds = numerosIdentidadBot(conn)
+  if (!misIds.size) return false
 
   const text = extraerTextoMensajeCrudo(msgCrudo)
   if (esTextoComandoModoSub(text)) return false
@@ -249,7 +321,9 @@ export function debeOmitirMensajeGrupoTemprano(conn, msgCrudo) {
 
   // Bot único elegido: los demás (incluido fromMe de otro subbot) no ejecutan nada
   if (activo) {
-    return miNum !== activo
+    const partes = conn?.chats?.[idChat]?.metadata?.participants || []
+    // true = omitir → solo omitimos si NO somos el activo (LID/PN/carpeta)
+    return !esteBotCoincideConActivo(conn, activo, partes)
   }
 
   // Modo all: evita que principal + sub ejecuten el mismo comando escrito desde un bot
@@ -270,8 +344,8 @@ export function debeOmitirPorModoSub(conn, idChat, { allowModoSubCommand = false
   const activo = obtenerBotActivoDelGrupo(idChat)
   if (!activo) return false
 
-  const miNum = limpiarNumBot(conn?.user?.jid || conn?.user?.id)
-  if (miNum && miNum === activo) return false
+  const partes = conn?.chats?.[idChat]?.metadata?.participants || []
+  if (esteBotCoincideConActivo(conn, activo, partes)) return false
 
   if (allowModoSubCommand && esTextoComandoModoSub(text, prefix)) return false
 
@@ -356,6 +430,9 @@ export default handler
 
 export {
   limpiarNumBot as cleanBotNum,
+  numerosIdentidadBot as botIdentityNumbers,
+  numeroPublicoBot as publicBotNumber,
+  esteBotCoincideConActivo as thisBotMatchesActive,
   esConnBotPrincipal as isMainBotConn,
   listarBotsEnGrupo as listBotsInGroup,
   obtenerBotActivoDelGrupo as getActiveBotForGroup,
