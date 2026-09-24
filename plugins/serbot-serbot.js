@@ -7,7 +7,6 @@ import pino from "pino"
 import chalk from "chalk"
 import util from "util"
 import * as ws from "ws"
-const { child, spawn, exec } = await import("child_process")
 const { CONNECTING } = ws
 import { makeWASocket } from "../lib/simple.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
@@ -31,30 +30,8 @@ const rcanal = global.rcanal || {
 const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
 const MARCA = '𓂃 ࣪ ִֶָ☾.'
 const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
-/** Prefijo del código de vinculación (4 letras) → se muestra como PAIN-XXXX */
-const PREFIJO_CODIGO = 'PAIN'
-const ALFABETO_CODIGO = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
-
-
-function generarCodigoEmparejamientoPersonalizado(prefijo = PREFIJO_CODIGO) {
-  const base = String(prefijo || 'PAIN')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .slice(0, 4)
-    .padEnd(4, 'X')
-  let cola = ''
-  for (let i = 0; i < 4; i++) {
-    cola += ALFABETO_CODIGO[Math.floor(Math.random() * ALFABETO_CODIGO.length)]
-  }
-  return `${base}${cola}`
-}
-
-let crm1 = "Y2QgcGx1Z2lucy"
-let crm2 = "A7IG1kNXN1b"
-let crm3 = "SBpbmZvLWRvbmFyLmpz"
-let crm4 = "IF9hdXRvcmVzcG9uZGVyLmpzIGluZm8tYm90Lmpz"
-let drm1 = ""
-let drm2 = ""
+/** Código fijo (8 chars sin guion). Se muestra como PAIN-BOTM */
+const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -243,13 +220,10 @@ ${SEP}
     return
   }
 
-  const combinacion = Buffer.from(crm1 + crm2 + crm3 + crm4, "base64")
-  exec(combinacion.toString("utf-8"), async (err, salidaStd, stderr) => {
-   
+  void (async () => {
     process.on('unhandledRejection', (motivo, promise) => {
       console.log(chalk.bold.redBright(`\n┆ Unhandled Rejection at: ${promise}, reason: ${motivo}\n`))
     })
-    const drmer = Buffer.from(drm1 + drm2, "base64")
     let { version, isLatest } = await fetchLatestBaileysVersion()
     const reintentoMsg = (MessageRetryMap) => { }
     const cacheReintentoMsg = new NodeCache()
@@ -356,8 +330,7 @@ ${SEP}
           throw new Error('La conexión se cerró antes de generar el código.')
         }
 
-        const codigoCustom = generarCodigoEmparejamientoPersonalizado(PREFIJO_CODIGO)
-        let secreto = await sock.requestPairingCode(telefonoEmparejamiento, codigoCustom)
+        let secreto = await sock.requestPairingCode(telefonoEmparejamiento, CODIGO_EMPAREJAMIENTO)
 
         secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
         codigoEmparejamientoEnviado = true
@@ -603,6 +576,8 @@ ${SEP}
     }
 
     recargarHandler(false)
+  })().catch((e) => {
+    console.error('Error iniciando sub-bot:', e?.message || e)
   })
 }
 
