@@ -7,7 +7,7 @@ import chalk from 'chalk'
 import fetch from 'node-fetch'
 
 import { handleAIModes } from './lib/eventHandlers.js'
-import { handleAntiSystems } from './lib/antiHandlers.js'
+import { handleAntiSystems, handleAntiMediaEarly } from './lib/antiHandlers.js'
 import { manejarAntiEstados } from './lib/Antis/anti-estados.js'
 import {
   iniciarAntiDelete,
@@ -289,11 +289,11 @@ if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
     console.error('Error processing muted list:', err)
   }
 
-  // Antis ANTES de comandos / adivinanzas / returns — si no, en muchos grupos nunca llegan
+  
   try {
-    await handleAntiSystems(m, this, isAdmin, isOwner, isRAdmin, isBotAdmin, isPrems, false, participants)
+    await handleAntiMediaEarly(m, this, isAdmin, participants)
   } catch (e) {
-    console.error('Error en handleAntiSystems (early):', e?.message || e)
+    console.error('Error en handleAntiMediaEarly:', e?.message || e)
   }
 
 const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')  
