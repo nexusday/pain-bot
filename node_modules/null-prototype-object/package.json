@@ -1,0 +1,101 @@
+{
+  "name": "null-prototype-object",
+  "description": "Fastest way for creating null-prototype objects in JavaScript",
+  "homepage": "https://github.com/kikobeats/null-prototype-object",
+  "version": "1.2.7",
+  "types": "src/index.d.ts",
+  "main": "src/index.js",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "author": {
+    "email": "josefrancisco.verdu@gmail.com",
+    "name": "Kiko Beats",
+    "url": "https://kikobeats.com"
+  },
+  "contributors": [
+    {
+      "name": "Sukka",
+      "email": "github@skk.moe"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kikobeats/null-prototype-object.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kikobeats/null-prototype-object/issues"
+  },
+  "keywords": [
+    "dictionary",
+    "fast",
+    "no-prototype",
+    "null-prototype",
+    "object",
+    "prototype",
+    "secure",
+    "utility"
+  ],
+  "devDependencies": {
+    "@commitlint/cli": "latest",
+    "@commitlint/config-conventional": "latest",
+    "ava": "latest",
+    "c8": "latest",
+    "ci-publish": "latest",
+    "finepack": "latest",
+    "git-authors-cli": "latest",
+    "github-generate-release": "latest",
+    "nano-staged": "latest",
+    "simple-git-hooks": "latest",
+    "standard": "latest",
+    "standard-markdown": "latest",
+    "standard-version": "latest"
+  },
+  "engines": {
+    "node": ">= 20"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "clean": "rm -rf node_modules",
+    "contributors": "(npx git-authors-cli && npx finepack && git add package.json && git commit -m 'build: contributors' --no-verify) || true",
+    "coverage": "c8 report --reporter=text-lcov > coverage/lcov.info",
+    "lint": "standard",
+    "postrelease": "npm run release:tags && npm run release:github && (ci-publish || npm publish --access=public)",
+    "pretest": "npm run lint",
+    "release": "standard-version -a",
+    "release:github": "github-generate-release",
+    "release:tags": "git push --follow-tags origin HEAD:master",
+    "test": "c8 ava"
+  },
+  "license": "MIT",
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "body-max-line-length": [
+        0
+      ]
+    }
+  },
+  "nano-staged": {
+    "*.js": [
+      "standard --fix"
+    ],
+    "*.md": [
+      "standard-markdown"
+    ],
+    "package.json": [
+      "finepack"
+    ]
+  },
+  "simple-git-hooks": {
+    "commit-msg": "npx commitlint --edit",
+    "pre-commit": "npx nano-staged"
+  }
+}
