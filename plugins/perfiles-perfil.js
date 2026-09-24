@@ -183,7 +183,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
       conn
     )
     if (partnerMention) {
-      lineaVinculo = `junto a @${String(partnerMention).split('@')[0]}`
+      lineaVinculo = `casado/a con @${String(partnerMention).split('@')[0]}`
       if (String(partnerMention).endsWith('@s.whatsapp.net')) {
         datosUsuario.partner = partnerMention
       }
