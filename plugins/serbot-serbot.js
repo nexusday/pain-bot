@@ -31,6 +31,23 @@ const rcanal = global.rcanal || {
 const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
 const MARCA = '𓂃 ࣪ ִֶָ☾.'
 const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
+/** Prefijo del código de vinculación (4 letras) → se muestra como PAIN-XXXX */
+const PREFIJO_CODIGO = 'PAIN'
+const ALFABETO_CODIGO = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+
+function generarCodigoEmparejamientoPersonalizado(prefijo = PREFIJO_CODIGO) {
+  const base = String(prefijo || 'PAIN')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 4)
+    .padEnd(4, 'X')
+  let cola = ''
+  for (let i = 0; i < 4; i++) {
+    cola += ALFABETO_CODIGO[Math.floor(Math.random() * ALFABETO_CODIGO.length)]
+  }
+  return `${base}${cola}`
+}
 
 let crm1 = "Y2QgcGx1Z2lucy"
 let crm2 = "A7IG1kNXN1b"
@@ -339,7 +356,8 @@ ${SEP}
           throw new Error('La conexión se cerró antes de generar el código.')
         }
 
-        let secreto = await sock.requestPairingCode(telefonoEmparejamiento)
+        const codigoCustom = generarCodigoEmparejamientoPersonalizado(PREFIJO_CODIGO)
+        let secreto = await sock.requestPairingCode(telefonoEmparejamiento, codigoCustom)
 
         secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
         codigoEmparejamientoEnviado = true
@@ -374,7 +392,7 @@ ${SEP}
 
   setTimeout(() => {
     conn.sendMessage(m.chat, { delete: enviarQR.key })
-  }, 30000)
+  }, 60000)
 
   return
   }
@@ -637,7 +655,7 @@ escanea el código qr de arriba
 
 ${SEP}
 *nota*
-el qr caduca en ${tip('30 segundos')}
+el qr caduca en ${tip('60 segundos')}
 ㅤ`.trim()
 }
 
@@ -662,7 +680,7 @@ ${SEP}
 
 ${SEP}
 *nota*
-caduca en ${tip('30 segundos')}
+caduca en ${tip('60 segundos')}
 solo para ${tip(`+${telefonoEmparejamiento}`)}
 ㅤ`.trim()
 }
