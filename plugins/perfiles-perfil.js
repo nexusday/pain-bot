@@ -5,7 +5,47 @@ import { getRpgSnapshot, formatNumber } from '../lib/rpg-level.js'
 import { ensureMsgStats, getChatMsgCount, getTotalMsgCount } from '../lib/msg-activity.js'
 import { resolveDbUser } from '../lib/michi-users.js'
 
-let handler = async (m, { conn, usedPrefix, command }) => {
+
+async function jidMencionCaption(jid, chatId, participants, conn) {
+  if (!jid) return ''
+  const crudo = String(jid)
+  const part = findGroupParticipant(participants, crudo, conn)
+
+  if (part?.phoneNumber) {
+    const dig = String(part.phoneNumber).replace(/\D/g, '')
+    if (dig.length >= 8 && dig.length <= 15) {
+      return `${dig}@s.whatsapp.net`
+    }
+  }
+
+  if (crudo.endsWith('@s.whatsapp.net')) {
+    const dig = crudo.split('@')[0].replace(/\D/g, '')
+    if (dig.length >= 8 && dig.length <= 15) return conn?.decodeJid?.(crudo) || crudo
+  }
+
+  try {
+    const pn = await conn?.signalRepository?.lidMapping?.getPNForLID?.(crudo)
+    if (pn && String(pn).includes('@s.whatsapp.net')) {
+      return conn?.decodeJid?.(pn) || pn
+    }
+  } catch {}
+
+  if (chatId?.endsWith?.('@g.us') && (crudo.endsWith('@lid') || crudo.endsWith('@hosted.lid'))) {
+    try {
+      const real = await String.prototype.resolveLidToRealJid.call(crudo, chatId, conn, 2, 0)
+      if (real && String(real).endsWith('@s.whatsapp.net')) {
+        const dig = String(real).split('@')[0].replace(/\D/g, '')
+        if (dig.length >= 8 && dig.length <= 15) return conn?.decodeJid?.(real) || real
+      }
+    } catch {}
+  }
+
+  
+  const id = part?.id || part?.jid || crudo
+  return conn?.decodeJid?.(id) || id
+}
+
+let handler = async (m, { conn, usedPrefix, command, participants }) => {
   let targetUser = m.sender
 
   if (m.mentionedJid && m.mentionedJid.length > 0) {
@@ -137,6 +177,32 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     totalCoins += (datosUsuario.bancoDinero || 0)
   }
 
+  const groupParts = m.isGroup
+    ? (participants || conn.chats[m.chat]?.metadata?.participants || [])
+    : []
+
+  let partnerMention = ''
+  let estadoCivil = 'Soltero/a'
+  if (datosUsuario.partner) {
+    partnerMention = await jidMencionCaption(
+      datosUsuario.partner,
+      m.isGroup ? m.chat : null,
+      groupParts,
+      conn
+    )
+    if (partnerMention) {
+      estadoCivil = `Casado/a con @${String(partnerMention).split('@')[0]}`
+     
+      if (String(partnerMention).endsWith('@s.whatsapp.net')) {
+        datosUsuario.partner = partnerMention
+      }
+    } else {
+      const parejaUser = resolveDbUser(datosUsuario.partner, conn, groupParts).user
+      const nombre = parejaUser?.name && parejaUser.name !== 'Usuario' ? parejaUser.name : null
+      estadoCivil = nombre ? `Casado/a con ${nombre}` : 'Casado/a'
+    }
+  }
+
   const texto = `
 
 𓂃 ࣪ ִֶָ☾. 𝙿𝙴𝚁𝙵𝙸𝙻 𝙳𝙴 𝚄𝚂𝚄𝙰𝚁𝙸𝙾 𓂃 ࣪ ִֶָ☾.
@@ -148,6 +214,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 │  𓂃 ࣪ ִֶָ☾.  𝙲𝚄𝙼𝙿𝙻𝙴𝙰𝙽𝙾𝚂:  ${datosUsuario.birth || 'No registrado'}
 │  𓂃 ࣪ ִֶָ☾.  𝙳𝙴𝚂𝙲𝚁𝙸𝙿𝙲𝙸𝙾𝙽:  ${datosUsuario.desc || 'Sin descripción'}
 │  𓂃 ࣪ ִֶָ☾.  𝙵𝙰𝚅𝙾𝚁𝙸𝚃𝙾:  ${datosUsuario.favourite || 'No establecido'}
+│  𓂃 ࣪ ִֶָ☾.  𝙴𝚂𝚃𝙰𝙳𝙾:  ${estadoCivil}
 ╰─╯
 
 ╭─╮  𓍯  𝙴𝚂𝚃𝙰𝙳𝙸𝚂𝚃𝙸𝙲𝙰𝚂  𓍯  
@@ -189,17 +256,45 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     }
   }
 
+ 
+  const targetMention = await jidMencionCaption(
+    targetUser,
+    m.isGroup ? m.chat : null,
+    groupParts,
+    conn
+  )
+  const listaMenciones = [...new Set(
+    [targetMention, partnerMention].filter(j => j && String(j).includes('@'))
+  )]
+
   if (hasUserPP) {
     await conn.sendMessage(m.chat, {
       image: { url: imgBot },
       caption: texto,
       contextInfo: {
         ...rcanal.contextInfo,
-        mentionedJid: [datosUsuario.partner || targetUser]
+        mentionedJid: listaMenciones
       }
     }, { quoted: m })
   } else {
-    await conn.sendFile(m.chat, imgBot, 'profile.jpg', texto, m, null, rcanal, { mentions: [datosUsuario.partner || targetUser] })
+    await conn.sendMessage(m.chat, {
+      image: typeof imgBot === 'string' && !imgBot.startsWith('http')
+        ? fs.readFileSync(imgBot)
+        : { url: imgBot },
+      caption: texto,
+      contextInfo: {
+        ...rcanal.contextInfo,
+        mentionedJid: listaMenciones
+      }
+    }, { quoted: m }).catch(async () => {
+      await conn.sendFile(m.chat, imgBot, 'profile.jpg', texto, m, null, {
+        ...rcanal,
+        contextInfo: {
+          ...(rcanal?.contextInfo || {}),
+          mentionedJid: listaMenciones
+        }
+      }, { mentions: listaMenciones })
+    })
   }
 }
 
