@@ -1,9 +1,8 @@
 import yts from 'yt-search'
-import youtubedl from 'youtube-dl-exec'
-import { join, extname } from 'path'
+import { join, extname, dirname } from 'path'
 import { existsSync, readdirSync, readFileSync, unlinkSync, mkdirSync } from 'fs'
 import { fileURLToPath } from 'url'
-import { dirname } from 'path'
+import { ejecutarYtDlp } from '../lib/ytdlp.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DIR_TMP = join(__dirname, '../tmp')
@@ -123,7 +122,7 @@ async function descargarAudioRapido(url, id) {
   asegurarTmp()
   const plantilla = join(DIR_TMP, `play3_${id}.%(ext)s`)
 
-  await youtubedl(url, {
+  await ejecutarYtDlp(url, {
     output: plantilla,
     format: 'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best',
     noPlaylist: true,
@@ -140,7 +139,7 @@ async function descargarAudioRapido(url, id) {
     .filter(n => n.startsWith(`play3_${id}.`))
     .sort((a, b) => a.length - b.length)[0]
 
-  if (!archivo) throw new Error('no generó el archivo de audio.')
+  if (!archivo) throw new Error('yt-dlp no generó el archivo de audio.')
   return join(DIR_TMP, archivo)
 }
 
@@ -212,7 +211,9 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     await conn.sendMessage(m.chat, {
       text: typeof e === 'string'
         ? e
-        : `[❌] No se pudo descargar.\n> ${e?.message || e}`,
+        : e?.code === 'ENOENT'
+          ? '[❌] Falta *yt-dlp* en el servidor. Reinicia el bot (se descarga solo) o instálalo en el VPS.'
+          : `[❌] No se pudo descargar.\n> ${e?.stderr || e?.message || e}`,
       contextInfo: { ...(global.rcanal?.contextInfo || {}) },
     }, { quoted: m })
   } finally {

@@ -9,4 +9,5 @@ storage/sticker-ban/
 storage/msgdels/
 package-lock.json
 tmp/
+bin/
 
