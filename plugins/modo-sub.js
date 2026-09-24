@@ -293,6 +293,33 @@ export function extraerTextoMensajeCrudo(msgCrudo) {
   }
 }
 
+/** Media que el anti debe poder borrar aunque lo mande otro Pain/subbot. */
+function esMensajeMediaAntiCrudo(msgCrudo) {
+  try {
+    let msg = msgCrudo?.message
+    if (!msg || typeof msg !== 'object') return false
+    for (let i = 0; i < 8; i++) {
+      if (msg.ephemeralMessage?.message) { msg = msg.ephemeralMessage.message; continue }
+      if (msg.viewOnceMessage?.message) { msg = msg.viewOnceMessage.message; continue }
+      if (msg.viewOnceMessageV2?.message) { msg = msg.viewOnceMessageV2.message; continue }
+      if (msg.viewOnceMessageV2Extension?.message) { msg = msg.viewOnceMessageV2Extension.message; continue }
+      if (msg.lottieStickerMessage?.message) { msg = msg.lottieStickerMessage.message; continue }
+      if (msg.documentWithCaptionMessage?.message) { msg = msg.documentWithCaptionMessage.message; continue }
+      break
+    }
+    return !!(
+      msg.stickerMessage ||
+      msg.lottieStickerMessage ||
+      msg.imageMessage ||
+      msg.videoMessage ||
+      msg.audioMessage ||
+      msg.documentMessage
+    )
+  } catch {
+    return false
+  }
+}
+
 /**
  * Filtro temprano: true = este socket no debe procesar nada en el grupo.
  * Se usa ANTES de pushMessage, DB, plugins y finally.
@@ -301,6 +328,7 @@ export function extraerTextoMensajeCrudo(msgCrudo) {
  * 1) Si hay bot activo (/modosub N): SOLO ese bot procesa (también si escribe desde su propio número).
  * 2) Si está en "all": un mensaje escrito desde un bot lo atiende solo ese bot (fromMe),
  *    los demás ignoran para no duplicar /rw, menús, etc.
+ *    EXCEPCIÓN: stickers/imgs/etc. de otro Pain — el bot responsable SÍ los procesa (anti).
  * 3) /modosub siempre se deja pasar en todos (para poder cambiar el activo).
  */
 export function debeOmitirMensajeGrupoTemprano(conn, msgCrudo) {
@@ -318,18 +346,23 @@ export function debeOmitirMensajeGrupoTemprano(conn, msgCrudo) {
 
   const activo = obtenerBotActivoDelGrupo(idChat)
   const desdeMi = Boolean(msgCrudo.key.fromMe)
+  const partes = conn?.chats?.[idChat]?.metadata?.participants || []
 
   // Bot único elegido: los demás (incluido fromMe de otro subbot) no ejecutan nada
   if (activo) {
-    const partes = conn?.chats?.[idChat]?.metadata?.participants || []
-    // true = omitir → solo omitimos si NO somos el activo (LID/PN/carpeta)
     return !esteBotCoincideConActivo(conn, activo, partes)
   }
 
-  // Modo all: evita que principal + sub ejecuten el mismo comando escrito desde un bot
+  // Modo all: evita duplicar comandos entre bots…
   if (!desdeMi) {
     const numRemitente = extraerNumRemitenteGrupo(conn, msgCrudo)
-    if (numRemitente && esNumeroBotConocido(numRemitente)) return true
+    if (numRemitente && esNumeroBotConocido(numRemitente)) {
+      // …pero el responsable debe ver media de otros Pain para poder borrarla
+      if (esMensajeMediaAntiCrudo(msgCrudo) && esteBotEsResponsableDelGrupo(conn, idChat, partes)) {
+        return false
+      }
+      return true
+    }
   }
 
   return false
