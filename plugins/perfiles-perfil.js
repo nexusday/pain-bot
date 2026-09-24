@@ -147,33 +147,25 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
     }
   }
 
-  let userRole = 'Miembro'
+  let userRole = 'miembro'
   if (isROwner || isOwner) {
-    if (targetIsGroupCreator) {
-      userRole = '👑 Creador del Bot y Grupo'
-    } else if (targetIsRAdmin || targetIsAdmin) {
-      userRole = '👑 Creador del Bot y Admin'
-    } else {
-      userRole = '👑 Creador del Bot'
-    }
+    if (targetIsGroupCreator) userRole = 'creador · bot & grupo'
+    else if (targetIsRAdmin || targetIsAdmin) userRole = 'creador · bot & admin'
+    else userRole = 'creador del bot'
   } else if (isMods) {
-    if (targetIsGroupCreator) {
-      userRole = 'Moderador del Bot y Creador'
-    } else if (targetIsRAdmin || targetIsAdmin) {
-      userRole = 'Moderador del Bot y Admin'
-    } else {
-      userRole = 'Moderador del Bot'
-    }
+    if (targetIsGroupCreator) userRole = 'mod · bot & creador'
+    else if (targetIsRAdmin || targetIsAdmin) userRole = 'mod · bot & admin'
+    else userRole = 'moderador'
   } else if (targetIsGroupCreator) {
-    userRole = 'Creador del Grupo'
+    userRole = 'creador del grupo'
   } else if (targetIsRAdmin || targetIsAdmin) {
-    userRole = 'Admin del Grupo'
+    userRole = 'admin'
   }
 
-  let bancoInfo = 'Sin banco'
+  let bancoInfo = 'sin banco'
   let totalCoins = datosUsuario.coins || 0
   if (datosUsuario.banco && global.bancos && global.bancos[datosUsuario.banco]) {
-    bancoInfo = global.bancos[datosUsuario.banco].nombre || 'Banco desconocido'
+    bancoInfo = global.bancos[datosUsuario.banco].nombre || 'banco'
     totalCoins += (datosUsuario.bancoDinero || 0)
   }
 
@@ -182,7 +174,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
     : []
 
   let partnerMention = ''
-  let estadoCivil = 'Soltero/a'
+  let lineaVinculo = 'soltero/a'
   if (datosUsuario.partner) {
     partnerMention = await jidMencionCaption(
       datosUsuario.partner,
@@ -191,49 +183,56 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
       conn
     )
     if (partnerMention) {
-      estadoCivil = `Casado/a con @${String(partnerMention).split('@')[0]}`
-     
+      lineaVinculo = `junto a @${String(partnerMention).split('@')[0]}`
       if (String(partnerMention).endsWith('@s.whatsapp.net')) {
         datosUsuario.partner = partnerMention
       }
     } else {
       const parejaUser = resolveDbUser(datosUsuario.partner, conn, groupParts).user
       const nombre = parejaUser?.name && parejaUser.name !== 'Usuario' ? parejaUser.name : null
-      estadoCivil = nombre ? `Casado/a con ${nombre}` : 'Casado/a'
+      lineaVinculo = nombre ? `junto a ${nombre}` : 'en pareja'
     }
   }
 
+  const nombre = String(datosUsuario.name || 'sin nombre').trim() || 'sin nombre'
+  const genero = datosUsuario.genre && datosUsuario.genre !== 'No establecido' ? datosUsuario.genre : '—'
+  const cumple = datosUsuario.birth && datosUsuario.birth !== 'No registrado' ? datosUsuario.birth : '—'
+  const desc = datosUsuario.desc && datosUsuario.desc !== 'Sin descripción' ? datosUsuario.desc : 'sin descripción aún'
+  const favorito = datosUsuario.favourite && datosUsuario.favourite !== 'No establecido' ? datosUsuario.favourite : '—'
+  const moneda = global.moneda || 'coins'
+  const sep = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
+
   const texto = `
+ㅤ
+𓂃 ࣪ ִֶָ☾.  *${nombre}*
+_${userRole}_
 
-𓂃 ࣪ ִֶָ☾. 𝙿𝙴𝚁𝙵𝙸𝙻 𝙳𝙴 𝚄𝚂𝚄𝙰𝚁𝙸𝙾 𓂃 ࣪ ִֶָ☾.
+${sep}
+*esencia*
+${genero}  ·  ${cumple}
+${desc}
+♡  ${favorito}
 
+${sep}
+*progreso*
+nivel *${rpg.level}*
+${rpg.bar}
+\`${rpg.ratio}\` xp
 
-╭─╮  𓍯  𝙸𝙽𝙵𝙾𝚁𝙼𝙰𝙲𝙸𝙾𝙽 𝙿𝙴𝚁𝚂𝙾𝙽𝙰𝙻  𓍯  
-│  𓂃 ࣪ ִֶָ☾.  𝙽𝙾𝙼𝙱𝚁𝙴:  ${datosUsuario.name || 'No establecido'}
-│  𓂃 ࣪ ִֶָ☾.  𝙶𝙴𝙽𝙴𝚁𝙾:  ${datosUsuario.genre || 'No establecido'}
-│  𓂃 ࣪ ִֶָ☾.  𝙲𝚄𝙼𝙿𝙻𝙴𝙰𝙽𝙾𝚂:  ${datosUsuario.birth || 'No registrado'}
-│  𓂃 ࣪ ִֶָ☾.  𝙳𝙴𝚂𝙲𝚁𝙸𝙿𝙲𝙸𝙾𝙽:  ${datosUsuario.desc || 'Sin descripción'}
-│  𓂃 ࣪ ִֶָ☾.  𝙵𝙰𝚅𝙾𝚁𝙸𝚃𝙾:  ${datosUsuario.favourite || 'No establecido'}
-│  𓂃 ࣪ ִֶָ☾.  𝙴𝚂𝚃𝙰𝙳𝙾:  ${estadoCivil}
-╰─╯
+*${formatNumber(totalCoins)}* ${moneda}
+banco · ${bancoInfo}
 
-╭─╮  𓍯  𝙴𝚂𝚃𝙰𝙳𝙸𝚂𝚃𝙸𝙲𝙰𝚂  𓍯  
-│  𓂃 ࣪ ִֶָ☾.  𝙽𝙸𝚅𝙴𝙻:  ${rpg.level}
-│  𓂃 ࣪ ִֶָ☾.  𝙴𝚇𝙿:  ${rpg.ratio}
-│  𓂃 ࣪ ִֶָ☾.  ${rpg.bar}
-│  𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙸𝙽𝚂:  ${formatNumber(totalCoins)} ${global.moneda}
-│  𓂃 ࣪ ִֶָ☾.  𝙱𝙰𝙽𝙲𝙾:  ${bancoInfo}
-│  𓂃 ࣪ ִֶָ☾.  𝙲𝙾𝙼𝙰𝙽𝙳𝙾𝚂:  ${formatNumber(rpg.commandCount)}
-│  𓂃 ࣪ ִֶָ☾.  𝚂𝚃𝙸𝙲𝙺𝙴𝚁𝚂:  ${formatNumber(rpg.stickerCount)}
-│  𓂃 ࣪ ִֶָ☾.  𝙼𝚂𝙶 𝙶𝚁𝚄𝙿𝙾:  ${m.isGroup ? formatNumber(msgGroup) : '—'}
-│  𓂃 ࣪ ִֶָ☾.  𝙼𝚂𝙶 𝚃𝙾𝚃𝙰𝙻:  ${formatNumber(msgTotal)}
-╰─╯
+${sep}
+*eco*
+comandos  ·  ${formatNumber(rpg.commandCount)}
+stickers  ·  ${formatNumber(rpg.stickerCount)}
+mensajes  ·  ${formatNumber(msgTotal)}${m.isGroup ? `\nen este grupo  ·  ${formatNumber(msgGroup)}` : ''}
 
-╭─╮  𓍯  𝙸𝙽𝙵𝙾 𝙶𝙴𝙽𝙴𝚁𝙰𝙻  𓍯  
-│  𓂃 ࣪ ִֶָ☾.  𝙸𝙳:  ${targetUser}
-│  𓂃 ࣪ ִֶָ☾.  𝚁𝙾𝙻:  ${userRole}
-│  𓂃 ࣪ ִֶָ☾.  𝚁𝙴𝙶𝙸𝚂𝚃𝚁𝙰𝙳𝙾:  ${datosUsuario.registered ? 'Sí' : 'No'}
-╰─╯`.trim()
+${sep}
+*vínculo*
+${lineaVinculo}
+${datosUsuario.registered ? 'registrado' : 'sin registro'}
+ㅤ`.trim()
 
   const botNumber = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
   const configPath = join('./Serbot', botNumber, 'config.json')
