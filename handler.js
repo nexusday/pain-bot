@@ -289,6 +289,13 @@ if (m.isGroup && !isRentalBypassCommand(m, this, isOwner, isROwner)) {
     console.error('Error processing muted list:', err)
   }
 
+  // Antis ANTES de comandos / adivinanzas / returns — si no, en muchos grupos nunca llegan
+  try {
+    await handleAntiSystems(m, this, isAdmin, isOwner, isRAdmin, isBotAdmin, isPrems, false, participants)
+  } catch (e) {
+    console.error('Error en handleAntiSystems (early):', e?.message || e)
+  }
+
 const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')  
 
 let usedPrefix = '.'  
@@ -574,7 +581,7 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
 
   
   await handleModoDescargas(m, this, comandoEjecutado)
-  await handleAntiSystems(m, this, isAdmin, isOwner, isRAdmin, isBotAdmin, isPrems, comandoEjecutado)
+  await handleAntiSystems(m, this, isAdmin, isOwner, isRAdmin, isBotAdmin, isPrems, comandoEjecutado, participants)
 
   await handleGroupEvents(m, this, isAdmin, isBotAdmin, isOwner, participants)
 
