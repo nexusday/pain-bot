@@ -30,7 +30,7 @@ const rcanal = global.rcanal || {
 const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
 const MARCA = '𓂃 ࣪ ִֶָ☾.'
 const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
-/** Código fijo (8 chars sin guion). Se muestra como PAIN-BOTM */
+
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -389,7 +389,7 @@ ${SEP}
           return
         }
 
-        // Cierre fatal de sesión (logout / reemplazo / prohibido): no reconectar en bucle
+        
         if (esMotivoSesionFatal(motivo)) {
           console.log(chalk.bold.magentaBright(`\n┆ Sesión fatal (+${idCarpetaBot}) código ${motivo}. Limpiando...\n`))
           if (codigoM && !estadoConn.creds.registered) {
@@ -403,7 +403,7 @@ ${SEP}
           return
         }
 
-        // Desconexión temporal (red, 503, timeout, restart, sin código…): reconectar
+    
         if (esFlujoEmparejamiento && !codigoEmparejamientoEnviado) {
           console.log(chalk.bold.yellow(`\n┆ Pairing (+${idCarpetaBot}) esperando vinculación (${motivo})\n`))
           return
@@ -698,12 +698,16 @@ nombre  ·  ${tip(nombreBot)}
 número  ·  ${tip(`+${numeroBot}`)}
 usuario  ·  ${tip(nombreUsuario)}
 estado  ·  ${tip('conectado')}
-auto-leer  ·  ${tip('desactivado')}
 
 ${SEP}
-*configuración*
-> ${tip(`${usedPrefix}setautoread on`)}
-> ${tip(`${usedPrefix}setautoread off`)}
+*puedes configurar tu sub-bot*
+escríbele a *tu sub-bot* (${tip(`+${numeroBot}`)})
+o desde este chat, con tu mismo número
+
+> ${tip(`${usedPrefix}setbotname <nombre>`)}
+> ${tip(`${usedPrefix}setbotimg`)}  ·  responde una imagen
+> ${tip(`${usedPrefix}setautoread on/off`)}
+> ${tip(`${usedPrefix}menu`)}  ·  ver comandos
 ㅤ`.trim()
 
   const mensajeCanal = `
@@ -741,7 +745,12 @@ async function enviarBienvenidaSubBot({ sock, m, conn, replyJid, nombreBot, botN
   })
 
   if (m && conn) {
-    await sendPrivateReply(m, conn, mensajePrivado, { contextInfo: { ...rcanal.contextInfo } })
+    await conn.sendMessage(m.chat, {
+      text: mensajePrivado,
+      contextInfo: { ...rcanal.contextInfo }
+    }, { quoted: m }).catch((err) => {
+      console.error('[subbot] Error enviando bienvenida en el chat:', err?.message || err)
+    })
   }
 
   const jidCanal = getSubBotsLogsJid()
