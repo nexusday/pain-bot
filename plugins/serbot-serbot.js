@@ -244,6 +244,8 @@ async function iniciarSubBot(options) {
     let tuvoNuevoLogin = false
     let reconectando = false
     let qrYaEnviado = false
+    let claveMensajeVinculo = null
+    let temporizadorVinculo = null
     let vistoUsuarioEn = Date.now()
     let temporizadorWatchdog = null
     const telefonoEmparejamiento = phoneNumber
@@ -251,6 +253,25 @@ async function iniciarSubBot(options) {
 
     const replyUser = async (text) => {
       return sendPrivateReply(m, conn, text, { contextInfo: { ...rcanal.contextInfo } })
+    }
+
+    async function borrarMensajeVinculo() {
+      if (temporizadorVinculo) {
+        clearTimeout(temporizadorVinculo)
+        temporizadorVinculo = null
+      }
+      const clave = claveMensajeVinculo
+      claveMensajeVinculo = null
+      if (!clave || !conn) return
+      await conn.sendMessage(m.chat, { delete: clave }).catch(() => {})
+    }
+
+    function programarBorradoVinculo(clave) {
+      claveMensajeVinculo = clave || null
+      if (temporizadorVinculo) clearTimeout(temporizadorVinculo)
+      temporizadorVinculo = setTimeout(() => {
+        borrarMensajeVinculo().catch(() => {})
+      }, 60000)
     }
 
     function socketAbierto() {
@@ -320,7 +341,8 @@ async function iniciarSubBot(options) {
         secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
         codigoEmparejamientoEnviado = true
 
-        await replyUser(construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento))
+        const enviado = await replyUser(construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento))
+        programarBorradoVinculo(enviado?.key)
 
         emparejamientoEnCurso = false
         return true
@@ -354,9 +376,7 @@ async function iniciarSubBot(options) {
             caption: construirMensajeEnlaceQr(),
             contextInfo: { ...rcanal.contextInfo }
           }, { quoted: m })
-          setTimeout(() => {
-            if (enviado?.key) conn.sendMessage(m.chat, { delete: enviado.key }).catch(() => {})
-          }, 60000)
+          programarBorradoVinculo(enviado?.key)
         } catch (errorQr) {
           qrYaEnviado = false
           console.error('Error enviando QR:', errorQr?.message || errorQr)
@@ -431,6 +451,7 @@ async function iniciarSubBot(options) {
       if (connection === 'open') {
         reconectando = false
         vistoUsuarioEn = Date.now()
+        await borrarMensajeVinculo().catch(() => {})
         if (!global.db.data?.users) loadDatabase()
 
         console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${idCarpetaBot}) conectado exitosamente.`))
