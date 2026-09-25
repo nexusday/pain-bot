@@ -128,25 +128,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    try {
-      await conn.sendMessage(m.chat, {
-        video: { url: descargaVideo },
-        caption: informacion,
-        fileName: `${limpiarNombreArchivo(titulo)}.mp4`,
-        mimetype: 'video/mp4'
-      }, { quoted: m })
-    } catch {
-      const respuesta = await fetch(descargaVideo)
-      if (!respuesta.ok) throw new Error('No se pudo descargar el archivo MP4.')
-      const bufer = Buffer.from(await respuesta.arrayBuffer())
-      await conn.sendMessage(m.chat, {
-        video: bufer,
-        caption: informacion,
-        fileName: `${limpiarNombreArchivo(titulo)}.mp4`,
-        mimetype: 'video/mp4'
-      }, { quoted: m })
-    }
-
+    enviarVideoAlFondo(conn, m, descargaVideo, titulo, informacion)
     await conn.sendPresenceUpdate('paused', m.chat).catch(() => {})
   } catch (e) {
     console.error('Error en download-video:', e)
@@ -157,6 +139,39 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
   }
+}
+
+function enviarVideoAlFondo(conn, m, url, titulo, informacion) {
+  setTimeout(() => {
+    (async () => {
+      try {
+        await conn.sendMessage(m.chat, {
+          video: { url },
+          caption: informacion,
+          fileName: `${limpiarNombreArchivo(titulo)}.mp4`,
+          mimetype: 'video/mp4'
+        }, { quoted: m })
+      } catch (error) {
+        try {
+          const respuesta = await fetch(url)
+          if (!respuesta.ok) throw error
+          const bufer = Buffer.from(await respuesta.arrayBuffer())
+          await conn.sendMessage(m.chat, {
+            video: bufer,
+            caption: informacion,
+            fileName: `${limpiarNombreArchivo(titulo)}.mp4`,
+            mimetype: 'video/mp4'
+          }, { quoted: m })
+        } catch (e) {
+          console.error('Error enviando video en segundo plano:', e?.message || e)
+          await conn.sendMessage(m.chat, {
+            text: '[❌] No se pudo enviar el video.',
+            contextInfo: { ...rcanal?.contextInfo }
+          }, { quoted: m }).catch(() => {})
+        }
+      }
+    })().catch((e) => console.error('video fondo:', e?.message || e))
+  }, 0)
 }
 
 handler.help = ['video <búsqueda/url/número>', 'ytmp4 <enlace>']

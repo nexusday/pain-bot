@@ -69,31 +69,31 @@ que te vaya bien
 }
 
 function asegurarConfig(chatId) {
-  if (!global.db.data.bienvenidas) global.db.data.bienvenidas = {}
+    if (!global.db.data.bienvenidas) global.db.data.bienvenidas = {}
   const actual = global.db.data.bienvenidas[chatId]
-
+    
   if (actual === true) {
     global.db.data.bienvenidas[chatId] = {
-      enabled: true,
-      welcomeMsg: '',
-      goodbyeMsg: '',
-      welcomeImg: '',
+        enabled: true,
+        welcomeMsg: '',
+        goodbyeMsg: '',
+        welcomeImg: '',
       goodbyeImg: '',
-    }
+      }
   } else if (actual === false) {
     global.db.data.bienvenidas[chatId] = {
-      enabled: false,
-      welcomeMsg: '',
-      goodbyeMsg: '',
-      welcomeImg: '',
+        enabled: false,
+        welcomeMsg: '',
+        goodbyeMsg: '',
+        welcomeImg: '',
       goodbyeImg: '',
-    }
+      }
   } else if (!actual || typeof actual !== 'object') {
     global.db.data.bienvenidas[chatId] = {
-      enabled: false,
-      welcomeMsg: '',
-      goodbyeMsg: '',
-      welcomeImg: '',
+        enabled: false,
+        welcomeMsg: '',
+        goodbyeMsg: '',
+        welcomeImg: '',
       goodbyeImg: '',
     }
   }
