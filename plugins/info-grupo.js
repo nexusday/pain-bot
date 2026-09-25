@@ -1,18 +1,37 @@
-let handler = async (m, { conn, usedPrefix, command }) => {
-  
+const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
+const MARCA = '𓂃 ࣪ ִֶָ☾.'
+const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
+
+function digitosDe(jid) {
+  return String(jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+}
+
+function etiquetaMention(jid) {
+  const n = digitosDe(jid)
+  return n ? `@${n}` : '—'
+}
+
+function cortar(texto, max = 420) {
+  const limpio = String(texto || '').replace(/\s+/g, ' ').trim()
+  if (!limpio) return ''
+  if (limpio.length <= max) return limpio
+  return `${limpio.slice(0, max).trim()}…`
+}
+
+let handler = async (m, { conn }) => {
   if (!m.chat.endsWith('@g.us')) {
     return conn.sendMessage(m.chat, {
-      text: '[❗] Este comando solo funciona en grupos.',
-      contextInfo: {
-        ...rcanal.contextInfo
-      }
+      text: `
+ㅤ
+${MARCA}  *grupo*
+_solo en grupos_
+ㅤ`.trim(),
+      contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 
   try {
-    
     const metadata = await conn.groupMetadata(m.chat)
-    
     const {
       subject: name,
       owner,
@@ -21,84 +40,107 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       participants
     } = metadata
 
+    const miembros = participants || []
+    const admins = miembros.filter(p => p.admin === 'admin' || p.admin === 'superadmin')
+    const idsAdmin = admins.map(p => p.id).filter(Boolean)
 
-    const totalMembers = participants.length
+    const numerosOwner = new Set()
+    for (const entrada of [...(global.owner || []), ...(global.ownerLid || [])]) {
+      const numero = Array.isArray(entrada) ? entrada[0] : entrada
+      const digitos = digitosDe(numero)
+      if (digitos) numerosOwner.add(digitos)
+    }
 
-    
-    const admins = participants.filter(p => p.admin === 'admin').map(p => p.id)
+    const ownersEnGrupo = miembros.filter(p => {
+      const ids = [p.id, p.jid, p.phoneNumber].map(digitosDe).filter(Boolean)
+      return ids.some(id => numerosOwner.has(id))
+    })
 
-    
-    const ownersList = [...(global.owner || []).map(o => o[0]), ...(global.ownerLid || []).map(o => o[0])]
-    const ownersInGroup = participants.filter(p => ownersList.includes(p.id.split('@')[0].split(':')[0])).map(p => p.id)
-    
-    
-    const creationDate = new Date(creation * 1000).toLocaleString('es-ES')
+    const fecha = creation
+      ? new Date(Number(creation) > 1e12 ? Number(creation) : Number(creation) * 1000).toLocaleString('es-ES')
+      : '—'
 
-    
-    const descLength = desc ? desc.length : 0
+    const descripcion = cortar(desc) || 'sin descripción'
+    const menciones = [...new Set([
+      ...(owner ? [owner] : []),
+      ...idsAdmin,
+      ...ownersEnGrupo.map(p => p.id)
+    ].filter(Boolean))]
 
-    
-    let menciones = []
-    if (owner) menciones.push(owner)
-    if (admins.length > 0) menciones.push(...admins)
-    if (ownersInGroup.length > 0) menciones.push(...ownersInGroup)
+    const bloqueAdmins = idsAdmin.length
+      ? idsAdmin.map(id => etiquetaMention(id)).join('\n')
+      : tip('ninguno')
 
-    
-    let textoInfo = `
-╭───「  𝙄𝙉𝙁𝙊 𝙂𝙍𝙐𝙋𝙊  」
-│
-│  *Nombre:* ${name || 'Sin nombre'}
-│  *Creador:* @${owner ? owner.split('@')[0] : 'Desconocido'}
-│  *Creado:* ${creationDate}
-│  *Miembros:* ${totalMembers}
-│  *Descripción:* ${descLength} caracteres
-│
-│  *Admins (${admins.length}):*
-${admins.length > 0 ? admins.map(a => `│  • @${a.split('@')[0]}`).join('\n') : '│  • Ninguno'}
-│
-│  *Owners del bot:*
-${ownersInGroup.length > 0 ? ownersInGroup.map(o => `│  • @${o.split('@')[0]}`).join('\n') : '│  • Los owners no están en este grupo'}
-`.trim()
+    const bloqueOwners = ownersEnGrupo.length
+      ? ownersEnGrupo.map(p => etiquetaMention(p.id)).join('\n')
+      : tip('no están en este grupo')
 
-    
+    const textoInfo = `
+ㅤ
+${MARCA}  *grupo*
+_${name || 'sin nombre'}_
+
+${SEP}
+*datos*
+miembros  ·  ${tip(miembros.length)}
+admins  ·  ${tip(idsAdmin.length)}
+creado  ·  ${tip(fecha)}
+
+${SEP}
+*creador*
+${owner ? etiquetaMention(owner) : tip('desconocido')}
+
+${SEP}
+*admins*
+${bloqueAdmins}
+
+${SEP}
+*owners del bot aquí*
+${bloqueOwners}
+
+${SEP}
+*descripción*
+${descripcion}
+ㅤ`.trim()
+
+    const contexto = {
+      mentionedJid: menciones,
+      ...rcanal.contextInfo
+    }
+
     try {
       const groupPic = await conn.profilePictureUrl(m.chat, 'image')
       if (groupPic) {
-        conn.sendMessage(m.chat, {
+        await conn.sendMessage(m.chat, {
           image: { url: groupPic },
           caption: textoInfo,
-          contextInfo: {
-            mentionedJid: menciones,
-            ...rcanal.contextInfo
-          }
+          contextInfo: contexto
         }, { quoted: m })
         return
       }
-    } catch (error) {
-      
-    }
+    } catch {}
 
-    
-    conn.sendMessage(m.chat, {
+    await conn.sendMessage(m.chat, {
       text: textoInfo,
-      contextInfo: {
-        mentionedJid: menciones,
-        ...rcanal.contextInfo
-      }
+      contextInfo: contexto
     }, { quoted: m })
-
   } catch (error) {
     console.error('Error en infogrupo:', error)
-    conn.sendMessage(m.chat, {
-      text: `[❌] Error al obtener información del grupo: ${error.message || 'Desconocido'}`,
-      contextInfo: {
-        ...rcanal.contextInfo
-      }
+    await conn.sendMessage(m.chat, {
+      text: `
+ㅤ
+${MARCA}  *grupo*
+_no se pudo leer_
+
+${SEP}
+${tip(error?.message || 'error desconocido')}
+ㅤ`.trim(),
+      contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 }
 
-handler.help = ['infogrupo → Muestra información completa del grupo']
+handler.help = ['infogrupo → información del grupo']
 handler.tags = ['group', 'info']
 handler.command = ['infogrupo', 'infogp', 'groupinfo']
 

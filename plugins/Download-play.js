@@ -1,10 +1,44 @@
 import fetch from "node-fetch"
 
+const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
+const MARCA = '𓂃 ࣪ ִֶָ☾.'
+const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
+
+function nombreAutor(autor) {
+  if (!autor) return '—'
+  if (typeof autor === 'string') return autor.trim() || '—'
+  return autor.name || autor.channel || '—'
+}
+
+function textoPlay({ titulo, canal, duracion, url }) {
+  return `
+ㅤ
+${MARCA}  *play*
+_${titulo || 'audio'}_
+
+${SEP}
+*audio*
+título  ·  ${tip(titulo || '—')}
+canal  ·  ${tip(canal || '—')}
+duración  ·  ${tip(duracion || '—')}
+
+${SEP}
+> ${tip(url || '—')}
+ㅤ`.trim()
+}
+
 const handler = async (m, { conn, text, usedPrefix }) => {
   try {
     if (!text?.trim())
       return conn.sendMessage(m.chat, {
-        text: " ִֶָ☾. Ingresa el nombre o enlace de YouTube.",
+        text: `
+ㅤ
+${MARCA}  *play*
+_falta la canción_
+
+${SEP}
+> ${tip(`${usedPrefix}play <nombre o link>`)}
+ㅤ`.trim(),
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
 
@@ -22,7 +56,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       const urlBusqueda = `https://api.delirius.online/search/ytsearch?q=${encodeURIComponent(text)}`
       const resBusqueda = await fetch(urlBusqueda).then(r => r.json())
       if (!resBusqueda?.status || !Array.isArray(resBusqueda.data) || resBusqueda.data.length === 0)
-        throw "[❗] No se encontraron resultados para la búsqueda."
+        throw "sin resultados"
       const primero = resBusqueda.data[0]
       urlVideo = primero.url || `https://youtu.be/${primero.videoId}`
       titulo = primero.title || titulo
@@ -35,31 +69,34 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     const apiDescarga = `https://api.delirius.online/download/ytmp3?url=${encodeURIComponent(urlVideo)}`
     const resDescarga = await fetch(apiDescarga).then(r => r.json())
     if (!resDescarga?.status || !resDescarga.data)
-      throw "[❗] No se pudo obtener el audio desde la URL."
+      throw "no se pudo obtener el audio"
 
     const datosInfo = resDescarga.data
     const urlAudio = typeof datosInfo.download === "string" ? datosInfo.download : datosInfo.download?.url
     const portada = datosInfo.image || urlMiniatura
     titulo = datosInfo.title || titulo
+    autor = datosInfo.author || datosInfo.channel || autor
+    duracion = datosInfo.duration || datosInfo.timestamp || duracion
 
     if (!urlAudio)
-      throw "[❗] No se encontró la URL del audio."
+      throw "no se encontró el audio"
 
-    const informacion = `ִֶָ☾. 𝗣𝗹𝗮𝘆 ִֶָ☾.
- 𓍯  *Título:* ${titulo}
- 𓍯  *Canal:* ${autor.name || autor}
- 𓍯  *Duración:* ${duracion}
- 𓍯  *Enlace:* ${urlVideo}`
+    const informacion = textoPlay({
+      titulo,
+      canal: nombreAutor(autor),
+      duracion,
+      url: urlVideo
+    })
 
-    
+    let envioPortada = false
     if (portada) {
       try {
         const miniatura = (await conn.getFile(portada)).data
         await conn.sendMessage(m.chat, { image: miniatura, caption: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
-      } catch (e) {
-       
-      }
-    } else {
+        envioPortada = true
+      } catch {}
+    }
+    if (!envioPortada) {
       await conn.sendMessage(m.chat, { text: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
     }
 
@@ -71,10 +108,17 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     )
 
   } catch (e) {
+    const detalle = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
     return conn.sendMessage(m.chat, {
-      text: typeof e === "string"
-        ? e
-        : `[❌] Se ha producido un problema.\n> Usa *${usedPrefix}report* para informarlo.\n\n${e.message}`,
+      text: `
+ㅤ
+${MARCA}  *play*
+_no se pudo enviar_
+
+${SEP}
+${tip(detalle)}
+> ${tip(`${usedPrefix}play <nombre o link>`)}
+ㅤ`.trim(),
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
   }
