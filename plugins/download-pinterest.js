@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+const LIMITE_IMAGENES = 3
+
 const CABECERAS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
@@ -25,19 +27,21 @@ async function buscarPinterest(consulta) {
       ? data.data
       : []
 
-  return lista
-    .map(item => {
-      if (typeof item === 'string') return item
-      return (
-        item?.image_large_url ||
-        item?.images?.orig?.url ||
-        item?.image ||
-        item?.url ||
-        item?.media?.url ||
-        null
-      )
-    })
-    .filter(Boolean)
+  return [...new Set(
+    lista
+      .map(item => {
+        if (typeof item === 'string') return item
+        return (
+          item?.image_large_url ||
+          item?.images?.orig?.url ||
+          item?.image ||
+          item?.url ||
+          item?.media?.url ||
+          null
+        )
+      })
+      .filter(url => typeof url === 'string' && /^https?:\/\//i.test(url))
+  )].slice(0, LIMITE_IMAGENES)
 }
 
 async function descargarPin(urlPin) {
@@ -105,7 +109,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    for (const urlImg of resultados.slice(0, 3)) {
+    for (const urlImg of resultados) {
       await conn.sendMessage(m.chat, {
         image: { url: urlImg },
         caption: `> *Búsqueda:* ${consulta}`,
