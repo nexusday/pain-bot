@@ -19,7 +19,14 @@ let handler = async (m, { conn, usedPrefix, command }) => {
   if (chance < 0.25) {
   
     usuario.lastSorpresa = Date.now()
-    let texto = `🎁 𝗘𝘀𝘁𝗮 𝗰𝗮𝗷𝗮 𝗲𝘀𝘁𝘂𝘃𝗼 𝘃𝗮𝗰𝗶𝗮\n\n> Suerte para la próxima.`
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *vacía*
+╰─ ✧  ✩
+┊ total  ·  \`${usuario.coins || 0} ${global.moneda}\`
+╰─────────`.trim()
     
     return conn.sendMessage(m.chat, {
       text: texto,
@@ -35,7 +42,14 @@ let handler = async (m, { conn, usedPrefix, command }) => {
   global.db.data.users[m.sender].coins = (usuario.coins || 0) + amount
   usuario.lastSorpresa = Date.now()
 
-  let texto = ` 🎁 𝗦𝗼𝗿𝗽𝗿𝗲𝘀𝗮 \n\n> *Premio:* +${amount} ${global.moneda}\n> *Total:* ${global.db.data.users[m.sender].coins} ${global.moneda}\n`
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *+${amount} ${global.moneda}*
+╰─ ✧  ✩
+┊ total  ·  \`${global.db.data.users[m.sender].coins} ${global.moneda}\`
+╰─────────`.trim()
 
   conn.sendMessage(m.chat, {
     text: texto,

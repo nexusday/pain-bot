@@ -83,34 +83,36 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     let winnings = 0
     let resultado = ''
-    let emoji = ''
 
     if (winType === 'jackpot') {
       winnings = bet * multiplier
-      resultado = `🎰 *¡JACKPOT!* Premio x${multiplier}`
-      emoji = '🎉'
+      resultado = `jackpot x${multiplier}`
     } else if (winType === 'big_win') {
       winnings = bet * multiplier
-      resultado = `✅ *¡Ganaste!* Premio x${multiplier}`
-      emoji = '🎊'
+      resultado = `ganaste x${multiplier}`
     } else if (winType === 'win') {
       winnings = Math.floor(bet * multiplier)
-      resultado = `😊 *¡Bien!* Premio x${multiplier.toFixed(1)}`
-      emoji = '✨'
+      resultado = `ganaste x${multiplier.toFixed(1)}`
     } else {
       winnings = 0
-      resultado = `❌ *¡Perdiste!* Suerte para la próxima`
-      emoji = '💸'
+      resultado = 'perdiste'
     }
 
     
     usuario.coins += winnings
 
     
-    let texto = `🎰 𝗔𝗣𝗨𝗘𝗦𝗧𝗔𝗦  🎰\n`
-    texto += `\n`
-    texto += `${reels}\n`
-    texto += `\n\n> ${resultado}\n> *Premio:* ${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\n> *Total:* ${usuario.coins} ${global.moneda}\n> *Próximo:* 30 seg\n`
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${reels}*
+╰─ ✧  ✩
+┊ resultado  ·  \`${resultado}\`
+┊ premio  ·  \`${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\`
+┊ total  ·  \`${usuario.coins} ${global.moneda}\`
+┊ siguiente  ·  \`30s\`
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,

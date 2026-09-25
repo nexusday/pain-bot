@@ -14,7 +14,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       const minutos = Math.floor(tiempoRestante / 60000)
       const segundos = Math.floor((tiempoRestante % 60000) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `🎲 𝗗𝗔𝗗𝗢\n> Debes esperar ${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''} para volver a jugar`,
+        text: `[❗] Debes esperar ${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''} para volver a jugar.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -65,13 +65,18 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     const emojisDado = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅']
 
-    let texto = `🎲 𝗗𝗔𝗗𝗢\n 
-> Dado: ${emojisDado[dado - 1]} (${dado})
-> Resultado: ${resultado}
-> Cambio: ${ganancia > 0 ? '+' : ''}${ganancia} ${global.moneda}
-> Total: ${monedas + ganancia} ${global.moneda}
+    const signo = ganancia > 0 ? '+' : ''
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-> Próximo intento: 2 minutos`
+╭─ ✧
+┊ *${emojisDado[dado - 1]}  ${dado}*
+╰─ ✧  ✩
+┊ ${resultado}
+┊ cambio  ·  \`${signo}${ganancia} ${global.moneda}\`
+┊ total  ·  \`${monedas + ganancia} ${global.moneda}\`
+┊ siguiente  ·  \`2 min\`
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,
@@ -84,7 +89,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   } catch (error) {
     console.error('Error en juego del dado:', error)
     return conn.sendMessage(m.chat, {
-      text: '❗ Ocurrió un error al ejecutar el juego del dado.',
+      text: '[❌] Ocurrió un error al ejecutar el juego del dado.',
       contextInfo: {
         ...rcanal.contextInfo
       }

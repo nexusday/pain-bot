@@ -91,12 +91,6 @@ function resolveSpin(bet) {
   return { result, won }
 }
 
-function resultDisplay(num) {
-  const c = colorOf(num)
-  const emoji = c === 'verde' ? '🟢' : c === 'rojo' ? '🔴' : '⚫'
-  return `${emoji} *${num}* (${c.toUpperCase()})`
-}
-
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
     if (!m.isGroup) {
@@ -134,7 +128,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (!betInfo) {
       return conn.sendMessage(m.chat, {
-        text: `[❗] *Ruleta europea (0-36)*\n\n> Uso: ${usedPrefix + command} <apuesta> <cantidad>\n\n> *Apuestas:*\n> • \`rojo\` / \`negro\` → x2\n> • \`par\` / \`impar\` → x2\n> • \`0\` a \`36\` (número) → x35\n\n> Ejemplo: ${usedPrefix + command} rojo 200`,
+        text: `[❗] *Ruleta (0-36)*\n\n> Uso: ${usedPrefix + command} <apuesta> <cantidad>\n> rojo / negro / par / impar → x2\n> número 0-36 → x35\n\n> Ejemplo: ${usedPrefix + command} rojo 200`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
@@ -161,15 +155,17 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (winnings > 0) usuario.coins += winnings
 
-    const texto = `🎡 *RULETA*
+    const texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-> Apuesta: *${betInfo.label}* — ${amount} ${global.moneda}
-Resultado: ${resultDisplay(result)}
-
-${won ? `✅ *¡Ganaste!* +${winnings} ${global.moneda} (x${betInfo.multiplier})` : `❌ *Perdiste* —${amount} ${global.moneda}`}
-
-Total: ${usuario.coins} ${global.moneda}
-> Próximo giro: 25 seg`
+╭─ ✧
+┊ *${result} · ${colorOf(result)}*
+╰─ ✧  ✩
+┊ apuesta  ·  \`${betInfo.label}\`
+┊ ${won ? 'ganaste' : 'perdiste'}  ·  \`${won ? '+' : '-'}${won ? winnings : amount} ${global.moneda}\`
+┊ total  ·  \`${usuario.coins} ${global.moneda}\`
+┊ siguiente  ·  \`25s\`
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,

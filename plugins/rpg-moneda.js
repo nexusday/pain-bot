@@ -63,7 +63,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (!choice || !['cara', 'sello', 'coin', 'flip'].includes(choice)) {
       return conn.sendMessage(m.chat, {
-        text: `[❌] Uso correcto: ${usedPrefix + command} <cara/sello> <cantidad>\nEjemplo: ${usedPrefix + command} cara 100`,
+        text: `[❌] Uso correcto: ${usedPrefix + command} <cara/sello> <cantidad>\n> Ejemplo: ${usedPrefix + command} cara 100`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -82,7 +82,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     if ((usuario.coins || 0) < bet) {
       return conn.sendMessage(m.chat, {
-        text: `[❗] No tienes suficientes ${global.moneda}.\nTienes: ${usuario.coins || 0} ${global.moneda}`,
+        text: `[❗] No tienes suficientes ${global.moneda}.\n> Tienes: ${usuario.coins || 0} ${global.moneda}`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -95,8 +95,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     
     const userWon = getCoinFlipResult(bet)
-    const probability = calculateProbability(bet)
-    const resultEmoji = userWon ? (choice === 'cara' ? '🪙' : '🪙') : (choice === 'cara' ? '🪙' : '🪙')
     const resultText = userWon ? (choice === 'cara' ? 'CARA' : 'SELLO') : (choice === 'cara' ? 'SELLO' : 'CARA')
 
     
@@ -106,37 +104,24 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (userWon) {
       winnings = bet * 2 
       usuario.coins += winnings
-      resultado = `🎉 ¡GANASTE! ${choice.toUpperCase()} salió!`
+      resultado = 'ganaste'
     } else {
       winnings = 0
-      resultado = `💸 ¡PERDISTE! Salió ${resultText}`
+      resultado = 'perdiste'
     }
 
-    
-    let riskMessage = ''
-    if (bet <= 200) {
-      riskMessage = 'Jugaste seguro, ¡bien hecho!'
-    } else if (bet <= 500) {
-      riskMessage = '¡Apuesta arriesgada!'
-    } else if (bet <= 1000) {
-      riskMessage = '¡Qué valentía! 💪'
-    } else {
-      riskMessage = '¡Apuesta extrema! 🔥'
-    }
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-    
-    let texto = `🪙 𝗖𝗮𝗿𝗮 𝗼 𝘀𝗲𝗹𝗹𝗼 \n`
-    texto += `\n`
-    texto += `> ${resultEmoji} *Resultado:* ${resultText}\n`
-    texto += `> *Elegiste:* ${choice.toUpperCase()}\n`
-    texto += `> ${resultado}\n`
-    texto += `> *Apuesta:* ${bet} ${global.moneda}\n`
-    texto += `> *Premio:* ${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\n`
-    texto += `> *Total:* ${usuario.coins} ${global.moneda}\n`
-    texto += `\n`
-    texto += `> ${riskMessage}\n`
-    texto += `> *Probabilidad:* ${Math.round(probability * 100)}%\n`
-    texto += `> *Próximo:* 15 seg\n`
+╭─ ✧
+┊ *${resultText.toLowerCase()}*
+╰─ ✧  ✩
+┊ elegiste  ·  \`${choice}\`
+┊ resultado  ·  \`${resultado}\`
+┊ premio  ·  \`${winnings > 0 ? '+' : ''}${winnings} ${global.moneda}\`
+┊ total  ·  \`${usuario.coins} ${global.moneda}\`
+┊ siguiente  ·  \`15s\`
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,

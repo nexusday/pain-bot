@@ -24,28 +24,25 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       const proximaRacha = (usuario.dailyStreak || 0) + 1
 
       return conn.sendMessage(m.chat, {
-        text: `[❗] Ya reclamaste tu daily hoy.\n\n> *⏱️ Tiempo restante:* ${horas}h ${minutos}m ${segundos}s\n\n> *🎯 Tu próxima racha:* ${proximaRacha} 🔥\n> *Próximo premio:* ${obtenerPremioDiario(proximaRacha).toLocaleString()} ${global.moneda}`,
+        text: `[❗] Ya reclamaste tu daily hoy.\n\n> *Tiempo restante:* ${horas}h ${minutos}m ${segundos}s\n> *Próxima racha:* ${proximaRacha}\n> *Próximo premio:* ${obtenerPremioDiario(proximaRacha).toLocaleString()} ${global.moneda}`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
     let racha = usuario.dailyStreak || 0
-    let mensaje = ''
+    let nota = ''
 
     const tiempoDesdeUltimoClaim = Date.now() - ultimoDiario
     if (ultimoDiario > 0 && tiempoDesdeUltimoClaim > ENFRIAMIENTO_DIARIO + 60000) {
       racha = 0
-      mensaje = '❌ *¡Perdiste tu racha!* No reclamaste a tiempo'
+      nota = 'racha reiniciada'
     }
 
     if (racha === 0) {
       racha = 1
-      if (ultimoDiario === 0) {
-        mensaje = '🎉 *¡Primer daily!* Bienvenido al sistema de rachas'
-      }
+      if (!nota && ultimoDiario === 0) nota = 'primer daily'
     } else {
       racha++
-      if (!mensaje) mensaje = `🔥 *¡Racha de ${racha} días!* Sigue así`
     }
 
     const premio = obtenerPremioDiario(racha)
@@ -65,17 +62,17 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       second: '2-digit'
     })
 
-    const texto = `🎁 *𝗗𝗮𝗶𝗹𝘆*
+    const texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-> *Racha:* ${racha} 🔥
-> *Premio hoy:* +${premio.toLocaleString()} ${global.moneda}
-> *Total:* ${usuario.coins.toLocaleString()} ${global.moneda}
-> ${mensaje}
-
-> *Mañana (racha ${racha + 1}):* +${proximoPremio.toLocaleString()} ${global.moneda}
-> *Próximo claim:* ${proximaFecha}
-
-_Escala: día 1 = 9K, cada día +500 (9K → 9.5K → 10K…)_`
+╭─ ✧
+┊ *+${premio.toLocaleString()} ${global.moneda}*
+╰─ ✧  ✩
+┊ ${nota || `${racha} ${racha === 1 ? 'día' : 'días'}`}
+┊ ahora  ·  \`${usuario.coins.toLocaleString()} ${global.moneda}\`
+┊ mañana  ·  \`+${proximoPremio.toLocaleString()} ${global.moneda}\`
+┊ vuelves  ·  \`${proximaFecha}\`
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,

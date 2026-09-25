@@ -83,20 +83,17 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     usuario.coins += recompensa
 
     
-    const mensajesFelicitacion = [
-      '¡Qué fortuna tienes!',
-      '¡La suerte te sonríe!',
-      '¡Eres un afortunado!',
-      '¡Bendecido por la suerte!',
-      '¡Increíble suerte!',
-      '¡La fortuna te acompaña!',
-      '¡Qué buena fortuna!',
-      '¡Suerte extraordinaria!',
-    ]
+    const moneda = global.moneda
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-    const mensajeFelicitacion = mensajesFelicitacion[Math.floor(Math.random() * mensajesFelicitacion.length)]
-
-    let texto = `🧿 𝗧𝘂 𝘀𝘂𝗲𝗿𝘁𝗲\n\n> Situación: ${situacionSeleccionada.descripcion}\n> Recompensa: +${recompensa} ${global.moneda}\n> Total: ${usuario.coins} ${global.moneda}\n> Próxima suerte: 5 min`
+╭─ ✧
+┊ *${situacionSeleccionada.descripcion}*
+╰─ ✧  ✩
+┊ premio  ·  \`+${recompensa} ${moneda}\`
+┊ total  ·  \`${usuario.coins} ${moneda}\`
+┊ siguiente  ·  \`5 min\`
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,

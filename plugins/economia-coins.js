@@ -12,10 +12,14 @@ let handler = async (m, { conn, text, args }) => {
   let name = await conn.getName(who)
 
   return conn.sendMessage(m.chat, {
-  text: `☾. Economía de usuario
+  text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-𓍯 Usuario: @${who.split('@')[0]}
-𓍯 Coins actuales: ${monedas}`,
+╭─ ✧
+┊ *@${who.split('@')[0]}*
+╰─ ✧  ✩
+┊ ${global.moneda || 'coins'}  ·  \`${monedas.toLocaleString()}\`
+╰─────────`.trim(),
       contextInfo: {
       ...rcanal.contextInfo,
       mentionedJid: [who, m.sender]

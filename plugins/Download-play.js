@@ -1,44 +1,16 @@
 import fetch from "node-fetch"
 
-const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
-const MARCA = '𓂃 ࣪ ִֶָ☾.'
-const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
-
 function nombreAutor(autor) {
   if (!autor) return '—'
   if (typeof autor === 'string') return autor.trim() || '—'
   return autor.name || autor.channel || '—'
 }
 
-function textoPlay({ titulo, canal, duracion, url }) {
-  return `
-ㅤ
-${MARCA}  *play*
-_${titulo || 'audio'}_
-
-${SEP}
-*audio*
-título  ·  ${tip(titulo || '—')}
-canal  ·  ${tip(canal || '—')}
-duración  ·  ${tip(duracion || '—')}
-
-${SEP}
-> ${tip(url || '—')}
-ㅤ`.trim()
-}
-
 const handler = async (m, { conn, text, usedPrefix }) => {
   try {
     if (!text?.trim())
       return conn.sendMessage(m.chat, {
-        text: `
-ㅤ
-${MARCA}  *play*
-_falta la canción_
-
-${SEP}
-> ${tip(`${usedPrefix}play <nombre o link>`)}
-ㅤ`.trim(),
+        text: `[❗] Falta la canción o el enlace.\n\n> *Ejemplo:* ${usedPrefix}play <nombre o link>`,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
 
@@ -81,12 +53,17 @@ ${SEP}
     if (!urlAudio)
       throw "no se encontró el audio"
 
-    const informacion = textoPlay({
-      titulo,
-      canal: nombreAutor(autor),
-      duracion,
-      url: urlVideo
-    })
+    const canal = nombreAutor(autor)
+    const informacion = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${titulo || 'audio'}*
+╰─ ✧  ✩
+┊ canal  ·  \`${canal}\`
+┊ duración  ·  \`${duracion || '—'}\`
+┊ \`${urlVideo || '—'}\`
+╰─────────`.trim()
 
     let envioPortada = false
     if (portada) {
@@ -110,15 +87,7 @@ ${SEP}
   } catch (e) {
     const detalle = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
     return conn.sendMessage(m.chat, {
-      text: `
-ㅤ
-${MARCA}  *play*
-_no se pudo enviar_
-
-${SEP}
-${tip(detalle)}
-> ${tip(`${usedPrefix}play <nombre o link>`)}
-ㅤ`.trim(),
+      text: `[❌] ${detalle}\n\n> *Ejemplo:* ${usedPrefix}play <nombre o link>`,
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
   }

@@ -86,32 +86,16 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       global.db.data.users[m.sender].lastPescar = Date.now()
 
       
-      let mensajeRareza = ''
-      switch (pescado.rareza) {
-        case 'Común':
-          mensajeRareza = '🎣 *¡Buena pesca!*'
-          break
-        case 'Poco Común':
-          mensajeRareza = '🎣 *¡Pesca decente!*'
-          break
-        case 'Raro':
-          mensajeRareza = '🎉 *¡Excelente pesca!*'
-          break
-        case 'Épico':
-          mensajeRareza = '🏆 *¡PESCA ÉPICA!*'
-          break
-        case 'Legendario':
-          mensajeRareza = '👑 *¡PESCA LEGENDARIA!*'
-          break
-      }
+      let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-      let texto = `🎣 𝗣𝗲𝘀𝗰𝗮𝗿\n`
-      texto += `\n`
-      texto += `> ${mensajeRareza}\n`
-      texto += `> *Pez capturado:* ${pescado.nombre} ${pescado.emoji}\n`
-      texto += `> *Valor:* +${pescado.valor} ${global.moneda}\n`
-      texto += `> *Total:* ${monedas + pescado.valor} ${global.moneda}\n`
-      texto += `> *Rareza:* ${pescado.rareza}\n`
+╭─ ✧
+┊ *${pescado.nombre}*
+╰─ ✧  ✩
+┊ rareza  ·  \`${pescado.rareza}\`
+┊ valor  ·  \`+${pescado.valor} ${global.moneda}\`
+┊ total  ·  \`${monedas + pescado.valor} ${global.moneda}\`
+╰─────────`.trim()
 
       return conn.sendMessage(m.chat, {
         text: texto,
@@ -124,7 +108,14 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       
       global.db.data.users[m.sender].lastPescar = Date.now()
 
-      let texto = `🎣 𝗣𝗲𝘀𝗰𝗮𝗿 \n> *No pescaste nada esta vez*\n> *Total:* ${monedas} ${global.moneda}`
+      let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *nada esta vez*
+╰─ ✧  ✩
+┊ total  ·  \`${monedas} ${global.moneda}\`
+╰─────────`.trim()
 
       return conn.sendMessage(m.chat, {
         text: texto,
@@ -138,7 +129,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   } catch (error) {
     console.error('Error en juego de pescar:', error)
     return conn.sendMessage(m.chat, {
-      text: '[❌] Ocurrió un error al pescar. Contacta al administrador.',
+      text: '[❌] Ocurrió un error al pescar.',
       contextInfo: {
         ...rcanal.contextInfo
       }

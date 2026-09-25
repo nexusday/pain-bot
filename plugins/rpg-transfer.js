@@ -44,7 +44,7 @@ let handler = async (m, { conn, text, args, usedPrefix }) => {
     
     if (senderCoins < cantidad) {
       return conn.sendMessage(m.chat, {
-        text: `[❗] No tienes suficientes coins.\n\n> *Tienes:* ${senderCoins} coins\n> *Necesitas:* ${cantidad} coins`,
+        text: `[❗] No tienes suficientes coins.\n\n> *Tienes:* ${senderCoins} ${global.moneda}\n> *Necesitas:* ${cantidad} ${global.moneda}`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -66,10 +66,16 @@ let handler = async (m, { conn, text, args, usedPrefix }) => {
     const receiverName = await conn.getName(who)
 
     
-    let texto = `💸 𝗧𝗿𝗮𝗻𝘀𝗳𝗲𝗿𝗲𝗻𝗰𝗶𝗮\n\n`
-    texto += `> *De:* @${m.sender.split('@')[0]}\n`
-    texto += `> *Para:* @${who.split('@')[0]}\n`
-    texto += `> *Cantidad:* ${cantidad} coins`
+    const moneda = global.moneda || 'coins'
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${cantidad} ${moneda}*
+╰─ ✧  ✩
+┊ de  ·  @${m.sender.split('@')[0]}
+┊ para  ·  @${who.split('@')[0]}
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,

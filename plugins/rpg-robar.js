@@ -25,7 +25,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     
     if (!m.mentionedJid || m.mentionedJid.length === 0) {
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes mencionar a quien quieres robar.\nEjemplo: ${usedPrefix + command} @usuario`,
+        text: `[❗] Debes mencionar a quien quieres robar.\n> Ejemplo: ${usedPrefix + command} @usuario`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
@@ -89,7 +89,14 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       
       if (userVictima.bancoDinero > 0) {
         return conn.sendMessage(m.chat, {
-          text: `DINERO PROTEGIDO\n\n> El dinero de @${getUserName(victima)} está protegido en ${userVictima.banco ? global.bancos[userVictima.banco].nombre : 'su banco'}\n> No puedes robar dinero que está en el banco`,
+          text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *@${getUserName(victima)}*
+╰─ ✧  ✩
+┊ el dinero está en el banco
+╰─────────`.trim(),
           contextInfo: {
             ...rcanal.contextInfo,
             mentionedJid: [victima]
@@ -105,11 +112,16 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       if (userLadron.coins < multa) multa = userLadron.coins
       if (multa > 0) userLadron.coins -= multa
 
-      let texto = `ROBO FALLIDO\n\n`
-      texto += `> Ladrón: @${getUserName(ladron)}\n`
-      texto += `> Víctima: @${getUserName(victima)}\n\n`
-      texto += `> Multa: -${multa} ${global.moneda}\n`
-      texto += `> Total: ${userLadron.coins} ${global.moneda}`
+      let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *no salió*
+╰─ ✧  ✩
+┊ @${getUserName(ladron)}  →  @${getUserName(victima)}
+┊ multa  ·  \`-${multa} ${global.moneda}\`
+┊ total  ·  \`${userLadron.coins} ${global.moneda}\`
+╰─────────`.trim()
 
       return conn.sendMessage(m.chat, {
         text: texto,
@@ -143,12 +155,16 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       userVictima.coins -= cantidadRobada
       userLadron.coins += cantidadRobada
 
-      let texto = `ROBO EXITOSO\n\n`
-      texto += `> Ladrón: @${getUserName(ladron)}\n`
-      texto += `> Víctima: @${getUserName(victima)}\n\n`
-      texto += `> Robado: ${cantidadRobada} ${global.moneda}\n`
-      texto += `> Víctima queda con: ${userVictima.coins} ${global.moneda}\n`
-      texto += `> Ladrón tiene: ${userLadron.coins} ${global.moneda}`
+      let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *+${cantidadRobada} ${global.moneda}*
+╰─ ✧  ✩
+┊ @${getUserName(ladron)}  →  @${getUserName(victima)}
+┊ víctima  ·  \`${userVictima.coins} ${global.moneda}\`
+┊ ahora  ·  \`${userLadron.coins} ${global.moneda}\`
+╰─────────`.trim()
 
       return conn.sendMessage(m.chat, {
         text: texto,
@@ -165,11 +181,16 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       if (userLadron.coins < multa) multa = userLadron.coins
       if (multa > 0) userLadron.coins -= multa
 
-      let texto = `ROBO FALLIDO\n\n`
-      texto += `> Ladrón: @${getUserName(ladron)}\n`
-      texto += `> Víctima: @${getUserName(victima)}\n\n`
-      texto += `> Multa: -${multa} ${global.moneda}\n`
-      texto += `> Total: ${userLadron.coins} ${global.moneda}\n\n`
+      let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *no salió*
+╰─ ✧  ✩
+┊ @${getUserName(ladron)}  →  @${getUserName(victima)}
+┊ multa  ·  \`-${multa} ${global.moneda}\`
+┊ total  ·  \`${userLadron.coins} ${global.moneda}\`
+╰─────────`.trim()
 
       return conn.sendMessage(m.chat, {
         text: texto,

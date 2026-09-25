@@ -82,45 +82,31 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
     let resultado = ''
     let cantidad = 0
-    let emoji = ''
 
     if (trabajoSeleccionado.tipo === 'positivo') {
       const [min, max] = trabajoSeleccionado.recompensa
       cantidad = Math.floor(Math.random() * (max - min + 1)) + min
       usuario.coins += cantidad
-      resultado = `✅ Trabajo completado`
-      emoji = '💼'
+      resultado = 'ganaste'
     } else {
       const [min, max] = trabajoSeleccionado.perdida
       cantidad = Math.floor(Math.random() * (max - min + 1)) + min
       usuario.coins -= cantidad
-      resultado = `❌ Qué mala suerte`
-      emoji = '💸'
+      resultado = 'perdiste'
     }
 
-    
-    let mensajeExtra = ''
-    if (trabajoSeleccionado.tipo === 'positivo') {
-      const mensajesPositivos = [
-        '¡Sigue ayudando a los demás!',
-        '¡Excelente trabajo!',
-        '¡Eres un crack!',
-        '¡La comunidad te lo agradece!',
-        '¡Así se hace!'
-      ]
-      mensajeExtra = mensajesPositivos[Math.floor(Math.random() * mensajesPositivos.length)]
-    } else {
-      const mensajesNegativos = [
-        '¡No te desanimes, sigue intentando!',
-        '¡La próxima será mejor!',
-        '¡Aprendiste una lección!',
-        '¡Todo pasa por algo!',
-        '¡Mañana será otro día!'
-      ]
-      mensajeExtra = mensajesNegativos[Math.floor(Math.random() * mensajesNegativos.length)]
-    }
+    const signo = trabajoSeleccionado.tipo === 'positivo' ? '+' : '-'
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-    let texto = `💼 𝗧𝗿𝗮𝗯𝗮𝗷𝗮𝘀𝘁𝗲 \n\n> *Trabajo:* ${trabajoSeleccionado.descripcion}\n> ${resultado}\n> *Resultado:* ${trabajoSeleccionado.tipo === 'positivo' ? '+' : '-'}${cantidad} ${global.moneda}\n> *Total:* ${usuario.coins} ${global.moneda}\n`
+╭─ ✧
+┊ *${trabajoSeleccionado.descripcion}*
+╰─ ✧  ✩
+┊ resultado  ·  \`${resultado}\`
+┊ cambio  ·  \`${signo}${cantidad} ${global.moneda}\`
+┊ total  ·  \`${usuario.coins} ${global.moneda}\`
+┊ siguiente  ·  \`5 min\`
+╰─────────`.trim()
 
     return conn.sendMessage(m.chat, {
       text: texto,
@@ -132,7 +118,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
   } catch (error) {
     console.error('Error en work:', error)
     return conn.sendMessage(m.chat, {
-      text: `[❌] No tienes suficientes ${global.moneda}.\nTienes: ${usuario.coins || 0} ${global.moneda}`,
+      text: `[❌] No tienes suficientes ${global.moneda}.\n> Tienes: ${usuario?.coins || 0} ${global.moneda}`,
       contextInfo: {
         ...rcanal.contextInfo
       }

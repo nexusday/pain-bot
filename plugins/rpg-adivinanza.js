@@ -17,7 +17,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       const minutos = Math.floor(tiempoRestante / 60000)
       const segundos = Math.floor((tiempoRestante % 60000) / 1000)
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar\n> *${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''}* para volver a jugar a las adivinanzas.`,
+        text: `[❗] Debes esperar ${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''} para volver a jugar.`,
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -34,7 +34,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     } catch (error) {
       console.error('Error cargando adivinanzas:', error)
       return conn.sendMessage(m.chat, {
-        text: '[❌] Error al cargar las adivinanzas. Contacta al administrador.',
+        text: '[❌] Error al cargar las adivinanzas.',
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -58,7 +58,16 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     global.db.data.users[m.sender].lastAdivinanza = Date.now()
     
-    let texto = `🧩 𝗔𝗗𝗜𝗩𝗜𝗡𝗔𝗡𝗭𝗔𝗦\n> *Pregunta:* ${adivinanza.pregunta}\n> *Premio:* 250-500 ${global.moneda}\n> *Tiempo:* 60s\n> *Categoria:* ${adivinanza.categoria}`
+    let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${adivinanza.pregunta}*
+╰─ ✧  ✩
+┊ ${adivinanza.categoria || '—'}
+┊ premio  ·  \`250-500 ${global.moneda}\`
+┊ tiempo  ·  \`60s\`
+╰─────────`.trim()
     
     return conn.sendMessage(m.chat, {
       text: texto,

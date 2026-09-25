@@ -89,7 +89,19 @@ function mostrarInfoBancoUsuario(usuario, conn, m) {
   const banco = bancos[usuario.banco]
   const totalDinero = usuario.coins + usuario.bancoDinero
 
-  let texto = `🌴 ${banco.nombre}\n> 𝗗𝗶𝗻𝗲𝗿𝗼 𝗱𝗶𝘀𝗽𝗼𝗻𝗶𝗯𝗹𝗲: ${usuario.coins} ${global.moneda}\n> 𝗗𝗶𝗻𝗲𝗿𝗼 𝗲𝗻 𝗯𝗮𝗻𝗰𝗼: ${usuario.bancoDinero}\n> 𝗧𝗼𝘁𝗮𝗹: ${totalDinero} ${global.moneda} Comandos:\n> 𝗖𝗼𝗺𝗮𝗻𝗱𝗼𝘀 𝗱𝗲 𝗯𝗮𝗻𝗰𝗼\n> .deposit <cantidad/all> - Depositar\n> .withdraw <cantidad/all> - Retirar\n .change <banco> - Cambiar banco`
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${banco.nombre}*
+╰─ ✧  ✩
+┊ disponible  ·  \`${usuario.coins} ${global.moneda}\`
+┊ en banco  ·  \`${usuario.bancoDinero} ${global.moneda}\`
+┊ total  ·  \`${totalDinero} ${global.moneda}\`
+┊ deposit  ·  \`<cantidad / all>\`
+┊ withdraw  ·  \`<cantidad / all>\`
+┊ change  ·  \`<banco>\`
+╰─────────`.trim()
 
   return conn.sendMessage(m.chat, {
     text: texto,
@@ -115,7 +127,15 @@ function unirseBanco(usuario, bancoElegido, conn, m, usedPrefix) {
   usuario.banco = bancoElegido
   const banco = bancos[bancoElegido]
 
-  let texto = `🌴 𝗧𝗲 𝗵𝗮𝘀 𝘂𝗻𝗶𝗱𝗼 𝗮 𝘂𝗻 𝗯𝗮𝗻𝗰𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n> 𝗧𝘂 𝗯𝗮𝗻𝗰𝗼: ${banco.nombre}\n> 𝗗𝗲𝘀𝗰𝗿𝗶𝗽𝗰𝗶𝗼́𝗻: ${banco.descripcion}\n> 𝗗𝗶𝗻𝗲𝗿𝗼 𝗲𝗻 𝗯𝗮𝗻𝗰𝗼: ${usuario.bancoDinero} ${global.moneda}`
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${banco.nombre}*
+╰─ ✧  ✩
+┊ ${banco.descripcion}
+┊ en banco  ·  \`${usuario.bancoDinero} ${global.moneda}\`
+╰─────────`.trim()
 
   return conn.sendMessage(m.chat, {
     text: texto,
@@ -157,7 +177,15 @@ function cambiarBanco(usuario, bancoElegido, conn, m, usedPrefix) {
   usuario.banco = bancoElegido
   const bancoNuevo = bancos[bancoElegido]
 
-  let texto = `🌴 𝗛𝗮𝘀 𝗰𝗮𝗺𝗯𝗶𝗮𝗱𝗼 𝗱𝗲 𝗯𝗮𝗻𝗰𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n> 𝗔𝗻𝘁𝗲𝘀: ${bancoAnterior.nombre}\n> 𝗔𝗵𝗼𝗿𝗮: ${bancoNuevo.nombre}\n> 𝗖𝗼𝘀𝘁𝗼: ${costoCambioBanco} ${global.moneda}`
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${bancoNuevo.nombre}*
+╰─ ✧  ✩
+┊ antes  ·  \`${bancoAnterior.nombre}\`
+┊ costo  ·  \`${costoCambioBanco} ${global.moneda}\`
+╰─────────`.trim()
 
   return conn.sendMessage(m.chat, {
     text: texto,
@@ -206,7 +234,16 @@ function depositarDinero(usuario, cantidad, conn, m, usedPrefix) {
   usuario.bancoDinero += monto
   const banco = bancos[usuario.banco]
 
-  let texto = `🌴 *${banco.nombre}*\n> 𝗗𝗲𝗽𝗼𝘀𝗶𝘁𝗮𝗱𝗼: ${monto} ${global.moneda}\n> 𝗘𝗻 𝗯𝗮𝗻𝗰𝗼: ${usuario.bancoDinero}\n> 𝗗𝗶𝘀𝗽𝗼𝗻𝗶𝗯𝗹𝗲: ${usuario.coins} ${global.moneda}\n> 𝗗𝗶𝗻𝗲𝗿𝗼 𝗽𝗿𝗼𝘁𝗲𝗴𝗶𝗱𝗼 𝗱𝗲𝗹 𝗿𝗼𝗯𝗼`
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${banco.nombre}*
+╰─ ✧  ✩
+┊ depositado  ·  \`${monto} ${global.moneda}\`
+┊ en banco  ·  \`${usuario.bancoDinero} ${global.moneda}\`
+┊ disponible  ·  \`${usuario.coins} ${global.moneda}\`
+╰─────────`.trim()
 
   return conn.sendMessage(m.chat, {
     text: texto,
@@ -255,7 +292,16 @@ function retirarDinero(usuario, cantidad, conn, m, usedPrefix) {
   usuario.bancoDinero -= monto
   const banco = bancos[usuario.banco]
 
-  let texto = `🌴 𝗛𝗮𝘀 𝗿𝗲𝘁𝗶𝗿𝗮𝗱𝗼 𝗱𝗶𝗻𝗲𝗿𝗼 𝗱𝗲𝗹 𝗯𝗮𝗻𝗰𝗼\n> Retirado: ${monto} ${global.moneda}\n> En banco: ${usuario.bancoDinero} ${global.moneda}\n> 𝗖𝘂𝗶𝗱𝗮𝗱𝗼, 𝘁𝗲 𝗽𝘂𝗲𝗱𝗲𝗻 𝗿𝗼𝗯𝗮𝗿.`
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${banco.nombre}*
+╰─ ✧  ✩
+┊ retirado  ·  \`${monto} ${global.moneda}\`
+┊ en banco  ·  \`${usuario.bancoDinero} ${global.moneda}\`
+┊ disponible  ·  \`${usuario.coins} ${global.moneda}\`
+╰─────────`.trim()
 
   return conn.sendMessage(m.chat, {
     text: texto,
@@ -274,7 +320,16 @@ function verSaldoBanco(usuario, conn, m) {
   const banco = bancos[usuario.banco]
   const totalDinero = usuario.coins + usuario.bancoDinero
 
-  let texto = `🌴 𝗜𝗡𝗙𝗢 𝗕𝗔𝗡𝗖𝗢\n> ${banco.emoji} ${banco.nombre}\n> 𝗗𝗶𝗻𝗲𝗿𝗼 𝗱𝗶𝘀𝗽𝗼𝗻𝗶𝗯𝗹𝗲: ${usuario.coins} ${global.moneda}\n> 𝗗𝗶𝗻𝗲𝗿𝗼 𝗲𝗻 𝗯𝗮𝗻𝗰𝗼: ${usuario.bancoDinero} ${global.moneda}\n> 𝗧𝗼𝘁𝗮𝗹: ${totalDinero}`
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${banco.nombre}*
+╰─ ✧  ✩
+┊ disponible  ·  \`${usuario.coins} ${global.moneda}\`
+┊ en banco  ·  \`${usuario.bancoDinero} ${global.moneda}\`
+┊ total  ·  \`${totalDinero} ${global.moneda}\`
+╰─────────`.trim()
 
   return conn.sendMessage(m.chat, {
     text: texto,
@@ -283,16 +338,17 @@ function verSaldoBanco(usuario, conn, m) {
 }
 
 function mostrarInfoBanco(usuario, conn, m) {
-  let texto = `🌴 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗖𝗜𝗢𝗡 𝗕𝗔𝗡𝗖𝗔𝗥𝗜𝗔 🌴
-  𝗞 BANK KONOHA
-> Banco tradicional con intereses moderados
+  let texto = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-  𝗔 BANK AKATSUKI
-> Banco misterioso con altos riesgos y recompensas
-
-  𝗕 BANK BOYS
-> Banco juvenil con servicios modernos
-> Cambio de banco: ${costoCambioBanco} ${global.moneda}`
+╭─ ✧
+┊ *bancos*
+╰─ ✧  ✩
+┊ konoha  ·  \`tradicional\`
+┊ akatsuki  ·  \`riesgo alto\`
+┊ boys  ·  \`moderno\`
+┊ cambio  ·  \`${costoCambioBanco} ${global.moneda}\`
+╰─────────`.trim()
 
   return conn.sendMessage(m.chat, {
     text: texto,
