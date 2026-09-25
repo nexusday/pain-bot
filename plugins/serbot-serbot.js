@@ -609,14 +609,16 @@ function construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento) {
 \`*˚   ✩    ✦    ✩   ˚*\`
 
 ╭─ ✧
-┊ *${secreto}*
+┊ *tu código de vinculación*
 ╰─ ✧  ✩
+┊ código  ·  \`${secreto}\`
+┊ escríbelo tal cual en whatsapp
 ┊ número  ·  \`+${telefonoEmparejamiento}\`
-┊ 1. abre whatsapp
-┊ 2. dispositivos vinculados
-┊ 3. vincular un dispositivo
-┊ 4. vincular con número
-┊ 5. ingresa el código
+┊ 1. abre whatsapp en tu teléfono
+┊ 2. entra a *dispositivos vinculados*
+┊ 3. toca *vincular un dispositivo*
+┊ 4. elige *vincular con número de teléfono*
+┊ 5. escribe este código: \`${secreto}\`
 ┊ caduca  ·  \`60s\`
 ╰─────────`.trim()
 }
