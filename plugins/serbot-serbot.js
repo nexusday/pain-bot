@@ -243,6 +243,7 @@ async function iniciarSubBot(options) {
     let emparejamientoEnCurso = false
     let tuvoNuevoLogin = false
     let reconectando = false
+    let qrYaEnviado = false
     let vistoUsuarioEn = Date.now()
     let temporizadorWatchdog = null
     const telefonoEmparejamiento = phoneNumber
@@ -344,6 +345,8 @@ async function iniciarSubBot(options) {
       }
 
       if (qr && !codigoM && m && conn) {
+        if (qrYaEnviado) return
+        qrYaEnviado = true
         try {
           const buffer = await qrcode.toBuffer(qr, { scale: 8, margin: 2 })
           const enviado = await conn.sendMessage(m.chat, {
@@ -355,6 +358,7 @@ async function iniciarSubBot(options) {
             if (enviado?.key) conn.sendMessage(m.chat, { delete: enviado.key }).catch(() => {})
           }, 60000)
         } catch (errorQr) {
+          qrYaEnviado = false
           console.error('Error enviando QR:', errorQr?.message || errorQr)
           await conn.sendMessage(m.chat, {
             text: `[❌] No se pudo generar el QR.\n> Vuelve a usar *${usedPrefix}qr*`,
