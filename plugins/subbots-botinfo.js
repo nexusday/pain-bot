@@ -11,10 +11,6 @@ const DIR_RAIZ = join(__dirname, '..')
 const DIR_IMG = join(DIR_RAIZ, 'storage', 'img')
 const IMG_POR_DEFECTO = 'https://files.catbox.moe/iomah1.jpg'
 
-const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
-const MARCA = '𓂃 ࣪ ִֶָ☾.'
-const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
-
 function resolverImagenBot(rutaConfig) {
   if (rutaConfig && fs.existsSync(rutaConfig)) {
     try {
@@ -83,7 +79,7 @@ function lineasOwners() {
     const digitos = String(numero || '').replace(/\D/g, '')
     if (!digitos || /^(0+|123|tunumero)$/i.test(digitos)) continue
     if (/tunumero|acael|xxx/i.test(String(numero))) continue
-    lineas.push(`${tip(nombre || 'owner')}  ·  ${tip(`+${digitos}`)}`)
+    lineas.push(`┊ ${nombre || 'owner'}  ·  \`+${digitos}\``)
   }
   return lineas.join('\n')
 }
@@ -111,28 +107,22 @@ let handler = async (m, { conn, usedPrefix }) => {
     const pref = usedPrefix || '.'
 
     const texto = `
-ㅤ
-${MARCA}  *info*
-_${nombreBot} · ${tipo}_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*estado*
-ping  ·  ${tip(formatearPing(pingMs))}
-uptime  ·  ${tip(formatBotUptime(conn))}
-memoria  ·  ${tip(`${memoriaMB} MB`)}
-
-${SEP}
-*bot*
-número  ·  ${tip(`+${botActual || '—'}`)}
-prefijo  ·  ${tip(pref)}
-librería  ·  ${tip('Baileys')}
-plugins  ·  ${tip(totalPlugins)}
-sub-bots  ·  ${tip(subBotsActivos)}
-${owners ? `\n${SEP}\n*owners*\n${owners}\n` : ''}
-${SEP}
-*hosting*
-> ${tip('https://nexcodea.com')}
-ㅤ`.trim()
+╭─ ✧
+┊ *${nombreBot}*
+╰─ ✧  ✩
+┊ ping  ·  \`${formatearPing(pingMs)}\`
+┊ uptime  ·  \`${formatBotUptime(conn)}\`
+┊ memoria  ·  \`${memoriaMB} MB\`
+┊ número  ·  \`+${botActual || '—'}\`
+┊ tipo  ·  \`${tipo}\`
+┊ prefijo  ·  \`${pref}\`
+┊ librería  ·  \`Baileys\`
+┊ plugins  ·  \`${totalPlugins}\`
+┊ sub-bots  ·  \`${subBotsActivos}\`${owners ? `\n${owners}` : ''}
+┊ \`https://nexcodea.com\`
+╰─────────`.trim()
 
     const imgBot = resolverImagenBot(rutaConfig)
     const opts = {

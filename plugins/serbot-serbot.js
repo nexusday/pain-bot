@@ -27,10 +27,6 @@ const rcanal = global.rcanal || {
   }
 }
 
-const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
-const MARCA = '𓂃 ࣪ ִֶָ☾.'
-const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
-
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -90,26 +86,19 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
 
     return conn.sendMessage(m.chat, {
       text: `
-ㅤ
-${MARCA}  *código*
-_no se detectó tu número_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*qué pasó*
-whatsapp envió un id interno
-${tip(`@lid · ${pistaLid}`)}
-y hace falta tu número real con país
-
-${SEP}
-*cómo hacerlo*
-> ${tip(`${usedPrefix}code <número>`)}
-> ${tip(ejemploPe)}  ·  perú
-> ${tip(ejemploMx)}  ·  méxico *(521)*
-
-${SEP}
-*otra opción*
-> ${tip(`${usedPrefix}qrr`)}  ·  vincular con qr
-ㅤ`.trim(),
+╭─ ✧
+┊ *no se detectó tu número*
+╰─ ✧  ✩
+┊ whatsapp envió un id interno
+┊ \`${pistaLid}\`
+┊ hace falta tu número con país
+┊ \`${usedPrefix}code <número>\`
+┊ \`${ejemploPe}\`  ·  perú
+┊ \`${ejemploMx}\`  ·  méxico 521
+┊ o  \`${usedPrefix}qrr\`
+╰─────────`.trim(),
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
@@ -118,20 +107,15 @@ ${SEP}
   if (!ranura.ok) {
     const informacion = getSubBotSlotsInfo(ws)
     return m.reply(`
-ㅤ
-${MARCA}  *código*
-_sin plazas disponibles_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*estado*
-en uso  ·  ${tip(`${informacion.registered}/${informacion.max}`)}
-conectados  ·  ${tip(informacion.connected)}
-
-${SEP}
-*nota*
-el dueño puede dejarlo ilimitado
-> ${tip(`${usedPrefix}maxsubs 0`)}
-ㅤ`.trim())
+╭─ ✧
+┊ *sin plazas*
+╰─ ✧  ✩
+┊ en uso  ·  \`${informacion.registered}/${informacion.max}\`
+┊ conectados  ·  \`${informacion.connected}\`
+┊ \`${usedPrefix}maxsubs 0\`
+╰─────────`.trim())
   }
 
   let id = phoneNumber
@@ -204,14 +188,14 @@ async function iniciarSubBot(options) {
     if (m && conn) {
       conn.sendMessage(m.chat, {
         text: `
-ㅤ
-${MARCA}  *vincular*
-_uso del comando_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-> ${tip(`${usedPrefix}code`)}  ·  código
-> ${tip(`${usedPrefix}qrr`)}  ·  qr
-ㅤ`.trim(),
+╭─ ✧
+┊ *vincular*
+╰─ ✧  ✩
+┊ \`${usedPrefix}code\`  ·  código
+┊ \`${usedPrefix}qrr\`  ·  qr
+╰─────────`.trim(),
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -221,9 +205,6 @@ ${SEP}
   }
 
   void (async () => {
-    process.on('unhandledRejection', (motivo, promise) => {
-      console.log(chalk.bold.redBright(`\n┆ Unhandled Rejection at: ${promise}, reason: ${motivo}\n`))
-    })
     let { version, isLatest } = await fetchLatestBaileysVersion()
     const reintentoMsg = (MessageRetryMap) => { }
     const cacheReintentoMsg = new NodeCache()
@@ -413,21 +394,18 @@ ${SEP}
           return
         }
         if (reconectando) {
-          console.log(chalk.bold.yellow(`\n┆ Subbot (+${idCarpetaBot}) ya reconectando, se omite duplicado (${motivo})\n`))
-            return
-          }
+          return
+        }
         reconectando = true
         console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). Reconectando...\n`))
-        try {
-          await recargarHandler(true)
-          // Si no abre en 45s, permitir otro intento
-          setTimeout(() => {
-            if (reconectando && !sock?.user) reconectando = false
-          }, 45000)
-        } catch (e) {
-          console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
-          reconectando = false
-        }
+        // Fuera del evento de conexión y sin recargar handler.js,
+        // para que el principal y los demás subbots sigan respondiendo.
+        setTimeout(() => {
+          recargarHandler(true).catch((e) => {
+            console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
+            reconectando = false
+          })
+        }, 3000)
         return
       }
 
@@ -521,13 +499,6 @@ ${SEP}
 
     let handler = await import('../handler.js')
     let recargarHandler = async function (restatConn) {
-      try {
-        const HandlerModulo = await import(`../handler.js?update=${Date.now()}`).catch(console.error)
-        if (Object.keys(HandlerModulo || {}).length) handler = HandlerModulo
-      } catch (e) {
-        console.error('Nuevo error: ', e)
-      }
-
       if (restatConn) {
         const sockAnterior = sock
         const chatsAnteriores = sock.chats
@@ -554,6 +525,9 @@ ${SEP}
           const indice = global.conns.indexOf(sockAnterior)
           if (indice >= 0) global.conns[indice] = sock
         }
+        setTimeout(() => {
+          if (reconectando && !sock?.user) reconectando = false
+        }, 45000)
       }
 
       if (!esInit) {
@@ -617,115 +591,87 @@ async function resolverNombreUsuarioSubBot(sock, m, conn, replyJid) {
 
 function construirMensajeEnlaceQr() {
   return `
-ㅤ
-${MARCA}  *vincular qr*
-_escanea para conectar_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*pasos*
-abre whatsapp en tu teléfono
-menú ⋮  →  *dispositivos vinculados*
-toca  *vincular nuevo dispositivo*
-escanea el código qr de arriba
-
-${SEP}
-*nota*
-el qr caduca en ${tip('60 segundos')}
-ㅤ`.trim()
+╭─ ✧
+┊ *vincular qr*
+╰─ ✧  ✩
+┊ abre whatsapp
+┊ dispositivos vinculados
+┊ vincular nuevo dispositivo
+┊ escanea el qr
+┊ caduca  ·  \`60s\`
+╰─────────`.trim()
 }
 
 function construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento) {
   return `
-ㅤ
-${MARCA}  *vincular código*
-_solo para tu número_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*tu código*
-${tip(secreto)}
-número  ·  ${tip(`+${telefonoEmparejamiento}`)}
-
-${SEP}
-*pasos*
-1. abre whatsapp en tu teléfono
-2. ve a *dispositivos vinculados*
-3. toca *vincular un dispositivo*
-4. elige *vincular con número*
-5. ingresa el código de arriba
-
-${SEP}
-*nota*
-caduca en ${tip('60 segundos')}
-solo para ${tip(`+${telefonoEmparejamiento}`)}
-ㅤ`.trim()
+╭─ ✧
+┊ *${secreto}*
+╰─ ✧  ✩
+┊ número  ·  \`+${telefonoEmparejamiento}\`
+┊ 1. abre whatsapp
+┊ 2. dispositivos vinculados
+┊ 3. vincular un dispositivo
+┊ 4. vincular con número
+┊ 5. ingresa el código
+┊ caduca  ·  \`60s\`
+╰─────────`.trim()
 }
 
 function construirErrorTelefonoEmparejamiento(usedPrefix) {
   return `
-ㅤ
-${MARCA}  *código*
-_no se pudo obtener tu número_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-usa
-> ${tip(`${usedPrefix}code 521XXXXXXXXXX`)}
-méxico  ·  ${tip('521 + 10 dígitos')}
-ㅤ`.trim()
+╭─ ✧
+┊ *no se obtuvo el número*
+╰─ ✧  ✩
+┊ \`${usedPrefix}code 521XXXXXXXXXX\`
+┊ méxico  ·  \`521 + 10 dígitos\`
+╰─────────`.trim()
 }
 
 function construirErrorCodigoEmparejamiento(usedPrefix, mensajeError = 'conexión interrumpida') {
   return `
-ㅤ
-${MARCA}  *código*
-_no se pudo generar_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-${tip(mensajeError || 'conexión interrumpida')}
-vuelve a usar
-> ${tip(`${usedPrefix}code`)}
-ㅤ`.trim()
+╭─ ✧
+┊ *no se generó el código*
+╰─ ✧  ✩
+┊ \`${mensajeError || 'conexión interrumpida'}\`
+┊ \`${usedPrefix}code\`
+╰─────────`.trim()
 }
 
 function construirMensajesBienvenidaSubBot({ nombreBot, botNumber: numeroBot, userName: nombreUsuario, usedPrefix = '.' }) {
   const mensajePrivado = `
-ㅤ
-${MARCA}  *bienvenido*
-_sub-bot activo_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*tu bot*
-nombre  ·  ${tip(nombreBot)}
-número  ·  ${tip(`+${numeroBot}`)}
-usuario  ·  ${tip(nombreUsuario)}
-estado  ·  ${tip('conectado')}
-
-${SEP}
-*puedes configurar tu sub-bot*
-escríbele a *tu sub-bot* (${tip(`+${numeroBot}`)})
-o desde este chat, con tu mismo número
-
-> ${tip(`${usedPrefix}setbotname <nombre>`)}
-> ${tip(`${usedPrefix}setbotimg`)}  ·  responde una imagen
-> ${tip(`${usedPrefix}setautoread on/off`)}
-> ${tip(`${usedPrefix}menu`)}  ·  ver comandos
-ㅤ`.trim()
+╭─ ✧
+┊ *${nombreBot}*
+╰─ ✧  ✩
+┊ número  ·  \`+${numeroBot}\`
+┊ usuario  ·  \`${nombreUsuario}\`
+┊ estado  ·  \`conectado\`
+┊ \`${usedPrefix}setbotname <nombre>\`
+┊ \`${usedPrefix}setbotimg\`  ·  responde una imagen
+┊ \`${usedPrefix}setautoread on/off\`
+┊ \`${usedPrefix}menu\`
+╰─────────`.trim()
 
   const mensajeCanal = `
-ㅤ
-${MARCA}  *nuevo sub-bot*
-_conectado_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-nombre  ·  ${tip(nombreBot)}
-número  ·  ${tip(`+${numeroBot}`)}
-owner  ·  ${tip(nombreUsuario)}
-estado  ·  ${tip('online')}
-
-${SEP}
-*¿quieres ser sub-bot?*
-escríbele a ${tip(`+${numeroBot}`)}
-> ${tip(`${usedPrefix}code`)}  ·  ${tip(`${usedPrefix}qrr`)}
-ㅤ`.trim()
+╭─ ✧
+┊ *${nombreBot}*
+╰─ ✧  ✩
+┊ número  ·  \`+${numeroBot}\`
+┊ owner  ·  \`${nombreUsuario}\`
+┊ estado  ·  \`online\`
+┊ \`${usedPrefix}code\`  ·  \`${usedPrefix}qrr\`
+╰─────────`.trim()
 
   return { privateMessage: mensajePrivado, channelMessage: mensajeCanal }
 }

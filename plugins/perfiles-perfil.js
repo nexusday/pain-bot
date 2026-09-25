@@ -202,48 +202,36 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
   const desc = datosUsuario.desc && datosUsuario.desc !== 'Sin descripción' ? datosUsuario.desc : 'sin descripción aún'
   const favorito = datosUsuario.favourite && datosUsuario.favourite !== 'No establecido' ? datosUsuario.favourite : '—'
   const moneda = global.moneda || 'coins'
-  const sep = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
-  const tip = (v) => `\`${String(v).replace(/`/g, "'")}\``
 
   const texto = `
-ㅤ
-𓂃 ࣪ ִֶָ☾.  *${nombre}*
-_${userRole}_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${sep}
-*sobre ti*
-${tip(genero)}  ·  ${tip(edad)}  ·  ${tip(cumple)}
-${tip(desc)}
-♡  ${tip(favorito)}
-${lineaVinculo}
-${tip(datosUsuario.registered ? 'registrado' : 'sin registro')}
+╭─ ✧
+┊ *${nombre}*
+╰─ ✧  ✩
+┊ ${userRole}
+┊ género  ·  \`${genero}\`
+┊ edad  ·  \`${edad}\`
+┊ cumple  ·  \`${cumple}\`
+┊ ${desc}
+┊ favorito  ·  \`${favorito}\`
+┊ ${lineaVinculo}
 
-${sep}
-*nivel y dinero*
-nivel  ${tip(rpg.level)}
-${tip(rpg.bar)}
-${tip(rpg.ratio)}  xp
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${tip(formatNumber(totalCoins))}  ${moneda}
-banco  ·  ${tip(bancoInfo)}
+┊ nivel  ·  \`${rpg.level}\`
+┊ ${rpg.bar}
+┊ xp  ·  \`${rpg.ratio}\`
+┊ ${moneda}  ·  \`${formatNumber(totalCoins)}\`
+┊ banco  ·  \`${bancoInfo}\`
+┊ comandos  ·  \`${formatNumber(rpg.commandCount)}\`
+┊ stickers  ·  \`${formatNumber(rpg.stickerCount)}\`
+┊ mensajes  ·  \`${formatNumber(msgTotal)}\`${m.isGroup ? `\n┊ aquí  ·  \`${formatNumber(msgGroup)}\`` : ''}
+╰─────────
 
-${sep}
-*actividad*
-comandos  ·  ${tip(formatNumber(rpg.commandCount))}
-stickers  ·  ${tip(formatNumber(rpg.stickerCount))}
-mensajes  ·  ${tip(formatNumber(msgTotal))}${m.isGroup ? `\nen este grupo  ·  ${tip(formatNumber(msgGroup))}` : ''}
-
-${sep}
-*editar perfil*
-> ${usedPrefix}setname <nombre>
-> ${usedPrefix}setgenre <hombre/mujer>
-> ${usedPrefix}setage <edad>
-> ${usedPrefix}setbirth <fecha>
-> ${usedPrefix}setdesc <texto>
-> ${usedPrefix}setfav <favorito>
-> ${usedPrefix}marry @user
-> ${usedPrefix}divorce
-ㅤ`.trim()
+\`${usedPrefix}setname\`  \`${usedPrefix}setage\`  \`${usedPrefix}setgenre\`
+\`${usedPrefix}setbirth\`  \`${usedPrefix}setdesc\`  \`${usedPrefix}setfav\`
+\`${usedPrefix}marry\`  \`${usedPrefix}divorce\``.trim()
 
   const botNumber = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
   const configPath = join('./Serbot', botNumber, 'config.json')

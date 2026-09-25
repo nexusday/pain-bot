@@ -1,7 +1,3 @@
-const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
-const MARCA = '𓂃 ࣪ ִֶָ☾.'
-const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
-
 function digitosDe(jid) {
   return String(jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
 }
@@ -21,11 +17,7 @@ function cortar(texto, max = 420) {
 let handler = async (m, { conn }) => {
   if (!m.chat.endsWith('@g.us')) {
     return conn.sendMessage(m.chat, {
-      text: `
-ㅤ
-${MARCA}  *grupo*
-_solo en grupos_
-ㅤ`.trim(),
+      text: `[❗] Este comando solo funciona en grupos.`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
@@ -68,40 +60,29 @@ _solo en grupos_
     ].filter(Boolean))]
 
     const bloqueAdmins = idsAdmin.length
-      ? idsAdmin.map(id => etiquetaMention(id)).join('\n')
-      : tip('ninguno')
+      ? idsAdmin.map(id => `┊ ${etiquetaMention(id)}`).join('\n')
+      : '┊ `ninguno`'
 
     const bloqueOwners = ownersEnGrupo.length
-      ? ownersEnGrupo.map(p => etiquetaMention(p.id)).join('\n')
-      : tip('no están en este grupo')
+      ? ownersEnGrupo.map(p => `┊ ${etiquetaMention(p.id)}`).join('\n')
+      : '┊ `no están aquí`'
 
     const textoInfo = `
-ㅤ
-${MARCA}  *grupo*
-_${name || 'sin nombre'}_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*datos*
-miembros  ·  ${tip(miembros.length)}
-admins  ·  ${tip(idsAdmin.length)}
-creado  ·  ${tip(fecha)}
+╭─ ✧
+┊ *${name || 'sin nombre'}*
+╰─ ✧  ✩
+┊ miembros  ·  \`${miembros.length}\`
+┊ admins  ·  \`${idsAdmin.length}\`
+┊ creado  ·  \`${fecha}\`
+┊ creador  ·  ${owner ? etiquetaMention(owner) : '`desconocido`'}
 
-${SEP}
-*creador*
-${owner ? etiquetaMention(owner) : tip('desconocido')}
-
-${SEP}
-*admins*
 ${bloqueAdmins}
 
-${SEP}
-*owners del bot aquí*
 ${bloqueOwners}
-
-${SEP}
-*descripción*
-${descripcion}
-ㅤ`.trim()
+┊ ${descripcion}
+╰─────────`.trim()
 
     const contexto = {
       mentionedJid: menciones,
@@ -127,14 +108,7 @@ ${descripcion}
   } catch (error) {
     console.error('Error en infogrupo:', error)
     await conn.sendMessage(m.chat, {
-      text: `
-ㅤ
-${MARCA}  *grupo*
-_no se pudo leer_
-
-${SEP}
-${tip(error?.message || 'error desconocido')}
-ㅤ`.trim(),
+      text: `[❌] ${error?.message || 'no se pudo leer el grupo'}`,
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }

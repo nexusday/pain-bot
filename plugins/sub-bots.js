@@ -11,10 +11,6 @@ const DIR_RAIZ = path.join(__dirname, '..')
 const DIR_IMG = join(DIR_RAIZ, 'storage', 'img')
 const IMG_POR_DEFECTO = 'https://files.catbox.moe/iomah1.jpg'
 
-const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
-const MARCA = '𓂃 ࣪ ִֶָ☾.'
-const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
-
 function resolverImagenBot(rutaConfig) {
   const candidatos = ['menu.jpg', 'menu2.jpg', 'menu3.jpg']
   const localPath = candidatos
@@ -112,50 +108,38 @@ let handler = async (m, { conn, usedPrefix }) => {
         const uptimeSub = formatBotUptime(connSub)
 
         lineas.push(
-          `*${i}.* ${nombreSubBot}\n` +
-          `> ${tip(`+${numeroSubBot}`)}  ·  ${tip(estadoSubBot)}\n` +
-          `> ${tip(nombreUsuario)}  ·  ${tip(uptimeSub)}`
+          `┊ *${i}.* ${nombreSubBot}\n` +
+          `┊ \`+${numeroSubBot}\`  ·  \`${estadoSubBot}\`\n` +
+          `┊ \`${nombreUsuario}\`  ·  \`${uptimeSub}\``
         )
         i++
       }
       bloqueSubs = lineas.join('\n\n')
     } else {
       bloqueSubs =
-        `${tip('sin sub-bots activos')}\n` +
-        `> ${tip(`${pref}code`)}  ·  ${tip(`${pref}qrr`)}`
+        `┊ \`sin sub-bots\`\n` +
+        `┊ \`${pref}code\`  ·  \`${pref}qrr\``
     }
 
     const texto = `
-ㅤ
-${MARCA}  *bots*
-_${nombreBot} · ${tipoActual}_
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-${SEP}
-*este bot*
-número  ·  ${tip(`+${botActual || '—'}`)}
-memoria  ·  ${tip(`${memoriaMB} MB`)}
+╭─ ✧
+┊ *${nombreBot}*
+╰─ ✧  ✩
+┊ número  ·  \`+${botActual || '—'}\`
+┊ tipo  ·  \`${tipoActual}\`
+┊ memoria  ·  \`${memoriaMB} MB\`
+┊ bots  ·  \`${totalBots}\`
+┊ sub-bots  ·  \`${totalSubBots}\`
+┊ grupos  ·  \`${totalGrupos}\`
+┊ principal  ·  \`+${numPrincipal}\`
+┊ estado  ·  \`${estadoBotPrincipal}\`
+┊ uptime  ·  \`${uptimePrincipal}\`
 
-${SEP}
-*resumen*
-bots  ·  ${tip(totalBots)}
-principal  ·  ${tip(1)}
-sub-bots  ·  ${tip(totalSubBots)}
-grupos  ·  ${tip(totalGrupos)}
-
-${SEP}
-*bot principal*
-número  ·  ${tip(`+${numPrincipal}`)}
-estado  ·  ${tip(estadoBotPrincipal)}
-uptime  ·  ${tip(uptimePrincipal)}
-
-${SEP}
-*sub-bots*
 ${bloqueSubs}
-
-${SEP}
-*hosting*
-> ${tip('https://nexcodea.com')}
-ㅤ`.trim()
+┊ \`https://nexcodea.com\`
+╰─────────`.trim()
 
     const imgBot = resolverImagenBot(rutaConfig)
     const optsEnvio = {
