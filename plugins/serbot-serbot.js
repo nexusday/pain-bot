@@ -669,11 +669,13 @@ function construirMensajesBienvenidaSubBot({ nombreBot, botNumber: numeroBot, us
 \`*˚   ✩    ✦    ✩   ˚*\`
 
 ╭─ ✧
-┊ *${nombreBot}*
+┊ *ya te vinculaste* - *${nombreBot}*
 ╰─ ✧  ✩
+┊ tu sub-bot quedó conectado
+┊ nombre  ·  \`${nombreBot}\`
 ┊ número  ·  \`+${numeroBot}\`
 ┊ usuario  ·  \`${nombreUsuario}\`
-┊ estado  ·  \`conectado\`
+┊ puedes configurarlo así
 ┊ \`${usedPrefix}setbotname <nombre>\`
 ┊ \`${usedPrefix}setbotimg\`  ·  responde una imagen
 ┊ \`${usedPrefix}setautoread on/off\`

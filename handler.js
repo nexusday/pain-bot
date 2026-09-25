@@ -26,6 +26,7 @@ import { isInviteOpponent } from './lib/michi-users.js'
 import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker, formatLevelUpMessage } from './lib/rpg-level.js'
 import { trackUserMessage } from './lib/msg-activity.js'
 import { getStaffOwnerIds } from './lib/staff.js'
+import { estaEnBlackn } from './lib/blackn.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -203,7 +204,9 @@ if (opts['queque'] && m.text && !(isMods || isPrems)) {
   }, tiempo)  
 }  
 
-if (m.isBaileys) return  
+if (m.isBaileys) return
+
+if (!m.fromMe && estaEnBlackn(m, this)) return  
 
 try {
   trackUserMessage(m, this)
