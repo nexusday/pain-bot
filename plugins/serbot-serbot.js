@@ -79,7 +79,8 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   })
   const replyJid = getPrivateReplyJid(m, conn)
 
-  if (!phoneNumber) {
+  const pideQr = command === 'qr' || command === 'qrr'
+  if (!phoneNumber && !pideQr) {
     const pistaLid = String(m.key?.participant || m.sender || '').split('@')[0]
     const ejemploMx = `${usedPrefix}code 5215551234567`
     const ejemploPe = `${usedPrefix}code 51901662987`
@@ -97,11 +98,13 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
 ┊ \`${usedPrefix}code <número>\`
 ┊ \`${ejemploPe}\`  ·  perú
 ┊ \`${ejemploMx}\`  ·  méxico 521
-┊ o  \`${usedPrefix}qrr\`
+┊ o  \`${usedPrefix}qr\`
 ╰─────────`.trim(),
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
+
+  if (!phoneNumber) phoneNumber = `tmp${Date.now()}`
 
   const ranura = canRegisterSubBot(phoneNumber)
   if (!ranura.ok) {
@@ -140,7 +143,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
 
 handler.help = ['#qr', '#code']
 handler.tags = ['subbots']
-handler.command = ['qrr', 'code']
+handler.command = ['qr', 'qrr', 'code']
 export { iniciarSubBot as AYBot }
 export default handler
 
@@ -149,13 +152,13 @@ async function iniciarSubBot(options) {
   
  
   if (!fromCommand) {
-    command = 'qrr'
+    command = 'qr'
     args = []
     usedPrefix = '.'
   }
   
   if (command === 'code') {
-    command = 'qrr'
+    command = 'qr'
     args.unshift('code')
   }
 
@@ -173,7 +176,7 @@ async function iniciarSubBot(options) {
     fs.mkdirSync(pathAYBot, { recursive: true })
   }
 
-  if (codigoM) {
+  if (fromCommand) {
     limpiarAuthSubBot(pathAYBot)
   }
 
@@ -194,7 +197,7 @@ async function iniciarSubBot(options) {
 ┊ *vincular*
 ╰─ ✧  ✩
 ┊ \`${usedPrefix}code\`  ·  código
-┊ \`${usedPrefix}qrr\`  ·  qr
+┊ \`${usedPrefix}qr\`  ·  qr
 ╰─────────`.trim(),
         contextInfo: {
           ...rcanal.contextInfo
@@ -341,15 +344,25 @@ async function iniciarSubBot(options) {
       }
 
       if (qr && !codigoM && m && conn) {
-        const texto = construirMensajeEnlaceQr()
-        let enviarQR = await conn.sendFile(m.chat, await qrcode.toDataURL(qr, { scale: 8 }), "qrcode.png", texto, m, null, rcanal)
-
-  setTimeout(() => {
-    conn.sendMessage(m.chat, { delete: enviarQR.key })
-  }, 60000)
-
-  return
-  }
+        try {
+          const buffer = await qrcode.toBuffer(qr, { scale: 8, margin: 2 })
+          const enviado = await conn.sendMessage(m.chat, {
+            image: buffer,
+            caption: construirMensajeEnlaceQr(),
+            contextInfo: { ...rcanal.contextInfo }
+          }, { quoted: m })
+          setTimeout(() => {
+            if (enviado?.key) conn.sendMessage(m.chat, { delete: enviado.key }).catch(() => {})
+          }, 60000)
+        } catch (errorQr) {
+          console.error('Error enviando QR:', errorQr?.message || errorQr)
+          await conn.sendMessage(m.chat, {
+            text: `[❌] No se pudo generar el QR.\n> Vuelve a usar *${usedPrefix}qr*`,
+            contextInfo: { ...rcanal.contextInfo }
+          }, { quoted: m }).catch(() => {})
+        }
+        return
+      }
 
       const terminarSesion = async (loaded) => {
         if (!loaded) {
@@ -672,7 +685,7 @@ function construirMensajesBienvenidaSubBot({ nombreBot, botNumber: numeroBot, us
 ┊ número  ·  \`+${numeroBot}\`
 ┊ owner  ·  \`${nombreUsuario}\`
 ┊ estado  ·  \`online\`
-┊ \`${usedPrefix}code\`  ·  \`${usedPrefix}qrr\`
+┊ \`${usedPrefix}code\`  ·  \`${usedPrefix}qr\`
 ╰─────────`.trim()
 
   return { privateMessage: mensajePrivado, channelMessage: mensajeCanal }

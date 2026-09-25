@@ -118,7 +118,7 @@ let handler = async (m, { conn, usedPrefix }) => {
     } else {
       bloqueSubs =
         `┊ \`sin sub-bots\`\n` +
-        `┊ \`${pref}code\`  ·  \`${pref}qrr\``
+        `┊ \`${pref}code\`  ·  \`${pref}qr\``
     }
 
     const texto = `

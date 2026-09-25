@@ -155,6 +155,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
 handler.help = ['#ge + {texto/enlace o imagen con caption/respondiendo} → genera un código QR']
 handler.tags = ['herramientas']
-handler.command = ['ge', 'qr', 'genqr', 'qrcode', 'generarqr']
+handler.command = ['ge', 'genqr', 'qrcode', 'generarqr']
 
 export default handler
