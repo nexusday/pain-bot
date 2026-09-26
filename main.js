@@ -257,25 +257,23 @@ if (!opts['test']) {
 
 startTmpCleanupInterval({ verbose: true })
 
+let reconectandoPrincipal = false
+
 async function connectionUpdate(update) {
   const sock = this?.ev ? this : conn
   const { connection, lastDisconnect, isNewLogin } = update
   global.stopped = connection
   if (isNewLogin) sock.isInit = true
-  const code =
-    lastDisconnect?.error?.output?.statusCode ||
-    lastDisconnect?.error?.output?.payload?.statusCode
-  if (code && code !== DisconnectReason.loggedOut && sock?.ws.socket == null) {
-    await global.reloadHandler(true).catch(console.error)
-    global.timestamp.connect = new Date()
-  }
+
   if (global.db.data == null) await loadDatabase()
+
   if (connection === 'open') {
+    reconectandoPrincipal = false
     console.log(chalk.yellow('Conectado correctamente.'))
     global.mainBotJid = sock.user?.jid?.split('@')[0] || sock.user?.id?.split('@')[0]
     try {
       const { markBotStart } = await import('./lib/bot-uptime.js')
-      markBotStart(sock) 
+      markBotStart(sock)
     } catch {
       if (!sock.startTime) sock.startTime = Date.now()
     }
@@ -285,8 +283,15 @@ async function connectionUpdate(update) {
     } catch (err) {
       console.error('[canal] Error al resolver config:', err?.message || err)
     }
+    return
   }
+
+  if (connection !== 'close') return
+
   const reason = new Boom(lastDisconnect?.error)?.output?.statusCode
+    || lastDisconnect?.error?.output?.statusCode
+    || lastDisconnect?.error?.output?.payload?.statusCode
+
   if (reason === 405) {
     if (existsSync('./sessions/creds.json')) unlinkSync('./sessions/creds.json')
     console.log(
@@ -295,36 +300,32 @@ async function connectionUpdate(update) {
       )
     )
     process.send('reset')
+    return
   }
-  if (connection === 'close') {
-    switch (reason) {
-      case DisconnectReason.badSession:
-        sock.logger.error(`Sesión incorrecta, elimina la carpeta ${global.authFile} y escanea nuevamente.`)
-        break
-      case DisconnectReason.connectionClosed:
-      case DisconnectReason.connectionLost:
-      case DisconnectReason.timedOut:
-        sock.logger.warn(`Conexión perdida o cerrada, reconectando...`)
-        await global.reloadHandler(true).catch(console.error)
-        break
-      case DisconnectReason.connectionReplaced:
-        sock.logger.error(
-          `Conexión reemplazada, se abrió otra sesión. Cierra esta sesión primero.`
-        )
-        break
-      case DisconnectReason.loggedOut:
-        sock.logger.error(`Sesión cerrada, elimina la carpeta ${global.authFile} y escanea nuevamente.`)
-        break
-      case DisconnectReason.restartRequired:
-        sock.logger.info(`Reinicio necesario, reinicia el servidor si hay problemas.`)
-        await global.reloadHandler(true).catch(console.error)
-        break
-      default:
-        sock.logger.warn(`Desconexión desconocida: ${reason || ''} - Estado: ${connection || ''}`)
-        await global.reloadHandler(true).catch(console.error)
-        break
-    }
+
+  const noReconectar = new Set([
+    DisconnectReason.badSession,
+    DisconnectReason.connectionReplaced,
+    DisconnectReason.loggedOut,
+    DisconnectReason.forbidden,
+    DisconnectReason.multideviceMismatch
+  ])
+
+  if (noReconectar.has(reason)) {
+    sock.logger?.error?.(`Sesión del principal cerrada (${reason}). No se reconecta sola.`)
+    return
   }
+
+  if (reconectandoPrincipal) return
+  reconectandoPrincipal = true
+  sock.logger?.warn?.(`Conexión perdida (${reason ?? 'sin código'}). Reconectando el principal...`)
+
+  setTimeout(() => {
+    global.reloadHandler(true).catch((e) => {
+      console.error('Error reconectando el principal:', e?.message || e)
+      reconectandoPrincipal = false
+    })
+  }, 3000)
 }
 
 process.on('uncaughtException', console.error)
@@ -332,30 +333,30 @@ process.on('uncaughtException', console.error)
 let isInit = true
 let handler = await import('./handler.js')
 global.reloadHandler = async function (restartConn) {
-  try {
-    const Handler = await import(`./handler.js?update=${Date.now()}`).catch(console.error)
-    if (Handler && Object.keys(Handler).length) handler = Handler
-  } catch (e) {
-    console.error(e)
+  if (!restartConn) {
+    try {
+      const Handler = await import(`./handler.js?update=${Date.now()}`).catch(console.error)
+      if (Handler && Object.keys(Handler).length) handler = Handler
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   if (restartConn) {
     try {
       if (global.conn.ws) global.conn.ws.close()
     } catch {}
-    global.conn.ev.removeAllListeners()
-    
-    
+    try { global.conn.ev.removeAllListeners() } catch {}
+
     const preservedStartTime = global.conn.startTime
     let preservedBotId = ''
     try {
       preservedBotId = String(global.conn.user?.jid || '').split('@')[0].replace(/\D/g, '')
     } catch {}
-    
+
     global.conn = makeWASocket(connectionOptions)
     conn = global.conn
-    
-   
+
     if (preservedStartTime) {
       global.conn.startTime = preservedStartTime
     }
@@ -371,6 +372,9 @@ global.reloadHandler = async function (restartConn) {
     } catch {}
 
     isInit = true
+    setTimeout(() => {
+      if (reconectandoPrincipal && !global.conn?.user) reconectandoPrincipal = false
+    }, 45000)
   }
 
   if (!isInit) {
@@ -563,20 +567,20 @@ connectionUpdate = async function(update) {
   await originalConnectionUpdate.call(this, update)
   
  
-  if (update.connection === 'open' && !this.subBotsReconnected) {
-    this.subBotsReconnected = true
+  if (update.connection === 'open' && !global.subBotsReconnected) {
+    global.subBotsReconnected = true
     console.log(chalk.cyan('\nBot principal conectado, iniciando reconexión de sub-bots...'))
     setTimeout(() => {
-      global.reloadHandler().then(() => {
-        global.reconnectSubBots().catch(console.error)
-      })
-    }, 5000) 
+      global.reconnectSubBots().catch(console.error)
+    }, 5000)
   }
 }
 
 
 setTimeout(() => {
+  if (global.subBotsReconnected) return
   if (global.conn && global.conn.user) {
+    global.subBotsReconnected = true
     console.log(chalk.cyan('\nIniciando reconexión automática de sub-bots..'))
     global.reconnectSubBots().catch(console.error)
   }
