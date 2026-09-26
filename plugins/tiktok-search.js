@@ -95,7 +95,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       if (!video) throw new Error(`Elige un número del 1 al ${cacheBusqueda.results.length}.`)
       await enviarVideo(conn, m, video, construirLeyendaEnlace(video))
     } else {
-      const resultados = (await searchTikTok(entrada, 4)).filter(video => video?.cover && video?.play)
+      const resultados = (await searchTikTok(entrada, 4)).filter(video => video?.play)
       if (!resultados.length) {
         return conn.sendMessage(
           m.chat,
@@ -113,7 +113,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       const tarjetas = resultados.map((video, i) => {
         const autor = video.author?.nickname || video.author?.unique_id || 'TikTok'
         return {
-          image: { url: video.cover },
+          video: { url: video.play },
           caption: `
 \`*˚   ✩    ✦    ✩   ˚*\`
 

@@ -36,8 +36,6 @@ let handler = async (m, { conn, text, usedPrefix }) => {
 ╰─────────`.trim()
 
     const nombre = String(app.name || 'app').replace(/[<>:"/\\|?*]/g, '').slice(0, 60) || 'app'
-    const peso = Number(app.sizeByte) || 0
-    const maximo = 100 * 1024 * 1024
 
     if (app.image) {
       try {
@@ -50,32 +48,18 @@ let handler = async (m, { conn, text, usedPrefix }) => {
       } catch {}
     }
 
-    if (peso > maximo) {
-      return conn.sendMessage(m.chat, {
-        text: `${infoApp}\n\n> El archivo pesa *${app.size || 'más de 100 MB'}*. Ábrelo desde este enlace:\n> ${app.download}`,
-        contextInfo: { ...rcanal.contextInfo }
-      }, { quoted: m })
-    }
-
     try {
-      const archivo = await axios.get(app.download, {
-        responseType: 'arraybuffer',
-        timeout: 180000,
-        maxContentLength: maximo,
-        maxBodyLength: maximo,
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      })
       await conn.sendMessage(m.chat, {
-        document: Buffer.from(archivo.data),
+        document: { url: app.download },
         fileName: `${nombre}.apk`,
         mimetype: 'application/vnd.android.package-archive',
         caption: app.image ? '' : infoApp,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     } catch (errorApk) {
-      console.error('Error enviando APK:', errorApk?.message || errorApk)
+      console.error('Error enviando APK:', errorApk)
       await conn.sendMessage(m.chat, {
-        text: `${infoApp}\n\n> No pude subir el APK al chat. Ábrelo aquí:\n> ${app.download}`,
+        text: `${infoApp}\n┊ \`${app.download}\``,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
