@@ -153,7 +153,7 @@ async function enviarRespuestaCategoria(conn, m, contexto, categorias, categoria
 
 const handler = async (m, { conn, usedPrefix }) => {
   try {
-    const contexto = await resolveMenuContext(m, conn, usedPrefix)
+    const contexto = await resolveMenuContext(m, conn, usedPrefix, { conPing: true })
     const categorias = buildMenuCategories(contexto)
     const encabezado = buildMenuHeader(m, contexto)
 
