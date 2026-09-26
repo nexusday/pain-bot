@@ -1,3 +1,5 @@
+import { areJidsSameUser } from '@whiskeysockets/baileys'
+
 const handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text) return avisar(conn, m, usedPrefix, command)
 
@@ -25,7 +27,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     keepQuoted: true,
     quoted: {
       key: {
-        fromMe: false,
+        fromMe: areJidsSameUser(quien, conn.user?.id),
         participant: quien,
         ...(m.isGroup ? { remoteJid: m.chat } : {})
       },
