@@ -353,7 +353,20 @@ async function iniciarSubBot(options) {
         secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
         codigoEmparejamientoEnviado = true
 
-        const enviado = await replyUser(construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento))
+        const textoCodigo = construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento)
+        const jid = getPrivateReplyJid(m, conn)
+        let enviado
+        try {
+          enviado = await conn.sendMessageLia(jid, {
+            text: textoCodigo,
+            footer: 'copiar código',
+            nativeFlow: [{ text: 'Copiar código', copy: secreto }],
+            linkPreview: null
+          }, { quoted: m, keepQuoted: true })
+        } catch (errorBoton) {
+          console.error('[code] No se pudo enviar el botón de copiar:', errorBoton?.message || errorBoton)
+          enviado = await replyUser(textoCodigo)
+        }
         programarBorradoVinculo(enviado?.key)
 
         emparejamientoEnCurso = false
