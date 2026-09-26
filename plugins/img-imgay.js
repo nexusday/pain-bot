@@ -165,14 +165,14 @@ function trazoPorTamano(tamanoFuente) {
   return Math.max(5, Math.round(tamanoFuente * 0.16))
 }
 
-function attrsFuente(tamanoFuente, { relleno = '#fff', trazo = null, anchoDeTrazo = 0 } = {}) {
+function attrsFuente(tamanoFuente, { fill = '#fff', stroke = null, strokeWidth = 0 } = {}) {
   let s =
     `font-family="Impact, Arial Black, Arial, Helvetica, sans-serif" ` +
-    `font-size="${tamanoFuente}" font-weight="900" fill="${relleno}" ` +
+    `font-size="${tamanoFuente}" font-weight="900" fill="${fill}" ` +
     `text-anchor="start" dominant-baseline="alphabetic"`
-  if (trazo && anchoDeTrazo > 0) {
+  if (stroke && strokeWidth > 0) {
     s +=
-      ` stroke="${trazo}" stroke-width="${anchoDeTrazo}" ` +
+      ` stroke="${stroke}" stroke-width="${strokeWidth}" ` +
       `paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"`
   }
   return s
@@ -311,7 +311,7 @@ async function ajustarFuente(text, imgW) {
     lineas = await envolverTexto(text, tamanoFuente, anchoTrazo, anchoMax)
   }
 
-  return { lineas, tamanoFuente, anchoTrazo, lineHeight: tamanoFuente * 1.28 }
+  return { lineas, tamanoFuente, anchoTrazo, altoLinea: tamanoFuente * 1.28 }
 }
 
 function construirSuperposicionOrgullo(ancho, alto) {

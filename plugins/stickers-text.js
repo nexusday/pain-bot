@@ -112,7 +112,7 @@ function calcularDiseno(texto) {
 
   tamanoFuente = Math.round(tamanoFuente * FONT_SCALE)
 
-  return { lines, fontSize }
+  return { lines: lineas, fontSize: tamanoFuente }
 }
 
 function construirSvgTexto(lineas, color, tamanoFuente) {
@@ -161,7 +161,7 @@ async function renderizarFotogramas(texto) {
     rutasFotogramas.push(rutaFotograma)
   }
 
-  return { tmpDir, framePaths }
+  return { tmpDir: dirTemp, framePaths: rutasFotogramas }
 }
 
 async function fotogramasAWebpAnimado(dirTemp) {
