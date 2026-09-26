@@ -1,36 +1,59 @@
 const handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text) return avisarUso(conn, m, usedPrefix, command)
+  if (!text) return avisar(conn, m, usedPrefix, command)
 
-  let who
-  if (text.includes('@0')) who = '0@s.whatsapp.net'
-  else if (m.isGroup) who = m.mentionedJid?.[0]
-  else who = m.chat
+  const copia = copiar(m)
+  let quien
+  if (text.includes('@0')) quien = '0@s.whatsapp.net'
+  else if (m.isGroup) quien = copia.participant = m.mentionedJid[0]
+  else quien = m.chat
 
-  if (!who) return avisarUso(conn, m, usedPrefix, command)
+  if (!quien) return avisar(conn, m, usedPrefix, command)
 
-  const sp = '@' + who.split('@')[0]
-  const [fake, ...real] = text.split(sp)
+  copia.key.fromMe = false
+  copia.message[m.mtype] = copiar(m.msg)
+  const marca = '@' + quien.split('@')[0]
+  const [falso, ...real] = text.split(marca)
+  const respuesta = real.join(marca).trimStart()
+  const cita = falso.trimEnd()
 
-  return conn.fakeReply(m.chat, real.join(sp).trimStart(), who, fake.trimEnd(), m.isGroup ? m.chat : false, {
+  return conn.sendMessage(m.chat, {
+    text: respuesta,
     contextInfo: {
-      mentionedJid: conn.parseMention(real.join(sp).trim())
+      mentionedJid: conn.parseMention(real.join(marca).trim())
+    }
+  }, {
+    keepQuoted: true,
+    quoted: {
+      key: {
+        fromMe: false,
+        participant: quien,
+        ...(m.isGroup ? { remoteJid: m.chat } : {})
+      },
+      message: { conversation: cita },
+      contextInfo: {
+        mentionedJid: conn.parseMention(real.join(marca).trim())
+      }
     }
   })
 }
 
-handler.help = ['fake <texto> @usuario <respuesta>']
+handler.help = ['fake <texto> @usuario <texto2>']
 handler.tags = ['herramientas']
 handler.command = ['fake', 'fakereply', 'fitnah']
 
 export default handler
 
-async function avisarUso(conn, m, usedPrefix, command) {
-  const yo = '@' + String(m.sender || '').split('@')[0]
+function copiar(obj) {
+  return JSON.parse(JSON.stringify(obj))
+}
+
+async function avisar(conn, m, usedPrefix, command) {
+  const yo = '@' + m.sender.split('@')[0]
   return conn.sendMessage(m.chat, {
     text: `*[❗] Ejemplo:*\n> ${usedPrefix + command} hola ${yo} a`,
     contextInfo: {
       ...(global.rcanal?.contextInfo || {}),
       mentionedJid: [m.sender]
     }
-  }, { quoted: m })
+  }, { quoted: m, keepQuoted: true })
 }
