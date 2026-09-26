@@ -1,9 +1,107 @@
 import fetch from "node-fetch"
+import yts from "yt-search"
 
 function nombreAutor(autor) {
   if (!autor) return '—'
   if (typeof autor === 'string') return autor.trim() || '—'
   return autor.name || autor.channel || '—'
+}
+
+function baseApi() {
+  return (global.APIs?.delirius?.url || "https://api.delirius.online").replace(/\/$/, "")
+}
+
+function espera(ms) {
+  return new Promise((resolver) => setTimeout(resolver, ms))
+}
+
+function pareceHtml(texto) {
+  const limpio = String(texto || "").trim()
+  return !limpio || limpio[0] === "<" || /^<!doctype/i.test(limpio)
+}
+
+async function pedirJson(url) {
+  for (let intento = 0; intento < 3; intento++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 20000)
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers: {
+          accept: "application/json",
+          "user-agent": "Mozilla/5.0"
+        }
+      })
+      const texto = await res.text()
+      if (pareceHtml(texto)) {
+        await espera(800 * (intento + 1))
+        continue
+      }
+      return JSON.parse(texto)
+    } catch {
+      await espera(800 * (intento + 1))
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  return null
+}
+
+async function buscarCancion(text) {
+  const json = await pedirJson(`${baseApi()}/search/ytsearch?q=${encodeURIComponent(text)}`)
+  const primero = json?.status && Array.isArray(json.data) ? json.data[0] : null
+  if (primero?.url || primero?.videoId) {
+    return {
+      url: primero.url || `https://youtu.be/${primero.videoId}`,
+      titulo: primero.title || "Desconocido",
+      autor: primero.author || { name: "Desconocido" },
+      duracion: primero.duration || "Desconocido",
+      portada: primero.image || primero.thumbnail
+    }
+  }
+
+  const busqueda = await yts(text).catch(() => null)
+  const video = busqueda?.videos?.[0]
+  if (!video?.url) return null
+  return {
+    url: video.url,
+    titulo: video.title || "Desconocido",
+    autor: video.author || { name: "Desconocido" },
+    duracion: video.timestamp || "Desconocido",
+    portada: video.thumbnail || video.image
+  }
+}
+
+async function urlEsAudio(url) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 12000)
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      signal: ctrl.signal,
+      headers: { range: "bytes=0-1", "user-agent": "Mozilla/5.0" }
+    })
+    const tipo = res.headers.get("content-type") || ""
+    if (/text\/html|text\/plain/i.test(tipo)) return false
+    const trozo = Buffer.from(await res.arrayBuffer()).slice(0, 24).toString("utf8")
+    if (pareceHtml(trozo)) return false
+    return res.ok || res.status === 206
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function pedirAudio(urlVideo) {
+  for (let intento = 0; intento < 2; intento++) {
+    const json = await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
+    const datos = json?.status ? json.data : null
+    const urlAudio = typeof datos?.download === "string" ? datos.download : datos?.download?.url
+    if (!urlAudio || pareceHtml(urlAudio)) continue
+    if (await urlEsAudio(urlAudio)) return { datos, urlAudio }
+  }
+  return null
 }
 
 const handler = async (m, { conn, text, usedPrefix }) => {
@@ -24,34 +122,24 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     if (esUrl) {
       urlVideo = text.trim()
     } else {
-      
-      const urlBusqueda = `https://api.delirius.online/search/ytsearch?q=${encodeURIComponent(text)}`
-      const resBusqueda = await fetch(urlBusqueda).then(r => r.json())
-      if (!resBusqueda?.status || !Array.isArray(resBusqueda.data) || resBusqueda.data.length === 0)
-        throw "sin resultados"
-      const primero = resBusqueda.data[0]
-      urlVideo = primero.url || `https://youtu.be/${primero.videoId}`
-      titulo = primero.title || titulo
-      autor = primero.author || autor
-      duracion = primero.duration || duracion
-      urlMiniatura = primero.image || primero.thumbnail
+      const encontrado = await buscarCancion(text)
+      if (!encontrado) throw "sin resultados"
+      urlVideo = encontrado.url
+      titulo = encontrado.titulo || titulo
+      autor = encontrado.autor || autor
+      duracion = encontrado.duracion || duracion
+      urlMiniatura = encontrado.portada
     }
 
-    
-    const apiDescarga = `https://api.delirius.online/download/ytmp3?url=${encodeURIComponent(urlVideo)}`
-    const resDescarga = await fetch(apiDescarga).then(r => r.json())
-    if (!resDescarga?.status || !resDescarga.data)
-      throw "no se pudo obtener el audio"
+    const audio = await pedirAudio(urlVideo)
+    if (!audio?.urlAudio) throw "no se pudo obtener el audio"
 
-    const datosInfo = resDescarga.data
-    const urlAudio = typeof datosInfo.download === "string" ? datosInfo.download : datosInfo.download?.url
+    const datosInfo = audio.datos
+    const urlAudio = audio.urlAudio
     const portada = datosInfo.image || urlMiniatura
     titulo = datosInfo.title || titulo
     autor = datosInfo.author || datosInfo.channel || autor
     duracion = datosInfo.duration || datosInfo.timestamp || duracion
-
-    if (!urlAudio)
-      throw "no se encontró el audio"
 
     const canal = nombreAutor(autor)
     const informacion = `
@@ -85,7 +173,10 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     )
 
   } catch (e) {
-    const detalle = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
+    const crudo = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
+    const detalle = /DOCTYPE|Unexpected token|not valid JSON|is not valid JSON/i.test(crudo)
+      ? "no se pudo obtener el audio"
+      : crudo
     return conn.sendMessage(m.chat, {
       text: `[❌] ${detalle}\n\n> *Ejemplo:* ${usedPrefix}play <nombre o link>`,
       contextInfo: { ...rcanal?.contextInfo }
