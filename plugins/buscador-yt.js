@@ -57,14 +57,20 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       const titulo = recortarTexto(elemento.title, 80) || 'Sin título'
       const miniatura = elemento.image || elemento.thumbnail || (elemento.videoId ? `https://i.ytimg.com/vi/${elemento.videoId}/hqdefault.jpg` : '')
       if (!miniatura) continue
-      const numero = tarjetas.length + 1
       tarjetas.push({
         image: { url: miniatura },
-        caption: `*${numero}.* ${titulo}
-𓍯  *Canal:* ${canal}
-𓍯  *Duración:* ${elemento.duration || '—'}
-𓍯  *Vistas:* ${formatearVistas(elemento.views)}`,
-        footer: recortarTexto(url, 60) || 'YouTube',
+        caption: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${titulo}*
+╰─ ✧  ✩
+┊ canal  ·  \`${canal}\`
+┊ duración  ·  \`${elemento.duration || '—'}\`
+┊ vistas  ·  \`${formatearVistas(elemento.views)}\`
+┊ \`${recortarTexto(url, 70) || '—'}\`
+╰─────────`.trim(),
+        footer: 'audio · video',
         nativeFlow: [
           { text: 'Audio', id: `${usedPrefix}play ${url}` },
           { text: 'Video', id: `${usedPrefix}video ${url}` }
@@ -75,8 +81,16 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     if (!tarjetas.length) throw '[❗] Los resultados no traen miniatura o enlace.'
 
     await conn.sendMessageLia(m.chat, {
-      text: `ִֶָ☾.  YouTube\n> *Búsqueda:* ${consulta}\n> *Resultados:* ${tarjetas.length}`,
-      footer: 'Audio o Video',
+      text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *YouTube*
+╰─ ✧  ✩
+┊ búsqueda  ·  \`${recortarTexto(consulta, 40)}\`
+┊ resultados  ·  \`${tarjetas.length}\`
+╰─────────`.trim(),
+      footer: 'audio · video',
       cards: tarjetas
     }, { quoted: m, keepQuoted: true })
   } catch (e) {
