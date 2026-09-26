@@ -35,23 +35,6 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
     const resultados = resBusqueda.data.slice(0, LIMITE_RESULTADOS)
 
-    let lista = `ִֶָ☾. 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 ִֶָ☾.\n\n> *Búsqueda:* ${consulta}\n> *Encontrados:* ${resultados.length}\n\n`
-    resultados.forEach((elemento, i) => {
-      const canal = recortarTexto(elemento.author?.name, 40) || 'YouTube'
-      lista += `*${i + 1}.* ${recortarTexto(elemento.title, 70)}\n`
-      lista += ` 𓍯  *Canal:* ${canal}\n`
-      lista += ` 𓍯  *Duración:* ${elemento.duration || '—'}\n`
-      lista += ` 𓍯  *Vistas:* ${formatearVistas(elemento.views)}\n`
-      lista += ` 𓍯  *Publicado:* ${elemento.publishedAt || '—'}\n`
-      lista += ` 𓍯  *Enlace:* ${elemento.url}\n\n`
-    })
-    lista += `> Descargar video:\n> ${usedPrefix}video <número>\n> ${usedPrefix}video <enlace>\n> ${usedPrefix}play <número>`
-
-    await conn.sendMessage(m.chat, {
-      text: lista.trim(),
-      contextInfo: { ...rcanal?.contextInfo }
-    }, { quoted: m })
-
     if (!global.lastYtSearch) global.lastYtSearch = {}
     global.lastYtSearch[m.sender] = {
       query: consulta,
@@ -66,35 +49,36 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       at: Date.now()
     }
 
-    for (let i = 0; i < resultados.length; i++) {
-      const elemento = resultados[i]
+    const tarjetas = []
+    for (const elemento of resultados) {
+      const url = elemento.url || (elemento.videoId ? `https://youtu.be/${elemento.videoId}` : '')
+      if (!url) continue
       const canal = recortarTexto(elemento.author?.name, 40) || 'YouTube'
-      const leyenda = `*${i + 1}.* ${recortarTexto(elemento.title, 90)}
- 𓍯  *Canal:* ${canal}
- 𓍯  *Duración:* ${elemento.duration || '—'}
- 𓍯  *Vistas:* ${formatearVistas(elemento.views)}
- 𓍯  *Enlace:* ${elemento.url}
-
-> ${usedPrefix}video ${i + 1}`
-
-      const miniatura = elemento.image || elemento.thumbnail
-      if (miniatura) {
-        try {
-          const imagen = (await conn.getFile(miniatura)).data
-          await conn.sendMessage(m.chat, {
-            image: imagen,
-            caption: leyenda,
-            contextInfo: { ...rcanal?.contextInfo }
-          }, { quoted: m })
-          continue
-        } catch {}
-      }
-
-      await conn.sendMessage(m.chat, {
-        text: leyenda,
-        contextInfo: { ...rcanal?.contextInfo }
-      }, { quoted: m })
+      const titulo = recortarTexto(elemento.title, 80) || 'Sin título'
+      const miniatura = elemento.image || elemento.thumbnail || (elemento.videoId ? `https://i.ytimg.com/vi/${elemento.videoId}/hqdefault.jpg` : '')
+      if (!miniatura) continue
+      const numero = tarjetas.length + 1
+      tarjetas.push({
+        image: { url: miniatura },
+        caption: `*${numero}.* ${titulo}
+𓍯  *Canal:* ${canal}
+𓍯  *Duración:* ${elemento.duration || '—'}
+𓍯  *Vistas:* ${formatearVistas(elemento.views)}`,
+        footer: recortarTexto(url, 60) || 'YouTube',
+        nativeFlow: [
+          { text: 'Audio', id: `${usedPrefix}play ${url}` },
+          { text: 'Video', id: `${usedPrefix}video ${url}` }
+        ]
+      })
     }
+
+    if (!tarjetas.length) throw '[❗] Los resultados no traen miniatura o enlace.'
+
+    await conn.sendMessageLia(m.chat, {
+      text: `ִֶָ☾.  YouTube\n> *Búsqueda:* ${consulta}\n> *Resultados:* ${tarjetas.length}`,
+      footer: 'Audio o Video',
+      cards: tarjetas
+    }, { quoted: m, keepQuoted: true })
   } catch (e) {
     console.error('Error en búsqueda YouTube:', e)
     return conn.sendMessage(m.chat, {
@@ -104,7 +88,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 }
 
-handler.help = ['yt <búsqueda> → 5 resultados de YouTube']
+handler.help = ['yt <búsqueda> → carrusel con Audio y Video']
 handler.command = ['yt', 'youtube', 'ytsearch']
 handler.tags = ['descargas', 'busqueda']
 
