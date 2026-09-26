@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import ws from 'ws'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 import { formatBotUptime } from '../lib/bot-uptime.js'
+import { idiomaDe, tr } from '../lib/lang.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -103,8 +104,11 @@ let handler = async (m, { conn, usedPrefix }) => {
     const totalPlugins = Object.values(global.plugins || {}).filter(v => v?.help && v?.tags).length
     const subBotsActivos = contarSubBots()
     const owners = lineasOwners()
-    const tipo = esPrincipal ? 'principal' : 'sub-bot'
+    const tipo = esPrincipal
+      ? tr(conn, 'principal', 'main')
+      : tr(conn, 'sub-bot', 'sub-bot')
     const pref = usedPrefix || '.'
+    const en = idiomaDe(conn) === 'en'
 
     const texto = `
 \`*˚   ✩    ✦    ✩   ˚*\`
@@ -114,11 +118,11 @@ let handler = async (m, { conn, usedPrefix }) => {
 ╰─ ✧  ✩
 ┊ ping  ·  \`${formatearPing(pingMs)}\`
 ┊ uptime  ·  \`${formatBotUptime(conn)}\`
-┊ memoria  ·  \`${memoriaMB} MB\`
-┊ número  ·  \`+${botActual || '—'}\`
-┊ tipo  ·  \`${tipo}\`
-┊ prefijo  ·  \`${pref}\`
-┊ librería  ·  \`Baileys\`
+┊ ${en ? 'memory' : 'memoria'}  ·  \`${memoriaMB} MB\`
+┊ ${en ? 'number' : 'número'}  ·  \`+${botActual || '—'}\`
+┊ ${en ? 'type' : 'tipo'}  ·  \`${tipo}\`
+┊ ${en ? 'prefix' : 'prefijo'}  ·  \`${pref}\`
+┊ ${en ? 'library' : 'librería'}  ·  \`Baileys\`
 ┊ plugins  ·  \`${totalPlugins}\`
 ┊ sub-bots  ·  \`${subBotsActivos}\`${owners ? `\n${owners}` : ''}
 ┊ \`https://nexcodea.com\`
@@ -139,7 +143,7 @@ let handler = async (m, { conn, usedPrefix }) => {
     }
   } catch (e) {
     console.error('Error en /info:', e)
-    await m.reply('[❌] Error al mostrar la info.\n> ' + (e?.message || e))
+    await m.reply(tr(conn, '[❌] Error al mostrar la info.\n> ', '[❌] Could not show the info.\n> ') + (e?.message || e))
   }
 }
 

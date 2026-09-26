@@ -278,6 +278,10 @@ async function connectionUpdate(update) {
       if (!sock.startTime) sock.startTime = Date.now()
     }
     try {
+      const { aplicarIdioma } = await import('./lib/lang.js')
+      aplicarIdioma(sock)
+    } catch {}
+    try {
       const { resolveCanalConfig } = await import('./lib/newsletter-rcanal.js')
       await resolveCanalConfig(sock)
     } catch (err) {

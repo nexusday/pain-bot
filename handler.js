@@ -27,6 +27,7 @@ import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker
 import { trackUserMessage } from './lib/msg-activity.js'
 import { getStaffOwnerIds } from './lib/staff.js'
 import { estaEnBlackn } from './lib/blackn.js'
+import { idiomaDe } from './lib/lang.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -767,20 +768,32 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
     }
   }
 
-global.dfail = (type, m, conn) => {  
-  const msg = {  
-    rowner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot.`,  
-    owner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot y *Sub Bots*.`,  
-    mods: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Moderadores* de la Bot.`,  
-    premium: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por Usuarios *Premium*.`,  
-    group: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en *Grupos*.`,  
-    private: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en mi Chat *Privado*.`,  
-    admin: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Administradores* del Grupo.`,  
-    botAdmin: `𓂃 ࣪ ִֶָ☾.  Hola, la bot debe ser *Administradora* para ejecutar este Comando.`,  
-    unreg: `𓂃 ࣪ ִֶָ☾.  Hola, para usar este comando debes estar *Registrado.*`,  
-    restrict: `𓂃 ࣪ ִֶָ☾.  Hola, esta característica está *deshabilitada.*`  
-  }[type]  
-  if (msg) return conn.reply(m.chat, msg, m, rcanal)  
+global.dfail = (type, m, conn) => {
+  const en = idiomaDe(conn) === 'en'
+  const msg = (en ? {
+    rowner: `𓂃 ࣪ ִֶָ☾.  This command can only be used by the bot *creator*.`,
+    owner: `𓂃 ࣪ ִֶָ☾.  This command can only be used by the bot *creator* and *sub-bots*.`,
+    mods: `𓂃 ࣪ ִֶָ☾.  This command can only be used by bot *moderators*.`,
+    premium: `𓂃 ࣪ ִֶָ☾.  This command can only be used by *premium* users.`,
+    group: `𓂃 ࣪ ִֶָ☾.  This command can only be used in *groups*.`,
+    private: `𓂃 ࣪ ִֶָ☾.  This command can only be used in my *private* chat.`,
+    admin: `𓂃 ࣪ ִֶָ☾.  This command can only be used by group *admins*.`,
+    botAdmin: `𓂃 ࣪ ִֶָ☾.  The bot must be a group *admin* to run this command.`,
+    unreg: `𓂃 ࣪ ִֶָ☾.  You need to be *registered* to use this command.`,
+    restrict: `𓂃 ࣪ ִֶָ☾.  This feature is *disabled*.`
+  } : {
+    rowner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot.`,
+    owner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot y *Sub Bots*.`,
+    mods: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Moderadores* de la Bot.`,
+    premium: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por Usuarios *Premium*.`,
+    group: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en *Grupos*.`,
+    private: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en mi Chat *Privado*.`,
+    admin: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Administradores* del Grupo.`,
+    botAdmin: `𓂃 ࣪ ִֶָ☾.  Hola, la bot debe ser *Administradora* para ejecutar este Comando.`,
+    unreg: `𓂃 ࣪ ִֶָ☾.  Hola, para usar este comando debes estar *Registrado.*`,
+    restrict: `𓂃 ࣪ ִֶָ☾.  Hola, esta característica está *deshabilitada.*`
+  })[type]
+  if (msg) return conn.reply(m.chat, msg, m, rcanal)
 }
 
 } catch (e) {

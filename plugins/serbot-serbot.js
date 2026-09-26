@@ -468,6 +468,10 @@ async function iniciarSubBot(options) {
         sock.botNumber = idCarpetaBot
         sock.pathAYBot = pathAYBot
         try {
+          const { aplicarIdioma } = await import('../lib/lang.js')
+          aplicarIdioma(sock)
+        } catch {}
+        try {
           const { markBotStart } = await import('../lib/bot-uptime.js')
        
           markBotStart(idCarpetaBot)

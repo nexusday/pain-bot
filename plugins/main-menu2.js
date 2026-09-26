@@ -198,7 +198,7 @@ const handler = async (m, { conn, usedPrefix }) => {
 _elige una sección para ver sus comandos_
 ㅤ`.trim(),
             MENU_BUTTON_TEXT,
-            buildListSections(categorias),
+            buildListSections(categorias, contexto.lang),
             m,
             { footer: contexto.nombreBot },
           )
