@@ -241,6 +241,9 @@ async function iniciarSubBot(options) {
       msgRetryCache: cacheReintentoMsg,
       browser: Browsers.ubuntu('Chrome'),
       version,
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
+      qrTimeout: 120_000,
       generateHighQualityLinkPreview: true
     }
 
@@ -344,6 +347,7 @@ async function iniciarSubBot(options) {
           throw new Error('La conexión se cerró antes de generar el código.')
         }
 
+        await new Promise((resolver) => setImmediate(resolver))
         let secreto = await sock.requestPairingCode(telefonoEmparejamiento, CODIGO_EMPAREJAMIENTO)
 
         secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
@@ -430,12 +434,10 @@ async function iniciarSubBot(options) {
         }
 
     
-        if (esFlujoEmparejamiento && !codigoEmparejamientoEnviado) {
-          console.log(chalk.bold.yellow(`\n┆ Pairing (+${idCarpetaBot}) esperando vinculación (${motivo})\n`))
-          return
-        }
         if (esFlujoEmparejamiento && !estadoConn.creds.registered) {
-          console.log(chalk.bold.yellow(`\n┆ Pairing (+${idCarpetaBot}) conexión interrumpida (${motivo}), esperando...\n`))
+          console.log(chalk.bold.yellow(`\n┆ Pairing (+${idCarpetaBot}) conexión interrumpida (${motivo ?? 'sin código'}). No se toca al resto.\n`))
+          try { sock.ev.removeAllListeners() } catch {}
+          detenerWatchdog()
           return
         }
         if (reconectando) {
@@ -481,6 +483,10 @@ async function iniciarSubBot(options) {
         }
         if (!Array.isArray(global.conns)) global.conns = []
         if (!global.conns.includes(sock)) global.conns.push(sock)
+        if (!sock.vistaUnicaLista) {
+          sock.vistaUnicaLista = true
+          initViewOnceAntiListener(sock)
+        }
         try {
           const { resolveCanalConfig } = await import('../lib/newsletter-rcanal.js')
           await resolveCanalConfig(sock)
@@ -586,11 +592,14 @@ async function iniciarSubBot(options) {
         sock.ev.off("creds.update", sock.credsUpdate)
       }
 
-      sock.handler = handler.handler.bind(sock)
+      sock.handler = async function (chatUpdate) {
+        if (!sock.authState?.creds?.registered) return
+        return handler.handler.call(sock, chatUpdate)
+      }
       sock.connectionUpdate = actualizacionConexion.bind(sock)
       sock.credsUpdate = saveCreds.bind(sock, true)
 
-      initViewOnceAntiListener(sock)
+      if (sock.authState?.creds?.registered) initViewOnceAntiListener(sock)
       sock.ev.on("messages.upsert", sock.handler)
       sock.ev.on("connection.update", sock.connectionUpdate)
       sock.ev.on("creds.update", sock.credsUpdate)
