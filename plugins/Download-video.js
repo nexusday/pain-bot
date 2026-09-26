@@ -69,8 +69,11 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     let urlVideo = null
     let vistaPrevia = null
 
-    if (RE_URL_YT.test(entrada)) {
-      urlVideo = entrada
+    const citado = m.mtype === 'interactiveResponseMessage' ? null : m
+    const enlace = (entrada.match(/https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/\S+|youtu\.be\/\S+)/i) || [''])[0]
+
+    if (enlace) {
+      urlVideo = enlace
     } else if (/^\d+$/.test(entrada)) {
       const indice = parseInt(entrada, 10) - 1
       const cacheBusqueda = global.lastYtSearch?.[m.sender]
@@ -114,21 +117,21 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
           image: miniatura,
           caption: informacion,
           contextInfo: { ...rcanal?.contextInfo }
-        }, { quoted: m })
+        }, { quoted: citado })
       } catch {
         await conn.sendMessage(m.chat, {
           text: informacion,
           contextInfo: { ...rcanal?.contextInfo }
-        }, { quoted: m })
+        }, { quoted: citado })
       }
     } else {
       await conn.sendMessage(m.chat, {
         text: informacion,
         contextInfo: { ...rcanal?.contextInfo }
-      }, { quoted: m })
+      }, { quoted: citado })
     }
 
-    enviarVideoAlFondo(conn, m, descargaVideo, titulo, informacion)
+    enviarVideoAlFondo(conn, m, descargaVideo, titulo, informacion, citado)
     await conn.sendPresenceUpdate('paused', m.chat).catch(() => {})
   } catch (e) {
     console.error('Error en download-video:', e)
@@ -141,7 +144,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 }
 
-function enviarVideoAlFondo(conn, m, url, titulo, informacion) {
+function enviarVideoAlFondo(conn, m, url, titulo, informacion, citado) {
   setTimeout(() => {
     (async () => {
       try {
@@ -150,7 +153,7 @@ function enviarVideoAlFondo(conn, m, url, titulo, informacion) {
           caption: informacion,
           fileName: `${limpiarNombreArchivo(titulo)}.mp4`,
           mimetype: 'video/mp4'
-        }, { quoted: m })
+        }, { quoted: citado })
       } catch (error) {
         try {
           const respuesta = await fetch(url)
@@ -161,7 +164,7 @@ function enviarVideoAlFondo(conn, m, url, titulo, informacion) {
             caption: informacion,
             fileName: `${limpiarNombreArchivo(titulo)}.mp4`,
             mimetype: 'video/mp4'
-          }, { quoted: m })
+          }, { quoted: citado })
         } catch (e) {
           console.error('Error enviando video en segundo plano:', e?.message || e)
           await conn.sendMessage(m.chat, {

@@ -112,15 +112,31 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
 
-    const esUrl = /youtu\.be|youtube\.com/.test(text)
+    const citado = m.mtype === 'interactiveResponseMessage' ? null : m
+    const enlace = (String(text).match(/https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/\S+|youtu\.be\/\S+)/i) || [''])[0]
     let urlVideo
     let titulo = "Desconocido"
     let autor = { name: "Desconocido" }
     let duracion = "Desconocido"
     let urlMiniatura
 
-    if (esUrl) {
-      urlVideo = text.trim()
+    if (enlace) {
+      urlVideo = enlace
+    } else if (/^\d+$/.test(text.trim())) {
+      const indice = parseInt(text.trim(), 10) - 1
+      const cacheBusqueda = global.lastYtSearch?.[m.sender]
+      if (!cacheBusqueda?.results?.length || Date.now() - cacheBusqueda.at > 10 * 60 * 1000) {
+        throw `[❗] No hay búsqueda reciente. Usa primero *${usedPrefix}yt <texto>*`
+      }
+      if (indice < 0 || indice >= cacheBusqueda.results.length) {
+        throw `[❗] Elige un número del 1 al ${cacheBusqueda.results.length}.`
+      }
+      const elegido = cacheBusqueda.results[indice]
+      urlVideo = elegido.url
+      titulo = elegido.title || titulo
+      autor = { name: elegido.author || 'Desconocido' }
+      duracion = elegido.duration || duracion
+      urlMiniatura = elegido.image
     } else {
       const encontrado = await buscarCancion(text)
       if (!encontrado) throw "sin resultados"
@@ -157,19 +173,19 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     if (portada) {
       try {
         const miniatura = (await conn.getFile(portada)).data
-        await conn.sendMessage(m.chat, { image: miniatura, caption: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
+        await conn.sendMessage(m.chat, { image: miniatura, caption: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: citado })
         envioPortada = true
       } catch {}
     }
     if (!envioPortada) {
-      await conn.sendMessage(m.chat, { text: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
+      await conn.sendMessage(m.chat, { text: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: citado })
     }
 
    
     await conn.sendMessage(
       m.chat,
       { audio: { url: urlAudio }, fileName: `${titulo}.mp3`, mimetype: "audio/mpeg" },
-      { quoted: m }
+      { quoted: citado }
     )
 
   } catch (e) {

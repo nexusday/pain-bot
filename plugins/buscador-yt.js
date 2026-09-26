@@ -72,8 +72,8 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 ╰─────────`.trim(),
         footer: 'audio · video',
         nativeFlow: [
-          { text: 'Audio', id: `${usedPrefix}play ${url}` },
-          { text: 'Video', id: `${usedPrefix}video ${url}` }
+          { text: 'Audio', id: `${usedPrefix}play ${tarjetas.length + 1}` },
+          { text: 'Video', id: `${usedPrefix}video ${tarjetas.length + 1}` }
         ]
       })
     }
