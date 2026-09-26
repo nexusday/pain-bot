@@ -12,12 +12,22 @@ export function limpiarNumBot(jidONum = '') {
  * compara mal y el bot "activo" se salta a sí mismo.
  */
 export function numerosIdentidadBot(conn) {
+  if (!conn) return new Set()
+  const marca = [
+    conn.user?.jid,
+    conn.user?.id,
+    conn.user?.lid,
+    conn.phoneNumber,
+    conn.botNumber,
+    conn.pathAYBot,
+  ].join('|')
+  if (conn._idsBot && conn._idsBotMarca === marca) return conn._idsBot
+
   const nums = new Set()
   const agregar = (v) => {
     const n = limpiarNumBot(v)
     if (n && n.length >= 6) nums.add(n)
   }
-  if (!conn) return nums
   agregar(conn.user?.jid)
   agregar(conn.user?.id)
   agregar(conn.user?.lid)
@@ -29,6 +39,8 @@ export function numerosIdentidadBot(conn) {
   if (conn.pathAYBot) {
     try { agregar(basename(conn.pathAYBot)) } catch {}
   }
+  conn._idsBotMarca = marca
+  conn._idsBot = nums
   return nums
 }
 
@@ -195,13 +207,26 @@ export function establecerBotActivoDelGrupo(idChat, numeroBotOTodos) {
   return num
 }
 
+let cacheBotsConocidos = null
+let cacheBotsHasta = 0
+let cacheBotsLargo = -1
+
 /** Números de principal + subbots conectados (PN + LID + carpeta). */
 export function listarNumerosBotsConocidos() {
+  const lista = global.conns || []
+  const ahora = Date.now()
+  if (cacheBotsConocidos && cacheBotsLargo === lista.length && ahora < cacheBotsHasta) {
+    return cacheBotsConocidos
+  }
+
   const nums = new Set()
   for (const n of numerosIdentidadBot(global.conn)) nums.add(n)
-  for (const c of global.conns || []) {
+  for (const c of lista) {
     for (const n of numerosIdentidadBot(c)) nums.add(n)
   }
+  cacheBotsConocidos = nums
+  cacheBotsLargo = lista.length
+  cacheBotsHasta = ahora + 5000
   return nums
 }
 

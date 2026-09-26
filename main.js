@@ -433,6 +433,7 @@ async function filesInit() {
   }
 }
 await filesInit()
+global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
 
 global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {
@@ -441,7 +442,9 @@ global.reload = async (_ev, filename) => {
       if (existsSync(dir)) conn.logger.info(`Updated plugin - '${filename}'`)
       else {
         conn.logger.warn(`Deleted plugin - '${filename}'`)
-        return delete global.plugins[filename]
+        delete global.plugins[filename]
+        global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
+        return
       }
     } else conn.logger.info(`New plugin - '${filename}'`)
 
@@ -458,6 +461,7 @@ global.reload = async (_ev, filename) => {
         conn.logger.error(`Error requiring plugin '${filename}':\n${format(e)}`)
       } finally {
         global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)))
+        global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
       }
     }
   }
@@ -490,6 +494,8 @@ global.reconnectSubBots = async function() {
   }
 
   console.log(chalk.cyan(`\nReconectando ${subBotFolders.length} sub-bots...`))
+
+  const serbotModule = await import('./plugins/serbot-serbot.js')
 
   for (const folder of subBotFolders) {
     try {
@@ -534,7 +540,6 @@ global.reconnectSubBots = async function() {
       })
 
       
-      const serbotModule = await import('./plugins/serbot-serbot.js')
       if (serbotModule.AYBot) {
         await serbotModule.AYBot({
           pathAYBot: botPath,

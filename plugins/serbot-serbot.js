@@ -28,6 +28,14 @@ const rcanal = global.rcanal || {
 }
 
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
+let versionBaileysCache = null
+
+async function obtenerVersionBaileys() {
+  if (versionBaileysCache) return versionBaileysCache
+  const { version } = await fetchLatestBaileysVersion()
+  versionBaileysCache = version
+  return version
+}
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -208,7 +216,7 @@ async function iniciarSubBot(options) {
   }
 
   void (async () => {
-    let { version, isLatest } = await fetchLatestBaileysVersion()
+    const version = await obtenerVersionBaileys()
     const reintentoMsg = (MessageRetryMap) => { }
     const cacheReintentoMsg = new NodeCache()
     let estadoConn, saveState, saveCreds

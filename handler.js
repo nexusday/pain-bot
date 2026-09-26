@@ -35,6 +35,57 @@ clearTimeout(this)
 resolve()
 }, ms))
 
+let cachePlugins = null
+
+function pluginsEnCache() {
+  const epoch = global.pluginsEpoch || 0
+  if (cachePlugins && cachePlugins.epoch === epoch) return cachePlugins
+
+  const lista = []
+  const conAll = []
+  const comandos = new Set()
+
+  for (const name in global.plugins) {
+    const plugin = global.plugins[name]
+    if (!plugin || plugin.disabled) continue
+
+    let command = plugin.command || plugin.handler?.command || []
+    if (typeof command === 'string') command = [command]
+    else if (command instanceof RegExp) command = [command.source]
+    else if (!Array.isArray(command)) command = []
+
+    const normalizado = {
+      name,
+      handler: plugin.handler || plugin,
+      command,
+      tags: plugin.tags || plugin.handler?.tags || [],
+      help: plugin.help || [],
+      all: plugin.all || plugin.handler?.all,
+      customPrefix: plugin.customPrefix || plugin.handler?.customPrefix
+    }
+
+    for (const cmd of command) {
+      if (typeof cmd === 'string' && cmd) comandos.add(cmd.toLowerCase())
+    }
+
+    lista.push(normalizado)
+    if (typeof normalizado.all === 'function') conAll.push(normalizado)
+  }
+
+  cachePlugins = { epoch, lista, conAll, comandos }
+  return cachePlugins
+}
+
+function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
+  const texto = typeof m.text === 'string' ? m.text.trim() : ''
+  if (!texto) return false
+  if (global.prefix instanceof RegExp && global.prefix.test(texto)) return true
+  const permiteSinPrefijo = isOwner || isROwner || (m.isGroup && global.db?.data?.antiprefijo?.[m.chat] === true)
+  if (!permiteSinPrefijo) return false
+  const palabra = texto.split(/\s+/)[0]?.toLowerCase() || ''
+  return comandos.has(palabra)
+}
+
 export async function handler(chatUpdate) {
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
@@ -307,36 +358,8 @@ let usedPrefix = '.'
 let comandoEjecutado = false
 
 
-const pluginsProcesados = []
-for (let name in global.plugins) {
-  let plugin = global.plugins[name]
-  if (!plugin || plugin.disabled) continue
-  
- 
-  let pluginNormalizado = {
-    name: name,
-    handler: plugin.handler || plugin,
-    command: plugin.command || [],
-    tags: plugin.tags || [],
-    help: plugin.help || [],
-    all: plugin.all || plugin.handler?.all,
-    customPrefix: plugin.customPrefix || plugin.handler?.customPrefix
-  }
-  
-  
-  if (typeof pluginNormalizado.command === 'string') {
-    pluginNormalizado.command = [pluginNormalizado.command]
-  }
-  
-  
-  if (pluginNormalizado.command instanceof RegExp) {
-    pluginNormalizado.command = [pluginNormalizado.command.source]
-  }
-  
-  pluginsProcesados.push(pluginNormalizado)
-}
-
 const pluginsSesion = ['xnxx.js', 'hentai.js', 'xvideos.js']
+const { lista: pluginsProcesados, conAll, comandos } = pluginsEnCache()
 
 for (let plugin of pluginsProcesados) {
   if (plugin.handler && typeof plugin.handler.before === 'function' && pluginsSesion.includes(plugin.name)) {
@@ -365,32 +388,33 @@ for (let plugin of pluginsProcesados) {
   }
 }
 
+for (const plugin of conAll) {
+  const __filename = join(___dirname, plugin.name)
+  try {
+    await plugin.all.call(this, m, {
+      conn: this,
+      participants,
+      groupMetadata,
+      user,
+      bot,
+      isROwner,
+      isOwner,
+      isRAdmin,
+      isAdmin,
+      isBotAdmin,
+      isPrems,
+      chatUpdate,
+      __dirname: ___dirname,
+      __filename
+    })
+  } catch (e) {
+    console.error(`Error en plugin.all de ${plugin.name}:`, e)
+  }
+}
+
+if (textoPuedeSerComando(m, isOwner, isROwner, comandos)) {
 for (let plugin of pluginsProcesados) {
   const __filename = join(___dirname, plugin.name)
-
-  
-  if (typeof plugin.all === 'function') {
-    try {
-      await plugin.all.call(this, m, {
-        conn: this,
-        participants,
-        groupMetadata,
-        user,
-        bot,
-        isROwner,
-        isOwner,
-        isRAdmin,
-        isAdmin,
-        isBotAdmin,
-        isPrems,
-        chatUpdate,
-        __dirname: ___dirname,
-        __filename
-      })
-    } catch (e) {
-      console.error(`Error en plugin.all de ${plugin.name}:`, e)
-    }
-  }
 
   
   if (!opts['restrict']) {
@@ -511,6 +535,7 @@ for (let plugin of pluginsProcesados) {
       console.error(`Error ejecutando plugin ${plugin.name}:`, e)
     }
   }
+}
 }
 
 if (m.rpgProgress?.leveled) {
