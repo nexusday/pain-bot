@@ -169,10 +169,10 @@ const connectionOptions = {
   browser: Browsers.ubuntu('Chrome'),
   markOnlineOnclientect: true,
   generateHighQualityLinkPreview: true,
-  syncFullHistory: true,
-  retryRequestDelayMs: 10,
-  transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 10 },
-  maxMsgRetryCount: 15,
+  syncFullHistory: false,
+  retryRequestDelayMs: 250,
+  transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
+  maxMsgRetryCount: 5,
   appStateMacVerification: {
     patch: false,
     snapshot: false,
@@ -246,10 +246,17 @@ conn.well = false
 
 if (!opts['test']) {
   if (global.db) {
+    let escribiendoDb = false
     setInterval(async () => {
-      if (global.db.data) await global.db.write()
-      if (opts['autocleartmp']) {
-        cleanupTmpFiles({ maxAgeMs: 3 * 60 * 1000 })
+      if (escribiendoDb || !global.db.data) return
+      escribiendoDb = true
+      try {
+        await global.db.write()
+        if (opts['autocleartmp']) {
+          cleanupTmpFiles({ maxAgeMs: 3 * 60 * 1000 })
+        }
+      } finally {
+        escribiendoDb = false
       }
     }, 30 * 1000)
   }

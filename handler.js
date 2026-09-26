@@ -90,6 +90,12 @@ function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
 export async function handler(chatUpdate) {
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
+if (chatUpdate.type && chatUpdate.type !== 'notify') {
+  const ultimo = chatUpdate.messages?.[chatUpdate.messages.length - 1]
+  const marca = Number(ultimo?.messageTimestamp || 0)
+  const ms = marca > 1e12 ? marca : marca * 1000
+  if (!ms || Date.now() - ms > 15000) return
+}
 let m = chatUpdate.messages[chatUpdate.messages.length - 1]
 if (!m) return
 
@@ -842,15 +848,18 @@ let debeAutoLeer = true
 
 if (esSubBot) {
   try {
-    const numeroBot = this.user.jid.split('@')[0].replace(/\D/g, '')
-    const rutaConfig = `./Serbot/${numeroBot}/config.json`
-
-    if (existsSync(rutaConfig)) {
-      const config = JSON.parse(readFileSync(rutaConfig, 'utf-8'))
-
-      if (config.autoRead === false) {
-        debeAutoLeer = false
+    const ahora = Date.now()
+    if (this._autoReadHasta && ahora < this._autoReadHasta) {
+      debeAutoLeer = this._autoReadCache !== false
+    } else {
+      const numeroBot = this.user.jid.split('@')[0].replace(/\D/g, '')
+      const rutaConfig = `./Serbot/${numeroBot}/config.json`
+      if (existsSync(rutaConfig)) {
+        const config = JSON.parse(readFileSync(rutaConfig, 'utf-8'))
+        if (config.autoRead === false) debeAutoLeer = false
       }
+      this._autoReadCache = debeAutoLeer
+      this._autoReadHasta = ahora + 30000
     }
   } catch (error) {
     console.error('Error leyendo configuración de auto-leer:', error)
@@ -870,13 +879,9 @@ if (esSubBot) {
 const idMensaje = m.id || m.key?.id
 const saltarAutoLeer = isKnownViewOnce(idMensaje) || isViewOnceCandidate(m)
 
-if (debeAutoLeer && !saltarAutoLeer) {
+if (debeAutoLeer && !saltarAutoLeer && m.key) {
   try {
-    await this.readMessages([m.key])
-
-    if (m.isGroup) {
-      await this.readMessages([m.key], { readEphemeral: true })
-    }
+    void this.readMessages([m.key]).catch(() => {})
   } catch (e) {
     console.error('Error al marcar como leído:', e)
   }
