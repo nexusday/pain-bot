@@ -55,8 +55,14 @@ export function resolverMetaSticker(m, conn) {
   const nombreUsuario = m.pushName || conn?.getName?.(m.sender) || 'Usuario'
   const nombreBot = global.namebot || 'PAIN BOT'
 
-  const packPorDefecto = `👑 𝗢𝘄𝗻𝗲𝗿𝘀: \n✰ Sunkovv`
-  const autorPorDefecto = `\n\n🪐 𝗕𝗼𝘁:\n↳${nombreBot}\n\n🍁 𝑼𝒔𝒖𝒂𝒓𝒊𝒐:\n↳@${nombreUsuario}`
+  const nombreCorto = String(nombreUsuario).replace(/\s+/g, ' ').trim().slice(0, 24) || 'Usuario'
+  const packPorDefecto = `꒰   𓆩  ${nombreBot}  𓆪   ꒱`
+  const autorPorDefecto = [
+    '',
+    '‧₊˚  𖦹  ˚₊‧',
+    'ᡣ𐭩   https://nexcodea.com',
+    `𓇼   ${nombreCorto}`
+  ].join('\n')
 
   const packPersonalizado = String(usuario.packname || '').trim()
   const autorPersonalizado = String(usuario.author || '').trim()
