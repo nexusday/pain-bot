@@ -1,4 +1,5 @@
 import fetch from 'node-fetch'
+import { esModoIos } from '../lib/menu-modo.js'
 
 const LIMITE_RESULTADOS = 4
 
@@ -47,6 +48,17 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
    
+
+    if (esModoIos(conn)) {
+      for (const elemento of resultados) {
+        await conn.sendMessage(m.chat, {
+          image: { url: elemento.download },
+          caption: construirLeyenda(elemento),
+          contextInfo: { ...rcanal?.contextInfo }
+        }, { quoted: m })
+      }
+      return
+    }
 
     const tarjetas = resultados.map(elemento => ({
       image: { url: elemento.download },

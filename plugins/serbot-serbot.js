@@ -11,6 +11,7 @@ const { CONNECTING } = ws
 import { makeWASocket } from "../lib/simple.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
+import { esModoIos } from '../lib/menu-modo.js'
 import { getSubBotsLogsJid } from '../lib/newsletter-rcanal.js'
 import { canRegisterSubBot, getSubBotSlotsInfo } from "../lib/max-subs.js"
 import { fileURLToPath } from "url"
@@ -356,6 +357,9 @@ async function iniciarSubBot(options) {
         const textoCodigo = construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento)
         const jid = getPrivateReplyJid(m, conn)
         let enviado
+        if (esModoIos(conn)) {
+          enviado = await replyUser(textoCodigo)
+        } else {
         try {
           enviado = await conn.sendMessageLia(jid, {
             text: textoCodigo,
@@ -366,6 +370,7 @@ async function iniciarSubBot(options) {
         } catch (errorBoton) {
           console.error('[code] No se pudo enviar el botón de copiar:', errorBoton?.message || errorBoton)
           enviado = await replyUser(textoCodigo)
+        }
         }
         programarBorradoVinculo(enviado?.key)
 

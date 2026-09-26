@@ -1,4 +1,5 @@
 import { downloadTikTok, searchTikTok } from './tiktok-2.js'
+import { esModoIos } from '../lib/menu-modo.js'
 
 const RE_URL_TT =
   /(?:https?:\/\/)?(?:www\.|vm\.|vt\.|m\.|t\.)?tiktok\.com\/[^\s]+/i
@@ -110,6 +111,16 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       if (!global.lastTtSearch) global.lastTtSearch = {}
       global.lastTtSearch[m.sender] = { query: entrada, results: resultados, at: Date.now() }
 
+      if (esModoIos(conn)) {
+        const lista = resultados.map((video, i) => {
+          const autor = video.author?.nickname || video.author?.unique_id || 'TikTok'
+          return `*${i + 1}.* ${String(video.title || 'TikTok').replace(/\s+/g, ' ').slice(0, 70)}\n┊ autor  ·  \`${autor}\`\n> ${usedPrefix}tiktok ${i + 1}`
+        }).join('\n\n')
+        await conn.sendMessage(m.chat, {
+          text: lista,
+          contextInfo: { ...rcanal.contextInfo }
+        }, { quoted: m })
+      } else {
       const tarjetas = resultados.map((video, i) => {
         const autor = video.author?.nickname || video.author?.unique_id || 'TikTok'
         return {
@@ -142,6 +153,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
         cards: tarjetas,
         linkPreview: null
       }, { quoted: m, keepQuoted: true })
+      }
     }
 
     await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})

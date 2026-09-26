@@ -1,4 +1,5 @@
 import fetch from 'node-fetch'
+import { esModoIos } from '../lib/menu-modo.js'
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text) return conn.sendMessage(m.chat, {
@@ -16,6 +17,18 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     }, { quoted: m })
 
     const elegidas = urls.slice(0, 3)
+    if (esModoIos(conn)) {
+      const leyenda = `*${text}*`
+      for (const url of elegidas) {
+        await conn.sendMessage(m.chat, {
+          image: { url },
+          caption: `${leyenda}\n┊ \`${url}\``,
+          contextInfo: { ...rcanal.contextInfo }
+        }, { quoted: m })
+      }
+      return
+    }
+
     const tarjetas = elegidas.map((url, i) => ({
       image: { url },
       caption: `

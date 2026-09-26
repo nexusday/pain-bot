@@ -1,4 +1,5 @@
 import { isInteractiveBaileysEnabled } from '../lib/baileys-dual.js'
+import { esModoIos } from '../lib/menu-modo.js'
 import {
   buildFullMenuText,
   buildInteractiveMenuContent,
@@ -115,9 +116,10 @@ async function enviarMenuInteractivo(conn, m, contexto, categorias, encabezado) 
 }
 
 async function enviarRespuestaCategoria(conn, m, contexto, categorias, categoria) {
-  const leyenda = buildCategoryResponse(categoria, contexto, { interactive: isInteractiveBaileysEnabled() })
+  const interactivo = isInteractiveBaileysEnabled() && !esModoIos(conn)
+  const leyenda = buildCategoryResponse(categoria, contexto, { interactive: interactivo })
 
-  if (!isInteractiveBaileysEnabled()) {
+  if (!interactivo) {
     await conn.sendFile(m.chat, categoria.img, 'menu-cat.jpg', leyenda, m, null, {
       contextInfo: {
         ...rcanal.contextInfo,
@@ -157,7 +159,7 @@ const handler = async (m, { conn, usedPrefix }) => {
     const categorias = buildMenuCategories(contexto)
     const encabezado = buildMenuHeader(m, contexto)
 
-    if (!isInteractiveBaileysEnabled()) {
+    if (!isInteractiveBaileysEnabled() || esModoIos(conn)) {
       const texto = buildFullMenuText(m, contexto, categorias)
       await conn.sendFile(m.chat, contexto.mainImg, 'thumbnail.jpg', texto, m, null, {
         contextInfo: {

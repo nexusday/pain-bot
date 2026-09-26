@@ -1,4 +1,5 @@
 import fetch from 'node-fetch'
+import { esModoIos } from '../lib/menu-modo.js'
 
 const LIMITE_RESULTADOS = 5
 
@@ -79,6 +80,18 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
     if (!tarjetas.length) throw '[❗] Los resultados no traen miniatura o enlace.'
+
+    if (esModoIos(conn)) {
+      const lista = resultados.map((elemento, i) => {
+        const url = elemento.url || (elemento.videoId ? `https://youtu.be/${elemento.videoId}` : '')
+        const titulo = recortarTexto(elemento.title, 70) || 'Sin título'
+        return `*${i + 1}.* ${titulo}\n┊ \`${url}\`\n> ${usedPrefix}play ${i + 1}  ·  ${usedPrefix}video ${i + 1}`
+      }).join('\n\n')
+      return conn.sendMessage(m.chat, {
+        text: `*YouTube*\n┊ búsqueda  ·  \`${recortarTexto(consulta, 40)}\`\n\n${lista}`,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
+    }
 
     await conn.sendMessageLia(m.chat, {
       text: `

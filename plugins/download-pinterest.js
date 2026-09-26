@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { esModoIos } from '../lib/menu-modo.js'
 
 const LIMITE_IMAGENES = 3
 
@@ -121,6 +122,17 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
         text: `[❗] No se encontraron resultados para: "${consulta}"`,
         contextInfo: { ...rcanal?.contextInfo }
       }, { quoted: m })
+    }
+
+    if (esModoIos(conn)) {
+      for (const urlImg of resultados) {
+        await conn.sendMessage(m.chat, {
+          image: { url: urlImg },
+          caption: `┊ búsqueda  ·  \`${consulta}\`\n┊ \`${urlImg}\``,
+          contextInfo: { ...rcanal?.contextInfo }
+        }, { quoted: m })
+      }
+      return
     }
 
     const tarjetas = resultados.map((urlImg, i) => ({

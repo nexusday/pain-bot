@@ -1,4 +1,5 @@
 import fetch from 'node-fetch'
+import { esModoIos } from '../lib/menu-modo.js'
 
 const API_BASE = () => (global.APIs?.delirius?.url || 'https://api.delirius.online').replace(/\/$/, '')
 const LIMITE_RESULTADOS = 5
@@ -140,7 +141,18 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       })
     })
 
-    if (tarjetas.length) {
+    if (esModoIos(conn) || !tarjetas.length) {
+      const lista = resultados.map((elemento, i) => (
+        `*${i + 1}.* ${recortarTexto(elemento.title, 70)}\n` +
+        `┊ artista  ·  \`${artistaDe(elemento)}\`\n` +
+        `┊ duración  ·  \`${formatearDuracion(elemento.duration)}\`\n` +
+        `> ${usedPrefix}sc ${i + 1}`
+      )).join('\n\n')
+      await conn.sendMessage(m.chat, {
+        text: lista,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
+    } else {
       await conn.sendMessageLia(m.chat, {
         text: `
 \`*˚   ✩    ✦    ✩   ˚*\`
@@ -155,17 +167,6 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
         cards: tarjetas,
         linkPreview: null
       }, { quoted: m, keepQuoted: true })
-    } else {
-      const lista = resultados.map((elemento, i) => (
-        `*${i + 1}.* ${recortarTexto(elemento.title, 70)}\n` +
-        `┊ artista  ·  \`${artistaDe(elemento)}\`\n` +
-        `┊ duración  ·  \`${formatearDuracion(elemento.duration)}\`\n` +
-        `> ${usedPrefix}sc ${i + 1}`
-      )).join('\n\n')
-      await conn.sendMessage(m.chat, {
-        text: lista,
-        contextInfo: { ...rcanal?.contextInfo }
-      }, { quoted: m })
     }
 
     await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})
