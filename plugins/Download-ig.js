@@ -46,9 +46,14 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
     if (!urlMedio) throw '[❗] No se encontró la URL del video.'
 
-    let leyenda = `> *${titulo}*`
-    if (descripcion) leyenda += `\n> ${descripcion}`
-    leyenda += `\n> *Enlace:* ${urlReel}`
+    let leyenda = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${String(titulo).replace(/\s+/g, ' ').slice(0, 70)}*
+╰─ ✧  ✩
+${descripcion ? `┊ ${String(descripcion).replace(/\s+/g, ' ').slice(0, 80)}\n` : ''}┊ \`${urlReel}\`
+╰─────────`.trim()
 
     if (urlMiniatura) {
       try {

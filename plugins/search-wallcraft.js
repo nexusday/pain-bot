@@ -8,36 +8,17 @@ function recortarTexto(text = '', max = 120) {
   return valor.length > max ? `${valor.slice(0, max - 1)}…` : valor
 }
 
-function construirLeyenda(elemento, indice, consulta) {
-  return `ִֶָ☾. 𝗪𝗮𝗹𝗹𝗽𝗮𝗽𝗲𝗿 ִֶָ☾. *${indice + 1}/4*
+function construirLeyenda(elemento) {
+  return `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
- 𓍯  *Búsqueda:* ${consulta}
- 𓍯  *Descripción:* ${recortarTexto(elemento.description, 140) || 'Sin descripción'}
- 𓍯  *Autor:* ${recortarTexto(elemento.author, 50) || 'Desconocido'}
- 𓍯  *Rating:* ${elemento.rating ?? '—'}
- 𓍯  *Descargas:* ${Number(elemento.downloads || 0).toLocaleString()}
- 𓍯  *Favoritos:* ${Number(elemento.favorites || 0).toLocaleString()}`
-}
-
-async function enviarWallpaper(conn, chat, elemento, leyenda, quoted) {
-  try {
-    await conn.sendMessage(chat, {
-      image: { url: elemento.download },
-      caption: leyenda,
-      contextInfo: { ...rcanal?.contextInfo }
-    }, { quoted })
-    return true
-  } catch {
-    const respuesta = await fetch(elemento.download)
-    if (!respuesta.ok) throw new Error('No se pudo descargar la imagen.')
-    const bufer = Buffer.from(await respuesta.arrayBuffer())
-    await conn.sendMessage(chat, {
-      image: bufer,
-      caption: leyenda,
-      contextInfo: { ...rcanal?.contextInfo }
-    }, { quoted })
-    return true
-  }
+╭─ ✧
+┊ *${recortarTexto(elemento.description, 60) || 'Wallpaper'}*
+╰─ ✧  ✩
+┊ autor  ·  \`${recortarTexto(elemento.author, 40) || 'Desconocido'}\`
+┊ rating  ·  \`${elemento.rating ?? '—'}\`
+┊ descargas  ·  \`${Number(elemento.downloads || 0).toLocaleString()}\`
+╰─────────`.trim()
 }
 
 const handler = async (m, { conn, text, usedPrefix, command }) => {
@@ -67,19 +48,27 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
    
 
-    for (let i = 0; i < resultados.length; i++) {
-      const elemento = resultados[i]
-      const leyenda = construirLeyenda(elemento, i, consulta)
-      try {
-        await enviarWallpaper(conn, m.chat, elemento, leyenda, m)
-      } catch (err) {
-        console.error(`Error enviando wall ${i + 1}:`, err)
-        await conn.sendMessage(m.chat, {
-          text: `[❗] No se pudo enviar el wallpaper *${i + 1}*.\n 𓍯  *Descripción:* ${recortarTexto(elemento.description, 100)}`,
-          contextInfo: { ...rcanal?.contextInfo }
-        }, { quoted: m })
-      }
-    }
+    const tarjetas = resultados.map(elemento => ({
+      image: { url: elemento.download },
+      caption: construirLeyenda(elemento),
+      footer: 'copiar enlace',
+      nativeFlow: [{ text: 'Copiar', copy: elemento.download }]
+    }))
+
+    await conn.sendMessageLia(m.chat, {
+      text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *Wallpaper*
+╰─ ✧  ✩
+┊ búsqueda  ·  \`${recortarTexto(consulta, 40)}\`
+┊ resultados  ·  \`${tarjetas.length}\`
+╰─────────`.trim(),
+      footer: 'desliza',
+      cards: tarjetas,
+      linkPreview: null
+    }, { quoted: m, keepQuoted: true })
   } catch (e) {
     console.error('Error en wallcraft:', e)
     return conn.sendMessage(m.chat, {

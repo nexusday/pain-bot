@@ -8,6 +8,20 @@ const CABECERAS = {
   Accept: 'application/json, text/plain, */*'
 }
 
+function ficha(titulo, lineas) {
+  const cuerpo = lineas
+    .map(([nombre, valor]) => `┊ ${nombre}  ·  \`${String(valor).replace(/`/g, "'")}\``)
+    .join('\n')
+  return `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${titulo}*
+╰─ ✧  ✩
+${cuerpo}
+╰─────────`.trim()
+}
+
 function esLinkPinterest(texto = '') {
   return /https?:\/\/(www\.)?(pinterest\.[a-z.]+|pin\.it)\//i.test(texto)
 }
@@ -109,13 +123,25 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    for (const urlImg of resultados) {
-      await conn.sendMessage(m.chat, {
-        image: { url: urlImg },
-        caption: `> *Búsqueda:* ${consulta}`,
-        contextInfo: { ...rcanal?.contextInfo }
-      }, { quoted: m })
-    }
+    const tarjetas = resultados.map((urlImg, i) => ({
+      image: { url: urlImg },
+      caption: ficha('Pinterest', [
+        ['búsqueda', consulta],
+        ['resultado', `${i + 1}`]
+      ]),
+      footer: 'copiar enlace',
+      nativeFlow: [{ text: 'Copiar', copy: urlImg }]
+    }))
+
+    await conn.sendMessageLia(m.chat, {
+      text: ficha('Pinterest', [
+        ['búsqueda', consulta],
+        ['resultados', String(tarjetas.length)]
+      ]),
+      footer: 'desliza',
+      cards: tarjetas,
+      linkPreview: null
+    }, { quoted: m, keepQuoted: true })
   } catch (e) {
     console.error('Error en Pinterest:', e)
     conn.sendMessage(m.chat, {

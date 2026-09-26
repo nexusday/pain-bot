@@ -291,12 +291,17 @@ async function buscarTikTok(consulta, limite = 3) {
   return videos.slice(0, limite).map(normalizarVideoTikwm)
 }
 
-function construirLeyenda(video, prefijo = '𝗧𝗜𝗞𝗧𝗢𝗞 𝗩𝗜𝗗𝗘𝗢') {
-  return `${prefijo}
+function construirLeyenda(video) {
+  const autor = video.author?.nickname || video.author?.unique_id || 'Desconocido'
+  return `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-> *[+] Título:* ${video.title || 'Sin título'}
-> *[+] Autor:* ${video.author?.nickname || video.author?.unique_id || 'Desconocido'}
-> *[+] Duración:* ${video.duration || 'N/A'}s`
+╭─ ✧
+┊ *${String(video.title || 'TikTok').replace(/\s+/g, ' ').slice(0, 70)}*
+╰─ ✧  ✩
+┊ autor  ·  \`${autor}\`
+┊ duración  ·  \`${video.duration || '—'}s\`
+╰─────────`.trim()
 }
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {

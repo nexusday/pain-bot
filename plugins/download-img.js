@@ -15,15 +15,35 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
 
-    const leyenda = `𓂃 ࣪ ִֶָ☾. Resultados de búsqueda para: *${text}*`
+    const elegidas = urls.slice(0, 3)
+    const tarjetas = elegidas.map((url, i) => ({
+      image: { url },
+      caption: `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-    for (let url of urls.slice(0, 3)) {
-      await conn.sendMessage(m.chat, {
-        image: { url },
-        caption: leyenda,
-        contextInfo: { ...rcanal.contextInfo }
-      }, { quoted: m })
-    }
+╭─ ✧
+┊ *${text}*
+╰─ ✧  ✩
+┊ imagen  ·  \`${i + 1}\`
+╰─────────`.trim(),
+      footer: 'copiar enlace',
+      nativeFlow: [{ text: 'Copiar', copy: url }]
+    }))
+
+    await conn.sendMessageLia(m.chat, {
+      text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *Imagen*
+╰─ ✧  ✩
+┊ búsqueda  ·  \`${text.slice(0, 40)}\`
+┊ resultados  ·  \`${tarjetas.length}\`
+╰─────────`.trim(),
+      footer: 'desliza',
+      cards: tarjetas,
+      linkPreview: null
+    }, { quoted: m, keepQuoted: true })
 
 
   } catch (error) {

@@ -190,13 +190,19 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     const duracion = formatearDuracion(datos.duration)
     const esVistaPrevia = Number(datos.duration) > 0 && Number(datos.duration) <= 35000
 
-    const informacion =
-      `ִֶָ☾. 𝗦𝗼𝘂𝗻𝗱𝗖𝗹𝗼𝘂𝗱 ִֶָ☾.\n` +
-      ` 𓍯  *Título:* ${recortarTexto(titulo, 90)}\n` +
-      ` 𓍯  *Autor:* ${autor}\n` +
-      ` 𓍯  *Duración:* ${duracion}${esVistaPrevia ? ' _(preview)_' : ''}\n` +
-      ` 𓍯  *Reproducciones:* ${datos.playbacks ?? vistaPrevia?.play ?? '—'}\n` +
-      ` 𓍯  *Enlace:* ${datos.link || enlaceSc}`
+    const duracionTxt = `${duracion}${esVistaPrevia ? ' preview' : ''}`
+    const plays = datos.playbacks ?? vistaPrevia?.play ?? '—'
+    const informacion = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${recortarTexto(titulo, 70)}*
+╰─ ✧  ✩
+┊ autor  ·  \`${autor}\`
+┊ duración  ·  \`${duracionTxt}\`
+┊ plays  ·  \`${plays}\`
+┊ \`${recortarTexto(datos.link || enlaceSc, 70)}\`
+╰─────────`.trim()
 
     if (portada) {
       try {

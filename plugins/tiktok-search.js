@@ -5,27 +5,35 @@ const RE_URL_TT =
 
 function construirLeyendaBusqueda(video) {
   const autor = video.author?.nickname || video.author?.unique_id || 'Desconocido'
-  return `𝗥𝗘𝗦𝗨𝗟𝗧𝗔𝗗𝗢 𝗗𝗘 𝗧𝗜𝗞𝗧𝗢𝗞
-
-> *[+] Título:* ${video.title || 'Sin título'}
-> *[+] Autor:* ${autor}
-> *[+] Región:* ${video.region || 'Desconocida'}
-> *[+] Duración:* ${video.duration || 'N/A'}s
-
-> *[•] Estadísticas*
-> *├─* Vistas: ${video.play_count?.toLocaleString?.() || video.play_count || 'N/A'}
-> *├─* Me gusta: ${video.digg_count?.toLocaleString?.() || video.digg_count || 'N/A'}
-> *├─* Comentarios: ${video.comment_count?.toLocaleString?.() || video.comment_count || 'N/A'}
-> *├─* Compartidos: ${video.share_count?.toLocaleString?.() || video.share_count || 'N/A'}
-> *└─* Descargas: ${video.download_count?.toLocaleString?.() || video.download_count || 'N/A'}`
+  return fichaTik(video.title, [
+    ['autor', autor],
+    ['región', video.region || '—'],
+    ['duración', `${video.duration || '—'}s`],
+    ['vistas', video.play_count ?? '—'],
+    ['me gusta', video.digg_count ?? '—']
+  ])
 }
 
 function construirLeyendaEnlace(video) {
-  return `𝗧𝗜𝗞𝗧𝗢𝗞 𝗩𝗜𝗗𝗘𝗢
+  const autor = video.author?.nickname || video.author?.unique_id || 'Desconocido'
+  return fichaTik(video.title, [
+    ['autor', autor],
+    ['duración', `${video.duration || '—'}s`]
+  ])
+}
 
-> *[+] Título:* ${video.title || 'Sin título'}
-> *[+] Autor:* ${video.author?.nickname || video.author?.unique_id || 'Desconocido'}
-> *[+] Duración:* ${video.duration || 'N/A'}s`
+function fichaTik(titulo, lineas) {
+  const cuerpo = lineas
+    .map(([nombre, valor]) => `┊ ${nombre}  ·  \`${String(valor).replace(/`/g, "'")}\``)
+    .join('\n')
+  return `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${String(titulo || 'TikTok').replace(/\s+/g, ' ').slice(0, 70)}*
+╰─ ✧  ✩
+${cuerpo}
+╰─────────`.trim()
 }
 
 async function enviarVideo(conn, m, video, leyenda) {
@@ -74,14 +82,21 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } }).catch(() => {})
 
     if (esUrl) {
-    
       const link = entrada.match(RE_URL_TT)?.[0] || entrada
       const video = await downloadTikTok(link)
       await enviarVideo(conn, m, video, construirLeyendaEnlace(video))
+    } else if (/^\d+$/.test(entrada)) {
+      const indice = parseInt(entrada, 10) - 1
+      const cacheBusqueda = global.lastTtSearch?.[m.sender]
+      if (!cacheBusqueda?.results?.length || Date.now() - cacheBusqueda.at > 10 * 60 * 1000) {
+        throw new Error('No hay búsqueda reciente. Usa primero /tiktok <texto>')
+      }
+      const video = cacheBusqueda.results[indice]
+      if (!video) throw new Error(`Elige un número del 1 al ${cacheBusqueda.results.length}.`)
+      await enviarVideo(conn, m, video, construirLeyendaEnlace(video))
     } else {
-      const resultados = await searchTikTok(entrada, 1)
-      const video = resultados[0]
-      if (!video) {
+      const resultados = (await searchTikTok(entrada, 4)).filter(video => video?.cover && video?.play)
+      if (!resultados.length) {
         return conn.sendMessage(
           m.chat,
           {
@@ -91,7 +106,42 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
           { quoted: m }
         )
       }
-      await enviarVideo(conn, m, video, construirLeyendaBusqueda(video))
+
+      if (!global.lastTtSearch) global.lastTtSearch = {}
+      global.lastTtSearch[m.sender] = { query: entrada, results: resultados, at: Date.now() }
+
+      const tarjetas = resultados.map((video, i) => {
+        const autor = video.author?.nickname || video.author?.unique_id || 'TikTok'
+        return {
+          image: { url: video.cover },
+          caption: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${String(video.title || 'TikTok').replace(/\s+/g, ' ').slice(0, 70)}*
+╰─ ✧  ✩
+┊ autor  ·  \`${autor}\`
+┊ duración  ·  \`${video.duration || '—'}s\`
+╰─────────`.trim(),
+          footer: 'descargar',
+          nativeFlow: [{ text: 'Descargar', id: `${usedPrefix}tiktok ${i + 1}` }]
+        }
+      })
+
+      await conn.sendMessageLia(m.chat, {
+        text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *TikTok*
+╰─ ✧  ✩
+┊ búsqueda  ·  \`${entrada.slice(0, 40)}\`
+┊ resultados  ·  \`${tarjetas.length}\`
+╰─────────`.trim(),
+        footer: 'descargar',
+        cards: tarjetas,
+        linkPreview: null
+      }, { quoted: m, keepQuoted: true })
     }
 
     await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})

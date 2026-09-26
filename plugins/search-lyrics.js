@@ -19,13 +19,17 @@ function partirLetras(text, max = MAX_FRAGMENTO) {
 }
 
 function construirEncabezado(datos, consulta) {
-  return `ִֶָ☾. 𝗟𝘆𝗿𝗶𝗰𝘀 ִֶָ☾.
+  return `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
- 𓍯  *Búsqueda:* ${consulta}
- 𓍯  *Título:* ${datos.title || 'Desconocido'}
- 𓍯  *Artista:* ${datos.artists || 'Desconocido'}
- 𓍯  *Álbum:* ${datos.album || '—'}
- 𓍯  *Duración:* ${datos.duration || '—'}`
+╭─ ✧
+┊ *${datos.title || 'Letra'}*
+╰─ ✧  ✩
+┊ búsqueda  ·  \`${consulta}\`
+┊ artista  ·  \`${datos.artists || 'Desconocido'}\`
+┊ álbum  ·  \`${datos.album || '—'}\`
+┊ duración  ·  \`${datos.duration || '—'}\`
+╰─────────`.trim()
 }
 
 const handler = async (m, { conn, text, usedPrefix, command }) => {

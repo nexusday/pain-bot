@@ -33,7 +33,14 @@ let handler = async (m, { conn, text, args, usedPrefix, command }) => {
     await conn.sendMessage(m.chat, {
       video: { url: urlVideo },
       fileName: "facebook.mp4",
-      caption: `*𓂃 ࣪ ִֶָ☾. *Aqui esta tu video*\n\n> *Título:* ${titulo}\n> *Duración:* ${durasi}`,
+      caption: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${String(titulo || 'Facebook').replace(/\s+/g, ' ').slice(0, 70)}*
+╰─ ✧  ✩
+┊ duración  ·  \`${durasi || '—'}\`
+╰─────────`.trim(),
       contextInfo: { ...rcanal?.contextInfo }
     }, { quoted: m })
 

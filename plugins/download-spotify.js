@@ -34,50 +34,50 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     
     const respuesta = await axios.get(`${global.APIs.delirius.url}/download/spotifydl?url=${encodeURIComponent(urlPista)}`)
     const d = respuesta.data?.data
+    const descarga = d?.download || d?.url
 
-    if (!respuesta.data?.status || !d?.url) throw new Error("⚠︎ No se pudo obtener el audio.")
+    if (!respuesta.data?.status || !descarga) throw new Error("⚠︎ No se pudo obtener el audio.")
 
     const datos = {
       title: d.title || informacion?.title || "Desconocido",
       artist: d.author || informacion?.artist || "Desconocido",
       album: informacion?.album || "Desconocido",
-      duration: informacion?.duration || `${Math.floor(d.duration / 60000)}:${String(Math.floor((d.duration % 60000) / 1000)).padStart(2, '0')}`,
+      duration: informacion?.duration || null,
       popularity: informacion?.popularity || "Desconocido",
       release: informacion?.release || "Desconocido",
-      type: d.type,
-      source: d.source,
       image: d.image || informacion?.image,
-      download: d.url,
+      download: descarga,
       url: informacion?.url || urlPista
     }
 
     
-    const leyenda = `╭───「 ✦ 𝗦𝗣𝗢𝗧𝗜𝗙𝗬 ✦ 」\n│\n` +
-      `│  *Título:* ${datos.title}\n` +
-      `│  *Autor:* ${datos.artist}\n` +
-      `${datos.album && datos.album !== "Desconocido" ? `│  *Álbum:* ${datos.album}\n` : ''}` +
-      `${datos.duration ? `│  *Duración:* ${datos.duration}\n` : ''}` +
-      `${datos.popularity && datos.popularity !== "Desconocido" ? `│  *Popularidad:* ${datos.popularity}\n` : ''}` +
-      `${datos.release && datos.release !== "Desconocido" ? `│  *Publicado:* ${datos.release}\n` : ''}` +
-      `${datos.url ? `│  *Enlace:* ${datos.url}\n` : ''}` +
-      `╰───「 ✦ ${global.packname} ✦ 」`
+    const lineas = [
+      ['autor', datos.artist],
+      datos.album && datos.album !== 'Desconocido' ? ['álbum', datos.album] : null,
+      datos.duration ? ['duración', datos.duration] : null,
+      datos.popularity && datos.popularity !== 'Desconocido' ? ['popularidad', datos.popularity] : null,
+      datos.release && datos.release !== 'Desconocido' ? ['publicado', datos.release] : null
+    ].filter(Boolean)
+    const leyenda = ficha(datos.title, lineas, datos.url)
 
-await conn.sendMessage(m.chat, {
-  text: leyenda,
-  contextInfo: {
-    externalAdReply: {
-      showAdAttribution: true,
-      containsAutoReply: true,
-      renderLargerThumbnail: true,
-      title: '🎵 Spotify Downloader',
-      body: `Autor: ${datos.artist}`, 
-      mediaType: 1,
-      thumbnailUrl: datos.image,
-      mediaUrl: datos.url,
-      sourceUrl: datos.url,
+    let envioPortada = false
+    if (datos.image) {
+      try {
+        const miniatura = (await conn.getFile(datos.image)).data
+        await conn.sendMessage(m.chat, {
+          image: miniatura,
+          caption: leyenda,
+          contextInfo: { ...rcanal?.contextInfo }
+        }, { quoted: m })
+        envioPortada = true
+      } catch {}
     }
-  }
-}, { quoted: m })
+    if (!envioPortada) {
+      await conn.sendMessage(m.chat, {
+        text: leyenda,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
+    }
 
     
     await conn.sendMessage(m.chat, {
@@ -99,3 +99,18 @@ handler.command = ["spotify", "splay"]
 handler.group = true
 
 export default handler
+
+function ficha(titulo, lineas, enlace) {
+  const cuerpo = lineas
+    .map(([nombre, valor]) => `┊ ${nombre}  ·  \`${String(valor).replace(/`/g, "'")}\``)
+    .join('\n')
+  const link = enlace ? `\n┊ \`${String(enlace).replace(/`/g, "'")}\`` : ''
+  return `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${String(titulo || 'Spotify').replace(/\s+/g, ' ').slice(0, 70)}*
+╰─ ✧  ✩
+${cuerpo}${link}
+╰─────────`.trim()
+}

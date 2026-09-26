@@ -1,87 +1,89 @@
 import axios from 'axios'
-import fs from 'fs'
-import path from 'path'
 
-let handler = async (m, { conn, text, args, usedPrefix, command }) => {
+let handler = async (m, { conn, text, usedPrefix }) => {
   if (!text) {
     return conn.sendMessage(m.chat, {
-      text: `[❗] Ingresa el nombre de la aplicación que deseas descargar.
-      
-> Ejemplo: ${usedPrefix}apk Whatsapp`,
-      contextInfo: {
-        ...rcanal.contextInfo
-      }
+      text: `[❗] Ingresa el nombre de la aplicación que deseas descargar.\n\n> Ejemplo: ${usedPrefix}apk Whatsapp`,
+      contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 
   const consulta = text.trim()
-  
+
   try {
+    const base = (global.APIs?.delirius?.url || 'https://api.delirius.online').replace(/\/$/, '')
+    const respuesta = await axios.get(`${base}/download/apk?query=${encodeURIComponent(consulta)}`)
+    const cuerpo = respuesta.data
 
-  
-    const urlApi = `https://bytebazz-api.koyeb.app/api/download/aptoide?query=${encodeURIComponent(consulta)}&apikey=8jkh5icbf05`
-    const { datos } = await axios.get(urlApi)
-
-    if (!datos.status) {
-      await conn.sendMessage(m.chat, {
-        text: `[❗] No se encontró la aplicación intenta con otro nombre.`,
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+    if (!cuerpo?.status || !cuerpo?.data?.download) {
+      return conn.sendMessage(m.chat, {
+        text: `[❗] No se encontró la aplicación. Intenta con otro nombre.`,
+        contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
-      return
     }
 
-    const datosApp = datos.data
+    const app = cuerpo.data
+    const infoApp = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-    
-    const infoApp = `𓂃 ࣪ ִֶָ☾. Nombre: ${datosApp.name}
-𓂃 ࣪ ִֶָ☾. Paquete: ${datosApp.package}
-𓂃 ࣪ ִֶָ☾. Tamaño: ${datosApp.size}
-𓂃 ࣪ ִֶָ☾. Actualizado: ${datosApp.lastup}`
+╭─ ✧
+┊ *${app.name}*
+╰─ ✧  ✩
+┊ paquete  ·  \`${app.id || '—'}\`
+┊ tamaño  ·  \`${app.size || '—'}\`
+┊ autor  ·  \`${app.developer || '—'}\`
+┊ publicado  ·  \`${app.publish || '—'}\`
+╰─────────`.trim()
 
-    
+    const nombre = String(app.name || 'app').replace(/[<>:"/\\|?*]/g, '').slice(0, 60) || 'app'
+    const peso = Number(app.sizeByte) || 0
+    const maximo = 100 * 1024 * 1024
+
+    if (app.image) {
+      try {
+        const icono = (await conn.getFile(app.image)).data
+        await conn.sendMessage(m.chat, {
+          image: icono,
+          caption: infoApp,
+          contextInfo: { ...rcanal.contextInfo }
+        }, { quoted: m })
+      } catch {}
+    }
+
+    if (peso > maximo) {
+      return conn.sendMessage(m.chat, {
+        text: `${infoApp}\n\n> El archivo pesa *${app.size || 'más de 100 MB'}*. Ábrelo desde este enlace:\n> ${app.download}`,
+        contextInfo: { ...rcanal.contextInfo }
+      }, { quoted: m })
+    }
+
     try {
-      const respuestaApk = await axios.get(datosApp.dllink, { responseType: 'arraybuffer' })
-      const buferApk = Buffer.from(respuestaApk.data)
-      
-      
+      const archivo = await axios.get(app.download, {
+        responseType: 'arraybuffer',
+        timeout: 180000,
+        maxContentLength: maximo,
+        maxBodyLength: maximo,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      })
       await conn.sendMessage(m.chat, {
-        document: buferApk,
-        fileName: `${datosApp.name}.apk`,
+        document: Buffer.from(archivo.data),
+        fileName: `${nombre}.apk`,
         mimetype: 'application/vnd.android.package-archive',
-        caption: infoApp,
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+        caption: app.image ? '' : infoApp,
+        contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
-      
     } catch (errorApk) {
-      console.error('Error descargando APK:', errorApk)
-      
-    
-      const infoReserva = `𓂃 ࣪ ִֶָ☾. Nombre: ${datosApp.name}
-𓂃 ࣪ ִֶָ☾. Paquete: ${datosApp.package}
-𓂃 ࣪ ִֶָ☾. Tamaño: ${datosApp.size}
-𓂃 ࣪ ִֶָ☾. Actualizado: ${datosApp.lastup}
-𓂃 ࣪ ִֶָ☾. Enlace de descarga: ${datosApp.dllink}`
-
+      console.error('Error enviando APK:', errorApk?.message || errorApk)
       await conn.sendMessage(m.chat, {
-        text: infoReserva,
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+        text: `${infoApp}\n\n> No pude subir el APK al chat. Ábrelo aquí:\n> ${app.download}`,
+        contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
-
   } catch (error) {
     console.error('Error en comando download-apps:', error)
-    
     await conn.sendMessage(m.chat, {
-      text: `[❌] Error al buscar la aplicación intenta nuevamente más tarde.`,
-      contextInfo: {
-        ...rcanal.contextInfo
-      }
+      text: `[❌] Error al buscar la aplicación. Intenta nuevamente más tarde.`,
+      contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 }

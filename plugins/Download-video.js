@@ -102,13 +102,18 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     const duracion = vistaPrevia?.duration || datos.duration || '—'
     const portada = datos.image || vistaPrevia?.image || vistaPrevia?.thumbnail
 
-    const informacion = `ִֶָ☾. 𝗩𝗶𝗱𝗲𝗼 ִֶָ☾.
- 𓍯  *Título:* ${recortarTexto(titulo, 90)}
- 𓍯  *Canal:* ${recortarTexto(canal, 50)}
- 𓍯  *Duración:* ${duracion}
- 𓍯  *Vistas:* ${formatearVistas(datos.views || vistaPrevia?.views)}
- 𓍯  *Formato:* ${datos.format || formato}
- 𓍯  *Enlace:* ${urlVideo}`
+    const informacion = `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${recortarTexto(titulo, 70)}*
+╰─ ✧  ✩
+┊ canal  ·  \`${recortarTexto(canal, 40)}\`
+┊ duración  ·  \`${duracion}\`
+┊ vistas  ·  \`${formatearVistas(datos.views || vistaPrevia?.views)}\`
+┊ formato  ·  \`${datos.format || formato}\`
+┊ \`${urlVideo}\`
+╰─────────`.trim()
 
     if (portada) {
       try {

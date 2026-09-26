@@ -102,8 +102,9 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     const consulta = text.trim()
     await conn.sendMessage(m.chat, { react: { text: '', key: m.key } }).catch(() => {})
 
-    const { consultaUsada, results: encontrados } = await buscarSoundCloud(consulta)
-    const resultados = encontrados.slice(0, LIMITE_RESULTADOS)
+    const busqueda = await buscarSoundCloud(consulta)
+    const consultaUsada = busqueda.queryUsed || consulta
+    const resultados = busqueda.results.slice(0, LIMITE_RESULTADOS)
 
     if (!global.lastScSearch) global.lastScSearch = {}
     global.lastScSearch[m.sender] = {
@@ -119,43 +120,54 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       at: Date.now()
     }
 
-    let lista =
-      `ִֶָ☾. 𝗦𝗼𝘂𝗻𝗱𝗖𝗹𝗼𝘂𝗱 ִֶָ☾.\n\n` +
-      `> *Búsqueda:* ${consulta}\n` +
-      (consultaUsada !== consulta ? `> *Usado:* ${consultaUsada}\n` : '') +
-      `> *Encontrados:* ${resultados.length}\n\n`
-
+    const tarjetas = []
     resultados.forEach((elemento, i) => {
-      lista += `*${i + 1}.* ${recortarTexto(elemento.title, 70)}\n`
-      lista += ` 𓍯  *Artista:* ${artistaDe(elemento)}\n`
-      lista += ` 𓍯  *Duración:* ${formatearDuracion(elemento.duration)}\n`
-      lista += ` 𓍯  *Reproducciones:* ${formatearReproducciones(elemento.play)}\n`
-      lista += ` 𓍯  *Enlace:* ${elemento.link}\n\n`
-    })
-    lista += `> Descargar:\n> ${usedPrefix}sc <número>\n> ${usedPrefix}sc <enlace>`
+      if (!elemento.image) return
+      tarjetas.push({
+        image: { url: elemento.image },
+        caption: `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-    const primeraPortada = resultados.find(r => r.image)?.image
-    if (primeraPortada) {
-      try {
-        const respuestaImg = await fetch(primeraPortada)
-        if (respuestaImg.ok) {
-          const miniatura = Buffer.from(await respuestaImg.arrayBuffer())
-          await conn.sendMessage(
-            m.chat,
-            { image: miniatura, caption: lista.trim(), contextInfo: { ...rcanal?.contextInfo } },
-            { quoted: m }
-          )
-          await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})
-          return
-        }
-      } catch {}
+╭─ ✧
+┊ *${recortarTexto(elemento.title, 70) || 'SoundCloud'}*
+╰─ ✧  ✩
+┊ artista  ·  \`${artistaDe(elemento)}\`
+┊ duración  ·  \`${formatearDuracion(elemento.duration)}\`
+┊ plays  ·  \`${formatearReproducciones(elemento.play)}\`
+╰─────────`.trim(),
+        footer: 'descargar',
+        nativeFlow: [{ text: 'Descargar', id: `${usedPrefix}sc ${i + 1}` }]
+      })
+    })
+
+    if (tarjetas.length) {
+      await conn.sendMessageLia(m.chat, {
+        text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *SoundCloud*
+╰─ ✧  ✩
+┊ búsqueda  ·  \`${recortarTexto(consultaUsada, 40)}\`
+┊ resultados  ·  \`${tarjetas.length}\`
+╰─────────`.trim(),
+        footer: 'descargar',
+        cards: tarjetas,
+        linkPreview: null
+      }, { quoted: m, keepQuoted: true })
+    } else {
+      const lista = resultados.map((elemento, i) => (
+        `*${i + 1}.* ${recortarTexto(elemento.title, 70)}\n` +
+        `┊ artista  ·  \`${artistaDe(elemento)}\`\n` +
+        `┊ duración  ·  \`${formatearDuracion(elemento.duration)}\`\n` +
+        `> ${usedPrefix}sc ${i + 1}`
+      )).join('\n\n')
+      await conn.sendMessage(m.chat, {
+        text: lista,
+        contextInfo: { ...rcanal?.contextInfo }
+      }, { quoted: m })
     }
 
-    await conn.sendMessage(
-      m.chat,
-      { text: lista.trim(), contextInfo: { ...rcanal?.contextInfo } },
-      { quoted: m }
-    )
     await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } }).catch(() => {})
   } catch (e) {
     console.error('Error en scsearch:', e)

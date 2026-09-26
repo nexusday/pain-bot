@@ -41,13 +41,16 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       }
     }
     
-    let txt = ` ִֶָ☾. Github Download 
+    let txt = `
+\`*˚   ✩    ✦    ✩   ˚*\`
 
-𓂃 ࣪ ִֶָ☾. *Nombre:* ${nombreArchivo}
-𓂃 ࣪ ִֶָ☾. *Repositorio:* ${usuario}/${repoLimpio}
-𓂃 ࣪ ִֶָ☾. *Creador:* ${datosRepo.owner.login}
-𓂃 ࣪ ִֶָ☾. *Descripción:* ${datosRepo.description || 'Sin descripción disponible'}
-𓂃 ࣪ ִֶָ☾. *URL:* ${args[0]}`
+╭─ ✧
+┊ *${nombreArchivo}*
+╰─ ✧  ✩
+┊ repo  ·  \`${usuario}/${repoLimpio}\`
+┊ creador  ·  \`${datosRepo.owner.login}\`
+┊ ${datosRepo.description || 'Sin descripción'}
+╰─────────`.trim()
    
     const respuestaImg = await fetch('https://files.catbox.moe/t8ampx.jpg')
     const buferImg = await respuestaImg.buffer()
