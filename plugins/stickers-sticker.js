@@ -126,34 +126,27 @@ async function aWebp(bufer) {
   const salida = path.join(directorioTemp, `${sello}.webp`)
   fs.writeFileSync(entrada, bufer)
 
-  const ejecutarFfmpeg = (calidad = 50, duracionSeg = 7) =>
+  const ejecutarFfmpeg = (lado = 320, duracionSeg = 7) =>
     new Promise((resolver, rechazar) => {
-      
-      
-      const vfEstatico =
-        'scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,setsar=1'
-      const vfAnimado =
-        'scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,fps=15,setsar=1'
+      const vf =
+        `scale='min(${lado},iw)':'min(${lado},ih)':force_original_aspect_ratio=decrease,` +
+        `format=rgba,fps=15,pad=${lado}:${lado}:(ow-iw)/2:(oh-ih)/2:color=white@0.0,` +
+        `split[a][b];[a]palettegen=reserve_transparent=on:transparency_color=ffffff[p];[b][p]paletteuse`
 
       const opciones = esEntradaAnimada
         ? [
             '-vcodec', 'libwebp',
-            '-vf', vfAnimado,
+            '-vf', vf,
             '-loop', '0',
             '-ss', '0',
             '-t', String(duracionSeg),
-            '-preset', 'default',
             '-an',
-            '-vsync', 'cfr',
-            '-q:v', String(calidad)
+            '-vsync', 'cfr'
           ]
         : [
             '-vcodec', 'libwebp',
-            '-vf', vfEstatico,
-            '-frames:v', '1',
-            '-lossless', '0',
-            '-compression_level', '6',
-            '-q:v', '75'
+            '-vf', vf,
+            '-frames:v', '1'
           ]
 
       fluent(entrada)
@@ -171,14 +164,10 @@ async function aWebp(bufer) {
     })
 
   try {
-    let resultado = await ejecutarFfmpeg(50, 7)
+    let resultado = await ejecutarFfmpeg(320, 7)
 
-  
-    if (esEntradaAnimada && resultado.length > 900 * 1024) {
-      resultado = await ejecutarFfmpeg(35, 6)
-    }
-    if (esEntradaAnimada && resultado.length > 900 * 1024) {
-      resultado = await ejecutarFfmpeg(25, 5)
+    if (resultado.length > 950 * 1024) {
+      resultado = await ejecutarFfmpeg(224, esEntradaAnimada ? 5 : 7)
     }
 
     if (esEntradaAnimada && !esWebPAnimado(resultado)) {
