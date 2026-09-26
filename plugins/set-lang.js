@@ -11,15 +11,16 @@ ${lineas}
 ╰─────────`.trim()
 }
 
-let handler = async (m, { conn, usedPrefix, args, isROwner }) => {
+let handler = async (m, { conn, usedPrefix, args, isROwner, isAdmin }) => {
   const actual = idiomaDe(conn)
+  const puede = isROwner || isAdmin
 
-  if (!isROwner) {
+  if (!puede) {
     return conn.reply(m.chat, tr(
       conn,
-      '[❗] Solo el owner de este bot puede cambiar el idioma.',
-      '[❗] Only this bot\'s owner can change the language.',
-      '[❗] Só o dono deste bot pode mudar o idioma.',
+      '[❗] Solo el owner de este bot o un admin del grupo puede cambiar el idioma.',
+      '[❗] Only this bot\'s owner or a group admin can change the language.',
+      '[❗] Só o dono deste bot ou um admin do grupo pode mudar o idioma.',
     ), m)
   }
 
