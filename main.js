@@ -496,6 +496,21 @@ watch(pluginFolder, global.reload)
 await global.reloadHandler()
 
 
+function esperarSubBotListo(digitos, topeMs = 20000) {
+  const inicio = Date.now()
+  return new Promise((resolve) => {
+    const mirar = () => {
+      const listo = (global.conns || []).some((c) => {
+        const n = String(c?.user?.jid || c?.user?.id || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+        return n && n === digitos && c?.user
+      })
+      if (listo || Date.now() - inicio >= topeMs) return resolve()
+      setTimeout(mirar, 400)
+    }
+    mirar()
+  })
+}
+
 global.reconnectSubBots = async function() {
   if (!global.conns || !Array.isArray(global.conns)) {
     global.conns = []
@@ -574,13 +589,13 @@ global.reconnectSubBots = async function() {
           command: 'qr',
           fromCommand: false
         })
+        await esperarSubBotListo(folderDigits)
         console.log(chalk.green(`Sub-bot ${folder} reconectado exitosamente`))
       } else {
         console.log(chalk.red(`No se pudo importar Pain Bot para ${folder}`))
       }
 
-     
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 1500))
 
     } catch (error) {
       console.log(chalk.red(`Error reconectando sub-bot ${folder}:`, error.message))

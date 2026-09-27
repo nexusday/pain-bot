@@ -39,7 +39,6 @@ resolve()
 
 let cachePlugins = null
 let imprimirMensaje = null
-const yaEncolado = new WeakSet()
 
 function pareceComandoCrudo(msg) {
   try {
@@ -117,32 +116,14 @@ function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
 }
 
 export async function handler(chatUpdate) {
-if (chatUpdate && !yaEncolado.has(chatUpdate)) {
-  yaEncolado.add(chatUpdate)
-  const anterior = this._colaHandler || Promise.resolve()
-  let soltar
-  const yo = new Promise((resolve) => { soltar = resolve })
-  this._colaHandler = anterior.then(() => yo, () => yo)
-  await Promise.race([
-    anterior.catch(() => {}),
-    new Promise((resolve) => setTimeout(resolve, 8000)),
-  ])
-  try {
-    return await handler.call(this, chatUpdate)
-  } finally {
-    soltar()
-  }
-}
-
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
 if (chatUpdate.type && chatUpdate.type !== 'notify') {
   const ultimo = chatUpdate.messages?.[chatUpdate.messages.length - 1]
+  if (!pareceComandoCrudo(ultimo)) return
   const marca = Number(ultimo?.messageTimestamp || 0)
   const ms = marca > 1e12 ? marca : marca * 1000
-  const edad = ms ? Date.now() - ms : 0
-  const limite = pareceComandoCrudo(ultimo) ? 180000 : 45000
-  if (ms && edad > limite) return
+  if (!ms || Date.now() - ms > 12000) return
 }
 let m = chatUpdate.messages[chatUpdate.messages.length - 1]
 if (!m) return
