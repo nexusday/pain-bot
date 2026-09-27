@@ -53,7 +53,7 @@ function avisarPermiso(tipo, m, conn) {
   if (typeof global.dfail === 'function') return global.dfail(tipo, m, conn)
   const textos = {
     admin: 'Este comando solo puede usarlo un administrador del grupo.',
-    botAdmin: 'Necesito ser administrador del grupo para usar este comando.',
+    botAdmin: 'El bot debe ser admin para usar este comando.',
     owner: 'Este comando solo puede usarlo el owner del bot.',
     rowner: 'Este comando solo puede usarlo el creador del bot.',
     group: 'Este comando solo funciona en grupos.'
@@ -306,13 +306,31 @@ if (!m.fromMe && isStickerMessage(m)) {
   if (usuarioDb) trackSentSticker(usuarioDb)
 }
 
-const groupMetadata = (m.isGroup ? ((this.chats[m.chat] || {}).metadata || await metadataGrupo(this, m.chat)) : {}) || {}  
-const participants = (m.isGroup ? groupMetadata.participants : []) || []  
+let groupMetadata = {}
+let participants = []
+if (m.isGroup) {
+  groupMetadata = (await metadataGrupo(this, m.chat)) || (this.chats[m.chat] || {}).metadata || {}
+  participants = groupMetadata.participants || []
+  const botEnCache = findBotParticipant(participants, this)
+  const adminEnCache = botEnCache?.admin === 'admin' || botEnCache?.admin === 'superadmin'
+  if (!adminEnCache) {
+    const marca = this._reconsultaAdmin?.[m.chat] || 0
+    if (Date.now() - marca > 20000) {
+      if (!this._reconsultaAdmin) this._reconsultaAdmin = {}
+      this._reconsultaAdmin[m.chat] = Date.now()
+      const fresco = await metadataGrupo(this, m.chat, { forzar: true })
+      if (fresco?.participants?.length) {
+        groupMetadata = fresco
+        participants = fresco.participants
+      }
+    }
+  }
+}
 const user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}  
 const bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}  
 const isRAdmin = user?.admin == 'superadmin' || false  
 const isAdmin = isRAdmin || user?.admin == 'admin' || false  
-const isBotAdmin = bot?.admin || false  
+const isBotAdmin = bot?.admin === 'admin' || bot?.admin === 'superadmin'  
 
 if (shouldBlockByGrupoOff(m, this)) return
 
@@ -869,7 +887,7 @@ global.dfail = (type, m, conn) => {
       group: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en *Grupos*.`,
       private: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en mi Chat *Privado*.`,
       admin: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Administradores* del Grupo.`,
-      botAdmin: `𓂃 ࣪ ִֶָ☾.  Hola, la bot debe ser *Administradora* para ejecutar este Comando.`,
+      botAdmin: `𓂃 ࣪ ִֶָ☾.  El bot debe ser *admin* para ejecutar este comando.`,
       unreg: `𓂃 ࣪ ִֶָ☾.  Hola, para usar este comando debes estar *Registrado.*`,
       restrict: `𓂃 ࣪ ִֶָ☾.  Hola, esta característica está *deshabilitada.*`
     }
