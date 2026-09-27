@@ -96,7 +96,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
       if (!video) throw new Error(`Elige un número del 1 al ${cacheBusqueda.results.length}.`)
       await enviarVideo(conn, m, video, construirLeyendaEnlace(video))
     } else {
-      const resultados = (await searchTikTok(entrada, 4)).filter(video => video?.play)
+      const resultados = (await searchTikTok(entrada, 3)).filter(video => video?.play)
       if (!resultados.length) {
         return conn.sendMessage(
           m.chat,
