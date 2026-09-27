@@ -98,6 +98,6 @@ let handler = async (m, { conn, text, args, usedPrefix }) => {
 
 handler.help = ['#transf @usuario <cantidad>\n→ Transfiere coins a otro usuario']
 handler.tags = ['juegos', 'economía']
-handler.command = ['transf', 'transfer', 'donar', 'dar']
+handler.command = ['transf', 'transfer', 'dar']
 
 export default handler 
