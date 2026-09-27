@@ -38,6 +38,18 @@ resolve()
 
 let cachePlugins = null
 
+function avisarPermiso(tipo, m, conn) {
+  if (typeof global.dfail === 'function') return global.dfail(tipo, m, conn)
+  const textos = {
+    admin: 'Este comando solo puede usarlo un administrador del grupo.',
+    botAdmin: 'Necesito ser administrador del grupo para usar este comando.',
+    owner: 'Este comando solo puede usarlo el owner del bot.',
+    rowner: 'Este comando solo puede usarlo el creador del bot.',
+    group: 'Este comando solo funciona en grupos.'
+  }
+  return conn.reply(m.chat, textos[tipo] || 'No puedes usar este comando.', m)
+}
+
 function pluginsEnCache() {
   const epoch = global.pluginsEpoch || 0
   if (cachePlugins && cachePlugins.epoch === epoch) return cachePlugins
@@ -62,7 +74,12 @@ function pluginsEnCache() {
       tags: plugin.tags || plugin.handler?.tags || [],
       help: plugin.help || [],
       all: plugin.all || plugin.handler?.all,
-      customPrefix: plugin.customPrefix || plugin.handler?.customPrefix
+      customPrefix: plugin.customPrefix || plugin.handler?.customPrefix,
+      admin: Boolean(plugin.admin || plugin.handler?.admin),
+      botAdmin: Boolean(plugin.botAdmin || plugin.handler?.botAdmin),
+      owner: Boolean(plugin.owner || plugin.handler?.owner),
+      rowner: Boolean(plugin.rowner || plugin.handler?.rowner),
+      group: Boolean(plugin.group || plugin.handler?.group)
     }
 
     for (const cmd of command) {
@@ -499,6 +516,27 @@ for (let plugin of pluginsProcesados) {
     }
 
     if (await checkCmd18Command(m, this, command, coincidenciaPrefijo[0] || usedPrefix, isOwner, isROwner)) {
+      continue
+    }
+
+    if (plugin.group && !m.isGroup) {
+      avisarPermiso('group', m, this)
+      continue
+    }
+    if (plugin.rowner && !isROwner) {
+      avisarPermiso('rowner', m, this)
+      continue
+    }
+    if (plugin.owner && !isOwner && !isROwner) {
+      avisarPermiso('owner', m, this)
+      continue
+    }
+    if (plugin.admin && m.isGroup && !isAdmin && !isOwner && !isROwner) {
+      avisarPermiso('admin', m, this)
+      continue
+    }
+    if (plugin.botAdmin && m.isGroup && !isBotAdmin) {
+      avisarPermiso('botAdmin', m, this)
       continue
     }
     
