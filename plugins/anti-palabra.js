@@ -1,4 +1,4 @@
-const SUBCOMANDOS_CONOCIDOS = ['on', 'off', 'add', 'del', 'remove', 'list', 'clear', 'action']
+const SUBCOMANDOS_CONOCIDOS = ['on', 'off', 'all', 'del', 'remove', 'add', 'list', 'clear', 'action']
 
 import { normalizeAntiText, sanitizeAntiPalabraWords, ensureAntiPalabraStore } from '../lib/Antis/anti-palabra.js'
 
@@ -43,10 +43,14 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
 
   switch (subcomando) {
     case 'on':
+    case 'all':
       config.enabled = true
+      config.action = subcomando === 'all' ? 'kick' : 'delete'
       await guardarAntiPalabra()
       return conn.sendMessage(m.chat, {
-        text: `ִֶָ☾. *Anti-palabras activado*\n> Palabras: ${config.words.length}\n> Acción: ${config.action || 'delete'}\n> Por: @${m.sender.split('@')[0]}`,
+        text: subcomando === 'all'
+          ? `ִֶָ☾. *Anti-palabras activado*\n> Elimina el mensaje y al usuario\n> Palabras: ${config.words.length}\n> Por: @${m.sender.split('@')[0]}`
+          : `ִֶָ☾. *Anti-palabras activado*\n> Solo elimina el mensaje\n> Palabras: ${config.words.length}\n> Por: @${m.sender.split('@')[0]}`,
         contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] },
       }, { quoted: m })
     case 'off':
@@ -67,9 +71,18 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
     case 'del':
     case 'remove':
       if (!argumentosArr[1]) {
+        if (subcomando === 'remove') {
+          return conn.sendMessage(m.chat, {
+            text: `[❗] Uso: ${usedPrefix}${command} del <palabra|indice>`,
+            contextInfo: { ...rcanal.contextInfo },
+          }, { quoted: m })
+        }
+        config.enabled = true
+        config.action = 'delete'
+        await guardarAntiPalabra()
         return conn.sendMessage(m.chat, {
-          text: `[❗] Uso: ${usedPrefix}${command} del <palabra|indice>`,
-          contextInfo: { ...rcanal.contextInfo },
+          text: `ִֶָ☾. *Anti-palabras activado*\n> Solo elimina el mensaje\n> Palabras: ${config.words.length}\n> Por: @${m.sender.split('@')[0]}`,
+          contextInfo: { ...rcanal.contextInfo, mentionedJid: [m.sender] },
         }, { quoted: m })
       }
       {
@@ -124,15 +137,15 @@ let handler = async (m, { conn, text, args, usedPrefix, command, isAdmin, isOwne
       }
       return conn.sendMessage(m.chat, {
         text: `[❗] Uso de *antipalabra*\n\n` +
-          `> *${usedPrefix}${command} on* — Activar\n` +
+          `> *${usedPrefix}${command} del* — Solo elimina el mensaje\n` +
+          `> *${usedPrefix}${command} on* — Igual que del\n` +
+          `> *${usedPrefix}${command} all* — Elimina el mensaje y al usuario\n` +
           `> *${usedPrefix}${command} off* — Desactivar\n` +
           `> *${usedPrefix}${command} add robux* — Añadir palabra\n` +
           `> *${usedPrefix}${command} robux* — Atajo para añadir\n` +
           `> *${usedPrefix}${command} add vendo diamantes* — Añadir frase\n` +
-          `> *${usedPrefix}${command} del robux* — Quitar\n` +
-          `> *${usedPrefix}${command} list* — Ver lista\n` +
-          `> *${usedPrefix}${command} action delete* — Solo borrar\n` +
-          `> *${usedPrefix}${command} action kick* — Borrar y expulsar\n\n` +
+          `> *${usedPrefix}${command} del robux* — Quitar palabra\n` +
+          `> *${usedPrefix}${command} list* — Ver lista\n\n` +
           `⊹ Detecta la palabra dentro del mensaje ⊹\n` +
           `Ej: "hola *robux* como estas"`,
         contextInfo: { ...rcanal.contextInfo },

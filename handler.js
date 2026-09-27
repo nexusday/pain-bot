@@ -824,30 +824,46 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
   }
 
 global.dfail = (type, m, conn) => {
-  const en = idiomaDe(conn) === 'en'
-  const msg = (en ? {
-    rowner: `𓂃 ࣪ ִֶָ☾.  This command can only be used by the bot *creator*.`,
-    owner: `𓂃 ࣪ ִֶָ☾.  This command can only be used by the bot *creator* and *sub-bots*.`,
-    mods: `𓂃 ࣪ ִֶָ☾.  This command can only be used by bot *moderators*.`,
-    premium: `𓂃 ࣪ ִֶָ☾.  This command can only be used by *premium* users.`,
-    group: `𓂃 ࣪ ִֶָ☾.  This command can only be used in *groups*.`,
-    private: `𓂃 ࣪ ִֶָ☾.  This command can only be used in my *private* chat.`,
-    admin: `𓂃 ࣪ ִֶָ☾.  This command can only be used by group *admins*.`,
-    botAdmin: `𓂃 ࣪ ִֶָ☾.  The bot must be a group *admin* to run this command.`,
-    unreg: `𓂃 ࣪ ִֶָ☾.  You need to be *registered* to use this command.`,
-    restrict: `𓂃 ࣪ ִֶָ☾.  This feature is *disabled*.`
-  } : {
-    rowner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot.`,
-    owner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot y *Sub Bots*.`,
-    mods: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Moderadores* de la Bot.`,
-    premium: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por Usuarios *Premium*.`,
-    group: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en *Grupos*.`,
-    private: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en mi Chat *Privado*.`,
-    admin: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Administradores* del Grupo.`,
-    botAdmin: `𓂃 ࣪ ִֶָ☾.  Hola, la bot debe ser *Administradora* para ejecutar este Comando.`,
-    unreg: `𓂃 ࣪ ִֶָ☾.  Hola, para usar este comando debes estar *Registrado.*`,
-    restrict: `𓂃 ࣪ ִֶָ☾.  Hola, esta característica está *deshabilitada.*`
-  })[type]
+  const lang = idiomaDe(conn)
+  const textos = {
+    en: {
+      rowner: `𓂃 ࣪ ִֶָ☾.  This command can only be used by the bot *creator*.`,
+      owner: `𓂃 ࣪ ִֶָ☾.  This command can only be used by the bot *creator* and *sub-bots*.`,
+      mods: `𓂃 ࣪ ִֶָ☾.  This command can only be used by bot *moderators*.`,
+      premium: `𓂃 ࣪ ִֶָ☾.  This command can only be used by *premium* users.`,
+      group: `𓂃 ࣪ ִֶָ☾.  This command can only be used in *groups*.`,
+      private: `𓂃 ࣪ ִֶָ☾.  This command can only be used in my *private* chat.`,
+      admin: `𓂃 ࣪ ִֶָ☾.  This command can only be used by group *admins*.`,
+      botAdmin: `𓂃 ࣪ ִֶָ☾.  The bot must be a group *admin* to run this command.`,
+      unreg: `𓂃 ࣪ ִֶָ☾.  You need to be *registered* to use this command.`,
+      restrict: `𓂃 ࣪ ִֶָ☾.  This feature is *disabled*.`
+    },
+    pt: {
+      rowner: `𓂃 ࣪ ִֶָ☾.  Olá, este comando só pode ser usado pelo *criador* do bot.`,
+      owner: `𓂃 ࣪ ִֶָ☾.  Olá, este comando só pode ser usado pelo *criador* do bot e pelos *sub-bots*.`,
+      mods: `𓂃 ࣪ ִֶָ☾.  Olá, este comando só pode ser usado pelos *moderadores* do bot.`,
+      premium: `𓂃 ࣪ ִֶָ☾.  Olá, este comando só pode ser usado por usuários *premium*.`,
+      group: `𓂃 ࣪ ִֶָ☾.  Olá, este comando só pode ser usado em *grupos*.`,
+      private: `𓂃 ࣪ ִֶָ☾.  Olá, este comando só pode ser usado no meu chat *privado*.`,
+      admin: `𓂃 ࣪ ִֶָ☾.  Olá, este comando só pode ser usado pelos *administradores* do grupo.`,
+      botAdmin: `𓂃 ࣪ ִֶָ☾.  Olá, o bot tem de ser *administrador* para usar este comando.`,
+      unreg: `𓂃 ࣪ ִֶָ☾.  Olá, para usar este comando tens de estar *registado*.`,
+      restrict: `𓂃 ࣪ ִֶָ☾.  Olá, esta função está *desativada*.`
+    },
+    es: {
+      rowner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot.`,
+      owner: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por el *Creador* de la Bot y *Sub Bots*.`,
+      mods: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Moderadores* de la Bot.`,
+      premium: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por Usuarios *Premium*.`,
+      group: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en *Grupos*.`,
+      private: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado en mi Chat *Privado*.`,
+      admin: `𓂃 ࣪ ִֶָ☾.  Hola, este comando solo puede ser utilizado por los *Administradores* del Grupo.`,
+      botAdmin: `𓂃 ࣪ ִֶָ☾.  Hola, la bot debe ser *Administradora* para ejecutar este Comando.`,
+      unreg: `𓂃 ࣪ ִֶָ☾.  Hola, para usar este comando debes estar *Registrado.*`,
+      restrict: `𓂃 ࣪ ִֶָ☾.  Hola, esta característica está *deshabilitada.*`
+    }
+  }
+  const msg = (textos[lang] || textos.es)[type]
   if (msg) return conn.reply(m.chat, msg, m, rcanal)
 }
 

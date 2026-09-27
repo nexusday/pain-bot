@@ -1,4 +1,6 @@
-let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }) => {
+import { modoAnti } from '../lib/Antis/anti-modo.js'
+
+let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
     if (!m.isGroup) {
       return conn.sendMessage(m.chat, {
@@ -21,10 +23,12 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
     }
     
-    if (accion === 'on') {
-      if (!limite || isNaN(limite) || limite < 1 || limite > 10000) {
+    if (accion === 'on' || accion === 'del' || accion === 'all') {
+      const guardado = global.db.data.antiCaracter[m.chat]
+      const limiteNuevo = !isNaN(limite) && limite >= 1 && limite <= 10000
+      if (!limiteNuevo && guardado.enabled !== true) {
         return conn.sendMessage(m.chat, {
-          text: `[❗] Debes poner un límite válido entre 1 y +1000 caracteres.\n> *Ejemplo:* ${usedPrefix}anticaracter on 599`,
+          text: `[❗] Debes poner un límite válido entre 1 y +1000 caracteres.\n> *Ejemplo:* ${usedPrefix}anticaracter del 599\n> *Ejemplo:* ${usedPrefix}anticaracter all 599`,
           contextInfo: {
             ...rcanal.contextInfo
           }
@@ -32,9 +36,12 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
       
       global.db.data.antiCaracter[m.chat].enabled = true
-      global.db.data.antiCaracter[m.chat].limit = limite
+      if (limiteNuevo) global.db.data.antiCaracter[m.chat].limit = limite
+      global.db.data.antiCaracter[m.chat].mode = accion === 'all' ? 'all' : 'del'
+      const limiteFinal = global.db.data.antiCaracter[m.chat].limit
+      const modoTxt = accion === 'all' ? 'Elimina el mensaje y al usuario' : 'Solo elimina el mensaje'
       
-      let texto = `ִֶָ☾. *Anti-caracteres activado correctamente*\n\n*Limite:* ${limite} caracteres\n> Por: @${m.sender.split('@')[0]}`
+      let texto = `ִֶָ☾. *Anti-caracteres activado correctamente*\n\n*Limite:* ${limiteFinal} caracteres\n> ${modoTxt}\n> Por: @${m.sender.split('@')[0]}`
       
       return conn.sendMessage(m.chat, {
         text: texto,
@@ -58,10 +65,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }, { quoted: m })
       
     } else if (accion === 'status' || accion === 'estado') {
-      const estado = global.db.data.antiCaracter[m.chat].enabled ? 'Activado' : 'Desactivado'
-      const limite = global.db.data.antiCaracter[m.chat].limit
+      const cfgEstado = global.db.data.antiCaracter[m.chat]
+      const modo = modoAnti(cfgEstado, 'all')
+      const estado = modo === 'off' ? 'OFF' : modo === 'all' ? 'ALL (borra y expulsa)' : 'DEL (solo borra)'
       
-      let texto = `ִֶָ☾. *Anti-caracteres estado*\n\n*Estado:* ${estado}\n*Limite:* ${limite} caracteres`
+      let texto = `ִֶָ☾. *Anti-caracteres estado*\n\n*Estado:* ${estado}\n*Limite:* ${cfgEstado.limit} caracteres`
       
       return conn.sendMessage(m.chat, {
         text: texto,
@@ -73,7 +81,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       
     } else {
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes poner una acción.\n\n> Ejemplo: ${usedPrefix}anticaracter on 599\n> Ejemplo: ${usedPrefix}anticaracter off\n> Ejemplo: ${usedPrefix}anticaracter status`,
+        text: `[❗] Debes poner una acción.\n\n> Ejemplo: ${usedPrefix}anticaracter del 599\n> Ejemplo: ${usedPrefix}anticaracter on 599\n> Ejemplo: ${usedPrefix}anticaracter all 599\n> Ejemplo: ${usedPrefix}anticaracter off\n> Ejemplo: ${usedPrefix}anticaracter status\n\n> *del* y *on* solo eliminan el mensaje\n> *all* elimina el mensaje y al usuario`,
         contextInfo: {
           ...rcanal.contextInfo
         }

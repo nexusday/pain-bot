@@ -1,5 +1,15 @@
+import { modoAnti } from '../lib/Antis/anti-modo.js'
+
 function estadoBool(mapa, chatId) {
   return !!(mapa && mapa[chatId] === true)
+}
+
+function lineaModo(nombre, valor, legacy = 'del', extra = '') {
+  const modo = modoAnti(valor, legacy)
+  const activo = modo !== 'off'
+  const marca = modo === 'all' ? '(ALL)' : modo === 'del' ? '(DEL)' : ''
+  const resto = [marca, extra].filter(Boolean).join(' ')
+  return linea(nombre, activo, resto)
 }
 
 function linea(nombre, activo, extra = '') {
@@ -19,7 +29,7 @@ let handler = async (m, { conn, usedPrefix }) => {
   const antiPalabra = db.antiPalabra?.[chat]
   const palabraOn = !!(antiPalabra && (antiPalabra.enabled === true || antiPalabra === true))
   const palabraExtra = palabraOn
-    ? `(${Array.isArray(antiPalabra?.words) ? antiPalabra.words.length : 0} palabras · ${antiPalabra?.action || 'delete'})`
+    ? `(${Array.isArray(antiPalabra?.words) ? antiPalabra.words.length : 0} palabras)`
     : ''
 
   const antiCaracter = db.antiCaracter?.[chat]
@@ -27,20 +37,20 @@ let handler = async (m, { conn, usedPrefix }) => {
   const caracterExtra = caracterOn ? `(límite ${antiCaracter.limit ?? '?'})` : ''
 
   const lineas = [
-    linea('antilink', estadoBool(db.antiLink, chat)),
-    linea('antiimg', estadoBool(db.antiImg, chat)),
-    linea('antiaudio', estadoBool(db.antiAudio, chat)),
-    linea('antivideo', estadoBool(db.antiVideo, chat)),
-    linea('antisticker', estadoBool(db.antiSticker, chat)),
-    linea('antispam', estadoBool(db.antiSpam, chat)),
-    linea('anticontact', estadoBool(db.antiContact, chat)),
-    linea('antimention', estadoBool(db.antiMention, chat)),
-    linea('antidocument', estadoBool(db.antiDocument, chat)),
-    linea('antipalabra', palabraOn, palabraExtra),
-    linea('anticaracter', caracterOn, caracterExtra),
+    lineaModo('antilink', db.antiLink?.[chat], 'all'),
+    lineaModo('antiimg', db.antiImg?.[chat]),
+    lineaModo('antiaudio', db.antiAudio?.[chat]),
+    lineaModo('antivideo', db.antiVideo?.[chat]),
+    lineaModo('antisticker', db.antiSticker?.[chat]),
+    lineaModo('antispam', db.antiSpam?.[chat], 'all'),
+    lineaModo('anticontact', db.antiContact?.[chat]),
+    lineaModo('antimention', db.antiMention?.[chat]),
+    lineaModo('antidocument', db.antiDocument?.[chat]),
+    lineaModo('antipalabra', antiPalabra, 'del', palabraExtra),
+    lineaModo('anticaracter', antiCaracter, 'all', caracterExtra),
     linea('antiprefijo', estadoBool(db.antiprefijo, chat)),
-    linea('antibot', estadoBool(db.antiBot, chat)),
-    linea('antiestados', estadoBool(db.antiEstados, chat)),
+    lineaModo('antibot', db.antiBot?.[chat], 'all'),
+    lineaModo('antiestados', db.antiEstados?.[chat]),
     linea('antidelete', estadoBool(db.antiDelete, chat)),
     linea('soloadmin', estadoBool(db.soloAdmin, chat))
   ]
@@ -52,7 +62,9 @@ let handler = async (m, { conn, usedPrefix }) => {
     `*Antis del grupo*\n\n` +
     lineas.join('\n') +
     `\n\n› Activos: *${activos}/${total}*\n` +
-    `> Ej: ${usedPrefix}antilink on`
+    `> *del* / *on* solo borran el mensaje\n` +
+    `> *all* borra el mensaje y expulsa\n` +
+    `> Ej: ${usedPrefix}antilink del`
 
   return conn.sendMessage(
     m.chat,
