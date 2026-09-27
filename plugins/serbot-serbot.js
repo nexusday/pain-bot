@@ -44,6 +44,74 @@ const opcionesSubBot = {}
 
 if (!(global.conns instanceof Array)) global.conns = []
 
+function variantesNumero(numero) {
+  const d = String(numero || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+  const set = new Set()
+  if (d.length < 8) return set
+  set.add(d)
+  if (d.startsWith('521') && d.length >= 12) set.add(`52${d.slice(3)}`)
+  if (d.startsWith('52') && !d.startsWith('521') && d.length >= 11) set.add(`521${d.slice(2)}`)
+  if (d.startsWith('549') && d.length >= 12) set.add(`54${d.slice(3)}`)
+  if (d.startsWith('54') && !d.startsWith('549') && d.length >= 11) set.add(`549${d.slice(2)}`)
+  return set
+}
+
+function numerosCoinciden(a, b) {
+  const A = variantesNumero(a)
+  if (!A.size) return false
+  for (const n of variantesNumero(b)) if (A.has(n)) return true
+  return false
+}
+
+function sesionDeNumero(numero) {
+  if (!numero || String(numero).startsWith('tmp')) return null
+
+  for (const c of global.conns || []) {
+    const candidatos = [
+      c?.phoneNumber,
+      c?.botNumber,
+      c?.user?.jid,
+      c?.user?.id,
+      c?.authState?.creds?.me?.id
+    ]
+    if (!candidatos.some(v => numerosCoinciden(numero, v))) continue
+    const abierto = c?.ws?.isOpen === true || c?.ws?.socket?.readyState === 1
+    if (c?.user && abierto) return 'activa'
+    if (c?.user || c?.authState?.creds?.registered) return 'guardada'
+  }
+
+  const raiz = path.join(process.cwd(), global.bot || 'Serbot')
+  if (!fs.existsSync(raiz)) return null
+  for (const carpeta of fs.readdirSync(raiz)) {
+    if (!numerosCoinciden(numero, carpeta)) continue
+    const ruta = path.join(raiz, carpeta, 'creds.json')
+    if (!fs.existsSync(ruta)) continue
+    try {
+      const creds = JSON.parse(fs.readFileSync(ruta, 'utf8'))
+      if (creds?.registered) return 'guardada'
+    } catch {}
+  }
+  return null
+}
+
+function avisarSesionExistente(conn, m, numero, tipo) {
+  const titulo = tipo === 'activa' ? 'sesión activa' : 'sesión guardada'
+  const estado = tipo === 'activa' ? 'ya está conectado' : 'ya está vinculada'
+  return conn.sendMessage(m.chat, {
+    text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *${titulo}*
+╰─ ✧  ✩
+┊ \`+${numero}\`
+┊ ${estado}
+┊ no hace falta otro código
+╰─────────`.trim(),
+    contextInfo: { ...rcanal.contextInfo }
+  }, { quoted: m })
+}
+
 function limpiarAuthSubBot(pathAYBot) {
   if (!fs.existsSync(pathAYBot)) return
   const preservar = new Set([
@@ -111,6 +179,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
 ╰─────────`.trim(),
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
+  }
+
+  if (phoneNumber) {
+    const ya = sesionDeNumero(phoneNumber)
+    if (ya) return avisarSesionExistente(conn, m, phoneNumber, ya)
   }
 
   if (!phoneNumber) phoneNumber = `tmp${Date.now()}`
@@ -183,6 +256,16 @@ async function iniciarSubBot(options) {
   const rutaCreds = path.join(pathAYBot, "creds.json")
   if (!fs.existsSync(pathAYBot)) {
     fs.mkdirSync(pathAYBot, { recursive: true })
+  }
+
+  if (fromCommand && fs.existsSync(rutaCreds)) {
+    try {
+      const previa = JSON.parse(fs.readFileSync(rutaCreds, 'utf8'))
+      if (previa?.registered) {
+        if (m && conn) await avisarSesionExistente(conn, m, path.basename(pathAYBot), 'guardada')
+        return
+      }
+    } catch {}
   }
 
   if (fromCommand) {
