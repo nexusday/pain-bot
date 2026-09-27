@@ -19,6 +19,7 @@ import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/vie
 import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant, candidatosJidRemitente, jidsSeSolapan } from './lib/group-participant.js'
+import { metadataGrupo } from './lib/group-meta-cache.js'
 import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
@@ -294,7 +295,7 @@ if (!m.fromMe && isStickerMessage(m)) {
   if (usuarioDb) trackSentSticker(usuarioDb)
 }
 
-const groupMetadata = (m.isGroup ? ((this.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
+const groupMetadata = (m.isGroup ? ((this.chats[m.chat] || {}).metadata || await metadataGrupo(this, m.chat)) : {}) || {}  
 const participants = (m.isGroup ? groupMetadata.participants : []) || []  
 const user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}  
 const bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}  

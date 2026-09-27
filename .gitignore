@@ -5,6 +5,7 @@ storage/databases/database.json
 storage/staff.json
 storage/maxsubs.json
 storage/soporte.json
+storage/main-groups.json
 storage/sticker-ban/
 storage/msgdels/
 package-lock.json
