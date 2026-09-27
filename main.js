@@ -27,7 +27,8 @@ import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
-import { Low, JSONFile } from 'lowdb'
+import { Low } from 'lowdb'
+import { ArchivoJsonCompacto } from './lib/db-json.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
@@ -87,7 +88,7 @@ global.prefix = new RegExp(
     ']'
 )
 
-global.db = new Low(new JSONFile(`storage/databases/database.json`))
+global.db = new Low(new ArchivoJsonCompacto(`storage/databases/database.json`))
 
 global.DATABASE = global.db
 global.loadDatabase = async function loadDatabase() {
@@ -168,7 +169,7 @@ const connectionOptions = {
   },
   browser: Browsers.ubuntu('Chrome'),
   markOnlineOnConnect: true,
-  generateHighQualityLinkPreview: true,
+  generateHighQualityLinkPreview: false,
   syncFullHistory: false,
   retryRequestDelayMs: 250,
   transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },

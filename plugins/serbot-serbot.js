@@ -245,7 +245,7 @@ async function iniciarSubBot(options) {
       syncFullHistory: false,
       markOnlineOnConnect: false,
       qrTimeout: 120_000,
-      generateHighQualityLinkPreview: true
+      generateHighQualityLinkPreview: false
     }
 
     let sock = makeWASocket(opcionesConexion)

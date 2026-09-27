@@ -20,7 +20,7 @@ import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant, candidatosJidRemitente, jidsSeSolapan } from './lib/group-participant.js'
 import { metadataGrupo } from './lib/group-meta-cache.js'
-import { shouldSkipGroupMessageEarly } from './plugins/modo-sub.js'
+import { shouldSkipGroupMessageEarly, extraerTextoMensajeCrudo } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
 import { isInviteOpponent } from './lib/michi-users.js'
@@ -38,6 +38,17 @@ resolve()
 }, ms))
 
 let cachePlugins = null
+let imprimirMensaje = null
+const yaEncolado = new WeakSet()
+
+function pareceComandoCrudo(msg) {
+  try {
+    const texto = String(extraerTextoMensajeCrudo(msg) || '').trim()
+    return Boolean(texto && global.prefix instanceof RegExp && global.prefix.test(texto))
+  } catch {
+    return false
+  }
+}
 
 function avisarPermiso(tipo, m, conn) {
   if (typeof global.dfail === 'function') return global.dfail(tipo, m, conn)
@@ -106,13 +117,32 @@ function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
 }
 
 export async function handler(chatUpdate) {
+if (chatUpdate && !yaEncolado.has(chatUpdate)) {
+  yaEncolado.add(chatUpdate)
+  const anterior = this._colaHandler || Promise.resolve()
+  let soltar
+  const yo = new Promise((resolve) => { soltar = resolve })
+  this._colaHandler = anterior.then(() => yo, () => yo)
+  await Promise.race([
+    anterior.catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, 8000)),
+  ])
+  try {
+    return await handler.call(this, chatUpdate)
+  } finally {
+    soltar()
+  }
+}
+
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
 if (chatUpdate.type && chatUpdate.type !== 'notify') {
   const ultimo = chatUpdate.messages?.[chatUpdate.messages.length - 1]
   const marca = Number(ultimo?.messageTimestamp || 0)
   const ms = marca > 1e12 ? marca : marca * 1000
-  if (!ms || Date.now() - ms > 15000) return
+  const edad = ms ? Date.now() - ms : 0
+  const limite = pareceComandoCrudo(ultimo) ? 180000 : 45000
+  if (ms && edad > limite) return
 }
 let m = chatUpdate.messages[chatUpdate.messages.length - 1]
 if (!m) return
@@ -900,7 +930,10 @@ if (m) {
 }  
 
 try {  
-  if (!opts['noprint']) await (await import(`./lib/print.js`)).default(m, this)  
+  if (!opts['noprint']) {
+    if (!imprimirMensaje) imprimirMensaje = (await import(`./lib/print.js`)).default
+    await imprimirMensaje(m, this)
+  }
 } catch (e) {  
   console.log(m, m.quoted, e)  
 }  
