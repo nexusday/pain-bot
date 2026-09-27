@@ -167,7 +167,7 @@ const connectionOptions = {
     keys: makeCacheableSignalKeyStore(state.keys, logger),
   },
   browser: Browsers.ubuntu('Chrome'),
-  markOnlineOnclientect: true,
+  markOnlineOnConnect: true,
   generateHighQualityLinkPreview: true,
   syncFullHistory: false,
   retryRequestDelayMs: 250,
@@ -180,7 +180,7 @@ const connectionOptions = {
   getMessage: async (key) => {
     const jid = jidNormalizedUser(key.remoteJid)
     const msg = await store.loadMessage(jid, key.id)
-    return msg?.message || ''
+    return msg?.message || undefined
   },
 }
 
@@ -262,6 +262,17 @@ if (!opts['test']) {
   }
 }
 
+let temporizadorPresencia = null
+
+function mantenerPresenciaPrincipal(sock) {
+  if (temporizadorPresencia) clearInterval(temporizadorPresencia)
+  const avisar = () => {
+    sock.sendPresenceUpdate?.('available').catch(() => {})
+  }
+  avisar()
+  temporizadorPresencia = setInterval(avisar, 3 * 60 * 60 * 1000)
+}
+
 startTmpCleanupInterval({ verbose: true })
 
 let reconectandoPrincipal = false
@@ -294,6 +305,7 @@ async function connectionUpdate(update) {
     } catch (err) {
       console.error('[canal] Error al resolver config:', err?.message || err)
     }
+    mantenerPresenciaPrincipal(sock)
     return
   }
 
