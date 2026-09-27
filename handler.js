@@ -520,22 +520,32 @@ for (let plugin of pluginsProcesados) {
     }
 
     if (plugin.group && !m.isGroup) {
+      comandoEjecutado = true
+      m.commandExecuted = true
       avisarPermiso('group', m, this)
       continue
     }
     if (plugin.rowner && !isROwner) {
+      comandoEjecutado = true
+      m.commandExecuted = true
       avisarPermiso('rowner', m, this)
       continue
     }
     if (plugin.owner && !isOwner && !isROwner) {
+      comandoEjecutado = true
+      m.commandExecuted = true
       avisarPermiso('owner', m, this)
       continue
     }
     if (plugin.admin && m.isGroup && !isAdmin && !isOwner && !isROwner) {
+      comandoEjecutado = true
+      m.commandExecuted = true
       avisarPermiso('admin', m, this)
       continue
     }
     if (plugin.botAdmin && m.isGroup && !isBotAdmin) {
+      comandoEjecutado = true
+      m.commandExecuted = true
       avisarPermiso('botAdmin', m, this)
       continue
     }
