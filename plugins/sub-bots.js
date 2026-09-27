@@ -127,6 +127,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 ╭─ ✧
 ┊ *${nombreBot}*
 ╰─ ✧  ✩
+┊ hosting  ·  https://nexcodea.com
 ┊ número  ·  \`+${botActual || '—'}\`
 ┊ tipo  ·  \`${tipoActual}\`
 ┊ memoria  ·  \`${memoriaMB} MB\`
@@ -138,7 +139,6 @@ let handler = async (m, { conn, usedPrefix }) => {
 ┊ uptime  ·  \`${uptimePrincipal}\`
 
 ${bloqueSubs}
-┊ \`https://nexcodea.com\`
 ╰─────────`.trim()
 
     const imgBot = resolverImagenBot(rutaConfig)
