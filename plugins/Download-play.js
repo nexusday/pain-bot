@@ -1,5 +1,12 @@
 import fetch from "node-fetch"
 import yts from "yt-search"
+import fs from "fs"
+import path from "path"
+import crypto from "crypto"
+import { execFile } from "child_process"
+import { promisify } from "util"
+
+const execFileAsync = promisify(execFile)
 
 function nombreAutor(autor) {
   if (!autor) return '—'
@@ -151,6 +158,81 @@ async function bajarPorPartes(url) {
   return audio
 }
 
+function idDeYoutube(url) {
+  return String(url || "").match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([A-Za-z0-9_-]{11})/)?.[1] || null
+}
+
+async function convertirAMp3(buffer) {
+  const dir = path.join(process.cwd(), "tmp")
+  fs.mkdirSync(dir, { recursive: true })
+  const id = crypto.randomBytes(6).toString("hex")
+  const entrada = path.join(dir, `play_${id}.bin`)
+  const salida = path.join(dir, `play_${id}.mp3`)
+  try {
+    fs.writeFileSync(entrada, buffer)
+    await execFileAsync("ffmpeg", [
+      "-y", "-i", entrada, "-vn", "-map_metadata", "-1",
+      "-ac", "2", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "128k", salida
+    ], { timeout: 120000 })
+    const mp3 = fs.readFileSync(salida)
+    if (!mp3.length) throw new Error("no se pudo obtener el audio")
+    return mp3
+  } finally {
+    fs.rmSync(entrada, { force: true })
+    fs.rmSync(salida, { force: true })
+  }
+}
+
+async function bajarUrl(url) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 60000)
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { "user-agent": "Mozilla/5.0", accept: "*/*" }
+    })
+    if (!res.ok) throw new Error("no se pudo bajar el audio")
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (buf.length < 1000 || pareceHtml(buf.slice(0, 20).toString("utf8"))) {
+      throw new Error("no se pudo obtener el audio")
+    }
+    return buf
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function audioPorConversor(urlVideo) {
+  const videoId = idDeYoutube(urlVideo)
+  if (!videoId) return null
+  const headers = {
+    "user-agent": "Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
+    referer: "https://id.ytmp3.mobi/",
+    accept: "application/json"
+  }
+  const initUrl = `https://d.ymcdn.org/api/v1/init?p=y&23=1llum1n471&_=${Math.random()}`
+  const initRes = await fetch(initUrl, { headers })
+  const init = await initRes.json().catch(() => null)
+  if (!init?.convertURL) return null
+
+  const convertRes = await fetch(`${init.convertURL}${init.convertURL.includes("?") ? "&" : "?"}v=${videoId}&f=mp3&_=${Math.random()}`, { headers })
+  const convert = await convertRes.json().catch(() => null)
+  if (!convert?.progressURL || !convert?.downloadURL) return null
+
+  let progreso = 0
+  for (let i = 0; i < 20 && progreso < 3; i++) {
+    const estadoRes = await fetch(convert.progressURL, { headers })
+    const estado = await estadoRes.json().catch(() => null)
+    if ((estado?.error || 0) > 0) return null
+    progreso = Number(estado?.progress || 0)
+    if (progreso < 3) await espera(250)
+  }
+  if (progreso < 3) return null
+
+  const crudo = await bajarUrl(convert.downloadURL)
+  return convertirAMp3(crudo)
+}
+
 async function pedirAudio(urlVideo, usarIzuka) {
   for (let intento = 0; intento < 2; intento++) {
     const json = usarIzuka
@@ -246,12 +328,24 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
    
     const archivo = audioDeEnlace(urlAudio)
-    const binario = /googlevideo\.com/i.test(urlAudio)
-      ? await bajarPorPartes(urlAudio)
-      : { url: urlAudio }
+    let binario
+    let mime = archivo.mime
+    let ext = archivo.ext
+    if (/googlevideo\.com/i.test(urlAudio)) {
+      try {
+        binario = await bajarPorPartes(urlAudio)
+      } catch {
+        binario = await audioPorConversor(urlVideo)
+        mime = "audio/mpeg"
+        ext = "mp3"
+      }
+      if (!binario) throw "no se pudo obtener el audio"
+    } else {
+      binario = { url: urlAudio }
+    }
     await conn.sendMessage(
       m.chat,
-      { audio: binario, fileName: `${titulo}.${archivo.ext}`, mimetype: archivo.mime },
+      { audio: binario, fileName: `${titulo}.${ext}`, mimetype: mime },
       { quoted: citado }
     )
 
