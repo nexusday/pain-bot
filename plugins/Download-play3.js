@@ -1,5 +1,6 @@
 import fetch from "node-fetch"
 import yts from "yt-search"
+import { toAudio } from "../lib/converter.js"
 
 const API_NEXUS = "https://nexus-light-7uyb.onrender.com/download/ytmp3"
 
@@ -74,27 +75,44 @@ async function pedirAudio(urlVideo) {
   return { datos, urlAudio }
 }
 
+function esMp3(buffer) {
+  if (!buffer || buffer.length < 1000) return false
+  if (buffer.subarray(0, 3).toString("latin1") === "ID3") return true
+  return buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0
+}
+
+async function cuerpo(res) {
+  if (typeof res.buffer === "function") return res.buffer()
+  return Buffer.from(await res.arrayBuffer())
+}
+
 async function bajarMp3(url) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 90000)
-  try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: {
-        accept: "audio/mpeg,*/*",
-        "user-agent": "Mozilla/5.0"
+  for (let intento = 0; intento < 3; intento++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 90000)
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        redirect: "follow",
+        headers: {
+          accept: "*/*",
+          "user-agent": "Mozilla/5.0",
+          referer: "https://www.youtube.com/"
+        }
+      })
+      if (!res.ok) {
+        await espera(1200 * (intento + 1))
+        continue
       }
-    })
-    const tipo = res.headers.get("content-type") || ""
-    if (!res.ok || /text\/html/i.test(tipo)) return null
-    const buffer = Buffer.from(await res.arrayBuffer())
-    if (buffer.length < 20000 || pareceHtml(buffer.subarray(0, 24).toString("utf8"))) return null
-    return buffer
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
+      const buffer = await cuerpo(res)
+      if (esMp3(buffer)) return buffer
+    } catch {
+    } finally {
+      clearTimeout(timer)
+    }
+    await espera(1200 * (intento + 1))
   }
+  return null
 }
 
 const handler = async (m, { conn, text, usedPrefix }) => {
@@ -141,9 +159,13 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       urlMiniatura = encontrado.portada
     }
 
-    const audio = await pedirAudio(urlVideo)
+    let audio = await pedirAudio(urlVideo)
     if (!audio?.urlAudio) throw "no se pudo obtener el audio"
-    const archivo = await bajarMp3(audio.urlAudio)
+    let archivo = await bajarMp3(audio.urlAudio)
+    if (!archivo) {
+      audio = await pedirAudio(urlVideo)
+      archivo = audio?.urlAudio ? await bajarMp3(audio.urlAudio) : null
+    }
     if (!archivo) throw "no se pudo obtener el audio"
 
     const datosInfo = audio.datos
@@ -175,16 +197,26 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     }
 
     const segundos = segundosDeTexto(duracion)
+    let convertido
+    let audioEnvio = archivo
+    let tipoAudio = "audio/mpeg"
+    try {
+      convertido = await toAudio(archivo, "mp3")
+      audioEnvio = convertido.data
+      tipoAudio = "audio/ogg; codecs=opus"
+    } catch {}
     await conn.sendMessage(
       m.chat,
       {
-        audio: archivo,
+        audio: audioEnvio,
         fileName: `${titulo}.mp3`,
-        mimetype: "audio/mpeg",
+        mimetype: tipoAudio,
+        ptt: false,
         ...(segundos > 0 ? { seconds: segundos } : {})
       },
       { quoted: citado }
     )
+    await convertido?.delete?.().catch(() => {})
   } catch (e) {
     const crudo = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
     const detalle = /DOCTYPE|Unexpected token|not valid JSON|is not valid JSON|aborted/i.test(crudo)
