@@ -1,8 +1,29 @@
 import fetch from "node-fetch"
 import yts from "yt-search"
 
-const API_IZUKA = "https://my.izuka-api.xyz/api/downloader/ytmp3"
+function baseApi() {
+  return (global.APIs?.delirius?.url || "https://api.delirius.online").replace(/\/$/, "")
+}
 
+async function pedirYtmp3(urlVideo) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 20000)
+  try {
+    const res = await fetch(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`, {
+      signal: ctrl.signal,
+      headers: { accept: "application/json", "user-agent": "Mozilla/5.0" }
+    })
+    const json = await res.json()
+    const datos = json?.status ? json.data : null
+    const url = typeof datos?.download === "string" ? datos.download : datos?.download?.url
+    if (!url) return null
+    return { datos, url }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
 function nombreAutor(autor) {
   if (!autor) return "Desconocido"
   if (typeof autor === "string") return autor.trim() || "Desconocido"
@@ -14,26 +35,6 @@ function tipoAudio(formato) {
   if (f.includes("webm")) return { mime: "audio/webm", ext: "webm" }
   if (f.includes("mp4") || f.includes("m4a") || f.includes("aac")) return { mime: "audio/mp4", ext: "m4a" }
   return { mime: "audio/mpeg", ext: "mp3" }
-}
-
-async function pedirYtmp3(urlVideo) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 20000)
-  try {
-    const res = await fetch(`${API_IZUKA}?url=${encodeURIComponent(urlVideo)}`, {
-      signal: ctrl.signal,
-      headers: { accept: "application/json", "user-agent": "Mozilla/5.0" }
-    })
-    const json = await res.json()
-    const datos = json?.status ? json.result : null
-    const url = typeof datos?.download_url === "string" ? datos.download_url : ""
-    if (!url) return null
-    return { datos, url }
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 const handler = async (m, { conn, text, usedPrefix }) => {
