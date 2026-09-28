@@ -94,9 +94,10 @@ function sesionDeNumero(numero) {
   return null
 }
 
-function avisarSesionExistente(conn, m, numero, tipo) {
+function avisarSesionExistente(conn, m, numero, tipo, usedPrefix = '.') {
   const titulo = tipo === 'activa' ? 'sesión activa' : 'sesión guardada'
   const estado = tipo === 'activa' ? 'ya está conectado' : 'ya está vinculada'
+  const pref = usedPrefix || '.'
   return conn.sendMessage(m.chat, {
     text: `
 \`*˚   ✩    ✦    ✩   ˚*\`
@@ -107,6 +108,7 @@ function avisarSesionExistente(conn, m, numero, tipo) {
 ┊ \`+${numero}\`
 ┊ ${estado}
 ┊ no hace falta otro código
+┊ desvincular  ·  \`${pref}delsession\`
 ╰─────────`.trim(),
     contextInfo: { ...rcanal.contextInfo }
   }, { quoted: m })
@@ -183,7 +185,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
 
   if (phoneNumber) {
     const ya = sesionDeNumero(phoneNumber)
-    if (ya) return avisarSesionExistente(conn, m, phoneNumber, ya)
+    if (ya) return avisarSesionExistente(conn, m, phoneNumber, ya, usedPrefix)
   }
 
   if (!phoneNumber) phoneNumber = `tmp${Date.now()}`
@@ -262,7 +264,7 @@ async function iniciarSubBot(options) {
     try {
       const previa = JSON.parse(fs.readFileSync(rutaCreds, 'utf8'))
       if (previa?.registered) {
-        if (m && conn) await avisarSesionExistente(conn, m, path.basename(pathAYBot), 'guardada')
+        if (m && conn) await avisarSesionExistente(conn, m, path.basename(pathAYBot), 'guardada', usedPrefix)
         return
       }
     } catch {}
