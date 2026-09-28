@@ -90,7 +90,8 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       }, { quoted: m })
     }
 
-    const pack = packs[Math.floor(Math.random() * packs.length)]
+    const cercanos = packs.slice(0, 3)
+    const pack = cercanos[Math.floor(Math.random() * cercanos.length)]
     const archivos = pack.resourceFiles.slice(0, MAX_STICKERS)
     const tapaArchivo = pack.resourceFiles[pack.trayIndex] || archivos[0]
     const tapa = urlArchivo(pack.resourceUrlPrefix, tapaArchivo)
