@@ -71,8 +71,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }, {
       userJid: conn.user?.id,
       quoted: m,
-      upload: conn.waUploadToServer,
-      logger: conn.logger
+      upload: conn.waUploadToServer
     })
     await conn.relayMessage(m.chat, creado.message, { messageId: creado.key.id })
   } catch (e) {
