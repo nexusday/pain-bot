@@ -93,18 +93,24 @@ async function urlEsAudio(url) {
   }
 }
 
-async function pedirAudio(urlVideo) {
+const API_IZUKA = "https://my.izuka-api.xyz/api/downloader/yt-dl"
+
+async function pedirAudio(urlVideo, usarIzuka) {
   for (let intento = 0; intento < 2; intento++) {
-    const json = await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
-    const datos = json?.status ? json.data : null
-    const urlAudio = typeof datos?.download === "string" ? datos.download : datos?.download?.url
+    const json = usarIzuka
+      ? await pedirJson(`${API_IZUKA}?url=${encodeURIComponent(urlVideo)}&type=audio`)
+      : await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
+    const datos = json?.status ? (usarIzuka ? json.result : json.data) : null
+    const urlAudio = usarIzuka
+      ? (typeof datos?.downloadUrl === "string" ? datos.downloadUrl : "")
+      : (typeof datos?.download === "string" ? datos.download : datos?.download?.url)
     if (!urlAudio || pareceHtml(urlAudio)) continue
     if (await urlEsAudio(urlAudio)) return { datos, urlAudio }
   }
   return null
 }
 
-const handler = async (m, { conn, text, usedPrefix }) => {
+const handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
     if (!text?.trim())
       return conn.sendMessage(m.chat, {
@@ -147,12 +153,13 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       urlMiniatura = encontrado.portada
     }
 
-    const audio = await pedirAudio(urlVideo)
+    const usarIzuka = command !== "play3"
+    const audio = await pedirAudio(urlVideo, usarIzuka)
     if (!audio?.urlAudio) throw "no se pudo obtener el audio"
 
     const datosInfo = audio.datos
     const urlAudio = audio.urlAudio
-    const portada = datosInfo.image || urlMiniatura
+    const portada = datosInfo.thumbnail || datosInfo.image || urlMiniatura
     titulo = datosInfo.title || titulo
     autor = datosInfo.author || datosInfo.channel || autor
     duracion = datosInfo.duration || datosInfo.timestamp || duracion
@@ -200,7 +207,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
   }
 }
 
-handler.command = ["play", "ytmp3", "playaudio"]
+handler.command = ["play", "ytmp3", "playaudio", "play3"]
 handler.tags = ["descargas"]
 handler.group = true
 
