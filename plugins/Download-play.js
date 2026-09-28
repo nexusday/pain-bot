@@ -95,17 +95,35 @@ async function urlEsAudio(url) {
 
 const API_IZUKA = "https://my.izuka-api.xyz/api/downloader/yt-dl"
 
+function enlaceAudio(datos, usarIzuka) {
+  if (!datos) return ""
+  if (usarIzuka) {
+    if (typeof datos.downloadUrl === "string") return datos.downloadUrl
+    if (typeof datos.download_url === "string") return datos.download_url
+    return ""
+  }
+  if (typeof datos.download === "string") return datos.download
+  return datos.download?.url || ""
+}
+
+function audioDeEnlace(url) {
+  const mime = decodeURIComponent((String(url).match(/[?&]mime=([^&]+)/i) || [])[1] || "")
+  if (/webm/i.test(mime)) return { mime: "audio/webm", ext: "webm" }
+  if (/mp4|m4a|aac/i.test(mime)) return { mime: "audio/mp4", ext: "m4a" }
+  return { mime: "audio/mpeg", ext: "mp3" }
+}
+
 async function pedirAudio(urlVideo, usarIzuka) {
   for (let intento = 0; intento < 2; intento++) {
     const json = usarIzuka
       ? await pedirJson(`${API_IZUKA}?url=${encodeURIComponent(urlVideo)}&type=audio`)
       : await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
     const datos = json?.status ? (usarIzuka ? json.result : json.data) : null
-    const urlAudio = usarIzuka
-      ? (typeof datos?.downloadUrl === "string" ? datos.downloadUrl : "")
-      : (typeof datos?.download === "string" ? datos.download : datos?.download?.url)
+    const urlAudio = enlaceAudio(datos, usarIzuka)
     if (!urlAudio || pareceHtml(urlAudio)) continue
-    if (await urlEsAudio(urlAudio)) return { datos, urlAudio }
+    if (usarIzuka || /googlevideo\.com/i.test(urlAudio) || await urlEsAudio(urlAudio)) {
+      return { datos, urlAudio }
+    }
   }
   return null
 }
@@ -189,9 +207,10 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
    
+    const archivo = audioDeEnlace(urlAudio)
     await conn.sendMessage(
       m.chat,
-      { audio: { url: urlAudio }, fileName: `${titulo}.mp3`, mimetype: "audio/mpeg" },
+      { audio: { url: urlAudio }, fileName: `${titulo}.${archivo.ext}`, mimetype: archivo.mime },
       { quoted: citado }
     )
 
