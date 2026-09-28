@@ -78,6 +78,19 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     }
 
     titulo = audio.datos.title || titulo
+    if (audio.datos.author || audio.datos.channel) {
+      autor = nombreAutor(audio.datos.author || audio.datos.channel)
+    }
+    duracion = audio.datos.duration || audio.datos.timestamp || duracion
+    portada = audio.datos.image || audio.datos.thumbnail || portada
+
+    let miniatura
+    if (portada) {
+      try {
+        miniatura = (await conn.getFile(portada)).data
+      } catch {}
+    }
+
     const archivo = tipoAudio(audio.datos.format)
 
     await conn.sendMessage(m.chat, {
@@ -89,9 +102,9 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         externalAdReply: {
           title: `ִֶָ☾. 𝐓𝐢𝐭𝐮𝐥𝐨: ${titulo}`,
           body: `ִֶָ☾. 𝐀𝐮𝐭𝐨𝐫: ${autor} | 𝐃𝐮𝐫𝐚𝐜𝐢𝐨́𝐧: ${duracion}`,
-          thumbnailUrl: portada || undefined,
-          mediaType: 4,
-          renderLargerThumbnail: false,
+          thumbnail: miniatura,
+          mediaType: 1,
+          renderLargerThumbnail: true,
           sourceUrl: videoUrl
         }
       }
