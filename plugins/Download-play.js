@@ -113,6 +113,44 @@ function audioDeEnlace(url) {
   return { mime: "audio/mpeg", ext: "mp3" }
 }
 
+async function bajarPorPartes(url) {
+  const headersBase = { "user-agent": "Mozilla/5.0", accept: "*/*" }
+  async function pedir(rango) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 20000)
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers: { ...headersBase, range: rango }
+      })
+      if (!(res.ok || res.status === 206)) throw new Error("no se pudo bajar el audio")
+      const buf = Buffer.from(await res.arrayBuffer())
+      const total = Number((res.headers.get("content-range") || "").split("/")[1]) || buf.length
+      return { buf, total }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  const cabeza = await pedir("bytes=0-1")
+  const total = cabeza.total
+  if (!total || total < 1000) throw new Error("no se pudo obtener el audio")
+  if (total > 16 * 1024 * 1024) throw new Error("el audio pesa demasiado")
+
+  const trozos = []
+  const paso = 1024 * 1024
+  for (let inicio = 0; inicio < total; inicio += paso) {
+    const fin = Math.min(total - 1, inicio + paso - 1)
+    const parte = await pedir(`bytes=${inicio}-${fin}`)
+    trozos.push(parte.buf)
+  }
+  const audio = Buffer.concat(trozos)
+  if (audio.length < 1000 || pareceHtml(audio.slice(0, 20).toString("utf8"))) {
+    throw new Error("no se pudo obtener el audio")
+  }
+  return audio
+}
+
 async function pedirAudio(urlVideo, usarIzuka) {
   for (let intento = 0; intento < 2; intento++) {
     const json = usarIzuka
@@ -208,9 +246,12 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
    
     const archivo = audioDeEnlace(urlAudio)
+    const binario = /googlevideo\.com/i.test(urlAudio)
+      ? await bajarPorPartes(urlAudio)
+      : { url: urlAudio }
     await conn.sendMessage(
       m.chat,
-      { audio: { url: urlAudio }, fileName: `${titulo}.${archivo.ext}`, mimetype: archivo.mime },
+      { audio: binario, fileName: `${titulo}.${archivo.ext}`, mimetype: archivo.mime },
       { quoted: citado }
     )
 
