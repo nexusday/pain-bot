@@ -1,8 +1,57 @@
 import fetch from 'node-fetch'
+import { createReadStream } from 'fs'
 import { generateWAMessage } from '@itsliaaa/baileys'
+import { encodeBase64EncodedStringForUpload } from '@whiskeysockets/baileys/lib/Utils/messages-media.js'
 
 const API = 'https://my.izuka-api.xyz/api/search/stickerly-search'
 const MAX_STICKERS = 20
+const RUTAS_PACK = {
+  'sticker-pack': '/mms/sticker-pack',
+  'thumbnail-sticker-pack': '/mms/thumbnail-sticker-pack'
+}
+
+async function subirPack(conn, filePath, info) {
+  const ruta = RUTAS_PACK[info?.mediaType]
+  if (!ruta) return conn.waUploadToServer(filePath, info)
+
+  let uploadInfo = await conn.refreshMediaConn(false)
+  const token = encodeBase64EncodedStringForUpload(info.fileEncSha256B64)
+  const hosts = uploadInfo?.hosts || []
+
+  for (let i = 0; i < hosts.length; i++) {
+    const hostname = hosts[i]?.hostname
+    if (!hostname) continue
+    const auth = encodeURIComponent(uploadInfo.auth || '')
+    const url = `https://${hostname}${ruta}/${token}?auth=${auth}&token=${token}`
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: createReadStream(filePath),
+        duplex: 'half',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          Origin: 'https://web.whatsapp.com'
+        },
+        signal: info.timeoutMs ? AbortSignal.timeout(info.timeoutMs) : undefined
+      })
+      const result = await response.json().catch(() => null)
+      if (result?.url || result?.direct_path || result?.directPath) {
+        return {
+          mediaUrl: result.url,
+          directPath: result.direct_path || result.directPath,
+          meta_hmac: result.meta_hmac,
+          fbid: result.fbid,
+          ts: result.ts
+        }
+      }
+      uploadInfo = await conn.refreshMediaConn(true)
+    } catch (e) {
+      console.error('[stickerly] upload', hostname, e?.message || e)
+    }
+  }
+
+  throw new Error('No se pudo subir el pack a WhatsApp')
+}
 
 function urlArchivo(prefijo, archivo) {
   const base = String(prefijo || '')
@@ -71,7 +120,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }, {
       userJid: conn.user?.id,
       quoted: m,
-      upload: conn.waUploadToServer
+      upload: (archivo, info) => subirPack(conn, archivo, info)
     })
     await conn.relayMessage(m.chat, creado.message, { messageId: creado.key.id })
   } catch (e) {
