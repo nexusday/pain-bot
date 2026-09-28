@@ -49,42 +49,6 @@ function pareceComandoCrudo(msg) {
   }
 }
 
-function reaccionar(conn, m, emoji) {
-  if (!conn || !m?.key || !emoji) return
-  void conn.sendMessage(m.chat, { react: { text: emoji, key: m.key } }).catch(() => {})
-}
-
-function vigilarRespuestas(conn) {
-  if (!conn || conn._reaccionEnvios) return
-  conn._reaccionEnvios = new Map()
-  const enviar = conn.sendMessage.bind(conn)
-  conn.sendMessage = function (...args) {
-    const citado = args[2]?.quoted
-    const id = citado?.key?.id || citado?.id
-    const estado = id && conn._reaccionEnvios.get(id)
-    if (estado && !estado.esperaMostrada) {
-      estado.yaRespondio = true
-      clearTimeout(estado.timer)
-    }
-    return enviar.apply(this, args)
-  }
-}
-
-function abrirEspera(conn, m) {
-  vigilarRespuestas(conn)
-  const estado = { yaRespondio: false, esperaMostrada: false, timer: null }
-  conn._reaccionEnvios.set(m.key.id, estado)
-  estado.timer = setTimeout(() => {
-    if (estado.yaRespondio) return
-    estado.esperaMostrada = true
-    reaccionar(conn, m, '⏳')
-  }, 280)
-  return () => {
-    clearTimeout(estado.timer)
-    conn._reaccionEnvios.delete(m.key.id)
-  }
-}
-
 function avisarPermiso(tipo, m, conn) {
   if (typeof global.dfail === 'function') return global.dfail(tipo, m, conn)
   const textos = {
@@ -617,7 +581,6 @@ for (let plugin of pluginsProcesados) {
     }
     
     comandoEjecutado = true
-    const cerrarEspera = abrirEspera(this, m)
     try {
       await plugin.handler.call(this, m, {
         match,
@@ -644,8 +607,6 @@ for (let plugin of pluginsProcesados) {
       m.command = command
       m.args = args
 
-      cerrarEspera()
-      reaccionar(this, m, m.error ? '❌' : '✅')
       if (m.error == null && !m.rpgAwarded) {
         const usuarioDb = global.db.data.users[m.sender]
         if (usuarioDb) {
@@ -656,8 +617,6 @@ for (let plugin of pluginsProcesados) {
       }
     } catch (e) {
       m.error = e
-      cerrarEspera()
-      reaccionar(this, m, '❌')
       console.error(`Error ejecutando plugin ${plugin.name}:`, e)
     }
   }
