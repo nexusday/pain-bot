@@ -49,6 +49,11 @@ function pareceComandoCrudo(msg) {
   }
 }
 
+function reaccionar(conn, m, emoji) {
+  if (!conn || !m?.key || !emoji) return
+  void conn.sendMessage(m.chat, { react: { text: emoji, key: m.key } }).catch(() => {})
+}
+
 function avisarPermiso(tipo, m, conn) {
   if (typeof global.dfail === 'function') return global.dfail(tipo, m, conn)
   const textos = {
@@ -581,6 +586,7 @@ for (let plugin of pluginsProcesados) {
     }
     
     comandoEjecutado = true
+    reaccionar(this, m, '⏳')
     try {
       await plugin.handler.call(this, m, {
         match,
@@ -607,6 +613,7 @@ for (let plugin of pluginsProcesados) {
       m.command = command
       m.args = args
 
+      reaccionar(this, m, m.error ? '❌' : '✅')
       if (m.error == null && !m.rpgAwarded) {
         const usuarioDb = global.db.data.users[m.sender]
         if (usuarioDb) {
@@ -617,6 +624,7 @@ for (let plugin of pluginsProcesados) {
       }
     } catch (e) {
       m.error = e
+      reaccionar(this, m, '❌')
       console.error(`Error ejecutando plugin ${plugin.name}:`, e)
     }
   }

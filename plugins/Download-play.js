@@ -189,6 +189,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     )
 
   } catch (e) {
+    m.error = e
     const crudo = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
     const detalle = /DOCTYPE|Unexpected token|not valid JSON|is not valid JSON/i.test(crudo)
       ? "no se pudo obtener el audio"

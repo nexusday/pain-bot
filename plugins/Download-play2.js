@@ -110,6 +110,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       }
     }, { quoted: m })
   } catch (e) {
+    m.error = e
     console.error("Error en play2:", e)
     await conn.sendMessage(m.chat, {
       text: `[❌] *Error:* ${e.message || e}`,
