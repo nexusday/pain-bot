@@ -58,12 +58,43 @@ async function buscarCancion(text) {
   }
 }
 
+function segundosDeTexto(texto) {
+  const partes = String(texto || "").trim().split(":").map((n) => Number(n))
+  if (!partes.length || partes.some((n) => !Number.isFinite(n))) return 0
+  if (partes.length === 2) return partes[0] * 60 + partes[1]
+  if (partes.length === 3) return partes[0] * 3600 + partes[1] * 60 + partes[2]
+  return 0
+}
+
 async function pedirAudio(urlVideo) {
   const json = await pedirJson(`${API_NEXUS}?url=${encodeURIComponent(urlVideo)}`, 55000)
   const datos = json?.status ? json.data : null
   const urlAudio = typeof datos?.dl_url === "string" ? datos.dl_url : ""
   if (!urlAudio || pareceHtml(urlAudio)) return null
   return { datos, urlAudio }
+}
+
+async function bajarMp3(url) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 90000)
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        accept: "audio/mpeg,*/*",
+        "user-agent": "Mozilla/5.0"
+      }
+    })
+    const tipo = res.headers.get("content-type") || ""
+    if (!res.ok || /text\/html/i.test(tipo)) return null
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.length < 20000 || pareceHtml(buffer.subarray(0, 24).toString("utf8"))) return null
+    return buffer
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 const handler = async (m, { conn, text, usedPrefix }) => {
@@ -112,6 +143,8 @@ const handler = async (m, { conn, text, usedPrefix }) => {
 
     const audio = await pedirAudio(urlVideo)
     if (!audio?.urlAudio) throw "no se pudo obtener el audio"
+    const archivo = await bajarMp3(audio.urlAudio)
+    if (!archivo) throw "no se pudo obtener el audio"
 
     const datosInfo = audio.datos
     titulo = datosInfo.title || titulo
@@ -141,9 +174,15 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       await conn.sendMessage(m.chat, { text: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: citado })
     }
 
+    const segundos = segundosDeTexto(duracion)
     await conn.sendMessage(
       m.chat,
-      { audio: { url: audio.urlAudio }, fileName: `${titulo}.mp3`, mimetype: "audio/mpeg" },
+      {
+        audio: archivo,
+        fileName: `${titulo}.mp3`,
+        mimetype: "audio/mpeg",
+        ...(segundos > 0 ? { seconds: segundos } : {})
+      },
       { quoted: citado }
     )
   } catch (e) {
