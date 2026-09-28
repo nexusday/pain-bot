@@ -29,6 +29,7 @@ import { trackUserMessage } from './lib/msg-activity.js'
 import { getStaffOwnerIds } from './lib/staff.js'
 import { estaEnBlackn } from './lib/blackn.js'
 import { idiomaDe } from './lib/lang.js'
+import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -621,6 +622,20 @@ for (let plugin of pluginsProcesados) {
     }
   }
 }
+}
+
+if (comandoEjecutado && global.db.data?.users?.[m.sender]) {
+  try {
+    const cobro = cobrarPrestamoSiToca(global.db.data.users[m.sender])
+    if (cobro?.tomado > 0) {
+      await this.sendMessage(m.chat, {
+        text: textoCobro(this, cobro),
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m }).catch(() => {})
+    }
+  } catch (e) {
+    console.error('Cobro de prestamo:', e)
+  }
 }
 
 if (m.rpgProgress?.leveled) {
