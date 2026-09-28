@@ -120,6 +120,30 @@ function audioDeEnlace(url) {
   return { mime: "audio/mpeg", ext: "mp3" }
 }
 
+async function mp3DesdeEnlace(url) {
+  const dir = path.join(process.cwd(), "tmp")
+  fs.mkdirSync(dir, { recursive: true })
+  const salida = path.join(dir, `play_${crypto.randomBytes(6).toString("hex")}.mp3`)
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-user_agent", "Mozilla/5.0",
+      "-i", url,
+      "-vn", "-map_metadata", "-1",
+      "-ac", "2", "-ar", "44100",
+      "-c:a", "libmp3lame", "-b:a", "128k",
+      salida
+    ], { timeout: 120000 })
+    const mp3 = fs.readFileSync(salida)
+    if (mp3.length < 1000 || mp3.slice(0, 3).toString() !== "ID3") {
+      throw new Error("no se pudo obtener el audio")
+    }
+    return mp3
+  } finally {
+    fs.rmSync(salida, { force: true })
+  }
+}
+
 async function bajarPorPartes(url) {
   const headersBase = { "user-agent": "Mozilla/5.0", accept: "*/*" }
   async function pedir(rango) {
@@ -330,12 +354,10 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     let bufferAudio = null
     if (usarIzuka || /googlevideo\.com/i.test(urlAudio)) {
       try {
-        const crudo = /googlevideo\.com/i.test(urlAudio)
-          ? await bajarPorPartes(urlAudio)
-          : await bajarUrl(urlAudio)
-        bufferAudio = crudo.slice(0, 3).toString() === "ID3" ? crudo : await convertirAMp3(crudo)
-      } catch {
-        bufferAudio = await audioPorConversor(urlVideo)
+        bufferAudio = await mp3DesdeEnlace(urlAudio)
+      } catch (errorAudio) {
+        console.error("[play] ffmpeg:", errorAudio?.message || errorAudio)
+        bufferAudio = await audioPorConversor(urlVideo).catch(() => null)
       }
       if (!bufferAudio?.length) throw "no se pudo obtener el audio"
       await conn.sendMessage(m.chat, {
