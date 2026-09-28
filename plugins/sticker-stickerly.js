@@ -1,4 +1,5 @@
 import fetch from 'node-fetch'
+import { generateWAMessage } from '@itsliaaa/baileys'
 
 const API = 'https://my.izuka-api.xyz/api/search/stickerly-search'
 const MAX_STICKERS = 20
@@ -61,13 +62,19 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     const nombre = String(pack.name || consulta).slice(0, 40)
     const autor = String(pack.authorName || 'Stickerly').slice(0, 40)
 
-    await conn.sendMessage(m.chat, {
+    const creado = await generateWAMessage(m.chat, {
       stickers,
       cover: { url: tapa },
       name: nombre,
       publisher: autor,
       description: nombre
-    }, { quoted: m })
+    }, {
+      userJid: conn.user?.id,
+      quoted: m,
+      upload: conn.waUploadToServer,
+      logger: conn.logger
+    })
+    await conn.relayMessage(m.chat, creado.message, { messageId: creado.key.id })
   } catch (e) {
     console.error('Error en stickerly:', e)
     await conn.sendMessage(m.chat, {
