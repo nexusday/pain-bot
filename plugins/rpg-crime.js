@@ -95,7 +95,7 @@ let handler = async (m, { conn }) => {
 
   const signo = caso.ok ? `+${monto}` : `-${monto}`
   const rango = tr(conn, ...rarezaTxt[caso.rareza])
-  const moneda = tr(conn, 'monedas', 'coins', 'moedas')
+  const moneda = global.moneda || 'USD'
   await conn.sendMessage(m.chat, {
     text: `\`*˚   ✩    ✦    ✩   ˚*\`\n\n╭─ ✧\n┊ *${tr(conn, 'crimen', 'crime', 'crime')}*\n╰─ ✧  ✩\n┊ ${tr(conn, caso.es, caso.en, caso.pt)}\n┊ ${tr(conn, 'rango', 'rank', 'nível')}  ·  \`${rango}\`\n┊ ${signo} ${moneda}\n┊ ${tr(conn, 'saldo', 'balance', 'saldo')}  ·  \`${usuario.coins}\`\n╰─────────`,
     contextInfo: { ...rcanal.contextInfo }

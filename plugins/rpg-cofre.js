@@ -94,7 +94,7 @@ let handler = async (m, { conn }) => {
 
   const signo = pierde ? `-${monto}` : `+${monto}`
   const rango = tr(conn, ...rarezaTxt[premio.rareza])
-  const moneda = tr(conn, 'monedas', 'coins', 'moedas')
+  const moneda = global.moneda || 'USD'
 
   await conn.sendMessage(m.chat, {
     text: `\`*˚   ✩    ✦    ✩   ˚*\`\n\n╭─ ✧\n┊ *${tr(conn, 'cofre', 'chest', 'baú')}*\n╰─ ✧  ✩\n┊ ${tr(conn, premio.es, premio.en, premio.pt)}\n┊ ${tr(conn, 'rareza', 'rarity', 'raridade')}  ·  \`${rango}\`\n┊ ${signo} ${moneda}\n┊ ${tr(conn, 'saldo', 'balance', 'saldo')}  ·  \`${usuario.coins}\`\n╰─────────`,

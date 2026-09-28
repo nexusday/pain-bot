@@ -48,8 +48,9 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   }
 
   const signo = delta > 0 ? `+${delta}` : `${delta}`
+  const moneda = global.moneda || 'USD'
   await conn.sendMessage(m.chat, {
-    text: `\`*˚   ✩    ✦    ✩   ˚*\`\n\n╭─ ✧\n┊ *piedra papel tijera*\n╰─ ✧  ✩\n┊ tú  ·  ${emoji[jugada]} ${jugada}\n┊ bot  ·  ${emoji[bot]} ${bot}\n┊ ${resultado}\n┊ ${signo} monedas\n┊ saldo  ·  \`${usuario.coins}\`\n╰─────────`,
+    text: `\`*˚   ✩    ✦    ✩   ˚*\`\n\n╭─ ✧\n┊ *piedra papel tijera*\n╰─ ✧  ✩\n┊ tú  ·  ${emoji[jugada]} ${jugada}\n┊ bot  ·  ${emoji[bot]} ${bot}\n┊ ${resultado}\n┊ ${signo} ${moneda}\n┊ saldo  ·  \`${usuario.coins}\`\n╰─────────`,
     contextInfo: { ...rcanal.contextInfo }
   }, { quoted: m })
 }

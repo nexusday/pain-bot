@@ -86,7 +86,7 @@ let handler = async (m, { conn }) => {
   }
 
   usuario.lastCazar = Date.now()
-  const moneda = tr(conn, 'monedas', 'coins', 'moedas')
+  const moneda = global.moneda || 'USD'
   const saldo = tr(conn, 'saldo', 'balance', 'saldo')
 
   if (Math.random() < 0.16) {
