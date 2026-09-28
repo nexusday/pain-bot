@@ -1,12 +1,5 @@
 import fetch from "node-fetch"
 import yts from "yt-search"
-import fs from "fs"
-import path from "path"
-import crypto from "crypto"
-import { execFile } from "child_process"
-import { promisify } from "util"
-
-const execFileAsync = promisify(execFile)
 
 function nombreAutor(autor) {
   if (!autor) return '—'
@@ -100,212 +93,18 @@ async function urlEsAudio(url) {
   }
 }
 
-const API_IZUKA = "https://my.izuka-api.xyz/api/downloader/yt-dl"
-
-function enlaceAudio(datos, usarIzuka) {
-  if (!datos) return ""
-  if (usarIzuka) {
-    if (typeof datos.downloadUrl === "string") return datos.downloadUrl
-    if (typeof datos.download_url === "string") return datos.download_url
-    return ""
-  }
-  if (typeof datos.download === "string") return datos.download
-  return datos.download?.url || ""
-}
-
-function audioDeEnlace(url) {
-  const mime = decodeURIComponent((String(url).match(/[?&]mime=([^&]+)/i) || [])[1] || "")
-  if (/webm/i.test(mime)) return { mime: "audio/webm", ext: "webm" }
-  if (/mp4|m4a|aac/i.test(mime)) return { mime: "audio/mp4", ext: "m4a" }
-  return { mime: "audio/mpeg", ext: "mp3" }
-}
-
-const UA_ANDROID = "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip"
-
-async function mp3DesdeEnlace(url, agente = "Mozilla/5.0") {
-  const dir = path.join(process.cwd(), "tmp")
-  fs.mkdirSync(dir, { recursive: true })
-  const salida = path.join(dir, `play_${crypto.randomBytes(6).toString("hex")}.mp3`)
-  try {
-    await execFileAsync("ffmpeg", [
-      "-y",
-      "-user_agent", agente,
-      "-i", url,
-      "-vn", "-map_metadata", "-1",
-      "-ac", "2", "-ar", "44100",
-      "-c:a", "libmp3lame", "-b:a", "128k",
-      salida
-    ], { timeout: 120000 })
-    const mp3 = fs.readFileSync(salida)
-    if (mp3.length < 1000 || mp3.slice(0, 3).toString() !== "ID3") {
-      throw new Error("no se pudo obtener el audio")
-    }
-    return mp3
-  } finally {
-    fs.rmSync(salida, { force: true })
-  }
-}
-
-async function urlAudioPropia(urlVideo) {
-  const videoId = idDeYoutube(urlVideo)
-  if (!videoId) return null
-  const cuerpo = {
-    videoId,
-    context: {
-      client: {
-        clientName: "ANDROID",
-        clientVersion: "20.10.38",
-        hl: "en",
-        gl: "US"
-      }
-    }
-  }
-  const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "user-agent": UA_ANDROID,
-      "x-youtube-client-name": "3",
-      "x-youtube-client-version": "20.10.38"
-    },
-    body: JSON.stringify(cuerpo)
-  })
-  const json = await res.json().catch(() => null)
-  const lista = (json?.streamingData?.adaptiveFormats || [])
-    .filter(f => String(f.mimeType || "").startsWith("audio/") && f.url)
-    .sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0))
-  return lista[0]?.url || null
-}
-
-async function bajarPorPartes(url) {
-  const headersBase = { "user-agent": "Mozilla/5.0", accept: "*/*" }
-  async function pedir(rango) {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 20000)
-    try {
-      const res = await fetch(url, {
-        signal: ctrl.signal,
-        headers: { ...headersBase, range: rango }
-      })
-      if (!(res.ok || res.status === 206)) throw new Error("no se pudo bajar el audio")
-      const buf = Buffer.from(await res.arrayBuffer())
-      const total = Number((res.headers.get("content-range") || "").split("/")[1]) || buf.length
-      return { buf, total }
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-
-  const cabeza = await pedir("bytes=0-1")
-  const total = cabeza.total
-  if (!total || total < 1000) throw new Error("no se pudo obtener el audio")
-  if (total > 16 * 1024 * 1024) throw new Error("el audio pesa demasiado")
-
-  const trozos = []
-  const paso = 1024 * 1024
-  for (let inicio = 0; inicio < total; inicio += paso) {
-    const fin = Math.min(total - 1, inicio + paso - 1)
-    const parte = await pedir(`bytes=${inicio}-${fin}`)
-    trozos.push(parte.buf)
-  }
-  const audio = Buffer.concat(trozos)
-  if (audio.length < 1000 || pareceHtml(audio.slice(0, 20).toString("utf8"))) {
-    throw new Error("no se pudo obtener el audio")
-  }
-  return audio
-}
-
-function idDeYoutube(url) {
-  return String(url || "").match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([A-Za-z0-9_-]{11})/)?.[1] || null
-}
-
-async function convertirAMp3(buffer) {
-  const dir = path.join(process.cwd(), "tmp")
-  fs.mkdirSync(dir, { recursive: true })
-  const id = crypto.randomBytes(6).toString("hex")
-  const entrada = path.join(dir, `play_${id}.bin`)
-  const salida = path.join(dir, `play_${id}.mp3`)
-  try {
-    fs.writeFileSync(entrada, buffer)
-    await execFileAsync("ffmpeg", [
-      "-y", "-i", entrada, "-vn", "-map_metadata", "-1",
-      "-ac", "2", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "128k", salida
-    ], { timeout: 120000 })
-    const mp3 = fs.readFileSync(salida)
-    if (!mp3.length) throw new Error("no se pudo obtener el audio")
-    return mp3
-  } finally {
-    fs.rmSync(entrada, { force: true })
-    fs.rmSync(salida, { force: true })
-  }
-}
-
-async function bajarUrl(url) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 60000)
-  try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: { "user-agent": "Mozilla/5.0", accept: "*/*" }
-    })
-    if (!res.ok) throw new Error("no se pudo bajar el audio")
-    const buf = Buffer.from(await res.arrayBuffer())
-    if (buf.length < 1000 || pareceHtml(buf.slice(0, 20).toString("utf8"))) {
-      throw new Error("no se pudo obtener el audio")
-    }
-    return buf
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-async function audioPorConversor(urlVideo) {
-  const videoId = idDeYoutube(urlVideo)
-  if (!videoId) return null
-  const headers = {
-    "user-agent": "Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
-    referer: "https://id.ytmp3.mobi/",
-    accept: "application/json"
-  }
-  const initUrl = `https://d.ymcdn.org/api/v1/init?p=y&23=1llum1n471&_=${Math.random()}`
-  const initRes = await fetch(initUrl, { headers })
-  const init = await initRes.json().catch(() => null)
-  if (!init?.convertURL) return null
-
-  const convertRes = await fetch(`${init.convertURL}${init.convertURL.includes("?") ? "&" : "?"}v=${videoId}&f=mp3&_=${Math.random()}`, { headers })
-  const convert = await convertRes.json().catch(() => null)
-  if (!convert?.progressURL || !convert?.downloadURL) return null
-
-  let progreso = 0
-  for (let i = 0; i < 20 && progreso < 3; i++) {
-    const estadoRes = await fetch(convert.progressURL, { headers })
-    const estado = await estadoRes.json().catch(() => null)
-    if ((estado?.error || 0) > 0) return null
-    progreso = Number(estado?.progress || 0)
-    if (progreso < 3) await espera(250)
-  }
-  if (progreso < 3) return null
-
-  const crudo = await bajarUrl(convert.downloadURL)
-  return convertirAMp3(crudo)
-}
-
-async function pedirAudio(urlVideo, usarIzuka) {
+async function pedirAudio(urlVideo) {
   for (let intento = 0; intento < 2; intento++) {
-    const json = usarIzuka
-      ? await pedirJson(`${API_IZUKA}?url=${encodeURIComponent(urlVideo)}&type=audio`)
-      : await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
-    const datos = json?.status ? (usarIzuka ? json.result : json.data) : null
-    const urlAudio = enlaceAudio(datos, usarIzuka)
+    const json = await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
+    const datos = json?.status ? json.data : null
+    const urlAudio = typeof datos?.download === "string" ? datos.download : datos?.download?.url
     if (!urlAudio || pareceHtml(urlAudio)) continue
-    if (usarIzuka || /googlevideo\.com/i.test(urlAudio) || await urlEsAudio(urlAudio)) {
-      return { datos, urlAudio }
-    }
+    if (await urlEsAudio(urlAudio)) return { datos, urlAudio }
   }
   return null
 }
 
-const handler = async (m, { conn, text, usedPrefix, command }) => {
+const handler = async (m, { conn, text, usedPrefix }) => {
   try {
     if (!text?.trim())
       return conn.sendMessage(m.chat, {
@@ -348,13 +147,12 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
       urlMiniatura = encontrado.portada
     }
 
-    const usarIzuka = command !== "play3"
-    const audio = await pedirAudio(urlVideo, usarIzuka)
+    const audio = await pedirAudio(urlVideo)
     if (!audio?.urlAudio) throw "no se pudo obtener el audio"
 
     const datosInfo = audio.datos
     const urlAudio = audio.urlAudio
-    const portada = datosInfo.thumbnail || datosInfo.image || urlMiniatura
+    const portada = datosInfo.image || urlMiniatura
     titulo = datosInfo.title || titulo
     autor = datosInfo.author || datosInfo.channel || autor
     duracion = datosInfo.duration || datosInfo.timestamp || duracion
@@ -384,36 +182,11 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
    
-    let bufferAudio = null
-    if (usarIzuka) {
-      try {
-        const propio = await urlAudioPropia(urlVideo)
-        if (!propio) throw new Error("sin enlace propio")
-        bufferAudio = await mp3DesdeEnlace(propio, UA_ANDROID)
-      } catch (errorAudio) {
-        console.error("[play]", String(errorAudio?.message || errorAudio).split("\n").pop())
-        try {
-          bufferAudio = await mp3DesdeEnlace(urlAudio)
-        } catch (errorIzuka) {
-          console.error("[play] izuka", String(errorIzuka?.message || errorIzuka).split("\n").pop())
-          bufferAudio = await audioPorConversor(urlVideo).catch(() => null)
-        }
-      }
-      if (!bufferAudio?.length) throw "no se pudo obtener el audio"
-      await conn.sendMessage(m.chat, {
-        audio: bufferAudio,
-        mimetype: "audio/mpeg",
-        ptt: false,
-        fileName: `${titulo}.mp3`
-      }, { quoted: citado })
-    } else {
-      await conn.sendMessage(m.chat, {
-        audio: { url: urlAudio },
-        mimetype: "audio/mpeg",
-        ptt: false,
-        fileName: `${titulo}.mp3`
-      }, { quoted: citado })
-    }
+    await conn.sendMessage(
+      m.chat,
+      { audio: { url: urlAudio }, fileName: `${titulo}.mp3`, mimetype: "audio/mpeg" },
+      { quoted: citado }
+    )
 
   } catch (e) {
     const crudo = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
@@ -427,7 +200,7 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
   }
 }
 
-handler.command = ["play", "ytmp3", "playaudio", "play3"]
+handler.command = ["play", "ytmp3", "playaudio"]
 handler.tags = ["descargas"]
 handler.group = true
 
