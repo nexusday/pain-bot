@@ -327,27 +327,31 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
    
-    const archivo = audioDeEnlace(urlAudio)
-    let binario
-    let mime = archivo.mime
-    let ext = archivo.ext
-    if (/googlevideo\.com/i.test(urlAudio)) {
+    let bufferAudio = null
+    if (usarIzuka || /googlevideo\.com/i.test(urlAudio)) {
       try {
-        binario = await bajarPorPartes(urlAudio)
+        const crudo = /googlevideo\.com/i.test(urlAudio)
+          ? await bajarPorPartes(urlAudio)
+          : await bajarUrl(urlAudio)
+        bufferAudio = crudo.slice(0, 3).toString() === "ID3" ? crudo : await convertirAMp3(crudo)
       } catch {
-        binario = await audioPorConversor(urlVideo)
-        mime = "audio/mpeg"
-        ext = "mp3"
+        bufferAudio = await audioPorConversor(urlVideo)
       }
-      if (!binario) throw "no se pudo obtener el audio"
+      if (!bufferAudio?.length) throw "no se pudo obtener el audio"
+      await conn.sendMessage(m.chat, {
+        audio: bufferAudio,
+        mimetype: "audio/mpeg",
+        ptt: false,
+        fileName: `${titulo}.mp3`
+      }, { quoted: citado })
     } else {
-      binario = { url: urlAudio }
+      await conn.sendMessage(m.chat, {
+        audio: { url: urlAudio },
+        mimetype: "audio/mpeg",
+        ptt: false,
+        fileName: `${titulo}.mp3`
+      }, { quoted: citado })
     }
-    await conn.sendMessage(
-      m.chat,
-      { audio: binario, fileName: `${titulo}.${ext}`, mimetype: mime },
-      { quoted: citado }
-    )
 
   } catch (e) {
     const crudo = typeof e === "string" ? e : (e?.message || "no se pudo descargar")
