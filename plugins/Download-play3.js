@@ -107,33 +107,24 @@ async function cuerpo(res) {
   return res.buffer()
 }
 
-async function pedirEnlace(url) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 90000)
-  const opciones = {
-    signal: ctrl.signal,
-    redirect: "follow",
-    headers: {
-      accept: "*/*",
-      "user-agent": "Mozilla/5.0",
-      referer: "https://www.youtube.com/"
-    }
-  }
-  try {
-    if (typeof globalThis.fetch === "function") {
-      const nativo = await globalThis.fetch(url, opciones).catch(() => null)
-      if (nativo?.ok) return nativo
-    }
-    return await fetch(url, opciones)
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 async function bajarMp3(url) {
   for (let intento = 0; intento < 3; intento++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 90000)
     try {
-      const res = await pedirEnlace(url)
+      const opciones = {
+        signal: ctrl.signal,
+        redirect: "follow",
+        headers: {
+          accept: "*/*",
+          "user-agent": "Mozilla/5.0",
+          referer: "https://www.youtube.com/"
+        }
+      }
+      let res = typeof globalThis.fetch === "function"
+        ? await globalThis.fetch(url, opciones).catch(() => null)
+        : null
+      if (!res?.ok) res = await fetch(url, opciones)
       if (!res?.ok) {
         await espera(1200 * (intento + 1))
         continue
@@ -141,6 +132,9 @@ async function bajarMp3(url) {
       const buffer = await cuerpo(res)
       if (esMp3(buffer)) return buffer
     } catch {}
+    finally {
+      clearTimeout(timer)
+    }
     await espera(1200 * (intento + 1))
   }
   return null
