@@ -81,35 +81,66 @@ function esMp3(buffer) {
   return buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0
 }
 
+async function segundosDelArchivo(buffer) {
+  try {
+    const mm = await import("music-metadata")
+    const meta = await mm.parseBuffer(buffer)
+    const segundos = Math.round(Number(meta?.format?.duration) || 0)
+    return segundos > 0 ? segundos : 0
+  } catch {
+    return 0
+  }
+}
+
+function textoDuracion(segundos) {
+  const total = Math.max(0, Math.floor(segundos))
+  const horas = Math.floor(total / 3600)
+  const minutos = Math.floor((total % 3600) / 60)
+  const resto = total % 60
+  const mm = String(minutos).padStart(horas ? 2 : 1, "0")
+  const ss = String(resto).padStart(2, "0")
+  return horas ? `${horas}:${mm}:${ss}` : `${minutos}:${ss}`
+}
+
 async function cuerpo(res) {
-  if (typeof res.buffer === "function") return res.buffer()
-  return Buffer.from(await res.arrayBuffer())
+  if (typeof res.arrayBuffer === "function") return Buffer.from(await res.arrayBuffer())
+  return res.buffer()
+}
+
+async function pedirEnlace(url) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 90000)
+  const opciones = {
+    signal: ctrl.signal,
+    redirect: "follow",
+    headers: {
+      accept: "*/*",
+      "user-agent": "Mozilla/5.0",
+      referer: "https://www.youtube.com/"
+    }
+  }
+  try {
+    if (typeof globalThis.fetch === "function") {
+      const nativo = await globalThis.fetch(url, opciones).catch(() => null)
+      if (nativo?.ok) return nativo
+    }
+    return await fetch(url, opciones)
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function bajarMp3(url) {
   for (let intento = 0; intento < 3; intento++) {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 90000)
     try {
-      const res = await fetch(url, {
-        signal: ctrl.signal,
-        redirect: "follow",
-        headers: {
-          accept: "*/*",
-          "user-agent": "Mozilla/5.0",
-          referer: "https://www.youtube.com/"
-        }
-      })
-      if (!res.ok) {
+      const res = await pedirEnlace(url)
+      if (!res?.ok) {
         await espera(1200 * (intento + 1))
         continue
       }
       const buffer = await cuerpo(res)
       if (esMp3(buffer)) return buffer
-    } catch {
-    } finally {
-      clearTimeout(timer)
-    }
+    } catch {}
     await espera(1200 * (intento + 1))
   }
   return null
@@ -168,6 +199,9 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     }
     if (!archivo) throw "no se pudo obtener el audio"
 
+    const segundos = segundosDeTexto(duracion) || await segundosDelArchivo(archivo)
+    if (segundos > 0) duracion = textoDuracion(segundos)
+
     const datosInfo = audio.datos
     titulo = datosInfo.title || titulo
     autor = datosInfo.author || autor
@@ -196,7 +230,6 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       await conn.sendMessage(m.chat, { text: informacion, contextInfo: { ...rcanal?.contextInfo } }, { quoted: citado })
     }
 
-    const segundos = segundosDeTexto(duracion)
     let convertido
     let audioEnvio = archivo
     let tipoAudio = "audio/mpeg"
