@@ -931,7 +931,7 @@ if (m) {
 try {  
   if (!opts['noprint']) {
     if (!imprimirMensaje) imprimirMensaje = (await import(`./lib/print.js`)).default
-    await imprimirMensaje(m, this)
+    void imprimirMensaje(m, this)
   }
 } catch (e) {  
   console.log(m, m.quoted, e)  
