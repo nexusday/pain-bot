@@ -190,20 +190,24 @@ export function listarBotsEnGrupo(participants = []) {
 }
 
 export function obtenerBotActivoDelGrupo(idChat) {
-  if (!global.db.data.modoSub) global.db.data.modoSub = {}
-  const value = global.db.data.modoSub[idChat]
+  const datos = global.db?.data
+  if (!datos) return null
+  if (!datos.modoSub || typeof datos.modoSub !== 'object') datos.modoSub = {}
+  const value = datos.modoSub[idChat]
   if (!value || value === 'all' || value === true) return null
   return String(value).replace(/\D/g, '') || null
 }
 
 export function establecerBotActivoDelGrupo(idChat, numeroBotOTodos) {
-  if (!global.db.data.modoSub) global.db.data.modoSub = {}
+  const datos = global.db?.data
+  if (!datos) return null
+  if (!datos.modoSub || typeof datos.modoSub !== 'object') datos.modoSub = {}
   if (!numeroBotOTodos || numeroBotOTodos === 'all' || numeroBotOTodos === 'off') {
-    delete global.db.data.modoSub[idChat]
+    delete datos.modoSub[idChat]
     return null
   }
   const num = String(numeroBotOTodos).replace(/\D/g, '')
-  global.db.data.modoSub[idChat] = num
+  datos.modoSub[idChat] = num
   return num
 }
 
