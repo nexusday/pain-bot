@@ -1,88 +1,112 @@
 import fetch from "node-fetch"
 import yts from "yt-search"
 
-const handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text) {
+const API_IZUKA = "https://my.izuka-api.xyz/api/downloader/ytmp3"
+
+function nombreAutor(autor) {
+  if (!autor) return "Desconocido"
+  if (typeof autor === "string") return autor.trim() || "Desconocido"
+  return autor.name || autor.channel || "Desconocido"
+}
+
+function tipoAudio(formato) {
+  const f = String(formato || "").toLowerCase()
+  if (f.includes("webm")) return { mime: "audio/webm", ext: "webm" }
+  if (f.includes("mp4") || f.includes("m4a") || f.includes("aac")) return { mime: "audio/mp4", ext: "m4a" }
+  return { mime: "audio/mpeg", ext: "mp3" }
+}
+
+async function pedirYtmp3(urlVideo) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 20000)
+  try {
+    const res = await fetch(`${API_IZUKA}?url=${encodeURIComponent(urlVideo)}`, {
+      signal: ctrl.signal,
+      headers: { accept: "application/json", "user-agent": "Mozilla/5.0" }
+    })
+    const json = await res.json()
+    const datos = json?.status ? json.result : null
+    const url = typeof datos?.download_url === "string" ? datos.download_url : ""
+    if (!url) return null
+    return { datos, url }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+const handler = async (m, { conn, text, usedPrefix }) => {
+  if (!text?.trim()) {
     return conn.sendMessage(m.chat, {
-      text: `[❗] Uso incorrecto.\n> *Ejemplo:* ${usedPrefix}play2 <canción>`,
-      contextInfo: {
-        ...rcanal.contextInfo
-      }
+      text: `[❗] Uso incorrecto.\n> *Ejemplo:* ${usedPrefix}play2 <canción o link>`,
+      contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 
-
   try {
-    
-    const busqueda = await yts(text)
-    if (!busqueda || !busqueda.videos || busqueda.videos.length === 0) {
-      return conn.sendMessage(m.chat, {
-        text: `[❗] No se encontró resultados para: ${text}`,
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
-      }, { quoted: m })
+    const enlace = (String(text).match(/https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/\S+|youtu\.be\/\S+)/i) || [""])[0]
+    let videoUrl = enlace
+    let titulo = "audio"
+    let autor = "Desconocido"
+    let duracion = "—"
+    let portada = ""
+
+    if (!videoUrl) {
+      const busqueda = await yts(text).catch(() => null)
+      const video = busqueda?.videos?.[0]
+      if (!video?.url) {
+        return conn.sendMessage(m.chat, {
+          text: `[❗] No se encontró resultados para: ${text}`,
+          contextInfo: { ...rcanal.contextInfo }
+        }, { quoted: m })
+      }
+      videoUrl = video.url
+      titulo = video.title || titulo
+      autor = nombreAutor(video.author)
+      duracion = video.timestamp || duracion
+      portada = video.thumbnail || video.image || ""
     }
 
-    const video = busqueda.videos[0]
-
-    
-   
-    const apiDescarga = `https://api.delirius.online/download/ytmp3?url=${encodeURIComponent(video.url)}`
-    const resDescarga = await fetch(apiDescarga).then(r => r.json())
-
-    if (!resDescarga?.status || !resDescarga.data) {
+    const audio = await pedirYtmp3(videoUrl)
+    if (!audio?.url) {
       return conn.sendMessage(m.chat, {
         text: `[❌] No se pudo descargar el audio.`,
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
+        contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
 
-  
-    const metadatos = {
-      title: resDescarga.data.title || video.title,
-      author: { name: (video.author && video.author.name) || video.author || "Desconocido" },
-      timestamp: video.timestamp,
-      thumbnail: resDescarga.data.image || video.image || video.thumbnail,
-      url: video.url
-    }
-    const descarga = {
-      url: typeof resDescarga.data.download === "string" ? resDescarga.data.download : resDescarga.data.download?.url,
-      filename: `${metadatos.title}.mp3`
-    }
+    titulo = audio.datos.title || titulo
+    const archivo = tipoAudio(audio.datos.format)
 
-    
     await conn.sendMessage(m.chat, {
-      audio: { url: descarga.url },
-      mimetype: "audio/mpeg",
+      audio: { url: audio.url },
+      mimetype: archivo.mime,
+      fileName: `${titulo}.${archivo.ext}`,
       ptt: false,
       contextInfo: {
         externalAdReply: {
-          title: `ִֶָ☾. 𝐓𝐢𝐭𝐮𝐥𝐨: ${metadatos.title}`,
-          body: `ִֶָ☾. 𝐀𝐮𝐭𝐨𝐫: ${metadatos.author.name} | 𝐃𝐮𝐫𝐚𝐜𝐢𝐨́𝐧: ${metadatos.timestamp}`,
-          thumbnailUrl: metadatos.thumbnail,
+          title: `ִֶָ☾. 𝐓𝐢𝐭𝐮𝐥𝐨: ${titulo}`,
+          body: `ִֶָ☾. 𝐀𝐮𝐭𝐨𝐫: ${autor} | 𝐃𝐮𝐫𝐚𝐜𝐢𝐨́𝐧: ${duracion}`,
+          thumbnailUrl: portada || undefined,
           mediaType: 4,
           renderLargerThumbnail: false,
-          sourceUrl: metadatos.url
+          sourceUrl: videoUrl
         }
       }
     }, { quoted: m })
-
   } catch (e) {
-    console.error('Error en play2:', e)
+    console.error("Error en play2:", e)
     await conn.sendMessage(m.chat, {
-      text: `[❌] *Error:* ${e.message}`,
-      contextInfo: {
-        ...rcanal.contextInfo
-      }
+      text: `[❌] *Error:* ${e.message || e}`,
+      contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   }
 }
 
-handler.command = ['play2', 'music2', 'song2', 'audio2']
-handler.tags = ['musica', 'audio', 'entretenimiento']
-handler.help = ['play2 <canción> - Reproducir música desde YouTube']
+handler.command = ["play2", "music2", "song2", "audio2"]
+handler.tags = ["musica", "audio", "entretenimiento"]
+handler.help = ["play2 <canción> - Reproducir música desde YouTube"]
+handler.group = true
 
-export default handler 
+export default handler
