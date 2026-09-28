@@ -120,14 +120,16 @@ function audioDeEnlace(url) {
   return { mime: "audio/mpeg", ext: "mp3" }
 }
 
-async function mp3DesdeEnlace(url) {
+const UA_ANDROID = "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip"
+
+async function mp3DesdeEnlace(url, agente = "Mozilla/5.0") {
   const dir = path.join(process.cwd(), "tmp")
   fs.mkdirSync(dir, { recursive: true })
   const salida = path.join(dir, `play_${crypto.randomBytes(6).toString("hex")}.mp3`)
   try {
     await execFileAsync("ffmpeg", [
       "-y",
-      "-user_agent", "Mozilla/5.0",
+      "-user_agent", agente,
       "-i", url,
       "-vn", "-map_metadata", "-1",
       "-ac", "2", "-ar", "44100",
@@ -142,6 +144,37 @@ async function mp3DesdeEnlace(url) {
   } finally {
     fs.rmSync(salida, { force: true })
   }
+}
+
+async function urlAudioPropia(urlVideo) {
+  const videoId = idDeYoutube(urlVideo)
+  if (!videoId) return null
+  const cuerpo = {
+    videoId,
+    context: {
+      client: {
+        clientName: "ANDROID",
+        clientVersion: "20.10.38",
+        hl: "en",
+        gl: "US"
+      }
+    }
+  }
+  const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "user-agent": UA_ANDROID,
+      "x-youtube-client-name": "3",
+      "x-youtube-client-version": "20.10.38"
+    },
+    body: JSON.stringify(cuerpo)
+  })
+  const json = await res.json().catch(() => null)
+  const lista = (json?.streamingData?.adaptiveFormats || [])
+    .filter(f => String(f.mimeType || "").startsWith("audio/") && f.url)
+    .sort((a, b) => (a.bitrate || 0) - (b.bitrate || 0))
+  return lista[0]?.url || null
 }
 
 async function bajarPorPartes(url) {
@@ -352,12 +385,19 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
    
     let bufferAudio = null
-    if (usarIzuka || /googlevideo\.com/i.test(urlAudio)) {
+    if (usarIzuka) {
       try {
-        bufferAudio = await mp3DesdeEnlace(urlAudio)
+        const propio = await urlAudioPropia(urlVideo)
+        if (!propio) throw new Error("sin enlace propio")
+        bufferAudio = await mp3DesdeEnlace(propio, UA_ANDROID)
       } catch (errorAudio) {
-        console.error("[play] ffmpeg:", errorAudio?.message || errorAudio)
-        bufferAudio = await audioPorConversor(urlVideo).catch(() => null)
+        console.error("[play]", String(errorAudio?.message || errorAudio).split("\n").pop())
+        try {
+          bufferAudio = await mp3DesdeEnlace(urlAudio)
+        } catch (errorIzuka) {
+          console.error("[play] izuka", String(errorIzuka?.message || errorIzuka).split("\n").pop())
+          bufferAudio = await audioPorConversor(urlVideo).catch(() => null)
+        }
       }
       if (!bufferAudio?.length) throw "no se pudo obtener el audio"
       await conn.sendMessage(m.chat, {
