@@ -16,6 +16,7 @@ import { esModoIos } from '../lib/menu-modo.js'
 import { getSubBotsLogsJid } from '../lib/newsletter-rcanal.js'
 import { canRegisterSubBot, getSubBotSlotsInfo } from "../lib/max-subs.js"
 import { fileURLToPath } from "url"
+import { tr } from '../lib/lang.js'
 
 
 const rcanal = global.rcanal || {
@@ -820,24 +821,26 @@ function construirErrorCodigoEmparejamiento(usedPrefix, mensajeError = 'conexió
 ╰─────────`.trim()
 }
 
-function construirMensajesBienvenidaSubBot({ nombreBot, botNumber: numeroBot, userName: nombreUsuario, usedPrefix = '.' }) {
+function construirMensajesBienvenidaSubBot({ conn, nombreBot, botNumber: numeroBot, userName: nombreUsuario, usedPrefix = '.' }) {
   const mensajePrivado = `
 \`*˚   ✩    ✦    ✩   ˚*\`
 
 ╭─ ✧
-┊ *ya te vinculaste* - *${nombreBot}*
+┊ *${tr(conn, 'ya te vinculaste', 'you are linked', 'você se vinculou')}* - *${nombreBot}*
 ╰─ ✧  ✩
-┊ tu sub-bot quedó conectado
-┊ nombre  ·  \`${nombreBot}\`
-┊ número  ·  \`+${numeroBot}\`
-┊ usuario  ·  \`${nombreUsuario}\`
-┊ puedes configurarlo así
-┊ \`${usedPrefix}setbotname <nombre>\`
-┊ \`${usedPrefix}setbotimg\`  ·  responde una imagen
+┊ ${tr(conn, 'tu sub-bot quedó conectado', 'your sub-bot is connected', 'seu sub-bot ficou conectado')}
+┊ ${tr(conn, 'nombre', 'name', 'nome')}  ·  \`${nombreBot}\`
+┊ ${tr(conn, 'número', 'number', 'número')}  ·  \`+${numeroBot}\`
+┊ ${tr(conn, 'usuario', 'user', 'usuário')}  ·  \`${nombreUsuario}\`
+┊ ${tr(conn, 'tu sub-bot no responde en la comunidad oficial', 'your sub-bot does not reply in the official community', 'seu sub-bot não responde na comunidade oficial')}
+┊ ${tr(conn, 'úsalo en grupos que no sean el oficial', 'use it in groups that are not the official one', 'use-o em grupos que não sejam o oficial')}
+┊ ${tr(conn, 'en el grupo', 'in the group', 'no grupo')}  ·  \`${usedPrefix}bot on\`
+┊ \`${usedPrefix}setbotname <${tr(conn, 'nombre', 'name', 'nome')}>\`
+┊ \`${usedPrefix}setbotimg\`  ·  ${tr(conn, 'responde una imagen', 'reply to an image', 'responda uma imagem')}
 ┊ \`${usedPrefix}setautoread on/off\`
 ┊ \`${usedPrefix}antipv on/off\`
-┊ \`${usedPrefix}setlen es/in/pt\`  ·  idioma
-┊ \`${usedPrefix}setmenu ios/android\`  ·  menú
+┊ \`${usedPrefix}setlen es/in/pt\`  ·  ${tr(conn, 'idioma', 'language', 'idioma')}
+┊ \`${usedPrefix}setmenu ios/android\`  ·  ${tr(conn, 'menú', 'menu', 'menu')}
 ┊ \`${usedPrefix}menu\`
 ╰─────────`.trim()
 
@@ -864,6 +867,7 @@ async function enviarBienvenidaSubBot({ sock, m, conn, replyJid, nombreBot, botN
   }
 
   const { privateMessage: mensajePrivado, channelMessage: mensajeCanal } = construirMensajesBienvenidaSubBot({
+    conn,
     nombreBot,
     botNumber: numeroBot,
     userName: nombreUsuario,
