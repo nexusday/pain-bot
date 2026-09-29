@@ -1,5 +1,20 @@
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1'
 
+const infoOriginal = console.info.bind(console)
+const avisoOriginal = console.warn.bind(console)
+const esSesionSignal = (args) => {
+  const texto = typeof args[0] === 'string' ? args[0] : ''
+  return texto.startsWith('Closing session') || texto.startsWith('Opening session') || texto.startsWith('Session already')
+}
+console.info = (...args) => {
+  if (esSesionSignal(args)) return
+  infoOriginal(...args)
+}
+console.warn = (...args) => {
+  if (esSesionSignal(args)) return
+  avisoOriginal(...args)
+}
+
 process.on('unhandledRejection', (reason) => {
   const msg = reason?.message || String(reason || '')
   if (msg.includes('sharp') || msg.includes('android-arm64')) {
@@ -613,7 +628,13 @@ global.reconnectSubBots = async function() {
           fromCommand: false
         })
         await esperarSubBotListo(folderDigits)
-        console.log(chalk.green(`Sub-bot ${folder} reconectado exitosamente`))
+        const quedoVivo = global.conns.some(c => {
+          if (!isSubBotAlive(c)) return false
+          const jidDigits = String(c.user?.jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+          return jidDigits && jidDigits === folderDigits
+        })
+        if (quedoVivo) console.log(chalk.green(`Sub-bot ${folder} reconectado exitosamente`))
+        else console.log(chalk.yellow(`Sub-bot ${folder} no quedó conectado`))
       } else {
         console.log(chalk.red(`No se pudo importar Pain Bot para ${folder}`))
       }
