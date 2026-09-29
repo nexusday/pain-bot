@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'fs'
 import fetch from 'node-fetch'
 
 import { antipvDebeIgnorar } from './lib/Antis/anti-pv.js'
+import { handleAIModes } from './lib/eventHandlers.js'
 import { handleAntiSystems, handleAntiMediaEarly } from './lib/antiHandlers.js'
 import { manejarAntiEstados } from './lib/Antis/anti-estados.js'
 import {
