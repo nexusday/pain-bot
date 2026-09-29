@@ -1002,12 +1002,12 @@ if (m) {
 }  
 
 try {  
-  if (!opts['noprint']) {
+  if (!opts['noprint'] && (m.plugin || m.command)) {
     if (!imprimirMensaje) imprimirMensaje = (await import(`./lib/print.js`)).default
     void imprimirMensaje(m, this)
   }
 } catch (e) {  
-  console.log(m, m.quoted, e)  
+  console.log(e?.message || e)  
 }  
 
 const ajustesLectura = global.db.data.settings[this.user.jid] || {}

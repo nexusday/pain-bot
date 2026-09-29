@@ -250,7 +250,7 @@ if (!opts['test']) {
       } finally {
         escribiendoDb = false
       }
-    }, 30 * 1000)
+    }, 2 * 60 * 1000)
   }
 }
 
