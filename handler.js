@@ -6,7 +6,7 @@ import { unwatchFile, watchFile, readFileSync, existsSync } from 'fs'
 import chalk from 'chalk'
 import fetch from 'node-fetch'
 
-import { handleAIModes } from './lib/eventHandlers.js'
+import { antipvDebeIgnorar } from './lib/Antis/anti-pv.js'
 import { handleAntiSystems, handleAntiMediaEarly } from './lib/antiHandlers.js'
 import { manejarAntiEstados } from './lib/Antis/anti-estados.js'
 import {
@@ -203,6 +203,7 @@ if (!m) return
 
 try {
   if (global.db.data == null) await global.loadDatabase()
+  if (antipvDebeIgnorar(this, m)) return
   if (shouldSkipGroupMessageEarly(this, m)) return
   if (esCharlaQueNoFrena(this, m)) return
 } catch (e) {
@@ -214,6 +215,7 @@ await this.pushMessage(chatUpdate.messages).catch(console.error)
 try {
 m = smsg(this, m) || m
 if (!m) return
+if (antipvDebeIgnorar(this, m)) return
 if (mensajeYaLeidoPuedeSoltarse(m)) return
 const conn = this
 iniciarAntiDelete(this)

@@ -833,6 +833,7 @@ function construirMensajesBienvenidaSubBot({ nombreBot, botNumber: numeroBot, us
 ┊ \`${usedPrefix}setbotname <nombre>\`
 ┊ \`${usedPrefix}setbotimg\`  ·  responde una imagen
 ┊ \`${usedPrefix}setautoread on/off\`
+┊ \`${usedPrefix}antipv on/off\`
 ┊ \`${usedPrefix}setlen es/in/pt\`  ·  idioma
 ┊ \`${usedPrefix}setmenu ios/android\`  ·  menú
 ┊ \`${usedPrefix}menu\`
