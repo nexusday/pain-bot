@@ -130,26 +130,6 @@ function elGrupoMiraCadaMensaje(chatId) {
   return false
 }
 
-function esRespuestaDeMenu(msg) {
-  let cuerpo = msg?.message
-  if (!cuerpo) return false
-  while (cuerpo?.ephemeralMessage?.message) cuerpo = cuerpo.ephemeralMessage.message
-  return Boolean(
-    cuerpo.buttonsResponseMessage ||
-    cuerpo.listResponseMessage ||
-    cuerpo.templateButtonReplyMessage ||
-    cuerpo.interactiveResponseMessage
-  )
-}
-
-function idChatCrudo(conn, msg) {
-  try {
-    return conn?.decodeJid?.(msg?.key?.remoteJid) || msg?.key?.remoteJid || ''
-  } catch {
-    return msg?.key?.remoteJid || ''
-  }
-}
-
 function hayRespuestaPendiente(chatId) {
   if (!chatId) return false
   if (global.pendingInvites?.[chatId]) return true
@@ -165,15 +145,16 @@ function hayRespuestaPendiente(chatId) {
   return false
 }
 
-/** La charla del grupo se hace igual, pero no delante de un comando. */
-function mensajeDeGrupoPuedeEsperar(conn, msg) {
-  const chatId = idChatCrudo(conn, msg)
-  if (!String(chatId).endsWith('@g.us')) return false
-  if (esRespuestaDeMenu(msg) || pareceComandoCrudo(msg)) return false
-  const texto = String(extraerTextoMensajeCrudo(msg) || '').trim().toLowerCase()
-  if (ORDENES_SUELTAS.has(texto)) return false
-  if (hayRespuestaPendiente(chatId)) return false
-  if (elGrupoMiraCadaMensaje(chatId)) return false
+function mensajeYaLeidoPuedeSoltarse(m) {
+  if (!m?.isGroup || m.fromMe) return false
+  const texto = String(m.text || '').trim()
+  if (global.prefix instanceof RegExp && texto && global.prefix.test(texto)) return false
+  if (ORDENES_SUELTAS.has(texto.toLowerCase())) return false
+  if (global.db?.data?.antiprefijo?.[m.chat] === true) return false
+  if (elGrupoMiraCadaMensaje(m.chat)) return false
+  if (hayRespuestaPendiente(m.chat)) return false
+  const tipo = m.mtype || ''
+  if (/buttons|list|template|interactive/i.test(tipo)) return false
   return true
 }
 
@@ -204,7 +185,6 @@ if (!m) return
 try {
   if (global.db.data == null) await global.loadDatabase()
   if (shouldSkipGroupMessageEarly(this, m)) return
-  if (mensajeDeGrupoPuedeEsperar(this, m)) return
 } catch (e) {
   console.error('Error modosub early:', e)
 }
@@ -214,6 +194,7 @@ await this.pushMessage(chatUpdate.messages).catch(console.error)
 try {
 m = smsg(this, m) || m
 if (!m) return
+if (mensajeYaLeidoPuedeSoltarse(m)) return
 const conn = this
 iniciarAntiDelete(this)
 
