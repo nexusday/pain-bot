@@ -9,6 +9,7 @@ import util from "util"
 import * as ws from "ws"
 const { CONNECTING } = ws
 import { makeWASocket } from "../lib/simple.js"
+import { conSocketEstable } from "../lib/socket-estable.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
 import { esModoIos } from '../lib/menu-modo.js'
@@ -316,7 +317,7 @@ async function iniciarSubBot(options) {
       return
     }
 
-    const opcionesConexion = {
+    const opcionesConexion = conSocketEstable({
       logger: pino({ level: "fatal" }),
       printQRInTerminal: false,
       auth: {
@@ -327,11 +328,9 @@ async function iniciarSubBot(options) {
       msgRetryCache: cacheReintentoMsg,
       browser: Browsers.ubuntu('Chrome'),
       version,
-      syncFullHistory: false,
       markOnlineOnConnect: false,
       qrTimeout: 120_000,
-      generateHighQualityLinkPreview: false
-    }
+    })
 
     let sock = makeWASocket(opcionesConexion)
     sock.isInit = false

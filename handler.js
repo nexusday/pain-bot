@@ -20,6 +20,7 @@ import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant, candidatosJidRemitente, jidsSeSolapan } from './lib/group-participant.js'
 import { metadataGrupo } from './lib/group-meta-cache.js'
+import { programarLectura } from './lib/lectura-lote.js'
 import { shouldSkipGroupMessageEarly, extraerTextoMensajeCrudo } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
@@ -136,6 +137,8 @@ try {
 } catch (e) {
   console.error('Error modosub early:', e)
 }
+
+await new Promise((resolve) => setImmediate(resolve))
 
 await this.pushMessage(chatUpdate.messages).catch(console.error)
 
@@ -314,17 +317,8 @@ if (m.isGroup) {
   participants = groupMetadata.participants || []
   const botEnCache = findBotParticipant(participants, this)
   const adminEnCache = botEnCache?.admin === 'admin' || botEnCache?.admin === 'superadmin'
-  if (!adminEnCache) {
-    const marca = this._reconsultaAdmin?.[m.chat] || 0
-    if (Date.now() - marca > 20000) {
-      if (!this._reconsultaAdmin) this._reconsultaAdmin = {}
-      this._reconsultaAdmin[m.chat] = Date.now()
-      const fresco = await metadataGrupo(this, m.chat, { forzar: true })
-      if (fresco?.participants?.length) {
-        groupMetadata = fresco
-        participants = fresco.participants
-      }
-    }
+  if (!adminEnCache && participants.length) {
+    void metadataGrupo(this, m.chat, { forzar: true })
   }
 }
 const user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}  
@@ -993,7 +987,7 @@ const saltarAutoLeer = isKnownViewOnce(idMensaje) || isViewOnceCandidate(m)
 
 if (debeAutoLeer && !saltarAutoLeer && m.key) {
   try {
-    void this.readMessages([m.key]).catch(() => {})
+    programarLectura(this, m.key)
   } catch (e) {
     console.error('Error al marcar como leído:', e)
   }

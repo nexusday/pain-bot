@@ -26,6 +26,7 @@ import { format } from 'util'
 import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
+import { conSocketEstable } from './lib/socket-estable.js'
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoJsonCompacto } from './lib/db-json.js'
@@ -41,7 +42,6 @@ const {
   fetchLatestBaileysVersion,
   Browsers,
   makeCacheableSignalKeyStore,
-  jidNormalizedUser,
 } = await import('@whiskeysockets/baileys')
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 3000
@@ -159,7 +159,7 @@ const logger = pino({
 }).child({ class: 'client' })
 logger.level = 'fatal'
 
-const connectionOptions = {
+const connectionOptions = conSocketEstable({
   version: version,
   logger,
   printQRInTerminal: false,
@@ -169,21 +169,12 @@ const connectionOptions = {
   },
   browser: Browsers.ubuntu('Chrome'),
   markOnlineOnConnect: true,
-  generateHighQualityLinkPreview: false,
-  syncFullHistory: false,
-  retryRequestDelayMs: 250,
-  transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
-  maxMsgRetryCount: 5,
   appStateMacVerification: {
     patch: false,
     snapshot: false,
   },
-  getMessage: async (key) => {
-    const jid = jidNormalizedUser(key.remoteJid)
-    const msg = await store.loadMessage(jid, key.id)
-    return msg?.message || undefined
-  },
-}
+  getMessage: async () => undefined,
+})
 
 global.conn = makeWASocket(connectionOptions)
 /** Alias vivo del socket principal (se actualiza en reloadHandler). */

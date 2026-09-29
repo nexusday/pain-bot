@@ -7,22 +7,24 @@ import cluster from 'node:cluster'
 
 const { setupMaster, fork } = cluster
 import { watchFile, unwatchFile } from 'fs'
-import cfonts from 'cfonts'
-
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const require = createRequire(__dirname)
 
-cfonts.say('PAIN\nBOT', {
-  font: 'block',
-  align: 'center',
-  gradient: ['cyan', 'blue']
-})
-
-cfonts.say('WhatsApp Multi-Bot-Official', {
-  font: 'simple',
-  align: 'center',
-  gradient: ['blue', 'white']
-})
+try {
+  const { default: cfonts } = await import('cfonts')
+  cfonts.say('PAIN\nBOT', {
+    font: 'block',
+    align: 'center',
+    gradient: ['cyan', 'blue']
+  })
+  cfonts.say('WhatsApp Multi-Bot-Official', {
+    font: 'simple',
+    align: 'center',
+    gradient: ['blue', 'white']
+  })
+} catch {
+  console.log('PAIN BOT')
+}
 
 let isWorking = false
 

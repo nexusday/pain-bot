@@ -52,16 +52,20 @@ async function main() {
     return
   }
 
-  console.log('[sharp] no carga en este sistema (típico en Termux/android-arm64)')
-  console.log('[sharp] instalando soporte WebAssembly...')
+  if (!isTermuxOrAndroid()) {
+    console.log('[sharp] no cargó. En Pterodactyl el bot sigue sin reinstalar paquetes.')
+    console.log('[sharp] las imágenes pueden fallar hasta que sharp esté bien instalado en este sistema.')
+    return
+  }
+
+  console.log('[sharp] no carga en Termux/android. Instalando soporte WebAssembly...')
 
   const ok = runNpm([
     'install',
     'sharp@0.34.1',
     '@img/sharp-wasm32@0.34.1',
     '--cpu=wasm32',
-    '--no-bin-links',
-    '--prefer-online'
+    '--no-bin-links'
   ])
 
   if (!ok) {
