@@ -1,9 +1,10 @@
 import fs from 'fs'
 import { join } from 'path'
+import { esDuenoPrincipal } from '../lib/staff.js'
 
-let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
-  if (!isOwner) {
-    return m.reply('*[❗] Solo los dueños pueden usar este comando.*')
+let handler = async (m, { conn, args, usedPrefix, command }) => {
+  if (!esDuenoPrincipal(m, conn)) {
+    return m.reply('*[❗] Solo el owner del bot principal puede usar este comando.*')
   }
 
   if (!args[0]) {

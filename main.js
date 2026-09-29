@@ -26,7 +26,7 @@ import { format } from 'util'
 import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
-import { conSocketEstable } from './lib/socket-estable.js'
+import { conSocketEstable, mantenerPrekeys } from './lib/socket-estable.js'
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoJsonCompacto } from './lib/db-json.js'
@@ -175,7 +175,6 @@ const connectionOptions = conSocketEstable({
     patch: false,
     snapshot: false,
   },
-  getMessage: async () => undefined,
   msgRetryCache: cacheReintentoPrincipal,
 })
 
@@ -333,6 +332,7 @@ async function connectionUpdate(update) {
       console.error('[canal] Error al resolver config:', err?.message || err)
     }
     mantenerPresenciaPrincipal(sock)
+    mantenerPrekeys(sock)
     return
   }
 
