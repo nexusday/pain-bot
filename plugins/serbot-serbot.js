@@ -542,11 +542,13 @@ async function iniciarSubBot(options) {
           detenerWatchdog()
           return
         }
-        if (reconectando) {
+        if (reconectando || cierrePropio) {
+          cierrePropio = false
           return
         }
         reconectando = true
-        console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). Reconectando...\n`))
+        const cola = 5000 + (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
+        console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). Reconectando en ${Math.round(cola / 1000)}s...\n`))
         // Fuera del evento de conexión y sin recargar handler.js,
         // para que el principal y los demás subbots sigan respondiendo.
         setTimeout(() => {
@@ -554,7 +556,7 @@ async function iniciarSubBot(options) {
             console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
             reconectando = false
           })
-        }, 3000)
+        }, cola)
         return
       }
 
@@ -638,6 +640,7 @@ async function iniciarSubBot(options) {
     // El reenganche se arma más abajo, cuando ya existe recargarHandler.
     detenerWatchdog()
 
+    let cierrePropio = false
     let handler = await import('../handler.js')
     let recargarHandler = async function (restatConn) {
       if (restatConn) {
@@ -645,6 +648,8 @@ async function iniciarSubBot(options) {
         const chatsAnteriores = sock.chats
         const inicioAnterior = sock.startTime
         const idAnterior = path.basename(pathAYBot)
+        cierrePropio = true
+        reconectando = true
         try { sock.ws.close() } catch { }
         sock.ev.removeAllListeners()
         sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
@@ -701,9 +706,9 @@ async function iniciarSubBot(options) {
           reconectando = false
           return
         }
-        if (emparejamientoEnCurso) return
+        if (emparejamientoEnCurso || reconectando) return
         if (!sock.authState?.creds?.registered) return
-        if (Date.now() - vistoUsuarioEn < 25_000) return
+        if (Date.now() - vistoUsuarioEn < 90_000) return
 
         vistoUsuarioEn = Date.now()
         reconectando = false
