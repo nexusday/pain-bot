@@ -1,12 +1,10 @@
-import fs from 'fs'
-import { join } from 'path'
+import { idiomaDe, tr } from '../lib/lang.js'
+import { listarBancoAdivinanzas } from '../lib/banco-adivinanzas.js'
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
     let usuario = global.db.data.users[m.sender]
-    if (!usuario) global.db.data.users[m.sender] = {}
-    
-    let monedas = usuario.coins || 0
+    if (!usuario) usuario = global.db.data.users[m.sender] = {}
     
     
     const cooldown = 3 * 60 * 1000 
@@ -16,39 +14,32 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (tiempoRestante > 0) {
       const minutos = Math.floor(tiempoRestante / 60000)
       const segundos = Math.floor((tiempoRestante % 60000) / 1000)
+      const espera = tr(conn,
+        `[❗] Debes esperar ${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''} para volver a jugar.`,
+        `[❗] Wait ${minutos} minute${minutos !== 1 ? 's' : ''} and ${segundos} second${segundos !== 1 ? 's' : ''} to play again.`,
+        `[❗] Espera ${minutos} minuto${minutos !== 1 ? 's' : ''} e ${segundos} segundo${segundos !== 1 ? 's' : ''} para jogar outra vez.`
+      )
       return conn.sendMessage(m.chat, {
-        text: `[❗] Debes esperar ${minutos} minuto${minutos !== 1 ? 's' : ''} y ${segundos} segundo${segundos !== 1 ? 's' : ''} para volver a jugar.`,
+        text: espera,
         contextInfo: {
           ...rcanal.contextInfo
         }
       }, { quoted: m })
     }
-    
-    
-    const adivinanzasPath = join('./storage/databases/adivinanzas.json')
-    let adivinanzas = []
-    
-    try {
-      const adivinanzasData = fs.readFileSync(adivinanzasPath, 'utf8')
-      adivinanzas = JSON.parse(adivinanzasData)
-    } catch (error) {
-      console.error('Error cargando adivinanzas:', error)
-      return conn.sendMessage(m.chat, {
-        text: '[❌] Error al cargar las adivinanzas.',
-        contextInfo: {
-          ...rcanal.contextInfo
-        }
-      }, { quoted: m })
-    }
-    
-    
-    const adivinanza = adivinanzas[Math.floor(Math.random() * adivinanzas.length)]
-    
-    
+
+    const lang = idiomaDe(conn)
+    const adivinanzas = listarBancoAdivinanzas()
+    const item = adivinanzas[Math.floor(Math.random() * adivinanzas.length)]
+    const pregunta = item.pregunta[lang] || item.pregunta.es
+    const respuestas = item.respuesta[lang] || item.respuesta.es
+    const categoria = item.categoria[lang] || item.categoria.es
+    const adivinanza = { pregunta, categoria, respuesta: respuestas[0], respuestas }
+
     if (!global.db.data.adivinanzasActivas) global.db.data.adivinanzasActivas = {}
     global.db.data.adivinanzasActivas[m.chat] = {
-      pregunta: adivinanza.pregunta,
-      respuesta: adivinanza.respuesta.toLowerCase(),
+      pregunta,
+      respuesta: respuestas[0],
+      respuestas,
       activa: true,
       creadaPor: m.sender,
       timestamp: Date.now(),
@@ -58,6 +49,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     global.db.data.users[m.sender].lastAdivinanza = Date.now()
     
+    const premioLbl = tr(conn, 'premio', 'prize', 'prémio')
+    const tiempoLbl = tr(conn, 'tiempo', 'time', 'tempo')
     let texto = `
 \`*˚   ✩    ✦    ✩   ˚*\`
 
@@ -65,8 +58,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 ┊ *${adivinanza.pregunta}*
 ╰─ ✧  ✩
 ┊ ${adivinanza.categoria || '—'}
-┊ premio  ·  \`250-500 ${global.moneda}\`
-┊ tiempo  ·  \`60s\`
+┊ ${premioLbl}  ·  \`250-500 ${global.moneda}\`
+┊ ${tiempoLbl}  ·  \`60s\`
 ╰─────────`.trim()
     
     return conn.sendMessage(m.chat, {
@@ -80,7 +73,11 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   } catch (error) {
     console.error('Error en juego de adivinanzas:', error)
     return conn.sendMessage(m.chat, {
-      text: '[❌] Ocurrió un error al ejecutar el juego de adivinanzas.',
+      text: tr(conn,
+        '[❌] Ocurrió un error al ejecutar el juego de adivinanzas.',
+        '[❌] The riddle game failed.',
+        '[❌] O jogo de adivinhas falhou.'
+      ),
       contextInfo: {
         ...rcanal.contextInfo
       }

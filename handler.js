@@ -29,7 +29,8 @@ import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker
 import { trackUserMessage } from './lib/msg-activity.js'
 import { getStaffOwnerIds } from './lib/staff.js'
 import { estaEnBlackn } from './lib/blackn.js'
-import { idiomaDe } from './lib/lang.js'
+import { idiomaDe, tr } from './lib/lang.js'
+import { coincideRespuesta } from './lib/banco-adivinanzas.js'
 import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
@@ -730,7 +731,11 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
       adivinanzaActiva.respondida = true
       
       await this.sendMessage(m.chat, {
-        text: `👻 𝗔𝗱𝗶𝘃𝗶𝗻𝗮𝗻𝘇𝗮 𝗲𝘅𝗽𝗶𝗿𝗮𝗱𝗼\n\n> *Respuesta:* ${adivinanzaActiva.respuesta}\n> Nadie pudo adivinarlo.`,
+        text: tr(this,
+          `👻 𝗔𝗱𝗶𝘃𝗶𝗻𝗮𝗻𝘇𝗮 𝗲𝘅𝗽𝗶𝗿𝗮𝗱𝗮\n\n> *Respuesta:* ${adivinanzaActiva.respuesta}\n> Nadie pudo adivinarla.`,
+          `👻 𝗥𝗶𝗱𝗱𝗹𝗲 𝗲𝘅𝗽𝗶𝗿𝗲𝗱\n\n> *Answer:* ${adivinanzaActiva.respuesta}\n> Nobody guessed it.`,
+          `👻 𝗔𝗱𝗶𝘃𝗶𝗻𝗵𝗮 𝗲𝘅𝗽𝗶𝗿𝗮𝗱𝗮\n\n> *Resposta:* ${adivinanzaActiva.respuesta}\n> Ninguém acertou.`
+        ),
         contextInfo: {
           ...rcanal.contextInfo
         }
@@ -740,8 +745,10 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
     }
     
   
-    const respuestaUsuario = m.text.toLowerCase().trim()
-    if (respuestaUsuario === adivinanzaActiva.respuesta) {
+    const lista = Array.isArray(adivinanzaActiva.respuestas) && adivinanzaActiva.respuestas.length
+      ? adivinanzaActiva.respuestas
+      : [adivinanzaActiva.respuesta]
+    if (coincideRespuesta(m.text, lista)) {
      
       adivinanzaActiva.activa = false
       adivinanzaActiva.respondida = true
@@ -755,7 +762,11 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
       user.coins = (user.coins || 0) + premio
       
       await this.sendMessage(m.chat, {
-        text: ` 🎉 𝗧𝗲𝗻𝗲𝗺𝗼𝘀 𝘂𝗻 𝗴𝗮𝗻𝗮𝗱𝗼𝗿 🎉\n\n> *Ganador:* @${m.sender.split('@')[0]}\n> *Respuesta:* ${adivinanzaActiva.respuesta}\n> *Premio:* +${premio} ${global.moneda}\n> *Total:* ${user.coins} ${global.moneda}`,
+        text: tr(this,
+          ` 🎉 𝗧𝗲𝗻𝗲𝗺𝗼𝘀 𝘂𝗻 𝗴𝗮𝗻𝗮𝗱𝗼𝗿 🎉\n\n> *Ganador:* @${m.sender.split('@')[0]}\n> *Respuesta:* ${adivinanzaActiva.respuesta}\n> *Premio:* +${premio} ${global.moneda}\n> *Total:* ${user.coins} ${global.moneda}`,
+          ` 🎉 𝗪𝗲 𝗵𝗮𝘃𝗲 𝗮 𝘄𝗶𝗻𝗻𝗲𝗿 🎉\n\n> *Winner:* @${m.sender.split('@')[0]}\n> *Answer:* ${adivinanzaActiva.respuesta}\n> *Prize:* +${premio} ${global.moneda}\n> *Total:* ${user.coins} ${global.moneda}`,
+          ` 🎉 𝗧𝗲𝗺𝗼𝘀 𝘂𝗺 𝘃𝗲𝗻𝗰𝗲𝗱𝗼𝗿 🎉\n\n> *Vencedor:* @${m.sender.split('@')[0]}\n> *Resposta:* ${adivinanzaActiva.respuesta}\n> *Prémio:* +${premio} ${global.moneda}\n> *Total:* ${user.coins} ${global.moneda}`
+        ),
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [m.sender]
