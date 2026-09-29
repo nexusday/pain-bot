@@ -592,21 +592,6 @@ watch(join(__dirname, 'lib'), { recursive: true }, (_evento, filename) => {
 await global.reloadHandler()
 
 
-function esperarSubBotListo(digitos, topeMs = 20000) {
-  const inicio = Date.now()
-  return new Promise((resolve) => {
-    const mirar = () => {
-      const listo = (global.conns || []).some((c) => {
-        const n = String(c?.user?.jid || c?.user?.id || '').split('@')[0].split(':')[0].replace(/\D/g, '')
-        return n && n === digitos && c?.user
-      })
-      if (listo || Date.now() - inicio >= topeMs) return resolve()
-      setTimeout(mirar, 400)
-    }
-    mirar()
-  })
-}
-
 global.reconnectSubBots = async function() {
   if (!global.conns || !Array.isArray(global.conns)) {
     global.conns = []
@@ -631,27 +616,28 @@ global.reconnectSubBots = async function() {
   console.log(chalk.cyan(`\nReconectando ${subBotFolders.length} sub-bots...`))
 
   const serbotModule = await import('./plugins/serbot-serbot.js')
+  const TAMANO = 6
+  const PAUSA_MS = 350
 
-  for (const folder of subBotFolders) {
+  const isSubBotAlive = (c) => {
+    if (!c?.user?.jid) return false
+    try {
+      if (c.ws?.isOpen === true) return true
+      const st = c.ws?.socket?.readyState
+      return st === 1 || st === CONNECTING
+    } catch {
+      return false
+    }
+  }
+
+  async function conectarUno(folder) {
     try {
       const botPath = join(serbotDir, folder)
       const credsPath = join(botPath, 'creds.json')
-      
+
       if (!existsSync(credsPath)) {
         console.log(chalk.red(`No se encontró creds.json en ${folder}`))
-        continue
-      }
-
-     
-      const isSubBotAlive = (c) => {
-        if (!c?.user?.jid) return false
-        try {
-          if (c.ws?.isOpen === true) return true
-          const st = c.ws?.socket?.readyState
-          return st === 1 || st === CONNECTING
-        } catch {
-          return false
-        }
+        return
       }
 
       const folderDigits = String(folder).replace(/\D/g, '')
@@ -663,10 +649,9 @@ global.reconnectSubBots = async function() {
 
       if (isAlreadyConnected) {
         console.log(chalk.green(`Sub-bot ${folder} ya está conectado`))
-        continue
+        return
       }
 
-      // Quitar entradas muertas del mismo número antes de reconectar
       global.conns = global.conns.filter(c => {
         if (!c?.user?.jid) return isSubBotAlive(c)
         const jidDigits = String(c.user.jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
@@ -674,31 +659,34 @@ global.reconnectSubBots = async function() {
         return true
       })
 
-      
-      if (serbotModule.AYBot) {
-        await serbotModule.AYBot({
-          pathAYBot: botPath,
-          m: null,
-          conn: global.conn,
-          args: [],
-          usedPrefix: '.',
-          command: 'qr',
-          fromCommand: false
-        })
-        await esperarSubBotListo(folderDigits)
-        console.log(chalk.green(`Sub-bot ${folder} reconectado exitosamente`))
-      } else {
+      if (!serbotModule.AYBot) {
         console.log(chalk.red(`No se pudo importar Pain Bot para ${folder}`))
+        return
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
+      await serbotModule.AYBot({
+        pathAYBot: botPath,
+        m: null,
+        conn: global.conn,
+        args: [],
+        usedPrefix: '.',
+        command: 'qr',
+        fromCommand: false
+      })
     } catch (error) {
       console.log(chalk.red(`Error reconectando sub-bot ${folder}:`, error.message))
     }
   }
 
-  console.log(chalk.cyan(`\nProceso de reconexión de sub-bots completado`))
+  for (let i = 0; i < subBotFolders.length; i += TAMANO) {
+    const lote = subBotFolders.slice(i, i + TAMANO)
+    await Promise.all(lote.map((folder) => conectarUno(folder)))
+    if (i + TAMANO < subBotFolders.length) {
+      await new Promise((resolve) => setTimeout(resolve, PAUSA_MS))
+    }
+  }
+
+  console.log(chalk.cyan(`\nConexión de ${subBotFolders.length} sub-bots en marcha`))
 }
 
 
