@@ -20,6 +20,7 @@ import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant, candidatosJidRemitente, jidsSeSolapan } from './lib/group-participant.js'
 import { metadataGrupo } from './lib/group-meta-cache.js'
+import { antiActivo } from './lib/Antis/anti-modo.js'
 import { shouldSkipGroupMessageEarly, extraerTextoMensajeCrudo } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
@@ -107,9 +108,27 @@ function pluginsEnCache() {
 }
 
 const ORDENES_SUELTAS = new Set(['abrir', 'cerrar', 'del', 'delete', 'eliminar'])
-const colaMensajesGrupo = []
-let drenandoGrupos = false
-const TOPE_COLA_GRUPO = 3000
+const ESCUCHA_CADA_MENSAJE = [
+  'antiLink', 'antiSpam', 'antiPalabra', 'antiBot', 'antiEstados', 'antiViewOnce',
+  'antiDelete', 'antiSticker', 'antiImg', 'antiVer', 'antiAudio', 'antiVideo',
+  'antiDocument', 'antiContact', 'antiMention', 'antiCaracter', 'soloAdmin', 'stickerBan',
+  'modoIA', 'modoHot', 'modoIlegal', 'modoHuman', 'modoSad', 'modoPsico', 'modoCustom', 'modoDescargas'
+]
+
+function elGrupoMiraCadaMensaje(chatId) {
+  const datos = global.db?.data
+  if (!datos || !chatId) return false
+  for (const clave of ESCUCHA_CADA_MENSAJE) {
+    const valor = datos[clave]?.[chatId]
+    if (clave.startsWith('modo')) {
+      if (valor === true) return true
+      continue
+    }
+    if (antiActivo(valor)) return true
+  }
+  if (datos.muted?.[chatId]?.length) return true
+  return false
+}
 
 function esRespuestaDeMenu(msg) {
   let cuerpo = msg?.message
@@ -154,27 +173,8 @@ function mensajeDeGrupoPuedeEsperar(conn, msg) {
   const texto = String(extraerTextoMensajeCrudo(msg) || '').trim().toLowerCase()
   if (ORDENES_SUELTAS.has(texto)) return false
   if (hayRespuestaPendiente(chatId)) return false
+  if (elGrupoMiraCadaMensaje(chatId)) return false
   return true
-}
-
-function drenarMensajesGrupo() {
-  const trabajo = colaMensajesGrupo.shift()
-  if (!trabajo) {
-    drenandoGrupos = false
-    return
-  }
-  Promise.resolve()
-    .then(trabajo)
-    .catch((e) => console.error('cola grupo:', e?.message || e))
-    .finally(() => setImmediate(drenarMensajesGrupo))
-}
-
-function encolarMensajeGrupo(trabajo) {
-  if (colaMensajesGrupo.length >= TOPE_COLA_GRUPO) colaMensajesGrupo.shift()
-  colaMensajesGrupo.push(trabajo)
-  if (drenandoGrupos) return
-  drenandoGrupos = true
-  setImmediate(drenarMensajesGrupo)
 }
 
 function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
@@ -187,7 +187,7 @@ function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
   return comandos.has(palabra)
 }
 
-export async function handler(chatUpdate, opciones = {}) {
+export async function handler(chatUpdate) {
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
 if (chatUpdate.type && chatUpdate.type !== 'notify') {
@@ -204,10 +204,7 @@ if (!m) return
 try {
   if (global.db.data == null) await global.loadDatabase()
   if (shouldSkipGroupMessageEarly(this, m)) return
-  if (!opciones.yaEnCola && mensajeDeGrupoPuedeEsperar(this, m)) {
-    encolarMensajeGrupo(() => handler.call(this, chatUpdate, { yaEnCola: true }))
-    return
-  }
+  if (mensajeDeGrupoPuedeEsperar(this, m)) return
 } catch (e) {
   console.error('Error modosub early:', e)
 }
