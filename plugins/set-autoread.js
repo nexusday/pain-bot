@@ -33,7 +33,7 @@ let handler = async (m, { conn, usedPrefix, command, text, args }) => {
 
   
   if (!text) {
-    const estadoAutoLeer = configuracion.autoRead !== false ? 'Activado ✅' : 'Desactivado ❌'
+    const estadoAutoLeer = configuracion.autoRead === true ? 'Activado ✅' : 'Desactivado ❌'
     return conn.reply(m.chat, `📖 𝗔𝘂𝘁𝗼-𝗟𝗲𝗲𝗿
 
 > *Estado actual:* ${estadoAutoLeer}

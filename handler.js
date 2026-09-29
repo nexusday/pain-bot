@@ -20,7 +20,6 @@ import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
 import { findGroupParticipant, findBotParticipant, candidatosJidRemitente, jidsSeSolapan } from './lib/group-participant.js'
 import { metadataGrupo } from './lib/group-meta-cache.js'
-import { programarLectura } from './lib/lectura-lote.js'
 import { shouldSkipGroupMessageEarly, extraerTextoMensajeCrudo } from './plugins/modo-sub.js'
 import { shouldBlockByGrupoOff } from './lib/bot-groups.js'
 import { sendMichiBoard } from './lib/michi-board.js'
@@ -107,6 +106,77 @@ function pluginsEnCache() {
   return cachePlugins
 }
 
+const ORDENES_SUELTAS = new Set(['abrir', 'cerrar', 'del', 'delete', 'eliminar'])
+const colaMensajesGrupo = []
+let drenandoGrupos = false
+const TOPE_COLA_GRUPO = 3000
+
+function esRespuestaDeMenu(msg) {
+  let cuerpo = msg?.message
+  if (!cuerpo) return false
+  while (cuerpo?.ephemeralMessage?.message) cuerpo = cuerpo.ephemeralMessage.message
+  return Boolean(
+    cuerpo.buttonsResponseMessage ||
+    cuerpo.listResponseMessage ||
+    cuerpo.templateButtonReplyMessage ||
+    cuerpo.interactiveResponseMessage
+  )
+}
+
+function idChatCrudo(conn, msg) {
+  try {
+    return conn?.decodeJid?.(msg?.key?.remoteJid) || msg?.key?.remoteJid || ''
+  } catch {
+    return msg?.key?.remoteJid || ''
+  }
+}
+
+function hayRespuestaPendiente(chatId) {
+  if (!chatId) return false
+  if (global.pendingInvites?.[chatId]) return true
+  if (global.pendingMarriages?.[chatId]) return true
+  if (global.games?.[chatId]) return true
+  if (global.db?.data?.adivinanzasActivas?.[chatId]) return true
+  const descargas = global.pendingYtDescarga
+  if (!descargas) return false
+  const prefijo = `${chatId}|`
+  for (const clave in descargas) {
+    if (clave.startsWith(prefijo)) return true
+  }
+  return false
+}
+
+/** La charla del grupo se hace igual, pero no delante de un comando. */
+function mensajeDeGrupoPuedeEsperar(conn, msg) {
+  const chatId = idChatCrudo(conn, msg)
+  if (!String(chatId).endsWith('@g.us')) return false
+  if (esRespuestaDeMenu(msg) || pareceComandoCrudo(msg)) return false
+  const texto = String(extraerTextoMensajeCrudo(msg) || '').trim().toLowerCase()
+  if (ORDENES_SUELTAS.has(texto)) return false
+  if (hayRespuestaPendiente(chatId)) return false
+  return true
+}
+
+function drenarMensajesGrupo() {
+  const trabajo = colaMensajesGrupo.shift()
+  if (!trabajo) {
+    drenandoGrupos = false
+    return
+  }
+  Promise.resolve()
+    .then(trabajo)
+    .catch((e) => console.error('cola grupo:', e?.message || e))
+    .finally(() => setImmediate(drenarMensajesGrupo))
+}
+
+function encolarMensajeGrupo(trabajo) {
+  if (colaMensajesGrupo.length >= TOPE_COLA_GRUPO) colaMensajesGrupo.shift()
+  colaMensajesGrupo.push(trabajo)
+  if (drenandoGrupos) return
+  drenandoGrupos = true
+  setImmediate(drenarMensajesGrupo)
+}
+
 function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
   const texto = typeof m.text === 'string' ? m.text.trim() : ''
   if (!texto) return false
@@ -117,7 +187,7 @@ function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
   return comandos.has(palabra)
 }
 
-export async function handler(chatUpdate) {
+export async function handler(chatUpdate, opciones = {}) {
 this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
 if (chatUpdate.type && chatUpdate.type !== 'notify') {
@@ -134,11 +204,13 @@ if (!m) return
 try {
   if (global.db.data == null) await global.loadDatabase()
   if (shouldSkipGroupMessageEarly(this, m)) return
+  if (!opciones.yaEnCola && mensajeDeGrupoPuedeEsperar(this, m)) {
+    encolarMensajeGrupo(() => handler.call(this, chatUpdate, { yaEnCola: true }))
+    return
+  }
 } catch (e) {
   console.error('Error modosub early:', e)
 }
-
-await new Promise((resolve) => setImmediate(resolve))
 
 await this.pushMessage(chatUpdate.messages).catch(console.error)
 
@@ -315,11 +387,6 @@ let participants = []
 if (m.isGroup) {
   groupMetadata = (await metadataGrupo(this, m.chat)) || (this.chats[m.chat] || {}).metadata || {}
   participants = groupMetadata.participants || []
-  const botEnCache = findBotParticipant(participants, this)
-  const adminEnCache = botEnCache?.admin === 'admin' || botEnCache?.admin === 'superadmin'
-  if (!adminEnCache && participants.length) {
-    void metadataGrupo(this, m.chat, { forzar: true })
-  }
 }
 const user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}  
 const bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}  
@@ -950,24 +1017,31 @@ const ajustesLectura = global.db.data.settings[this.user.jid] || {}
 
 
 const esSubBot = this.user.jid !== global.conn.user.jid
-let debeAutoLeer = true
+let debeAutoLeer = !esSubBot
 
 if (esSubBot) {
   try {
     const ahora = Date.now()
     if (this._autoReadHasta && ahora < this._autoReadHasta) {
-      debeAutoLeer = this._autoReadCache !== false
+      debeAutoLeer = this._autoReadCache === true
     } else {
-      const numeroBot = this.user.jid.split('@')[0].replace(/\D/g, '')
-      const rutaConfig = `./Serbot/${numeroBot}/config.json`
-      if (existsSync(rutaConfig)) {
+      debeAutoLeer = false
+      const numeroBot = String(this.user?.jid || '').split('@')[0].replace(/\D/g, '')
+      const rutas = [
+        this.pathAYBot ? join(this.pathAYBot, 'config.json') : '',
+        numeroBot ? `./Serbot/${numeroBot}/config.json` : ''
+      ].filter(Boolean)
+      for (const rutaConfig of rutas) {
+        if (!existsSync(rutaConfig)) continue
         const config = JSON.parse(readFileSync(rutaConfig, 'utf-8'))
-        if (config.autoRead === false) debeAutoLeer = false
+        debeAutoLeer = config.autoRead === true
+        break
       }
       this._autoReadCache = debeAutoLeer
       this._autoReadHasta = ahora + 30000
     }
   } catch (error) {
+    debeAutoLeer = false
     console.error('Error leyendo configuración de auto-leer:', error)
   }
 } else {
@@ -987,15 +1061,13 @@ const saltarAutoLeer = isKnownViewOnce(idMensaje) || isViewOnceCandidate(m)
 
 if (debeAutoLeer && !saltarAutoLeer && m.key) {
   try {
-    programarLectura(this, m.key)
+    void this.readMessages([m.key]).catch(() => {})
   } catch (e) {
     console.error('Error al marcar como leído:', e)
   }
 }
 
-if (debeAutoLeer) {
-  await handleAIModes(m, this)
-}
+await handleAIModes(m, this)
 
 }
 }
