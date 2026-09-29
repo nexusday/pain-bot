@@ -268,6 +268,37 @@ function mantenerPresenciaPrincipal(sock) {
 startTmpCleanupInterval({ verbose: true })
 
 let reconectandoPrincipal = false
+let sinSocketDesde = 0
+
+function socketPrincipalAbierto(sock) {
+  try {
+    if (!sock) return false
+    if (sock.ws?.isOpen === true) return true
+    const estado = sock.ws?.socket?.readyState ?? sock.ws?.readyState
+    return estado === 1
+  } catch {
+    return false
+  }
+}
+
+function vigilarSocketPrincipal() {
+  const sock = global.conn
+  if (!sock?.authState?.creds?.registered) return
+  if (socketPrincipalAbierto(sock)) {
+    sinSocketDesde = 0
+    return
+  }
+  if (!sinSocketDesde) sinSocketDesde = Date.now()
+  if (Date.now() - sinSocketDesde < 25_000) return
+  sinSocketDesde = Date.now()
+  reconectandoPrincipal = false
+  console.log('El principal se quedó sin conexión. Reconectando...')
+  global.reloadHandler?.(true)?.catch?.((e) => {
+    console.error('Error reconectando el principal:', e?.message || e)
+  })
+}
+
+setInterval(vigilarSocketPrincipal, 15_000).unref?.()
 
 async function connectionUpdate(update) {
   const sock = this?.ev ? this : conn
@@ -336,11 +367,12 @@ async function connectionUpdate(update) {
   sock.logger?.warn?.(`Conexión perdida (${reason ?? 'sin código'}). Reconectando el principal...`)
 
   setTimeout(() => {
+    reconectandoPrincipal = false
     global.reloadHandler(true).catch((e) => {
       console.error('Error reconectando el principal:', e?.message || e)
       reconectandoPrincipal = false
     })
-  }, 3000)
+  }, 4000)
 }
 
 process.on('uncaughtException', console.error)
@@ -388,8 +420,8 @@ global.reloadHandler = async function (restartConn) {
 
     isInit = true
     setTimeout(() => {
-      if (reconectandoPrincipal && !global.conn?.user) reconectandoPrincipal = false
-    }, 45000)
+      if (!socketPrincipalAbierto(global.conn)) reconectandoPrincipal = false
+    }, 20000)
   }
 
   if (!isInit) {

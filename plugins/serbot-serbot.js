@@ -635,25 +635,8 @@ async function iniciarSubBot(options) {
       }
     }
 
-    // Antes: cerraba el socket si !sock.user a los 60s (mata reconexiones a medias).
-    // Ahora solo limpia sockets realmente muertos tras varios minutos sin user y sin WS abierto.
+    // El reenganche se arma más abajo, cuando ya existe recargarHandler.
     detenerWatchdog()
-    temporizadorWatchdog = setInterval(() => {
-      try {
-        if (sock?.user) {
-          vistoUsuarioEn = Date.now()
-          return
-        }
-        if (reconectando || emparejamientoEnCurso || socketAbierto()) return
-        if (Date.now() - vistoUsuarioEn < 3 * 60 * 1000) return
-
-        console.log(chalk.bold.yellow(`\n┆ Watchdog: subbot (+${idCarpetaBot}) muerto sin user. Limpiando...\n`))
-        try { sock.ws.close() } catch (e) { }
-        try { sock.ev.removeAllListeners() } catch {}
-        quitarSockDeConns(sock)
-        detenerWatchdog()
-      } catch {}
-    }, 60000)
 
     let handler = await import('../handler.js')
     let recargarHandler = async function (restatConn) {
@@ -684,8 +667,8 @@ async function iniciarSubBot(options) {
           if (indice >= 0) global.conns[indice] = sock
         }
         setTimeout(() => {
-          if (reconectando && !sock?.user) reconectando = false
-        }, 45000)
+          if (!socketAbierto()) reconectando = false
+        }, 20000)
       }
 
       if (!esInit) {
@@ -709,6 +692,27 @@ async function iniciarSubBot(options) {
       esInit = false
       return true
     }
+
+    detenerWatchdog()
+    temporizadorWatchdog = setInterval(() => {
+      try {
+        if (socketAbierto()) {
+          vistoUsuarioEn = Date.now()
+          reconectando = false
+          return
+        }
+        if (emparejamientoEnCurso) return
+        if (!sock.authState?.creds?.registered) return
+        if (Date.now() - vistoUsuarioEn < 25_000) return
+
+        vistoUsuarioEn = Date.now()
+        reconectando = false
+        console.log(chalk.bold.yellow(`\n┆ Subbot (+${idCarpetaBot}) sin conexión. Reconectando...\n`))
+        recargarHandler(true).catch((e) => {
+          console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
+        })
+      } catch {}
+    }, 15000)
 
     recargarHandler(false)
   })().catch((e) => {
