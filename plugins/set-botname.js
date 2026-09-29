@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { join } from 'path'
+import { tr } from '../lib/lang.js'
 
 let handler = async (m, { conn, usedPrefix, command, text, args }) => {
   const botActual = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
@@ -19,11 +20,18 @@ let handler = async (m, { conn, usedPrefix, command, text, args }) => {
   const rutaBot = path.join('./Serbot', numeroRemitente)
 
   if (!fs.existsSync(rutaBot)) {
-    return conn.reply(m.chat, `¿Hola, cómo te va?\n\n* No encontré una sesión activa vinculada a tu número\n\n* Puede que aún no te hayas conectado\n\n* Si deseas iniciar una nueva, estaré aquí para ayudarte`, m, rcanal)
+    return conn.reply(m.chat, tr(conn,
+      '[❗] No encontré una sesión vinculada a tu número.',
+      '[❗] I could not find a session linked to your number.',
+      '[❗] Não encontrei uma sessão ligada ao seu número.'
+    ), m, rcanal)
   }
 
-  if (!text) return conn.reply(m.chat, `Necesito un nombre para continuar, cielo.
-¿Podrías decírmelo con dulzura?\n\nEjemplo:\n\n* .setbotname BLACKPINK\n* .setbotname ${nombreBot}`, m, rcanal)
+  if (!text) return conn.reply(m.chat, tr(conn,
+    `*[❗] Ejemplo:* ${usedPrefix}setbotname ${nombreBot}`,
+    `*[❗] Example:* ${usedPrefix}setbotname ${nombreBot}`,
+    `*[❗] Exemplo:* ${usedPrefix}setbotname ${nombreBot}`
+  ), m, rcanal)
 
   const rutaConfigUsuario = path.join(rutaBot, 'config.json')
   let configuracion = {}
@@ -38,7 +46,11 @@ let handler = async (m, { conn, usedPrefix, command, text, args }) => {
 
   try {
     fs.writeFileSync(rutaConfigUsuario, JSON.stringify(configuracion, null, 2))
-    return conn.reply(m.chat, `¡Nuevo nombre recibido con gracia!\n\n* Nombre (${text.trim()})\n\n* Si cambias de opinión, puedes volver a nombrarme cuando gustes`, m, rcanal)
+    return conn.reply(m.chat, tr(conn,
+      `ִֶָ☾. *Nombre actualizado*\n> ${text.trim()}`,
+      `ִֶָ☾. *Name updated*\n> ${text.trim()}`,
+      `ִֶָ☾. *Nome atualizado*\n> ${text.trim()}`
+    ), m, rcanal)
   } catch {}
 }
 

@@ -685,7 +685,9 @@ async function iniciarSubBot(options) {
 
       sock.handler = async function (chatUpdate) {
         if (!sock.authState?.creds?.registered) return
-        return handler.handler.call(sock, chatUpdate)
+        const modulo = global.handlerModule
+        if (!modulo?.handler) return
+        return modulo.handler.call(sock, chatUpdate)
       }
       sock.connectionUpdate = actualizacionConexion.bind(sock)
       sock.credsUpdate = saveCreds.bind(sock, true)

@@ -9,11 +9,21 @@ process.on('unhandledRejection', (reason) => {
   console.error('unhandledRejection', reason)
 })
 
+try {
+  const listo = register(new URL('./lib/hot-loader.js', import.meta.url).href, {
+    parentURL: import.meta.url,
+  })
+  if (listo && typeof listo.then === 'function') await listo
+} catch (e) {
+  console.error('No se pudo activar la recarga en vivo:', e?.message || e)
+}
+
 import { PROJECT_TMP, cleanupTmpFiles, startTmpCleanupInterval } from './lib/tmp-cleanup.js'
 import './config.js'
 import './lib/bot-uptime.js'
 import { createRequire } from 'module'
 import path, { join } from 'path'
+import { register } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { platform } from 'process'
 import * as ws from 'ws'
@@ -383,11 +393,15 @@ process.on('uncaughtException', console.error)
 
 let isInit = true
 let handler = await import('./handler.js')
+global.handlerModule = handler
 global.reloadHandler = async function (restartConn) {
   if (!restartConn) {
     try {
       const Handler = await import(`./handler.js?update=${Date.now()}`).catch(console.error)
-      if (Handler && Object.keys(Handler).length) handler = Handler
+      if (Handler && Object.keys(Handler).length) {
+        handler = Handler
+        global.handlerModule = Handler
+      }
     } catch (e) {
       console.error(e)
     }
@@ -442,6 +456,22 @@ global.reloadHandler = async function (restartConn) {
   global.conn.ev.on('messages.upsert', global.conn.handler)
   global.conn.ev.on('connection.update', global.conn.connectionUpdate)
   global.conn.ev.on('creds.update', global.conn.credsUpdate)
+
+  for (const sub of global.conns || []) {
+    if (!sub?.ev) continue
+    const fn = async (chatUpdate) => {
+      if (!sub.authState?.creds?.registered) return
+      const modulo = global.handlerModule
+      if (!modulo?.handler) return
+      return modulo.handler.call(sub, chatUpdate)
+    }
+    if (sub._upsertVivo) {
+      try { sub.ev.off('messages.upsert', sub._upsertVivo) } catch {}
+    }
+    sub._upsertVivo = fn
+    sub.handler = fn
+    sub.ev.on('messages.upsert', fn)
+  }
 
   isInit = false
   return true
@@ -520,6 +550,45 @@ global.reload = async (_ev, filename) => {
 Object.freeze(global.reload)
 
 watch(pluginFolder, global.reload)
+
+function agendarRecargaCodigo(nombre) {
+  clearTimeout(agendarRecargaCodigo._espera)
+  agendarRecargaCodigo._espera = setTimeout(async () => {
+    try {
+      globalThis.__HOT_EPOCH = Date.now()
+      await filesInitEnCaliente()
+      await global.reloadHandler(false)
+      console.log(chalk.cyan(`Updated code - '${nombre}'`))
+    } catch (e) {
+      console.error('No se pudo recargar el código:', e?.message || e)
+    }
+  }, 400)
+}
+
+async function filesInitEnCaliente() {
+  for (const filename of readdirSync(pluginFolder).filter(pluginFilter)) {
+    const dir = global.__filename(join(pluginFolder, filename), true)
+    if (!existsSync(dir)) {
+      delete global.plugins[filename]
+      continue
+    }
+    try {
+      const module = await import(`${global.__filename(dir)}?update=${Date.now()}`)
+      global.plugins[filename] = normalizePlugin(module.default || module)
+    } catch (e) {
+      conn.logger?.error?.(`Error recargando plugin ${filename}:`, e)
+    }
+  }
+  global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)))
+  global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
+}
+
+watch(join(__dirname, 'handler.js'), () => agendarRecargaCodigo('handler.js'))
+watch(join(__dirname, 'lib'), { recursive: true }, (_evento, filename) => {
+  if (!filename || !String(filename).endsWith('.js')) return
+  agendarRecargaCodigo(join('lib', filename).replace(/\\/g, '/'))
+})
+
 await global.reloadHandler()
 
 

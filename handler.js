@@ -2,8 +2,7 @@ import { smsg } from './lib/simple.js'
 import { format } from 'util'
 import { fileURLToPath } from 'url'
 import path, { join } from 'path'
-import { unwatchFile, watchFile, readFileSync, existsSync } from 'fs'
-import chalk from 'chalk'
+import { readFileSync, existsSync } from 'fs'
 import fetch from 'node-fetch'
 
 import { antipvDebeIgnorar } from './lib/Antis/anti-pv.js'
@@ -1071,10 +1070,3 @@ await handleAIModes(m, this)
 
 }
 }
-
-let file = global.__filename(import.meta.url, true)
-watchFile(file, async () => {
-unwatchFile(file)
-console.log(chalk.magenta("Se actualizó 'handler.js'"))
-if (global.reloadHandler) console.log(await global.reloadHandler())
-})

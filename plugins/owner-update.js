@@ -1,6 +1,7 @@
 import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import { esDuenoPrincipal } from '../lib/staff.js'
 
 /** Config local del servidor: no se pierde al actualizar */
 const PRESERVAR_AL_ACTUALIZAR = ['storage/maxsubs.json']
@@ -112,9 +113,9 @@ function gitPullForzado() {
   return out.trim()
 }
 
-let handler = async (m, { conn, text, isOwner }) => {
-  if (!isOwner) {
-    return m.reply('*[❗] Solo los dueños pueden usar este comando.*')
+let handler = async (m, { conn, text }) => {
+  if (!esDuenoPrincipal(m, conn)) {
+    return m.reply('*[❗] Solo el owner del bot principal puede usar este comando.*')
   }
 
   m.react = async emoji => {
