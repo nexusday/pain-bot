@@ -305,7 +305,7 @@ async function iniciarSubBot(options) {
   void (async () => {
     const version = await obtenerVersionBaileys()
     const reintentoMsg = (MessageRetryMap) => { }
-    const cacheReintentoMsg = new NodeCache({ stdTTL: 180, checkperiod: 60, useClones: false })
+    const cacheReintentoMsg = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
     let estadoConn, saveState, saveCreds
     try {
       const estadoAuth = await useMultiFileAuthState(pathAYBot)
