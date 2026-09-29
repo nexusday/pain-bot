@@ -292,9 +292,10 @@ function vigilarSocketPrincipal() {
     return
   }
   if (!sinSocketDesde) sinSocketDesde = Date.now()
-  if (Date.now() - sinSocketDesde < 25_000) return
+  if (Date.now() - sinSocketDesde < 3 * 60_000) return
+  if (reconectandoPrincipal) return
   sinSocketDesde = Date.now()
-  reconectandoPrincipal = false
+  reconectandoPrincipal = true
   console.log('El principal se quedó sin conexión. Reconectando...')
   global.reloadHandler?.(true)?.catch?.((e) => {
     console.error('Error reconectando el principal:', e?.message || e)

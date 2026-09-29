@@ -158,6 +158,25 @@ function mensajeYaLeidoPuedeSoltarse(m) {
   return true
 }
 
+function esCharlaQueNoFrena(conn, msg) {
+  const jid = String(msg?.key?.remoteJid || '')
+  if (!jid.endsWith('@g.us') || msg?.key?.fromMe || msg?.messageStubType) return false
+  let chatId = jid
+  try { chatId = conn?.decodeJid?.(jid) || jid } catch {}
+  if (global.db?.data?.antiprefijo?.[chatId] === true) return false
+  if (elGrupoMiraCadaMensaje(chatId) || hayRespuestaPendiente(chatId)) return false
+
+  const texto = String(extraerTextoMensajeCrudo(msg) || '').trim()
+  if (!texto) {
+    const cuerpo = msg?.message || {}
+    const esMedia = cuerpo.imageMessage || cuerpo.videoMessage || cuerpo.stickerMessage || cuerpo.audioMessage || cuerpo.documentMessage
+    return Boolean(esMedia)
+  }
+  if (global.prefix instanceof RegExp && global.prefix.test(texto)) return false
+  if (ORDENES_SUELTAS.has(texto.toLowerCase())) return false
+  return true
+}
+
 function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
   const texto = typeof m.text === 'string' ? m.text.trim() : ''
   if (!texto) return false
@@ -185,6 +204,7 @@ if (!m) return
 try {
   if (global.db.data == null) await global.loadDatabase()
   if (shouldSkipGroupMessageEarly(this, m)) return
+  if (esCharlaQueNoFrena(this, m)) return
 } catch (e) {
   console.error('Error modosub early:', e)
 }
