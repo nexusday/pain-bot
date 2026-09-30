@@ -32,6 +32,7 @@ const rcanal = global.rcanal || {
 
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
 let versionBaileysCache = null
+const iniciosSubBot = new Map()
 
 async function obtenerVersionBaileys() {
   if (versionBaileysCache) return versionBaileysCache
@@ -223,7 +224,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   opcionesSubBot.phoneNumber = phoneNumber
   opcionesSubBot.replyJid = replyJid
 
-  iniciarSubBot(opcionesSubBot)
+  iniciarSubBot(opcionesSubBot).catch((error) => {
+    console.error('Error iniciando sub-bot solicitado:', error?.message || error)
+  })
   global.db.data.users[m.sender].Subs = new Date * 1
 }
 
@@ -234,7 +237,25 @@ export { iniciarSubBot as AYBot }
 export default handler
 
 async function iniciarSubBot(options) {
-  let { pathAYBot, m, conn, args, usedPrefix, command, fromCommand = true, phoneNumber = null, replyJid = null } = options
+  let {
+    pathAYBot,
+    m,
+    conn,
+    args,
+    usedPrefix,
+    command,
+    fromCommand = true,
+    phoneNumber = null,
+    replyJid = null,
+    esperarConexion = false,
+    timeoutConexionMs = 60_000
+  } = options
+
+  const claveInicio = path.resolve(pathAYBot)
+  const inicioExistente = iniciosSubBot.get(claveInicio)
+  if (inicioExistente) {
+    return esperarConexion ? inicioExistente.conectado : inicioExistente.iniciado
+  }
   
  
   if (!fromCommand) {
@@ -303,8 +324,56 @@ async function iniciarSubBot(options) {
     return
   }
 
-  void (async () => {
+  let resolverConexion
+  let rechazarConexion
+  const promesaConexion = new Promise((resolve, reject) => {
+    resolverConexion = resolve
+    rechazarConexion = reject
+  })
+  promesaConexion.catch(() => {})
+
+  const intento = {
+    conectado: promesaConexion,
+    iniciado: null,
+    sock: null,
+    cancelado: false,
+    temporizador: null,
+    cancelar: null,
+    limpiarAuxiliares: null
+  }
+  iniciosSubBot.set(claveInicio, intento)
+
+  function terminarIntento(error = null, socket = null) {
+    if (intento.temporizador) clearTimeout(intento.temporizador)
+    intento.temporizador = null
+    if (iniciosSubBot.get(claveInicio) === intento) iniciosSubBot.delete(claveInicio)
+    if (error) rechazarConexion(error)
+    else resolverConexion(socket)
+  }
+
+  intento.cancelar = () => {
+    intento.cancelado = true
+    intento.limpiarAuxiliares?.()
+    const socket = intento.sock
+    if (socket) {
+      socket._ignorarCierre = true
+      socket.ev?.removeAllListeners?.()
+      try { socket.ws?.close?.() } catch {}
+      if (Array.isArray(global.conns)) {
+        global.conns = global.conns.filter((conexion) => conexion !== socket)
+      }
+    }
+    terminarIntento(new Error(`Tiempo agotado conectando sub-bot ${path.basename(pathAYBot)}`))
+  }
+
+  if (esperarConexion) {
+    intento.temporizador = setTimeout(intento.cancelar, Math.max(1_000, timeoutConexionMs))
+    intento.temporizador.unref?.()
+  }
+
+  intento.iniciado = (async () => {
     const version = await obtenerVersionBaileys()
+    if (intento.cancelado) return false
     const reintentoMsg = (MessageRetryMap) => { }
     const cacheReintentoMsg = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
     let estadoConn, saveState, saveCreds
@@ -315,8 +384,9 @@ async function iniciarSubBot(options) {
       saveCreds = estadoAuth.saveCreds
     } catch (error) {
       console.log(chalk.bold.redBright(`\n┆ Error inicializando auth state para ${path.basename(pathAYBot)}: ${error.message}\n`))
-      return
+      throw error
     }
+    if (intento.cancelado) return false
 
     const opcionesConexion = conSocketEstable({
       logger: pino({ level: "fatal" }),
@@ -334,6 +404,7 @@ async function iniciarSubBot(options) {
     })
 
     let sock = makeWASocket(opcionesConexion)
+    intento.sock = sock
     sock.isInit = false
     let esInit = true
     let codigoEmparejamientoEnviado = false
@@ -394,6 +465,13 @@ async function iniciarSubBot(options) {
         clearInterval(temporizadorWatchdog)
         temporizadorWatchdog = null
       }
+    }
+    intento.limpiarAuxiliares = () => {
+      if (temporizadorVinculo) {
+        clearTimeout(temporizadorVinculo)
+        temporizadorVinculo = null
+      }
+      detenerWatchdog()
     }
 
     function esMotivoSesionFatal(motivo) {
@@ -524,6 +602,7 @@ async function iniciarSubBot(options) {
 
         
         if (esMotivoSesionFatal(motivo)) {
+          terminarIntento(new Error(`Sesión de sub-bot ${idCarpetaBot} cerrada con código ${motivo ?? 'desconocido'}`))
           console.log(chalk.bold.magentaBright(`\n┆ Sesión fatal (+${idCarpetaBot}) código ${motivo}. Limpiando...\n`))
           if (codigoM && !estadoConn.creds.registered) {
             limpiarAuthSubBot(pathAYBot)
@@ -538,6 +617,7 @@ async function iniciarSubBot(options) {
 
     
         if (esFlujoEmparejamiento && !estadoConn.creds.registered) {
+          terminarIntento(new Error(`Emparejamiento de sub-bot ${idCarpetaBot} interrumpido`))
           console.log(chalk.bold.yellow(`\n┆ Pairing (+${idCarpetaBot}) conexión interrumpida (${motivo ?? 'sin código'}). No se toca al resto.\n`))
           try { sock.ev.removeAllListeners() } catch {}
           detenerWatchdog()
@@ -567,6 +647,7 @@ async function iniciarSubBot(options) {
         reconectando = false
         vistoUsuarioEn = Date.now()
         await borrarMensajeVinculo().catch(() => {})
+        if (intento.cancelado) return
         if (!global.db.data?.users) loadDatabase()
 
         console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${idCarpetaBot}) conectado exitosamente.`))
@@ -589,6 +670,7 @@ async function iniciarSubBot(options) {
         }
         if (!Array.isArray(global.conns)) global.conns = []
         if (!global.conns.includes(sock)) global.conns.push(sock)
+        terminarIntento(null, sock)
         if (!sock.vistaUnicaLista) {
           sock.vistaUnicaLista = true
           initViewOnceAntiListener(sock)
@@ -644,6 +726,7 @@ async function iniciarSubBot(options) {
 
     let cierrePropio = false
     let handler = await import('../handler.js')
+    if (intento.cancelado) return false
     let recargarHandler = async function (restatConn) {
       if (restatConn) {
         const sockAnterior = sock
@@ -655,6 +738,7 @@ async function iniciarSubBot(options) {
         try { sock.ws.close() } catch { }
         sock.ev.removeAllListeners()
         sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
+        intento.sock = sock
         esInit = true
         try {
           const { setBotStartTime, getBotStartTime, markBotStart } = await import('../lib/bot-uptime.js')
@@ -729,9 +813,15 @@ async function iniciarSubBot(options) {
     }, 15000)
 
     recargarHandler(false)
+    if (esperarConexion) return promesaConexion
+    return true
   })().catch((e) => {
+    terminarIntento(e)
     console.error('Error iniciando sub-bot:', e?.message || e)
+    throw e
   })
+
+  return esperarConexion ? intento.conectado : intento.iniciado
 }
 
 const retraso = (ms) => new Promise((resolve) => setTimeout(resolve, ms))

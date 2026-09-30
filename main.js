@@ -594,7 +594,12 @@ watch(join(__dirname, 'lib'), { recursive: true }, (_evento, filename) => {
 await global.reloadHandler()
 
 
+let reconexionSubBotsPromise = null
+
 global.reconnectSubBots = async function() {
+  if (reconexionSubBotsPromise) return reconexionSubBotsPromise
+
+  reconexionSubBotsPromise = (async () => {
   if (!global.conns || !Array.isArray(global.conns)) {
     global.conns = []
   }
@@ -606,8 +611,13 @@ global.reconnectSubBots = async function() {
   }
 
   const subBotFolders = readdirSync(serbotDir).filter(folder => {
-    const folderPath = join(serbotDir, folder)
-    return statSync(folderPath).isDirectory() && existsSync(join(folderPath, 'creds.json'))
+    try {
+      const folderPath = join(serbotDir, folder)
+      return statSync(folderPath).isDirectory() && existsSync(join(folderPath, 'creds.json'))
+    } catch (error) {
+      console.error(`No se pudo revisar la sesión ${folder}:`, error?.message || error)
+      return false
+    }
   })
 
   if (subBotFolders.length === 0) {
@@ -618,11 +628,13 @@ global.reconnectSubBots = async function() {
   console.log(chalk.cyan(`\nReconectando ${subBotFolders.length} sub-bots...`))
 
   const serbotModule = await import('./plugins/serbot-serbot.js')
-  const TAMANO = 6
-  const PAUSA_MS = 350
+  const CONCURRENCIA_MAXIMA = 3
+  const PAUSA_ENTRE_INTENTOS_MS = 1000
+  let siguiente = 0
+  let conectados = 0
+  let fallidos = 0
 
   const isSubBotAlive = (c) => {
-    if (!c?.user?.jid) return false
     try {
       if (c.ws?.isOpen === true) return true
       const st = c.ws?.socket?.readyState
@@ -633,62 +645,85 @@ global.reconnectSubBots = async function() {
   }
 
   async function conectarUno(folder) {
-    try {
-      const botPath = join(serbotDir, folder)
-      const credsPath = join(botPath, 'creds.json')
+    const botPath = join(serbotDir, folder)
+    const folderDigits = String(folder).replace(/\D/g, '')
+    global.conns = global.conns.filter(c => {
+      const jidDigits = String(c?.phoneNumber || c?.botNumber || c?.user?.jid || c?.user?.id || '')
+        .split('@')[0].split(':')[0].replace(/\D/g, '')
+      const pathDigits = c?.pathAYBot ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '') : ''
+      const matchesFolder = jidDigits === folderDigits || pathDigits === folderDigits
+      return !matchesFolder || isSubBotAlive(c)
+    })
+    const isAlreadyConnected = global.conns.some(c => {
+      if (!isSubBotAlive(c)) return false
+      const jidDigits = String(c.phoneNumber || c.botNumber || c.user?.jid || c.user?.id || '')
+        .split('@')[0].split(':')[0].replace(/\D/g, '')
+      const pathDigits = c.pathAYBot ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '') : ''
+      return (jidDigits && jidDigits === folderDigits) || pathDigits === folderDigits
+    })
 
-      if (!existsSync(credsPath)) {
-        console.log(chalk.red(`No se encontró creds.json en ${folder}`))
+    if (isAlreadyConnected) {
+      conectados++
+      return
+    }
+
+    const intentosMaximos = 2
+    for (let intento = 1; intento <= intentosMaximos; intento++) {
+      if (!existsSync(join(botPath, 'creds.json'))) {
+        console.log(chalk.yellow(`Sesión sin credenciales, se omite ${folder}`))
+        fallidos++
         return
       }
-
-      const folderDigits = String(folder).replace(/\D/g, '')
-      const isAlreadyConnected = global.conns.some(c => {
-        if (!isSubBotAlive(c)) return false
-        const jidDigits = String(c.user.jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
-        return jidDigits && folderDigits && jidDigits === folderDigits
-      })
-
-      if (isAlreadyConnected) {
-        console.log(chalk.green(`Sub-bot ${folder} ya está conectado`))
+      try {
+        if (!serbotModule.AYBot) throw new Error('AYBot no está disponible')
+        await serbotModule.AYBot({
+          pathAYBot: botPath,
+          m: null,
+          conn: global.conn,
+          args: [],
+          usedPrefix: '.',
+          command: 'qr',
+          fromCommand: false,
+          esperarConexion: true,
+          timeoutConexionMs: 60_000
+        })
+        console.log(chalk.green(`Sub-bot ${folder} conectado`))
+        conectados++
         return
+      } catch (error) {
+        console.error(`Intento ${intento}/${intentosMaximos} fallido para ${folder}:`, error?.message || error)
+        if (intento < intentosMaximos && existsSync(join(botPath, 'creds.json'))) {
+          await new Promise(resolve => setTimeout(resolve, 5000 * intento))
+        }
       }
+    }
+    fallidos++
+  }
 
-      global.conns = global.conns.filter(c => {
-        if (!c?.user?.jid) return isSubBotAlive(c)
-        const jidDigits = String(c.user.jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
-        if (jidDigits === folderDigits && !isSubBotAlive(c)) return false
-        return true
-      })
-
-      if (!serbotModule.AYBot) {
-        console.log(chalk.red(`No se pudo importar Pain Bot para ${folder}`))
-        return
+  async function trabajador() {
+    while (siguiente < subBotFolders.length) {
+      const folder = subBotFolders[siguiente++]
+      await conectarUno(folder)
+      if (siguiente < subBotFolders.length) {
+        await new Promise(resolve => setTimeout(resolve, PAUSA_ENTRE_INTENTOS_MS))
       }
-
-      await serbotModule.AYBot({
-        pathAYBot: botPath,
-        m: null,
-        conn: global.conn,
-        args: [],
-        usedPrefix: '.',
-        command: 'qr',
-        fromCommand: false
-      })
-    } catch (error) {
-      console.log(chalk.red(`Error reconectando sub-bot ${folder}:`, error.message))
     }
   }
 
-  for (let i = 0; i < subBotFolders.length; i += TAMANO) {
-    const lote = subBotFolders.slice(i, i + TAMANO)
-    await Promise.all(lote.map((folder) => conectarUno(folder)))
-    if (i + TAMANO < subBotFolders.length) {
-      await new Promise((resolve) => setTimeout(resolve, PAUSA_MS))
-    }
-  }
+  await Promise.all(
+    Array.from(
+      { length: Math.min(CONCURRENCIA_MAXIMA, subBotFolders.length) },
+      () => trabajador()
+    )
+  )
+  console.log(chalk.cyan(`\nReconexión terminada: ${conectados} conectados, ${fallidos} pendientes.`))
+  })()
 
-  console.log(chalk.cyan(`\nConexión de ${subBotFolders.length} sub-bots en marcha`))
+  try {
+    return await reconexionSubBotsPromise
+  } finally {
+    reconexionSubBotsPromise = null
+  }
 }
 
 
