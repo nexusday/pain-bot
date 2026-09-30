@@ -543,7 +543,7 @@ async function iniciarSubBot(options) {
           detenerWatchdog()
           return
         }
-        if (reconectando || cierrePropio) {
+        if (sock._ignorarCierre || reconectando || cierrePropio) {
           cierrePropio = false
           return
         }
@@ -698,6 +698,11 @@ async function iniciarSubBot(options) {
       sock.ev.on("connection.update", sock.connectionUpdate)
       sock.ev.on("creds.update", sock.credsUpdate)
 
+      sock.reconectarPain = () => {
+        if (reconectando) return Promise.resolve(false)
+        return recargarHandler(true)
+      }
+
       esInit = false
       return true
     }
@@ -710,7 +715,7 @@ async function iniciarSubBot(options) {
           reconectando = false
           return
         }
-        if (emparejamientoEnCurso || reconectando) return
+        if (sock._ignorarCierre || emparejamientoEnCurso || reconectando) return
         if (!sock.authState?.creds?.registered) return
         if (Date.now() - vistoUsuarioEn < 90_000) return
 

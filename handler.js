@@ -599,7 +599,7 @@ for (let plugin of pluginsProcesados) {
       }
     }
     
-    const comandosPrivadosPermitidos = ['qr', 'code', 'setbotname', 'setbotimg', 'setautoread']
+    const comandosPrivadosPermitidos = ['qr', 'code', 'setbotname', 'setbotimg', 'setautoread', 'delsession', 'delssesion', 'deletesession', 'eliminarsesion', 'delsub', 'borrarsesion', 'logoutbot']
     if (!m.isGroup && !comandosPrivadosPermitidos.includes(command) && !isOwner) {
       return 
     }

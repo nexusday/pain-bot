@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import ws from 'ws'
-import { esOwnerConfig, esBotPrincipal, numeroBotDe } from '../lib/staff.js'
+import { esOwnerConfig, esDuenoPrincipal, esBotPrincipal, numeroBotDe } from '../lib/staff.js'
 import { cleanBotNum, numerosIdentidadBot, numeroPublicoBot } from './modo-sub.js'
 import { resolvePhoneNumber } from '../lib/resolve-phone.js'
 import { candidatosJidRemitente, jidsSeSolapan } from '../lib/group-participant.js'
@@ -132,14 +132,14 @@ function ayuda(usedPrefix) {
   return `*Eliminar sesión de subbot*\n\n` +
     `*Tu sesión:*\n` +
     `> ${usedPrefix}delsession\n\n` +
-    `*Owner (cualquier subbot):*\n` +
+    `*Owner principal:*\n` +
     `> ${usedPrefix}delsession <número>\n` +
     `> ${usedPrefix}delsession <índice>\n` +
     `> ${usedPrefix}delsession lista`
 }
 
 let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
-  const esOwnerGlobal = esOwnerConfig(m, conn)
+  const esOwnerGlobal = esDuenoPrincipal(m, conn) || esOwnerConfig(m, conn)
   const partes = m.isGroup
     ? (((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(() => null))?.participants || participants || [])
     : []
@@ -264,6 +264,7 @@ handler.help = ['delsession', 'delsession <número>', 'delsession lista']
 handler.tags = ['serbot']
 handler.command = [
   'delsession',
+  'delssesion',
   'deletesession',
   'eliminarsesion',
   'delsub',
