@@ -6,6 +6,7 @@ import { extractPhoneFromArgs, resolvePhoneNumber } from '../lib/resolve-phone.j
 import { tr } from '../lib/lang.js'
 
 const ESPERA_MS = 5 * 60 * 1000
+let reconexionMasivaEnCurso = false
 
 function variantesNumero(numero) {
   const d = String(numero || '').split('@')[0].split(':')[0].replace(/\D/g, '')
@@ -80,6 +81,59 @@ function carpetaDe(numero) {
 }
 
 let handler = async (m, { conn, args, usedPrefix, command, participants, groupMetadata }) => {
+  const pidioTodos = args.length === 1 && String(args[0]).toLowerCase() === 'all'
+  if (args.some((arg) => String(arg).toLowerCase() === 'all') && !pidioTodos) {
+    return conn.sendMessage(m.chat, {
+      text: `Usa ${usedPrefix + command} all para reconectar todos los sub-bots.`,
+      contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+    }, { quoted: m })
+  }
+
+  if (pidioTodos) {
+    const autorizado = esBotPrincipal(conn) &&
+      (esDuenoPrincipal(m, conn) || esStaffPrincipal(m, conn))
+    if (!autorizado) {
+      return conn.sendMessage(m.chat, {
+        text: 'Solo el owner principal y el staff del bot principal pueden reconectar todos los sub-bots.',
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+    }
+    if (reconexionMasivaEnCurso) {
+      return conn.sendMessage(m.chat, {
+        text: 'Ya hay una reconexión masiva de sub-bots en curso.',
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+    }
+    if (typeof global.reconnectSubBots !== 'function') {
+      return conn.sendMessage(m.chat, {
+        text: 'La función de reconexión de sub-bots no está disponible.',
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+    }
+
+    reconexionMasivaEnCurso = true
+    try {
+      await conn.sendMessage(m.chat, {
+        text: 'Iniciando la reconexión de todos los sub-bots...',
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+      await global.reconnectSubBots()
+      await conn.sendMessage(m.chat, {
+        text: 'Se inició la reconexión de todos los sub-bots registrados.',
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+    } catch (e) {
+      console.error('[rebot all]', e?.message || e)
+      await conn.sendMessage(m.chat, {
+        text: 'No se pudo iniciar la reconexión masiva de sub-bots.',
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+    } finally {
+      reconexionMasivaEnCurso = false
+    }
+    return
+  }
+
   if (!esBotPrincipal(conn)) return
 
   let quien = m.mentionedJid?.[0] || (m.fromMe ? conn.user.jid : m.sender)
@@ -213,7 +267,7 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
   }, { quoted: m })
 }
 
-handler.help = ['#rebot [número]\n→ Reconecta tu subbot. El owner principal y su staff pueden poner otro número. Una vez cada 5 minutos']
+handler.help = ['#rebot [número|all]\n→ Reconecta tu subbot. El owner principal y su staff pueden poner otro número o reconectar todos los sub-bots. Una vez cada 5 minutos']
 handler.tags = ['subbots']
 handler.command = ['rebot']
 
