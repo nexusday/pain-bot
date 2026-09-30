@@ -1,3 +1,5 @@
+import './lib/sesion-log.js'
+
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1'
 
 process.on('unhandledRejection', (reason) => {
