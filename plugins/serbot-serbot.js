@@ -813,12 +813,11 @@ async function iniciarSubBot(options) {
     }, 15000)
 
     recargarHandler(false)
-    if (esperarConexion) return promesaConexion
     return true
   })().catch((e) => {
     terminarIntento(e)
     console.error('Error iniciando sub-bot:', e?.message || e)
-    throw e
+    return false
   })
 
   return esperarConexion ? intento.conectado : intento.iniciado

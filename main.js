@@ -628,8 +628,8 @@ global.reconnectSubBots = async function() {
   console.log(chalk.cyan(`\nReconectando ${subBotFolders.length} sub-bots...`))
 
   const serbotModule = await import('./plugins/serbot-serbot.js')
-  const CONCURRENCIA_MAXIMA = 3
-  const PAUSA_ENTRE_INTENTOS_MS = 1000
+  const CONCURRENCIA_MAXIMA = 2
+  const PAUSA_ENTRE_INTENTOS_MS = 5000
   let siguiente = 0
   let conectados = 0
   let fallidos = 0
