@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
-import { esBotPrincipal } from '../lib/staff.js'
+import { esBotPrincipal, esDuenoPrincipal, esOwnerConfig, obtenerIdsStaffComoOwner } from '../lib/staff.js'
+import { candidatosJidRemitente, jidsSeSolapan } from '../lib/group-participant.js'
 import { extractPhoneFromArgs, resolvePhoneNumber } from '../lib/resolve-phone.js'
 import { tr } from '../lib/lang.js'
 
@@ -23,6 +24,15 @@ function numerosCoinciden(a, b) {
   if (!A.size) return false
   for (const n of variantesNumero(b)) if (A.has(n)) return true
   return false
+}
+
+function esStaffPrincipal(m, conn) {
+  if (!global.conn) return false
+  try {
+    return jidsSeSolapan(candidatosJidRemitente(m, conn), obtenerIdsStaffComoOwner(global.conn))
+  } catch {
+    return false
+  }
 }
 
 function reloj() {
@@ -75,11 +85,26 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
     } catch {}
   }
 
-  const phoneNumber = await resolvePhoneNumber(quien, conn, extractPhoneFromArgs(args), m, {
+  const datosNumero = {
     participants: participantesGrupo,
     groupId: m.isGroup ? m.chat : null,
     groupMetadata: groupMetadata || null
-  })
+  }
+  const pedido = extractPhoneFromArgs(args)
+  const propio = await resolvePhoneNumber(quien, conn, null, m, datosNumero)
+  const puedeOtro = esDuenoPrincipal(m, conn) || esOwnerConfig(m, conn) || esStaffPrincipal(m, conn)
+  let phoneNumber = pedido || propio
+
+  if (pedido && !puedeOtro && !numerosCoinciden(pedido, propio)) {
+    return conn.sendMessage(m.chat, {
+      text: tr(conn,
+        `+${pedido} no es tu subbot.`,
+        `+${pedido} is not your sub-bot.`,
+        `+${pedido} não é o seu sub-bot.`
+      ),
+      contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+    }, { quoted: m })
+  }
 
   if (!phoneNumber) {
     return conn.sendMessage(m.chat, {
@@ -162,7 +187,7 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
   }
 }
 
-handler.help = ['#rebot\n→ El bot principal reconecta tu subbot. Una vez cada 5 minutos']
+handler.help = ['#rebot [número]\n→ Reconecta tu subbot. El owner principal y su staff pueden poner otro número. Una vez cada 5 minutos']
 handler.tags = ['subbots']
 handler.command = ['rebot']
 
