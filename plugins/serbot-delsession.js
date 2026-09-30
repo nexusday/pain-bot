@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import ws from 'ws'
-import { esOwnerConfig, esDuenoPrincipal, esBotPrincipal, numeroBotDe } from '../lib/staff.js'
+import { esOwnerConfig, esDuenoPrincipal, esBotPrincipal, numeroBotDe, obtenerIdsStaffComoOwner } from '../lib/staff.js'
 import { cleanBotNum, numerosIdentidadBot, numeroPublicoBot } from './modo-sub.js'
 import { resolvePhoneNumber } from '../lib/resolve-phone.js'
 import { candidatosJidRemitente, jidsSeSolapan } from '../lib/group-participant.js'
@@ -27,6 +27,21 @@ function idsDeNumero(num) {
     `${n}@lid`,
     `${n}@hosted.lid`,
   ]
+}
+
+function esStaffDe(connStaff, m, conn) {
+  if (!connStaff) return false
+  try {
+    return jidsSeSolapan(candidatosJidRemitente(m, conn), obtenerIdsStaffComoOwner(connStaff))
+  } catch {
+    return false
+  }
+}
+
+function principalEnElGrupo(partes) {
+  if (!global.conn?.user) return false
+  const ids = numerosIdentidadBot(global.conn)
+  return (partes || []).some((p) => ids.has(digitos(p?.id || p?.jid || p)))
 }
 
 /** Dueño real del subbot = el número vinculado (carpeta), no el staff /mod. */
@@ -139,10 +154,16 @@ function ayuda(usedPrefix) {
 }
 
 let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
-  const esOwnerGlobal = esDuenoPrincipal(m, conn) || esOwnerConfig(m, conn)
   const partes = m.isGroup
     ? (((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(() => null))?.participants || participants || [])
     : []
+
+  const esJson = esDuenoPrincipal(m, conn) || esOwnerConfig(m, conn)
+  const esStaffPrincipal = esStaffDe(global.conn, m, conn)
+  const esStaffEste = !esBotPrincipal(conn) && esStaffDe(conn, m, conn)
+  const esOwnerGlobal = esJson || esStaffPrincipal || esStaffEste
+
+  if (!esBotPrincipal(conn) && (esJson || esStaffPrincipal) && principalEnElGrupo(partes)) return
 
   let miTelefono = ''
   try {
