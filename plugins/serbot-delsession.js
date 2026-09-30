@@ -160,10 +160,9 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
 
   const esJson = esDuenoPrincipal(m, conn) || esOwnerConfig(m, conn)
   const esStaffPrincipal = esStaffDe(global.conn, m, conn)
-  const esStaffEste = !esBotPrincipal(conn) && esStaffDe(conn, m, conn)
-  const esOwnerGlobal = esJson || esStaffPrincipal || esStaffEste
+  const esOwnerGlobal = esJson || esStaffPrincipal
 
-  if (!esBotPrincipal(conn) && (esJson || esStaffPrincipal) && principalEnElGrupo(partes)) return
+  if (!esBotPrincipal(conn) && esOwnerGlobal && principalEnElGrupo(partes)) return
 
   let miTelefono = ''
   try {
