@@ -55,6 +55,15 @@ function socketDe(numero) {
   return null
 }
 
+function socketAbierto(c) {
+  try {
+    if (c?.ws?.isOpen === true) return true
+    return c?.ws?.socket?.readyState === 1
+  } catch {
+    return false
+  }
+}
+
 function carpetaDe(numero) {
   const raiz = path.join(process.cwd(), global.bot || 'Serbot')
   if (!fs.existsSync(raiz)) return null
@@ -158,33 +167,50 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
 
   reloj()[clave] = Date.now()
 
-  await conn.sendMessage(m.chat, {
-    text: tr(conn,
-      `+${phoneNumber} reconectando tu subbot, por favor espere un momento.`,
-      `+${phoneNumber} reconnecting your sub-bot, please wait a moment.`,
-      `+${phoneNumber} reconectando seu sub-bot, por favor espere um momento.`
-    ),
-    contextInfo: { ...(global.rcanal?.contextInfo || {}) }
-  }, { quoted: m })
-
+  let ok = false
   try {
     if (typeof sock?.reconectarPain === 'function') {
       await sock.reconectarPain()
-      return
+    } else {
+      const { AYBot } = await import('./serbot-serbot.js')
+      // fromCommand false: no pide QR ni código. Solo vuelve a abrir la carpeta ya vinculada.
+      await AYBot({
+        pathAYBot: carpeta,
+        m: null,
+        conn: global.conn,
+        args: [],
+        usedPrefix: '.',
+        command: 'qr',
+        fromCommand: false
+      })
     }
-    const { AYBot } = await import('./serbot-serbot.js')
-    await AYBot({
-      pathAYBot: carpeta,
-      m: null,
-      conn: global.conn,
-      args: [],
-      usedPrefix: '.',
-      command: 'qr',
-      fromCommand: false
-    })
+    const limite = Date.now() + 50000
+    while (Date.now() < limite) {
+      const vivo = socketDe(phoneNumber)
+      if (vivo?.user && socketAbierto(vivo)) {
+        ok = true
+        break
+      }
+      await new Promise((resolver) => setTimeout(resolver, 500))
+    }
   } catch (e) {
     console.error('[rebot]', e?.message || e)
   }
+
+  await conn.sendMessage(m.chat, {
+    text: ok
+      ? tr(conn,
+        `+${phoneNumber} SUBBOT RECONECTADO CON EXITO.`,
+        `+${phoneNumber} SUBBOT RECONNECTED.`,
+        `+${phoneNumber} SUBBOT RECONECTADO COM SUCESSO.`
+      )
+      : tr(conn,
+        `+${phoneNumber} NO SE PUDO RECONECTAR EL SUBBOT.`,
+        `+${phoneNumber} THE SUBBOT COULD NOT RECONNECT.`,
+        `+${phoneNumber} NÃO FOI POSSÍVEL RECONECTAR O SUBBOT.`
+      ),
+    contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+  }, { quoted: m })
 }
 
 handler.help = ['#rebot [número]\n→ Reconecta tu subbot. El owner principal y su staff pueden poner otro número. Una vez cada 5 minutos']
