@@ -194,9 +194,11 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
     let i = 1
     for (const n of [...nums].sort()) {
       const on = online.some(o => o.num === n)
-      texto += `*${i}.* +${n} ${on ? '🟢' : '⚪'}\n`
+      const requiereVincular = fs.existsSync(path.join(rutaSesionSub(n), '.needs-relink'))
+      texto += `*${i}.* +${n} ${on ? '🟢' : requiereVincular ? '🔗' : '⚪'}\n`
       i++
     }
+    texto += '\n> 🟢 activo · ⚪ desconectado · 🔗 requiere volver a vincular'
     texto += `\n> ${usedPrefix}${command} <número|índice>`
     return conn.reply(m.chat, texto, m)
   }

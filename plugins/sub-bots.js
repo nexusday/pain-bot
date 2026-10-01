@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 import { formatBotUptime } from '../lib/bot-uptime.js'
+import { tr } from '../lib/lang.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -57,13 +58,22 @@ let handler = async (m, { conn, usedPrefix }) => {
 
     const conexionesActivas = global.conns.filter(connSub => {
       return Boolean(
-        connSub?.user?.jid &&
+        (connSub?.user?.jid || connSub?.user?.id) &&
         (connSub.ws?.isOpen === true || connSub.ws?.socket?.readyState === ws.OPEN)
       )
     })
 
     const usuariosUnicos = new Map()
     const idsGruposUnicos = new Set()
+    const raizSubs = join(process.cwd(), global.bot || 'Serbot')
+    const carpetasSesion = fs.existsSync(raizSubs)
+      ? fs.readdirSync(raizSubs, { withFileTypes: true })
+        .filter((entrada) => entrada.isDirectory() && fs.existsSync(join(raizSubs, entrada.name, 'creds.json')))
+        .map((entrada) => entrada.name)
+      : []
+    const requierenVincular = carpetasSesion.filter((nombre) =>
+      fs.existsSync(join(raizSubs, nombre, '.needs-relink'))
+    ).length
 
     if (connBotPrincipal?.chats) {
       for (const jidUsuario of Object.keys(connBotPrincipal.chats)) {
@@ -72,8 +82,16 @@ let handler = async (m, { conn, usedPrefix }) => {
     }
 
     for (const connSub of conexionesActivas) {
-      if (!connSub?.user?.jid) continue
-      usuariosUnicos.set(connSub.user.jid, connSub)
+      const candidatos = [
+        connSub?.phoneNumber,
+        connSub?.botNumber,
+        connSub?.pathAYBot ? path.basename(connSub.pathAYBot) : '',
+        connSub?.user?.jid,
+        connSub?.user?.id
+      ]
+      const numero = candidatos.map(cleanBotNum).find((valor) => valor.length >= 8)
+      if (!numero) continue
+      usuariosUnicos.set(numero, connSub)
       if (connSub.chats) {
         for (const jidUsuario of Object.keys(connSub.chats)) {
           if (jidUsuario.endsWith('@g.us')) idsGruposUnicos.add(jidUsuario)
@@ -84,6 +102,7 @@ let handler = async (m, { conn, usedPrefix }) => {
     const nombreBot = leerNombreConfig(rutaConfig, global.namebot || 'PAIN BOT')
     const totalSubBots = usuariosUnicos.size
     const totalBots = totalSubBots + 1
+    const sinSocketActivo = Math.max(0, carpetasSesion.length - totalSubBots)
     const totalGrupos = idsGruposUnicos.size
     const memoriaMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
 
@@ -97,9 +116,8 @@ let handler = async (m, { conn, usedPrefix }) => {
     if (totalSubBots > 0) {
       const lineas = []
       let i = 1
-      for (const [jidUsuario, connSub] of usuariosUnicos) {
-        const numeroSubBot = cleanBotNum(jidUsuario)
-        const rutaConfigSubBot = join('./Serbot', numeroSubBot, 'config.json')
+      for (const [numeroSubBot, connSub] of usuariosUnicos) {
+        const rutaConfigSubBot = join(raizSubs, numeroSubBot, 'config.json')
         const nombreSubBot = leerNombreConfig(rutaConfigSubBot, `sub-bot ${i}`)
         const estadoSubBot = connSub.ws?.isOpen === true || connSub.ws?.socket?.readyState === ws.OPEN
           ? 'activo'
@@ -133,8 +151,11 @@ let handler = async (m, { conn, usedPrefix }) => {
 ┊ número  ·  \`+${botActual || '—'}\`
 ┊ tipo  ·  \`${tipoActual}\`
 ┊ memoria  ·  \`${memoriaMB} MB\`
-┊ bots  ·  \`${totalBots}\`
-┊ sub-bots  ·  \`${totalSubBots}\`
+┊ bots activos ·  \`${totalBots}\`
+┊ sub-bots activos ·  \`${totalSubBots}\`
+┊ sesiones guardadas ·  \`${carpetasSesion.length}\`
+┊ sin socket activo ·  \`${sinSocketActivo}\`
+┊ requieren vincular ·  \`${requierenVincular}\`
 ┊ grupos  ·  \`${totalGrupos}\`
 ┊ principal  ·  \`+${numPrincipal}\`
 ┊ estado  ·  \`${estadoBotPrincipal}\`
@@ -143,6 +164,22 @@ let handler = async (m, { conn, usedPrefix }) => {
 ${bloqueSubs}
 ╰─────────`.trim()
 
+    const textoLocalizado = tr(
+      conn,
+      texto,
+      texto
+        .replace('sub-bots activos', 'active sub-bots')
+        .replace('bots activos', 'active bots')
+        .replace('sesiones guardadas', 'saved sessions')
+        .replace('sin socket activo', 'without an active socket')
+        .replace('requieren vincular', 'need relinking'),
+      texto
+        .replace('sub-bots ativos', 'sub-bots ativos')
+        .replace('bots activos', 'bots ativos')
+        .replace('sesiones guardadas', 'sessões guardadas')
+        .replace('sin socket activo', 'sem socket ativo')
+        .replace('requieren vincular', 'precisam de novo vínculo')
+    )
     const imgBot = resolverImagenBot(rutaConfig)
     const optsEnvio = {
       contextInfo: {
@@ -151,10 +188,10 @@ ${bloqueSubs}
     }
 
     try {
-      await conn.sendFile(m.chat, imgBot, 'thumbnail.jpg', texto, m, null, optsEnvio)
+      await conn.sendFile(m.chat, imgBot, 'thumbnail.jpg', textoLocalizado, m, null, optsEnvio)
     } catch (err) {
       console.error('sub-bots sendFile falló, enviando texto:', err?.message || err)
-      await conn.sendMessage(m.chat, { text: texto, ...optsEnvio }, { quoted: m })
+      await conn.sendMessage(m.chat, { text: textoLocalizado, ...optsEnvio }, { quoted: m })
     }
   } catch (e) {
     console.error('Error en /bots:', e)

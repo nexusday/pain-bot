@@ -630,10 +630,31 @@ global.reconnectSubBots = async function() {
       return false
     }
   })
+  const requierenVincular = sesionesSubBot.filter(folder =>
+    existsSync(join(serbotDir, folder, '.needs-relink'))
+  ).length
+  const sesionesRevisables = sesionesSubBot.filter(folder =>
+    !existsSync(join(serbotDir, folder, '.needs-relink'))
+  )
 
   if (sesionesSubBot.length === 0) {
     console.log(chalk.yellow('No se encontraron sub-bots para reconectar'))
-    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
+    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0, requierenVincular: 0 }
+  }
+
+  if (requierenVincular) {
+    console.warn(`${requierenVincular} sub-bot(s) tienen una sesión rechazada y requieren volver a vincularse.`)
+  }
+
+  if (sesionesRevisables.length === 0) {
+    return {
+      total: sesionesSubBot.length,
+      omitidos: 0,
+      conectados: 0,
+      pendientes: 0,
+      fallidos: 0,
+      requierenVincular
+    }
   }
 
   const serbotModule = await import('./plugins/serbot-serbot.js')
@@ -688,11 +709,11 @@ global.reconnectSubBots = async function() {
     return socketDeCarpetaAbierto(folder)
   }
 
-  let omitidos = sesionesSubBot.filter(socketDeCarpetaAbierto).length
-  const subBotFolders = sesionesSubBot.filter(folder => !socketDeCarpetaAbierto(folder))
+  let omitidos = sesionesRevisables.filter(socketDeCarpetaAbierto).length
+  const subBotFolders = sesionesRevisables.filter(folder => !socketDeCarpetaAbierto(folder))
   console.log(chalk.cyan(
     `\nSesiones registradas: ${sesionesSubBot.length}; ya conectadas: ${omitidos}; ` +
-    `por reconectar: ${subBotFolders.length}.`
+    `por reconectar: ${subBotFolders.length}; requieren vincular: ${requierenVincular}.`
   ))
 
   if (subBotFolders.length === 0) {
@@ -701,7 +722,8 @@ global.reconnectSubBots = async function() {
       omitidos,
       conectados: 0,
       pendientes: 0,
-      fallidos: 0
+      fallidos: 0,
+      requierenVincular
     }
   }
 
@@ -814,7 +836,8 @@ global.reconnectSubBots = async function() {
     omitidos,
     conectados,
     pendientes,
-    fallidos
+    fallidos,
+    requierenVincular
   }
   })()
 

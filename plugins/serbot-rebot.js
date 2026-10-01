@@ -133,9 +133,10 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
         const omitidos = Number(resultado?.omitidos) || 0
         const pendientes = Number(resultado?.pendientes) || 0
         const fallidos = Number(resultado?.fallidos) || 0
+        const requierenVincular = Number(resultado?.requierenVincular) || 0
         const socketAviso = global.conn || conn
         await socketAviso.sendMessage(m.chat, {
-          text: `Revisión terminada.\n> Reconectados por esta revisión: ${conectados}\n> Ya activos, sin tocar: ${omitidos}\n> Ya en reconexión automática: ${pendientes}\n> Fallidos: ${fallidos}`,
+          text: `Revisión terminada.\n> Reconectados por esta revisión: ${conectados}\n> Ya activos, sin tocar: ${omitidos}\n> Ya en reconexión automática: ${pendientes}\n> Fallidos: ${fallidos}\n> Requieren volver a vincular: ${requierenVincular}`,
           contextInfo: { ...(global.rcanal?.contextInfo || {}) }
         }, { quoted: m })
       } catch (e) {

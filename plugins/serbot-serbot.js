@@ -30,6 +30,7 @@ const rcanal = global.rcanal || {
 }
 
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
+const ARCHIVO_REENLACE_PENDIENTE = '.needs-relink'
 const SOCKET_CONEXION_MAX_MS = 60_000
 const SOCKET_INACTIVO_MAX_MS = 90_000
 let versionBaileysCache = null
@@ -287,7 +288,7 @@ async function iniciarSubBot(options) {
   if (fromCommand && fs.existsSync(rutaCreds)) {
     try {
       const previa = JSON.parse(fs.readFileSync(rutaCreds, 'utf8'))
-      if (previa?.registered) {
+      if (previa?.registered && !fs.existsSync(path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE))) {
         if (m && conn) await avisarSesionExistente(conn, m, path.basename(pathAYBot), 'guardada', usedPrefix)
         return
       }
@@ -533,16 +534,6 @@ async function iniciarSubBot(options) {
       )
     }
 
-    async function borrarCarpetaSubBot() {
-      try {
-        if (fs.existsSync(pathAYBot)) {
-          fs.rmSync(pathAYBot, { recursive: true, force: true })
-        }
-      } catch (error) {
-        console.log(chalk.bold.redBright(`\n┆ Error eliminando carpeta ${pathAYBot}: ${error.message}\n`))
-      }
-    }
-
     async function enviarCodigoEmparejamiento() {
       if (codigoEmparejamientoEnviado || emparejamientoEnCurso || !codigoM || !m || !conn) return false
       emparejamientoEnCurso = true
@@ -640,6 +631,11 @@ async function iniciarSubBot(options) {
       }
 
       const motivo = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
+      const detalleDesconexion = String(
+        lastDisconnect?.error?.message ||
+        lastDisconnect?.error?.output?.payload?.message ||
+        ''
+      ).slice(0, 240)
 
       if (connection === 'close') {
         detenerPrekeys(sock)
@@ -653,12 +649,19 @@ async function iniciarSubBot(options) {
         
         if (esMotivoSesionFatal(motivo)) {
           terminarIntento(new Error(`Sesión de sub-bot ${idCarpetaBot} cerrada con código ${motivo ?? 'desconocido'}`))
-          console.log(chalk.bold.magentaBright(`\n┆ Sesión fatal (+${idCarpetaBot}) código ${motivo}. Limpiando...\n`))
-          if (codigoM && !estadoConn.creds.registered) {
-            limpiarAuthSubBot(pathAYBot)
-          } else {
-            await borrarCarpetaSubBot()
+          try {
+            fs.writeFileSync(
+              path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE),
+              JSON.stringify({ reason: motivo ?? null, markedAt: new Date().toISOString() }, null, 2)
+            )
+          } catch (error) {
+            console.error(`No se pudo marcar el subbot ${idCarpetaBot} para volver a vincular:`, error?.message || error)
           }
+          console.log(chalk.bold.magentaBright(
+            `\n┆ Sesión (+${idCarpetaBot}) rechazada por WhatsApp (código ${motivo ?? 'desconocido'}). ` +
+            `${detalleDesconexion ? `Motivo: ${detalleDesconexion}. ` : ''}` +
+            `Se conserva su carpeta; vuelve a vincularla con /code o /qr.\n`
+          ))
           try { sock.ws.close() } catch {}
           quitarSockDeConns(sock)
           detenerWatchdog()
@@ -677,7 +680,7 @@ async function iniciarSubBot(options) {
           cierrePropio = false
           return
         }
-        programarReconexion(motivo)
+        programarReconexion(motivo, detalleDesconexion)
         return
       }
 
@@ -834,12 +837,13 @@ async function iniciarSubBot(options) {
       return true
     }
 
-    function programarReconexion(motivo) {
+    function programarReconexion(motivo, detalle = '') {
       if (temporizadorReconexion) return
       reconectando = true
       const cola = 5000 + (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
       console.log(chalk.bold.magentaBright(
         `\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). ` +
+        `${detalle ? `Motivo: ${detalle}. ` : ''}` +
         `Reconectando en ${Math.round(cola / 1000)}s...\n`
       ))
       temporizadorReconexion = setTimeout(() => {
