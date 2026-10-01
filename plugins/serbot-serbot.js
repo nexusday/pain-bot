@@ -402,6 +402,7 @@ async function iniciarSubBot(options) {
       browser: Browsers.ubuntu('Chrome'),
       version,
       markOnlineOnConnect: false,
+      keepAliveIntervalMs: 10_000,
       qrTimeout: 120_000,
     })
 
@@ -878,10 +879,12 @@ async function iniciarSubBot(options) {
         if (sock._ignorarCierre || emparejamientoEnCurso || reconectando) return
         if (!sock.authState?.creds?.registered) return
         const estadoSocket = sock?.ws?.socket?.readyState ?? sock?.ws?.readyState
+        const socketCerrado = estadoSocket === ws.CLOSED || estadoSocket === ws.CLOSING
         const conexionAtascada = !sock?.user?.id && !sock?.user?.jid &&
           ahora - inicioSocketEn >= SOCKET_CONEXION_MAX_MS
-        const conexionPerdida = estadoSocket !== ws.CONNECTING &&
+        const conexionPerdida = socketCerrado || (estadoSocket !== ws.CONNECTING &&
           ahora - vistoUsuarioEn >= SOCKET_INACTIVO_MAX_MS
+        )
         if (!conexionAtascada && !conexionPerdida) return
 
         reconectando = true
