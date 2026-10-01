@@ -402,7 +402,6 @@ async function iniciarSubBot(options) {
       browser: Browsers.ubuntu('Chrome'),
       version,
       markOnlineOnConnect: false,
-      keepAliveIntervalMs: 10_000,
       qrTimeout: 120_000,
     })
 
