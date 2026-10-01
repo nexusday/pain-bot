@@ -5,6 +5,7 @@ import fs from 'fs'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 import { formatBotUptime } from '../lib/bot-uptime.js'
 import { tr } from '../lib/lang.js'
+import { sesionRequiereVincular } from '../lib/subbot-recovery.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -72,7 +73,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         .map((entrada) => entrada.name)
       : []
     const requierenVincular = carpetasSesion.filter((nombre) =>
-      fs.existsSync(join(raizSubs, nombre, '.needs-relink'))
+      sesionRequiereVincular(join(raizSubs, nombre))
     ).length
 
     if (connBotPrincipal?.chats) {

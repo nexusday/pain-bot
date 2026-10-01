@@ -5,6 +5,7 @@ import { esOwnerConfig, esDuenoPrincipal, esBotPrincipal, numeroBotDe, obtenerId
 import { cleanBotNum, numerosIdentidadBot, numeroPublicoBot } from './modo-sub.js'
 import { resolvePhoneNumber } from '../lib/resolve-phone.js'
 import { candidatosJidRemitente, jidsSeSolapan } from '../lib/group-participant.js'
+import { sesionRequiereVincular } from '../lib/subbot-recovery.js'
 
 function dirSerbot() {
   return path.join(process.cwd(), global.bot || 'Serbot')
@@ -194,7 +195,7 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
     let i = 1
     for (const n of [...nums].sort()) {
       const on = online.some(o => o.num === n)
-      const requiereVincular = fs.existsSync(path.join(rutaSesionSub(n), '.needs-relink'))
+      const requiereVincular = sesionRequiereVincular(rutaSesionSub(n))
       texto += `*${i}.* +${n} ${on ? '🟢' : requiereVincular ? '🔗' : '⚪'}\n`
       i++
     }

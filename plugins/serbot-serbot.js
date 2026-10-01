@@ -14,6 +14,7 @@ import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPriva
 import { esModoIos } from '../lib/menu-modo.js'
 import { getSubBotsLogsJid } from '../lib/newsletter-rcanal.js'
 import { canRegisterSubBot, getSubBotSlotsInfo } from "../lib/max-subs.js"
+import { ARCHIVO_REENLACE_PENDIENTE, limpiarMarcaReenlace } from '../lib/subbot-recovery.js'
 import { fileURLToPath } from "url"
 import { tr } from '../lib/lang.js'
 
@@ -30,7 +31,6 @@ const rcanal = global.rcanal || {
 }
 
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
-const ARCHIVO_REENLACE_PENDIENTE = '.needs-relink'
 const SOCKET_CONEXION_MAX_MS = 60_000
 const SOCKET_INACTIVO_MAX_MS = 90_000
 let versionBaileysCache = null
@@ -422,6 +422,7 @@ async function iniciarSubBot(options) {
     let vistoUsuarioEn = Date.now()
     let temporizadorWatchdog = null
     let temporizadorReconexion = null
+    let reemplazosConsecutivos = 0
     const telefonoEmparejamiento = phoneNumber
     const idCarpetaBot = path.basename(pathAYBot)
 
@@ -528,7 +529,6 @@ async function iniciarSubBot(options) {
       return (
         motivo === DisconnectReason.loggedOut || // 401
         motivo === 405 ||
-        motivo === DisconnectReason.connectionReplaced || // 440
         motivo === DisconnectReason.forbidden || // 403
         motivo === DisconnectReason.multideviceMismatch // 411
       )
@@ -687,11 +687,17 @@ async function iniciarSubBot(options) {
       if (global.db.data == null) loadDatabase()
 
       if (connection === 'open') {
+        try {
+          limpiarMarcaReenlace(pathAYBot)
+        } catch (error) {
+          console.error(`No se pudo limpiar la marca de reconexión de ${idCarpetaBot}:`, error?.message || error)
+        }
         if (temporizadorReconexion) {
           clearTimeout(temporizadorReconexion)
           temporizadorReconexion = null
         }
         reconectando = false
+        reemplazosConsecutivos = 0
         vistoUsuarioEn = Date.now()
         await borrarMensajeVinculo().catch(() => {})
         if (intento.cancelado) return
@@ -840,11 +846,16 @@ async function iniciarSubBot(options) {
     function programarReconexion(motivo, detalle = '') {
       if (temporizadorReconexion) return
       reconectando = true
-      const cola = 5000 + (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
+      const dispersarMs = (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
+      const esReemplazo = motivo === DisconnectReason.connectionReplaced
+      const cola = esReemplazo
+        ? Math.min(60_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 15 * 60_000) + dispersarMs
+        : 5000 + dispersarMs
+      if (esReemplazo) reemplazosConsecutivos++
       console.log(chalk.bold.magentaBright(
         `\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). ` +
         `${detalle ? `Motivo: ${detalle}. ` : ''}` +
-        `Reconectando en ${Math.round(cola / 1000)}s...\n`
+        `${esReemplazo ? 'Reemplazo detectado; ' : ''}reconectando en ${Math.round(cola / 1000)}s...\n`
       ))
       temporizadorReconexion = setTimeout(() => {
         temporizadorReconexion = null
