@@ -7,7 +7,6 @@ import pino from "pino"
 import chalk from "chalk"
 import util from "util"
 import * as ws from "ws"
-const { CONNECTING } = ws
 import { makeWASocket } from "../lib/simple.js"
 import { conSocketEstable, mantenerPrekeys } from "../lib/socket-estable.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
@@ -31,6 +30,8 @@ const rcanal = global.rcanal || {
 }
 
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
+const SOCKET_CONEXION_MAX_MS = 60_000
+const SOCKET_INACTIVO_MAX_MS = 90_000
 let versionBaileysCache = null
 const iniciosSubBot = new Map()
 
@@ -405,6 +406,7 @@ async function iniciarSubBot(options) {
 
     let sock = makeWASocket(opcionesConexion)
     intento.sock = sock
+    let inicioSocketEn = Date.now()
     sock.isInit = false
     let esInit = true
     let codigoEmparejamientoEnviado = false
@@ -446,7 +448,7 @@ async function iniciarSubBot(options) {
       try {
         if (sock?.ws?.isOpen === true) return true
         const st = sock?.ws?.socket?.readyState
-        return st === ws.OPEN || st === CONNECTING
+        return st === ws.OPEN
       } catch {
         return false
       }
@@ -735,10 +737,12 @@ async function iniciarSubBot(options) {
         const idAnterior = path.basename(pathAYBot)
         cierrePropio = true
         reconectando = true
+        vistoUsuarioEn = Date.now()
         try { sock.ws.close() } catch { }
         sock.ev.removeAllListeners()
         sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
         intento.sock = sock
+        inicioSocketEn = Date.now()
         esInit = true
         try {
           const { setBotStartTime, getBotStartTime, markBotStart } = await import('../lib/bot-uptime.js')
@@ -794,20 +798,29 @@ async function iniciarSubBot(options) {
     detenerWatchdog()
     temporizadorWatchdog = setInterval(() => {
       try {
+        const ahora = Date.now()
         if (socketAbierto()) {
-          vistoUsuarioEn = Date.now()
+          vistoUsuarioEn = ahora
           reconectando = false
           return
         }
         if (sock._ignorarCierre || emparejamientoEnCurso || reconectando) return
         if (!sock.authState?.creds?.registered) return
-        if (Date.now() - vistoUsuarioEn < 90_000) return
+        const estadoSocket = sock?.ws?.socket?.readyState ?? sock?.ws?.readyState
+        const conexionAtascada = estadoSocket === ws.CONNECTING &&
+          ahora - inicioSocketEn >= SOCKET_CONEXION_MAX_MS
+        const conexionPerdida = estadoSocket !== ws.CONNECTING &&
+          ahora - vistoUsuarioEn >= SOCKET_INACTIVO_MAX_MS
+        if (!conexionAtascada && !conexionPerdida) return
 
-        vistoUsuarioEn = Date.now()
-        reconectando = false
-        console.log(chalk.bold.yellow(`\n┆ Subbot (+${idCarpetaBot}) sin conexión. Reconectando...\n`))
+        reconectando = true
+        vistoUsuarioEn = ahora
+        console.log(chalk.bold.yellow(
+          `\n┆ Subbot (+${idCarpetaBot}) ${conexionAtascada ? 'atascado conectando' : 'sin conexión'} (estado ${estadoSocket ?? 'desconocido'}). Reconectando...\n`
+        ))
         recargarHandler(true).catch((e) => {
           console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
+          reconectando = false
         })
       } catch {}
     }, 15000)
