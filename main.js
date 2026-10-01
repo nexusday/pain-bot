@@ -637,8 +637,8 @@ global.reconnectSubBots = async function() {
   }
 
   const serbotModule = await import('./plugins/serbot-serbot.js')
-  const CONCURRENCIA_MAXIMA = 1
-  const PAUSA_ENTRE_INTENTOS_MS = 5000
+  const CONCURRENCIA_MAXIMA = 5
+  const PAUSA_ENTRE_INTENTOS_MS = 1500
   let siguiente = 0
   let conectados = 0
   let pendientes = 0
@@ -712,34 +712,45 @@ global.reconnectSubBots = async function() {
       return
     }
 
+    const intentosMaximos = 3
     const socketExistente = socketDeCarpeta(folder)
     if (socketExistente) {
-      if (typeof socketExistente.reconectarPain !== 'function') {
-        console.warn(`Sub-bot ${folder} tiene un socket anterior sin reconectador; se evita crear otro socket.`)
-        pendientes++
-        return
-      }
+      for (let intento = 1; intento <= intentosMaximos; intento++) {
+        if (socketDeCarpetaAbierto(folder)) {
+          omitidos++
+          return
+        }
 
-      try {
-        const inicio = await socketExistente.reconectarPain()
-        if (inicio === false) {
+        const socketActual = socketDeCarpeta(folder)
+        if (!socketActual || typeof socketActual.reconectarPain !== 'function') {
+          console.warn(`Sub-bot ${folder} no tiene reconectador disponible; se evita crear una conexión duplicada.`)
           pendientes++
           return
         }
-        if (await esperarSocketAbierto(folder)) {
-          conectados++
-        } else {
-          fallidos++
-          console.error(`Tiempo agotado esperando que reconecte el socket existente ${folder}`)
+
+        try {
+          const inicio = await socketActual.reconectarPain()
+          if (inicio === false) {
+            pendientes++
+            return
+          }
+          if (await esperarSocketAbierto(folder)) {
+            conectados++
+            return
+          }
+          console.error(`Intento ${intento}/${intentosMaximos}: tiempo agotado esperando el socket existente ${folder}`)
+        } catch (error) {
+          console.error(`Intento ${intento}/${intentosMaximos} reconectando socket existente ${folder}:`, error?.message || error)
         }
-      } catch (error) {
-        fallidos++
-        console.error(`Error reconectando socket existente ${folder}:`, error?.message || error)
+
+        if (intento < intentosMaximos) {
+          await new Promise(resolve => setTimeout(resolve, 5000 * intento))
+        }
       }
+      fallidos++
       return
     }
 
-    const intentosMaximos = 2
     for (let intento = 1; intento <= intentosMaximos; intento++) {
       if (!existsSync(join(botPath, 'creds.json'))) {
         console.log(chalk.yellow(`Sesión sin credenciales, se omite ${folder}`))
@@ -785,6 +796,9 @@ global.reconnectSubBots = async function() {
     }
   }
 
+  console.log(chalk.cyan(
+    `Reconectando hasta ${Math.min(CONCURRENCIA_MAXIMA, subBotFolders.length)} sub-bots a la vez.`
+  ))
   await Promise.all(
     Array.from(
       { length: Math.min(CONCURRENCIA_MAXIMA, subBotFolders.length) },
