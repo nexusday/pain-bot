@@ -8,7 +8,7 @@ import chalk from "chalk"
 import util from "util"
 import * as ws from "ws"
 import { makeWASocket } from "../lib/simple.js"
-import { conSocketEstable, mantenerPrekeys } from "../lib/socket-estable.js"
+import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from "../lib/socket-estable.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
 import { esModoIos } from '../lib/menu-modo.js'
@@ -407,6 +407,8 @@ async function iniciarSubBot(options) {
     let sock = makeWASocket(opcionesConexion)
     intento.sock = sock
     let inicioSocketEn = Date.now()
+    let firmaCanalesResuelta = null
+    let resolucionCanalesPendiente = null
     sock.isInit = false
     let esInit = true
     let codigoEmparejamientoEnviado = false
@@ -434,6 +436,42 @@ async function iniciarSubBot(options) {
       claveMensajeVinculo = null
       if (!clave || !conn) return
       await conn.sendMessage(m.chat, { delete: clave }).catch(() => {})
+    }
+
+    function firmaConfigCanales() {
+      return JSON.stringify({
+        canales: global.ch || {},
+        canal: global.canal || '',
+        canalName: global.canalName || '',
+        idCanal: global.idcanal || '',
+        nombreCanal: global.namecanal || '',
+        inviteCanal: global._canalInvitePending || '',
+        logs: global.logssubbots || '',
+        logsName: global.logssubbotsName || '',
+        idLogs: global.idlogssubbots || '',
+        nombreLogs: global.namelogssubbots || '',
+        inviteLogs: global._logssubbotsInvitePending || ''
+      })
+    }
+
+    async function resolverCanalesSiHaceFalta(socket) {
+      const firmaActual = firmaConfigCanales()
+      if (firmaCanalesResuelta === firmaActual) return
+      if (resolucionCanalesPendiente) return resolucionCanalesPendiente
+
+      resolucionCanalesPendiente = (async () => {
+        try {
+          const { resolveCanalConfig } = await import('../lib/newsletter-rcanal.js')
+          await resolveCanalConfig(socket)
+          firmaCanalesResuelta = firmaConfigCanales()
+        } catch (err) {
+          console.error('[canal] Error al resolver config del sub-bot:', err?.message || err)
+        } finally {
+          resolucionCanalesPendiente = null
+        }
+      })()
+
+      return resolucionCanalesPendiente
     }
 
     function programarBorradoVinculo(clave) {
@@ -595,6 +633,7 @@ async function iniciarSubBot(options) {
       const motivo = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
 
       if (connection === 'close') {
+        detenerPrekeys(sock)
         const esFlujoEmparejamiento = codigoM && !estadoConn.creds.registered
 
         if (emparejamientoEnCurso) {
@@ -677,12 +716,7 @@ async function iniciarSubBot(options) {
           sock.vistaUnicaLista = true
           initViewOnceAntiListener(sock)
         }
-        try {
-          const { resolveCanalConfig } = await import('../lib/newsletter-rcanal.js')
-          await resolveCanalConfig(sock)
-        } catch (err) {
-          console.error('[canal] Error al seguir canales (sub-bot):', err?.message || err)
-        }
+        await resolverCanalesSiHaceFalta(sock)
         
        
                 try {
@@ -735,6 +769,7 @@ async function iniciarSubBot(options) {
         const chatsAnteriores = sock.chats
         const inicioAnterior = sock.startTime
         const idAnterior = path.basename(pathAYBot)
+        detenerPrekeys(sockAnterior)
         cierrePropio = true
         reconectando = true
         vistoUsuarioEn = Date.now()

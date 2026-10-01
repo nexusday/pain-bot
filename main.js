@@ -37,7 +37,7 @@ import { format } from 'util'
 import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
-import { conSocketEstable, mantenerPrekeys } from './lib/socket-estable.js'
+import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-estable.js'
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoJsonCompacto } from './lib/db-json.js'
@@ -348,6 +348,7 @@ async function connectionUpdate(update) {
   }
 
   if (connection !== 'close') return
+  detenerPrekeys(sock)
 
   const reason = new Boom(lastDisconnect?.error)?.output?.statusCode
     || lastDisconnect?.error?.output?.statusCode
@@ -413,6 +414,11 @@ global.reloadHandler = async function (restartConn) {
   }
 
   if (restartConn) {
+    detenerPrekeys(global.conn)
+    if (temporizadorPresencia) {
+      clearInterval(temporizadorPresencia)
+      temporizadorPresencia = null
+    }
     try {
       if (global.conn.ws) global.conn.ws.close()
     } catch {}
@@ -612,7 +618,7 @@ global.reconnectSubBots = async function() {
   const serbotDir = './Serbot'
   if (!existsSync(serbotDir)) {
     console.log(chalk.yellow('No se encontró la carpeta Serbot'))
-    return { total: 0, omitidos: 0, conectados: 0, fallidos: 0 }
+    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
   }
 
   const sesionesSubBot = readdirSync(serbotDir).filter(folder => {
@@ -627,14 +633,15 @@ global.reconnectSubBots = async function() {
 
   if (sesionesSubBot.length === 0) {
     console.log(chalk.yellow('No se encontraron sub-bots para reconectar'))
-    return { total: 0, omitidos: 0, conectados: 0, fallidos: 0 }
+    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
   }
 
   const serbotModule = await import('./plugins/serbot-serbot.js')
-  const CONCURRENCIA_MAXIMA = 2
+  const CONCURRENCIA_MAXIMA = 1
   const PAUSA_ENTRE_INTENTOS_MS = 5000
   let siguiente = 0
   let conectados = 0
+  let pendientes = 0
   let fallidos = 0
 
   const socketSubBotAbierto = (c) => {
@@ -660,6 +667,27 @@ global.reconnectSubBots = async function() {
     })
   }
 
+  const socketDeCarpeta = (folder) => {
+    const folderDigits = String(folder).replace(/\D/g, '')
+    return global.conns.find(c => {
+      const jidDigits = String(c?.phoneNumber || c?.botNumber || c?.user?.jid || c?.user?.id || '')
+        .split('@')[0].split(':')[0].replace(/\D/g, '')
+      const pathDigits = c?.pathAYBot
+        ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '')
+        : ''
+      return jidDigits === folderDigits || pathDigits === folderDigits
+    })
+  }
+
+  const esperarSocketAbierto = async (folder, timeoutMs = 60_000) => {
+    const vence = Date.now() + timeoutMs
+    while (Date.now() < vence) {
+      if (socketDeCarpetaAbierto(folder)) return true
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+    return socketDeCarpetaAbierto(folder)
+  }
+
   let omitidos = sesionesSubBot.filter(socketDeCarpetaAbierto).length
   const subBotFolders = sesionesSubBot.filter(folder => !socketDeCarpetaAbierto(folder))
   console.log(chalk.cyan(
@@ -672,6 +700,7 @@ global.reconnectSubBots = async function() {
       total: sesionesSubBot.length,
       omitidos,
       conectados: 0,
+      pendientes: 0,
       fallidos: 0
     }
   }
@@ -680,6 +709,33 @@ global.reconnectSubBots = async function() {
     const botPath = join(serbotDir, folder)
     if (socketDeCarpetaAbierto(folder)) {
       omitidos++
+      return
+    }
+
+    const socketExistente = socketDeCarpeta(folder)
+    if (socketExistente) {
+      if (typeof socketExistente.reconectarPain !== 'function') {
+        console.warn(`Sub-bot ${folder} tiene un socket anterior sin reconectador; se evita crear otro socket.`)
+        pendientes++
+        return
+      }
+
+      try {
+        const inicio = await socketExistente.reconectarPain()
+        if (inicio === false) {
+          pendientes++
+          return
+        }
+        if (await esperarSocketAbierto(folder)) {
+          conectados++
+        } else {
+          fallidos++
+          console.error(`Tiempo agotado esperando que reconecte el socket existente ${folder}`)
+        }
+      } catch (error) {
+        fallidos++
+        console.error(`Error reconectando socket existente ${folder}:`, error?.message || error)
+      }
       return
     }
 
@@ -692,7 +748,7 @@ global.reconnectSubBots = async function() {
       }
       try {
         if (!serbotModule.AYBot) throw new Error('AYBot no está disponible')
-        await serbotModule.AYBot({
+        const resultado = await serbotModule.AYBot({
           pathAYBot: botPath,
           m: null,
           conn: global.conn,
@@ -703,9 +759,12 @@ global.reconnectSubBots = async function() {
           esperarConexion: true,
           timeoutConexionMs: 60_000
         })
-        console.log(chalk.green(`Sub-bot ${folder} conectado`))
-        conectados++
-        return
+        if (resultado && await esperarSocketAbierto(folder, 1000)) {
+          console.log(chalk.green(`Sub-bot ${folder} conectado`))
+          conectados++
+          return
+        }
+        throw new Error(`No se confirmó el socket abierto para ${folder}`)
       } catch (error) {
         console.error(`Intento ${intento}/${intentosMaximos} fallido para ${folder}:`, error?.message || error)
         if (intento < intentosMaximos && existsSync(join(botPath, 'creds.json'))) {
@@ -732,11 +791,15 @@ global.reconnectSubBots = async function() {
       () => trabajador()
     )
   )
-  console.log(chalk.cyan(`\nReconexión terminada: ${conectados} conectados, ${fallidos} pendientes.`))
+  console.log(chalk.cyan(
+    `\nRevisión terminada: ${conectados} reconectados, ${omitidos} ya activos, ` +
+    `${pendientes} en reconexión automática y ${fallidos} fallidos.`
+  ))
   return {
     total: sesionesSubBot.length,
     omitidos,
     conectados,
+    pendientes,
     fallidos
   }
   })()

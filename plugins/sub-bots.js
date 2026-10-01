@@ -55,10 +55,10 @@ let handler = async (m, { conn, usedPrefix }) => {
     const botActual = cleanBotNum(conn.user?.jid || conn.user?.id)
     const rutaConfig = join('./Serbot', botActual, 'config.json')
 
-    global.conns = global.conns.filter(connSub => {
+    const conexionesActivas = global.conns.filter(connSub => {
       return Boolean(
         connSub?.user?.jid &&
-        connSub.ws?.socket?.readyState === ws.OPEN
+        (connSub.ws?.isOpen === true || connSub.ws?.socket?.readyState === ws.OPEN)
       )
     })
 
@@ -71,7 +71,7 @@ let handler = async (m, { conn, usedPrefix }) => {
       }
     }
 
-    for (const connSub of global.conns) {
+    for (const connSub of conexionesActivas) {
       if (!connSub?.user?.jid) continue
       usuariosUnicos.set(connSub.user.jid, connSub)
       if (connSub.chats) {
@@ -101,7 +101,9 @@ let handler = async (m, { conn, usedPrefix }) => {
         const numeroSubBot = cleanBotNum(jidUsuario)
         const rutaConfigSubBot = join('./Serbot', numeroSubBot, 'config.json')
         const nombreSubBot = leerNombreConfig(rutaConfigSubBot, `sub-bot ${i}`)
-        const estadoSubBot = connSub.ws?.socket?.readyState === ws.OPEN ? 'activo' : 'inactivo'
+        const estadoSubBot = connSub.ws?.isOpen === true || connSub.ws?.socket?.readyState === ws.OPEN
+          ? 'activo'
+          : 'inactivo'
         const nombreUsuario = connSub.user?.name
           || connSub.authState?.creds?.me?.name
           || 'anónimo'

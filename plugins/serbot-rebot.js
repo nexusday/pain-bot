@@ -114,26 +114,45 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
     reconexionMasivaEnCurso = true
     try {
       await conn.sendMessage(m.chat, {
-        text: 'Buscando sub-bots desconectados; los que ya están activos no se reiniciarán...',
-        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
-      }, { quoted: m })
-      const resultado = await global.reconnectSubBots()
-      const conectados = Number(resultado?.conectados) || 0
-      const omitidos = Number(resultado?.omitidos) || 0
-      const fallidos = Number(resultado?.fallidos) || 0
-      await conn.sendMessage(m.chat, {
-        text: `Revisión terminada.\n> Reconectados: ${conectados}\n> Ya activos, sin tocar: ${omitidos}\n> Pendientes o fallidos: ${fallidos}`,
+        text: 'Revisión iniciada en segundo plano. Los sub-bots activos no se reiniciarán; te avisaré al terminar.',
         contextInfo: { ...(global.rcanal?.contextInfo || {}) }
       }, { quoted: m })
     } catch (e) {
+      reconexionMasivaEnCurso = false
       console.error('[rebot all]', e?.message || e)
-      await conn.sendMessage(m.chat, {
+      return conn.sendMessage(m.chat, {
         text: 'No se pudo iniciar la reconexión masiva de sub-bots.',
         contextInfo: { ...(global.rcanal?.contextInfo || {}) }
       }, { quoted: m })
-    } finally {
-      reconexionMasivaEnCurso = false
     }
+
+    setImmediate(async () => {
+      try {
+        const resultado = await global.reconnectSubBots()
+        const conectados = Number(resultado?.conectados) || 0
+        const omitidos = Number(resultado?.omitidos) || 0
+        const pendientes = Number(resultado?.pendientes) || 0
+        const fallidos = Number(resultado?.fallidos) || 0
+        const socketAviso = global.conn || conn
+        await socketAviso.sendMessage(m.chat, {
+          text: `Revisión terminada.\n> Reconectados por esta revisión: ${conectados}\n> Ya activos, sin tocar: ${omitidos}\n> Ya en reconexión automática: ${pendientes}\n> Fallidos: ${fallidos}`,
+          contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+        }, { quoted: m })
+      } catch (e) {
+        console.error('[rebot all]', e?.message || e)
+        try {
+          const socketAviso = global.conn || conn
+          await socketAviso.sendMessage(m.chat, {
+            text: 'La reconexión masiva falló. Revisa los errores del servidor.',
+            contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+          }, { quoted: m })
+        } catch (errorAviso) {
+          console.error('[rebot all] No se pudo enviar el resultado:', errorAviso?.message || errorAviso)
+        }
+      } finally {
+        reconexionMasivaEnCurso = false
+      }
+    })
     return
   }
 
