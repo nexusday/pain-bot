@@ -361,7 +361,8 @@ async function connectionUpdate(update) {
         `Conexión reemplazada, por favor espera un momento. Reiniciando...\nSi aparecen errores, vuelve a iniciar con: npm start`
       )
     )
-    process.send('reset')
+    if (typeof process.send === 'function') process.send('reset')
+    else process.exit(1)
     return
   }
 
@@ -391,7 +392,10 @@ async function connectionUpdate(update) {
   }, 4000)
 }
 
-process.on('uncaughtException', console.error)
+process.on('uncaughtException', (error) => {
+  console.error('Error no capturado; el supervisor reiniciará el proceso:', error)
+  process.exit(1)
+})
 
 let isInit = true
 let handler = await import('./handler.js')
