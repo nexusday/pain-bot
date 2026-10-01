@@ -615,7 +615,7 @@ global.reconnectSubBots = async function() {
     global.conns = []
   }
 
-  const serbotDir = './Serbot'
+  const serbotDir = global.bot || './Serbot'
   if (!existsSync(serbotDir)) {
     console.log(chalk.yellow('No se encontró la carpeta Serbot'))
     return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
@@ -646,9 +646,9 @@ global.reconnectSubBots = async function() {
 
   const socketSubBotAbierto = (c) => {
     try {
-      if (c.ws?.isOpen === true) return true
-      const st = c.ws?.socket?.readyState
-      return st === ws.OPEN
+      const tieneUsuario = Boolean(c?.user?.id || c?.user?.jid)
+      const socketAbierto = c.ws?.isOpen === true || c.ws?.socket?.readyState === ws.OPEN
+      return tieneUsuario && socketAbierto
     } catch {
       return false
     }
@@ -849,6 +849,13 @@ setTimeout(() => {
     global.reconnectSubBots().catch(console.error)
   }
 }, 10000) 
+
+setInterval(() => {
+  if (!global.conn?.user) return
+  global.reconnectSubBots().catch((error) => {
+    console.error('[supervisor sub-bots] Error revisando sesiones:', error?.message || error)
+  })
+}, 60_000).unref?.()
 
 const publicationTimers = new Map()
 const publicationQueue = new Map()

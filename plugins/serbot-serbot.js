@@ -420,6 +420,7 @@ async function iniciarSubBot(options) {
     let temporizadorVinculo = null
     let vistoUsuarioEn = Date.now()
     let temporizadorWatchdog = null
+    let temporizadorReconexion = null
     const telefonoEmparejamiento = phoneNumber
     const idCarpetaBot = path.basename(pathAYBot)
 
@@ -492,6 +493,10 @@ async function iniciarSubBot(options) {
       }
     }
 
+    function socketAutenticado() {
+      return socketAbierto() && Boolean(sock?.user?.id || sock?.user?.jid)
+    }
+
     function quitarSockDeConns(target = sock) {
       if (!Array.isArray(global.conns)) return
       const i = global.conns.indexOf(target)
@@ -510,6 +515,10 @@ async function iniciarSubBot(options) {
       if (temporizadorVinculo) {
         clearTimeout(temporizadorVinculo)
         temporizadorVinculo = null
+      }
+      if (temporizadorReconexion) {
+        clearTimeout(temporizadorReconexion)
+        temporizadorReconexion = null
       }
       detenerWatchdog()
     }
@@ -664,27 +673,21 @@ async function iniciarSubBot(options) {
           detenerWatchdog()
           return
         }
-        if (sock._ignorarCierre || reconectando || cierrePropio) {
+        if (sock._ignorarCierre || cierrePropio) {
           cierrePropio = false
           return
         }
-        reconectando = true
-        const cola = 5000 + (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
-        console.log(chalk.bold.magentaBright(`\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). Reconectando en ${Math.round(cola / 1000)}s...\n`))
-        // Fuera del evento de conexión y sin recargar handler.js,
-        // para que el principal y los demás subbots sigan respondiendo.
-        setTimeout(() => {
-          recargarHandler(true).catch((e) => {
-            console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
-            reconectando = false
-          })
-        }, cola)
+        programarReconexion(motivo)
         return
       }
 
       if (global.db.data == null) loadDatabase()
 
       if (connection === 'open') {
+        if (temporizadorReconexion) {
+          clearTimeout(temporizadorReconexion)
+          temporizadorReconexion = null
+        }
         reconectando = false
         vistoUsuarioEn = Date.now()
         await borrarMensajeVinculo().catch(() => {})
@@ -776,6 +779,7 @@ async function iniciarSubBot(options) {
         try { sock.ws.close() } catch { }
         sock.ev.removeAllListeners()
         sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
+        cierrePropio = false
         intento.sock = sock
         inicioSocketEn = Date.now()
         esInit = true
@@ -797,7 +801,7 @@ async function iniciarSubBot(options) {
           if (indice >= 0) global.conns[indice] = sock
         }
         setTimeout(() => {
-          if (!socketAbierto()) reconectando = false
+          if (!temporizadorReconexion && !socketAutenticado()) reconectando = false
         }, 20000)
       }
 
@@ -830,11 +834,28 @@ async function iniciarSubBot(options) {
       return true
     }
 
+    function programarReconexion(motivo) {
+      if (temporizadorReconexion) return
+      reconectando = true
+      const cola = 5000 + (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
+      console.log(chalk.bold.magentaBright(
+        `\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). ` +
+        `Reconectando en ${Math.round(cola / 1000)}s...\n`
+      ))
+      temporizadorReconexion = setTimeout(() => {
+        temporizadorReconexion = null
+        recargarHandler(true).catch((error) => {
+          console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
+          reconectando = false
+        })
+      }, cola)
+    }
+
     detenerWatchdog()
     temporizadorWatchdog = setInterval(() => {
       try {
         const ahora = Date.now()
-        if (socketAbierto()) {
+        if (socketAutenticado()) {
           vistoUsuarioEn = ahora
           reconectando = false
           return
@@ -842,7 +863,7 @@ async function iniciarSubBot(options) {
         if (sock._ignorarCierre || emparejamientoEnCurso || reconectando) return
         if (!sock.authState?.creds?.registered) return
         const estadoSocket = sock?.ws?.socket?.readyState ?? sock?.ws?.readyState
-        const conexionAtascada = estadoSocket === ws.CONNECTING &&
+        const conexionAtascada = !sock?.user?.id && !sock?.user?.jid &&
           ahora - inicioSocketEn >= SOCKET_CONEXION_MAX_MS
         const conexionPerdida = estadoSocket !== ws.CONNECTING &&
           ahora - vistoUsuarioEn >= SOCKET_INACTIVO_MAX_MS
@@ -857,7 +878,9 @@ async function iniciarSubBot(options) {
           console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
           reconectando = false
         })
-      } catch {}
+      } catch (error) {
+        console.error(`Error en watchdog del subbot ${idCarpetaBot}:`, error?.message || error)
+      }
     }, 15000)
 
     recargarHandler(false)
