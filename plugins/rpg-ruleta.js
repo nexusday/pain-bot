@@ -182,6 +182,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
 handler.help = ['ruleta <rojo/negro/par/impar/0-36> <cantidad>']
 handler.tags = ['juegos', 'economía']
-handler.command = ['ruleta', 'roulette', 'rule']
+handler.command = ['ruleta', 'roulette']
 
 export default handler
