@@ -467,8 +467,10 @@ global.reloadHandler = async function (restartConn) {
       if (!modulo?.handler) return
       return modulo.handler.call(sub, chatUpdate)
     }
-    if (sub._upsertVivo) {
-      try { sub.ev.off('messages.upsert', sub._upsertVivo) } catch {}
+    const handlersAnteriores = new Set([sub.handler, sub._upsertVivo])
+    for (const handlerAnterior of handlersAnteriores) {
+      if (typeof handlerAnterior !== 'function') continue
+      try { sub.ev.off('messages.upsert', handlerAnterior) } catch {}
     }
     sub._upsertVivo = fn
     sub.handler = fn
