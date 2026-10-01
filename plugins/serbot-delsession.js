@@ -56,7 +56,7 @@ function listarSubsConectados() {
   const vistos = new Set()
   for (const c of global.conns || []) {
     if (!c?.user) continue
-    if (c.ws?.socket && c.ws.socket.readyState !== ws.OPEN) continue
+    if (c.ws?.isOpen !== true && c.ws?.socket?.readyState !== ws.OPEN) continue
     const num =
       digitos(c.phoneNumber || c.botNumber) ||
       (c.pathAYBot ? digitos(path.basename(c.pathAYBot)) : '') ||

@@ -114,12 +114,15 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
     reconexionMasivaEnCurso = true
     try {
       await conn.sendMessage(m.chat, {
-        text: 'Iniciando la reconexión de todos los sub-bots...',
+        text: 'Buscando sub-bots desconectados; los que ya están activos no se reiniciarán...',
         contextInfo: { ...(global.rcanal?.contextInfo || {}) }
       }, { quoted: m })
-      await global.reconnectSubBots()
+      const resultado = await global.reconnectSubBots()
+      const conectados = Number(resultado?.conectados) || 0
+      const omitidos = Number(resultado?.omitidos) || 0
+      const fallidos = Number(resultado?.fallidos) || 0
       await conn.sendMessage(m.chat, {
-        text: 'Se inició la reconexión de todos los sub-bots registrados.',
+        text: `Revisión terminada.\n> Reconectados: ${conectados}\n> Ya activos, sin tocar: ${omitidos}\n> Pendientes o fallidos: ${fallidos}`,
         contextInfo: { ...(global.rcanal?.contextInfo || {}) }
       }, { quoted: m })
     } catch (e) {

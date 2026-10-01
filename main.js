@@ -29,7 +29,6 @@ import { register } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { platform } from 'process'
 import * as ws from 'ws'
-const { CONNECTING } = ws
 import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, watch, mkdirSync } from 'fs'
 import yargs from 'yargs'
 import chalk from 'chalk'
@@ -613,10 +612,10 @@ global.reconnectSubBots = async function() {
   const serbotDir = './Serbot'
   if (!existsSync(serbotDir)) {
     console.log(chalk.yellow('No se encontró la carpeta Serbot'))
-    return
+    return { total: 0, omitidos: 0, conectados: 0, fallidos: 0 }
   }
 
-  const subBotFolders = readdirSync(serbotDir).filter(folder => {
+  const sesionesSubBot = readdirSync(serbotDir).filter(folder => {
     try {
       const folderPath = join(serbotDir, folder)
       return statSync(folderPath).isDirectory() && existsSync(join(folderPath, 'creds.json'))
@@ -626,12 +625,10 @@ global.reconnectSubBots = async function() {
     }
   })
 
-  if (subBotFolders.length === 0) {
+  if (sesionesSubBot.length === 0) {
     console.log(chalk.yellow('No se encontraron sub-bots para reconectar'))
-    return
+    return { total: 0, omitidos: 0, conectados: 0, fallidos: 0 }
   }
-
-  console.log(chalk.cyan(`\nReconectando ${subBotFolders.length} sub-bots...`))
 
   const serbotModule = await import('./plugins/serbot-serbot.js')
   const CONCURRENCIA_MAXIMA = 2
@@ -640,36 +637,49 @@ global.reconnectSubBots = async function() {
   let conectados = 0
   let fallidos = 0
 
-  const isSubBotAlive = (c) => {
+  const socketSubBotAbierto = (c) => {
     try {
       if (c.ws?.isOpen === true) return true
       const st = c.ws?.socket?.readyState
-      return st === 1 || st === CONNECTING
+      return st === ws.OPEN
     } catch {
       return false
     }
   }
 
-  async function conectarUno(folder) {
-    const botPath = join(serbotDir, folder)
+  const socketDeCarpetaAbierto = (folder) => {
     const folderDigits = String(folder).replace(/\D/g, '')
-    global.conns = global.conns.filter(c => {
+    return global.conns.some(c => {
+      if (!socketSubBotAbierto(c)) return false
       const jidDigits = String(c?.phoneNumber || c?.botNumber || c?.user?.jid || c?.user?.id || '')
         .split('@')[0].split(':')[0].replace(/\D/g, '')
-      const pathDigits = c?.pathAYBot ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '') : ''
-      const matchesFolder = jidDigits === folderDigits || pathDigits === folderDigits
-      return !matchesFolder || isSubBotAlive(c)
+      const pathDigits = c?.pathAYBot
+        ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '')
+        : ''
+      return jidDigits === folderDigits || pathDigits === folderDigits
     })
-    const isAlreadyConnected = global.conns.some(c => {
-      if (!isSubBotAlive(c)) return false
-      const jidDigits = String(c.phoneNumber || c.botNumber || c.user?.jid || c.user?.id || '')
-        .split('@')[0].split(':')[0].replace(/\D/g, '')
-      const pathDigits = c.pathAYBot ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '') : ''
-      return (jidDigits && jidDigits === folderDigits) || pathDigits === folderDigits
-    })
+  }
 
-    if (isAlreadyConnected) {
-      conectados++
+  let omitidos = sesionesSubBot.filter(socketDeCarpetaAbierto).length
+  const subBotFolders = sesionesSubBot.filter(folder => !socketDeCarpetaAbierto(folder))
+  console.log(chalk.cyan(
+    `\nSesiones registradas: ${sesionesSubBot.length}; ya conectadas: ${omitidos}; ` +
+    `por reconectar: ${subBotFolders.length}.`
+  ))
+
+  if (subBotFolders.length === 0) {
+    return {
+      total: sesionesSubBot.length,
+      omitidos,
+      conectados: 0,
+      fallidos: 0
+    }
+  }
+
+  async function conectarUno(folder) {
+    const botPath = join(serbotDir, folder)
+    if (socketDeCarpetaAbierto(folder)) {
+      omitidos++
       return
     }
 
@@ -723,6 +733,12 @@ global.reconnectSubBots = async function() {
     )
   )
   console.log(chalk.cyan(`\nReconexión terminada: ${conectados} conectados, ${fallidos} pendientes.`))
+  return {
+    total: sesionesSubBot.length,
+    omitidos,
+    conectados,
+    fallidos
+  }
   })()
 
   try {
