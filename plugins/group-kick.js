@@ -2,7 +2,8 @@ import {
   findGroupParticipant,
   findBotParticipant,
   jidsParticipante,
-  jidsSeSolapan
+  jidsSeSolapan,
+  quitarParticipanteActual
 } from '../lib/group-participant.js'
 import {
   resolveGroupTarget,
@@ -108,7 +109,19 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
     )
   }
 
-  await conn.groupParticipantsUpdate(m.chat, [quien], 'remove')
+  const resultadoExpulsion = await quitarParticipanteActual(conn, m.chat, ids, partes)
+  if (!resultadoExpulsion.ok) {
+    return conn.sendMessage(
+      m.chat,
+      {
+        text: resultadoExpulsion.reason === 'not_in_group'
+          ? '[❗] No encontré a ese usuario en la lista actual del grupo.'
+          : '[❗] WhatsApp no permitió expulsar a ese usuario. Verifica que siga en el grupo y que el bot sea administrador.',
+        contextInfo: { ...rcanal.contextInfo }
+      },
+      { quoted: m }
+    )
+  }
 
   if (!global.db.data.users[quien]) global.db.data.users[quien] = {}
   global.db.data.users[quien].banned = true

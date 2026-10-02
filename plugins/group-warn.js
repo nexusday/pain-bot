@@ -2,7 +2,8 @@
   findGroupParticipant,
   findBotParticipant,
   jidsParticipante,
-  jidsSeSolapan
+  jidsSeSolapan,
+  quitarParticipanteActual
 } from '../lib/group-participant.js'
 import {
   resolveGroupTarget,
@@ -118,7 +119,17 @@ let handler = async (m, { conn, args, participants, isAdmin, isOwner, usedPrefix
 
   if (advertenciasUsuario.count >= 3) {
     try {
-      await conn.groupParticipantsUpdate(m.chat, [quien], 'remove')
+      const resultadoExpulsion = await quitarParticipanteActual(conn, m.chat, ids, partes)
+      if (!resultadoExpulsion.ok) {
+        return conn.sendMessage(
+          m.chat,
+          {
+            text: '[❗] No se pudo expulsar al usuario; verifica que siga en el grupo y que el bot sea administrador.',
+            contextInfo: { ...rcanal.contextInfo }
+          },
+          { quoted: m }
+        )
+      }
 
       if (!global.db.data.users[quien]) global.db.data.users[quien] = {}
       global.db.data.users[quien].banned = true
