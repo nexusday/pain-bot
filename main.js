@@ -24,7 +24,7 @@ import { PROJECT_TMP, cleanupTmpFiles, startTmpCleanupInterval } from './lib/tmp
 import './config.js'
 import './lib/bot-uptime.js'
 import { createRequire } from 'module'
-import path, { join } from 'path'
+import path, { join, resolve } from 'path'
 import { register } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { platform } from 'process'
@@ -41,11 +41,12 @@ import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-
 import { sesionRequiereVincular, vinculacionEnCurso } from './lib/subbot-recovery.js'
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
-import { ArchivoJsonCompacto } from './lib/db-json.js'
+import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
 import qrcode from 'qrcode-terminal'
+import { EventEmitter } from 'node:events'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const {
@@ -100,7 +101,10 @@ global.prefix = new RegExp(
     ']'
 )
 
-global.db = new Low(new ArchivoJsonCompacto(`storage/databases/database.json`))
+global.db = new Low(new ArchivoSqliteCompartido(
+  'storage/databases/database.sqlite',
+  'storage/databases/database.json'
+))
 
 global.DATABASE = global.db
 global.loadDatabase = async function loadDatabase() {
@@ -115,8 +119,11 @@ global.loadDatabase = async function loadDatabase() {
     )
   if (global.db.data !== null) return
   global.db.READ = true
-  await global.db.read().catch(console.error)
-  global.db.READ = null
+  try {
+    await global.db.read()
+  } finally {
+    global.db.READ = null
+  }
   const normalizeModeMap = (value) =>
     value && typeof value === 'object' && !Array.isArray(value) ? value : {}
   global.db.data = {
@@ -158,97 +165,141 @@ global.loadDatabase = async function loadDatabase() {
   global.db.chain = lodash.chain(global.db.data) 
 }
 
-global.authFile = `sessions`
-const { state, saveCreds } = await useMultiFileAuthState(global.authFile)
+await global.loadDatabase()
 
-const { version } = await fetchLatestBaileysVersion()
+const isSubbotWorker = process.env.PAIN_ROLE === 'subbot'
+const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
+global.processRole = isSubbotWorker ? 'subbot' : 'primary'
+if (isSubbotWorker || isManagedPrimary) {
+  const syncDatabase = setInterval(() => {
+    global.db.adapter.refresh(global.db.data).catch((error) => {
+      console.error('[db] No se pudo actualizar la vista de otro proceso:', error?.message || error)
+    })
+  }, 500)
+  syncDatabase.unref?.()
+}
+global.authFile = 'sessions'
+let state = null
+let saveCreds = async () => {}
+let connectionOptions = null
+let conn
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-const question = (texto) => new Promise((resolver) => rl.question(texto, resolver))
+if (!isSubbotWorker) {
+  const authState = await useMultiFileAuthState(global.authFile)
+  state = authState.state
+  saveCreds = authState.saveCreds
+}
 
 const logger = pino({
   timestamp: () => `,"time":"${new Date().toJSON()}"`,
 }).child({ class: 'client' })
 logger.level = 'fatal'
 
-const cacheReintentoPrincipal = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
+if (!isSubbotWorker) {
+  const { version } = await fetchLatestBaileysVersion()
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  const question = (texto) => new Promise((resolver) => rl.question(texto, resolver))
+  const cacheReintentoPrincipal = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
 
-const connectionOptions = conSocketEstable({
-  version: version,
-  logger,
-  printQRInTerminal: false,
-  auth: {
-    creds: state.creds,
-    keys: makeCacheableSignalKeyStore(state.keys, logger),
-  },
-  browser: Browsers.ubuntu('Chrome'),
-  markOnlineOnConnect: true,
-  appStateMacVerification: {
-    patch: false,
-    snapshot: false,
-  },
-  msgRetryCache: cacheReintentoPrincipal,
-})
+  connectionOptions = conSocketEstable({
+    version,
+    logger,
+    printQRInTerminal: false,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    browser: Browsers.ubuntu('Chrome'),
+    markOnlineOnConnect: true,
+    appStateMacVerification: { patch: false, snapshot: false },
+    msgRetryCache: cacheReintentoPrincipal,
+  })
 
-global.conn = makeWASocket(connectionOptions)
-/** Alias vivo del socket principal (se actualiza en reloadHandler). */
-let conn = global.conn
+  global.conn = makeWASocket(connectionOptions)
+  conn = global.conn
+  global.mainBotJid = null
 
-global.mainBotJid = null
-
-async function handleLogin() {
-  if (conn.authState.creds.registered) {
-    console.log(chalk.green('Sesión ya está registrada.'))
-    return
-  }
-
-  let loginMethod = await question(
-    chalk.green(
-      '¿Cómo deseas iniciar sesión?\nEscribe "qr" para escanear el código QR o "code" para usar un código de 8 dígitos:\n'
-    )
-  )
-
-  loginMethod = loginMethod.toLowerCase().trim()
-
-  if (loginMethod === 'code') {
-    let phoneNumber = await question(chalk.blue('Ingresa el número de WhatsApp donde estará el bot (incluye código país, ej: 521XXXXXXXXXX):\n'))
-    phoneNumber = phoneNumber.replace(/\D/g, '').replace(/^0+/, '')
-
-    // México: WhatsApp usa 521. Si ya trae 521, no volver a insertar el 1.
-    if (phoneNumber.startsWith('521') && phoneNumber.length >= 12 && phoneNumber.length <= 13) {
-      // ok
-    } else if (phoneNumber.startsWith('52') && !phoneNumber.startsWith('521') && phoneNumber.length === 12) {
-      phoneNumber = `521${phoneNumber.slice(2)}`
+  async function handleLogin() {
+    if (conn.authState.creds.registered) {
+      console.log(chalk.green('Sesión ya está registrada.'))
+      rl.close()
+      return
     }
 
-    if (typeof conn.requestPairingCode === 'function') {
-      try {
-        
-        if (conn.ws.readyState === ws.OPEN) {
-          let code = await conn.requestPairingCode(phoneNumber)
-          code = code?.match(/.{1,4}/g)?.join('-') || code
-          console.log(chalk.cyan('Tu código de emparejamiento es:', code))
-        } else {
-          console.log(chalk.red('La conexión no está abierta. Intenta nuevamente.'))
+    let loginMethod = await question(
+      chalk.green(
+        '¿Cómo deseas iniciar sesión?\nEscribe "qr" para escanear el código QR o "code" para usar un código de 8 dígitos:\n'
+      )
+    )
+
+    loginMethod = loginMethod.toLowerCase().trim()
+
+    if (loginMethod === 'code') {
+      let phoneNumber = await question(chalk.blue('Ingresa el número de WhatsApp donde estará el bot (incluye código país, ej: 521XXXXXXXXXX):\n'))
+      phoneNumber = phoneNumber.replace(/\D/g, '').replace(/^0+/, '')
+      if (phoneNumber.startsWith('521') && phoneNumber.length >= 12 && phoneNumber.length <= 13) {
+        // El prefijo mexicano ya incluye el dígito adicional.
+      } else if (phoneNumber.startsWith('52') && !phoneNumber.startsWith('521') && phoneNumber.length === 12) {
+        phoneNumber = `521${phoneNumber.slice(2)}`
+      }
+
+      if (typeof conn.requestPairingCode === 'function') {
+        try {
+          if (conn.ws.readyState === ws.OPEN) {
+            let code = await conn.requestPairingCode(phoneNumber)
+            code = code?.match(/.{1,4}/g)?.join('-') || code
+            console.log(chalk.cyan('Tu código de emparejamiento es:', code))
+          } else {
+            console.log(chalk.red('La conexión no está abierta. Intenta nuevamente.'))
+          }
+        } catch (error) {
+          console.log(chalk.red('Error al solicitar código de emparejamiento:'), error.message || error)
         }
-      } catch (e) {
-        console.log(chalk.red('Error al solicitar código de emparejamiento:'), e.message || e)
+      } else {
+        console.log(chalk.red('Tu versión de Baileys no soporta emparejamiento por código.'))
       }
     } else {
-      console.log(chalk.red('Tu versión de Baileys no soporta emparejamiento por código.'))
+      console.log(chalk.yellow('Generando código QR, escanéalo con tu WhatsApp...'))
+      conn.ev.on('connection.update', ({ qr }) => {
+        if (qr) qrcode.generate(qr, { small: true })
+      })
     }
-  } else {
-    console.log(chalk.yellow('Generando código QR, escanéalo con tu WhatsApp...'))
-    conn.ev.on('connection.update', ({ qr }) => {
-      if (qr) qrcode.generate(qr, { small: true })
-    })
+    rl.close()
   }
+
+  await handleLogin()
+} else {
+  const eventBus = new EventEmitter()
+  const facade = {
+    ev: eventBus,
+    user: {},
+    _painPlaceholder: true,
+    logger,
+    decodeJid: (jid) => global.conns?.[0]?.decodeJid?.(jid) || jid || '',
+    reply: (...args) => {
+      const socket = global.conns?.find((item) => item?.reply)
+      return socket ? socket.reply(...args) : Promise.reject(new Error('No hay sub-bots conectados en este worker'))
+    },
+    sendMessage: (...args) => {
+      const socket = global.conns?.find((item) => item?.sendMessage)
+      return socket ? socket.sendMessage(...args) : Promise.reject(new Error('No hay sub-bots conectados en este worker'))
+    },
+  }
+  global.conn = new Proxy(facade, {
+    get(target, property, receiver) {
+      if (Reflect.has(target, property)) return Reflect.get(target, property, receiver)
+      const socket = global.conns?.[0]
+      const value = socket?.[property]
+      return typeof value === 'function' ? value.bind(socket) : value
+    }
+  })
+  conn = global.conn
 }
 
-await handleLogin()
-
-conn.isInit = false
-conn.well = false
+if (!isSubbotWorker) {
+  conn.isInit = false
+  conn.well = false
+}
 
 if (!opts['test']) {
   if (global.db) {
@@ -261,6 +312,8 @@ if (!opts['test']) {
         if (opts['autocleartmp']) {
           cleanupTmpFiles({ maxAgeMs: 3 * 60 * 1000 })
         }
+      } catch (error) {
+        console.error('[db] No se pudieron guardar los cambios de la base compartida:', error?.message || error)
       } finally {
         escribiendoDb = false
       }
@@ -279,7 +332,7 @@ function mantenerPresenciaPrincipal(sock) {
   temporizadorPresencia = setInterval(avisar, 3 * 60 * 60 * 1000)
 }
 
-startTmpCleanupInterval({ verbose: true })
+if (!isSubbotWorker) startTmpCleanupInterval({ verbose: true })
 
 let reconectandoPrincipal = false
 let sinSocketDesde = 0
@@ -313,7 +366,7 @@ function vigilarSocketPrincipal() {
   })
 }
 
-setInterval(vigilarSocketPrincipal, 15_000).unref?.()
+if (!isSubbotWorker) setInterval(vigilarSocketPrincipal, 15_000).unref?.()
 
 async function connectionUpdate(update) {
   const sock = this?.ev ? this : conn
@@ -413,6 +466,8 @@ global.reloadHandler = async function (restartConn) {
       console.error(e)
     }
   }
+
+  if (isSubbotWorker) return true
 
   if (restartConn) {
     detenerPrekeys(global.conn)
@@ -603,12 +658,57 @@ watch(join(__dirname, 'lib'), { recursive: true }, (_evento, filename) => {
   agendarRecargaCodigo(join('lib', filename).replace(/\\/g, '/'))
 })
 
-await global.reloadHandler()
+if (!isSubbotWorker) {
+  await global.reloadHandler()
+} else {
+  global.conns = []
+  const assignedSessions = JSON.parse(process.env.PAIN_SESSIONS_JSON || '[]')
+  if (!Array.isArray(assignedSessions)) throw new Error('La asignación de sub-bots no es válida')
+  const serbotModule = await import('./plugins/serbot-serbot.js')
+  const serbotDir = resolve(__dirname, global.bot || 'Serbot')
+  for (const folder of [...new Set(assignedSessions)]) {
+    if (typeof folder !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(folder)) continue
+    const botPath = join(serbotDir, folder)
+    if (!existsSync(join(botPath, 'creds.json'))) continue
+    await serbotModule.AYBot({
+      pathAYBot: botPath,
+      m: null,
+      conn: global.conn,
+      args: [],
+      usedPrefix: '.',
+      command: 'qr',
+      fromCommand: false,
+      esperarConexion: false
+    })
+  }
+  console.log(`Worker ${process.env.PAIN_WORKER_ID || 'subbot'} administra ${assignedSessions.length} sesión(es).`)
+}
+
+function cerrarConexionesDelProceso(signal) {
+  console.log(`Proceso ${process.env.PAIN_WORKER_ID || 'primary'} cerrando por ${signal}.`)
+  const sockets = new Set([global.conn, ...(global.conns || [])])
+  for (const socket of sockets) {
+    if (!socket) continue
+    try { detenerPrekeys(socket) } catch {}
+    try { socket.ev?.removeAllListeners?.() } catch {}
+    try { socket.ws?.close?.() } catch {}
+  }
+  setTimeout(() => process.exit(0), 1500).unref?.()
+}
+
+process.once('SIGINT', () => cerrarConexionesDelProceso('SIGINT'))
+process.once('SIGTERM', () => cerrarConexionesDelProceso('SIGTERM'))
+process.on('message', (message) => {
+  if (message?.type === 'shutdown') cerrarConexionesDelProceso('shutdown')
+})
 
 
 let reconexionSubBotsPromise = null
 
 global.reconnectSubBots = async function() {
+  if (isSubbotWorker || isManagedPrimary) {
+    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
+  }
   if (reconexionSubBotsPromise) return reconexionSubBotsPromise
 
   reconexionSubBotsPromise = (async () => {
@@ -856,7 +956,7 @@ connectionUpdate = async function(update) {
   await originalConnectionUpdate.call(this, update)
   
  
-  if (update.connection === 'open' && !global.subBotsReconnected) {
+  if (!isManagedPrimary && update.connection === 'open' && !global.subBotsReconnected) {
     global.subBotsReconnected = true
     console.log(chalk.cyan('\nBot principal conectado, iniciando reconexión de sub-bots...'))
     setTimeout(() => {
@@ -866,16 +966,16 @@ connectionUpdate = async function(update) {
 }
 
 
-setTimeout(() => {
+if (!isSubbotWorker && !isManagedPrimary) setTimeout(() => {
   if (global.subBotsReconnected) return
   if (global.conn && global.conn.user) {
     global.subBotsReconnected = true
     console.log(chalk.cyan('\nIniciando reconexión automática de sub-bots..'))
     global.reconnectSubBots().catch(console.error)
   }
-}, 10000) 
+}, 10000)
 
-setInterval(() => {
+if (!isSubbotWorker && !isManagedPrimary) setInterval(() => {
   if (!global.conn?.user) return
   global.reconnectSubBots().catch((error) => {
     console.error('[supervisor sub-bots] Error revisando sesiones:', error?.message || error)

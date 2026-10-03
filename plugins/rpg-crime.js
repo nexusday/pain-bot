@@ -62,24 +62,35 @@ function elegir(lista) {
   return lista[lista.length - 1]
 }
 
-function usuarioDe(m) {
-  let usuario = global.db.data.users[m.sender]
-  if (!usuario) {
-    global.db.data.users[m.sender] = { coins: 100, exp: 0, level: 0, registered: true }
-    usuario = global.db.data.users[m.sender]
-  }
-  if (!Number.isFinite(usuario.coins)) usuario.coins = 0
-  return usuario
-}
-
 let handler = async (m, { conn }) => {
-  const usuario = usuarioDe(m)
-  const falta = espera - (Date.now() - (usuario.lastCrime || 0))
-  if (falta > 0) {
+  const reclamo = await global.db.adapter.claimAndUpdate(
+    global.db.data,
+    `cooldown:crime:${m.sender}`,
+    espera,
+    (datos, ahora) => {
+      if (!datos.users[m.sender]) {
+        datos.users[m.sender] = { coins: 100, exp: 0, level: 0, registered: true }
+      }
+      const usuario = datos.users[m.sender]
+      if (!Number.isFinite(usuario.coins)) usuario.coins = 0
+      const falta = espera - (ahora - (usuario.lastCrime || 0))
+      if (falta > 0) return { claim: false, falta }
+
+      const caso = elegir(casos)
+      const monto = entre(caso.min, caso.max)
+      usuario.lastCrime = ahora
+      if (caso.ok) usuario.coins += monto
+      else usuario.coins = Math.max(0, usuario.coins - monto)
+      return { caso, monto, coins: usuario.coins }
+    }
+  )
+
+  if (!reclamo.acquired || reclamo.result?.falta > 0) {
+    const falta = reclamo.result?.falta || espera
     const minutos = Math.ceil(falta / 60000)
     return conn.sendMessage(m.chat, {
       text: tr(conn,
-        `[❗] Debes esperar *${minutos} minuto${minutos !== 1 ? 's' : ''}* para otro crimen.`,
+        `[❗] Ya reclamaste el crimen. Debes esperar *${minutos} minuto${minutos !== 1 ? 's' : ''}* para otro.`,
         `[❗] Wait *${minutos} minute${minutos !== 1 ? 's' : ''}* before another crime.`,
         `[❗] Espera *${minutos} minuto${minutos !== 1 ? 's' : ''}* para outro crime.`
       ),
@@ -87,17 +98,13 @@ let handler = async (m, { conn }) => {
     }, { quoted: m })
   }
 
-  const caso = elegir(casos)
-  const monto = entre(caso.min, caso.max)
-  usuario.lastCrime = Date.now()
-  if (caso.ok) usuario.coins += monto
-  else usuario.coins = Math.max(0, usuario.coins - monto)
+  const { caso, monto, coins } = reclamo.result
 
   const signo = caso.ok ? `+${monto}` : `-${monto}`
   const rango = tr(conn, ...rarezaTxt[caso.rareza])
   const moneda = global.moneda || 'USD'
   await conn.sendMessage(m.chat, {
-    text: `\`*˚   ✩    ✦    ✩   ˚*\`\n\n╭─ ✧\n┊ *${tr(conn, 'crimen', 'crime', 'crime')}*\n╰─ ✧  ✩\n┊ ${tr(conn, caso.es, caso.en, caso.pt)}\n┊ ${tr(conn, 'rango', 'rank', 'nível')}  ·  \`${rango}\`\n┊ ${signo} ${moneda}\n┊ ${tr(conn, 'saldo', 'balance', 'saldo')}  ·  \`${usuario.coins}\`\n╰─────────`,
+    text: `\`*˚   ✩    ✦    ✩   ˚*\`\n\n╭─ ✧\n┊ *${tr(conn, 'crimen', 'crime', 'crime')}*\n╰─ ✧  ✩\n┊ ${tr(conn, caso.es, caso.en, caso.pt)}\n┊ ${tr(conn, 'rango', 'rank', 'nível')}  ·  \`${rango}\`\n┊ ${signo} ${moneda}\n┊ ${tr(conn, 'saldo', 'balance', 'saldo')}  ·  \`${coins}\`\n╰─────────`,
     contextInfo: { ...rcanal.contextInfo }
   }, { quoted: m })
 }

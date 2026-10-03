@@ -264,6 +264,14 @@ if (!m) return
 
 try {
   if (global.db.data == null) await global.loadDatabase()
+  if (pareceComandoCrudo(m)) {
+    try {
+      await global.db.adapter.refresh(global.db.data)
+    } catch (error) {
+      console.error('[db] No se pudo sincronizar antes de filtrar el comando:', error?.message || error)
+      return
+    }
+  }
   if (antipvDebeIgnorar(this, m)) return
   if (shouldSkipGroupMessageEarly(this, m)) return
   if (esCharlaQueNoFrena(this, m)) return
@@ -704,6 +712,28 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
       avisarPermiso('botAdmin', m, this)
       continue
     }
+
+    const esComandoJuego = (Array.isArray(plugin.tags) && plugin.tags.some((tag) =>
+      /^(juegos?|econom[ií]a|rpg)$/i.test(String(tag))
+    )) || /^rpg[-_]/i.test(plugin.name)
+    const idMensaje = String(m.key?.id || m.id || '')
+    if (esComandoJuego && idMensaje) {
+      const claimKey = `game:${m.chat}:${idMensaje}`
+      try {
+        const adquirido = await global.db.adapter.claimCommand(global.db.data, claimKey)
+        if (!adquirido) {
+          comandoEjecutado = true
+          m.commandExecuted = true
+          continue
+        }
+      } catch (error) {
+        console.error('[game] No se pudo bloquear la ejecución duplicada:', error?.message || error)
+        comandoEjecutado = true
+        m.commandExecuted = true
+        await m.reply('No pude verificar si este comando ya fue ejecutado. Inténtalo de nuevo en unos segundos.')
+        continue
+      }
+    }
     
     comandoEjecutado = true
     try {
@@ -734,11 +764,28 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
 
       if (m.error == null && !m.rpgAwarded) {
         const usuarioDb = global.db.data.users[m.sender]
-        if (usuarioDb) {
+        const idProgreso = String(m.key?.id || m.id || '')
+        let reclamarProgreso = Boolean(usuarioDb)
+        if (reclamarProgreso && idProgreso) {
+          try {
+            reclamarProgreso = await global.db.adapter.claimCommand(
+              global.db.data,
+              `rpg-progress:${m.chat}:${idProgreso}`
+            )
+          } catch (error) {
+            reclamarProgreso = false
+            console.error('[rpg] No se pudo reservar la experiencia de este mensaje:', error?.message || error)
+          }
+        }
+        if (usuarioDb && reclamarProgreso) {
           const esSticker = Array.isArray(plugin.tags) && plugin.tags.includes('stickers')
           m.rpgProgress = awardCommandProgress(usuarioDb, { isSticker: esSticker })
           m.rpgAwarded = true
+          await global.db.write()
         }
+      }
+      if (esComandoJuego) {
+        await global.db.write()
       }
     } catch (e) {
       m.error = e

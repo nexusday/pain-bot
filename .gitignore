@@ -2,6 +2,11 @@ sessions/
 yarn.lock
 Serbot/
 storage/databases/database.json
+storage/databases/database.json.pre-sqlite.bak
+storage/databases/database.sqlite
+storage/databases/database.sqlite.lock/
+storage/databases/database.sqlite.*.tmp
+storage/process-mode.json
 storage/staff.json
 storage/maxsubs.json
 storage/soporte.json

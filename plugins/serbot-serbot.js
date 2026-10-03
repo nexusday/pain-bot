@@ -22,6 +22,7 @@ import {
 } from '../lib/subbot-recovery.js'
 import { fileURLToPath } from "url"
 import { tr } from '../lib/lang.js'
+import { releaseSessionLease, requestSessionLease } from '../lib/process-isolation.js'
 
 
 const rcanal = global.rcanal || {
@@ -223,6 +224,13 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   opcionesSubBot.usedPrefix = usedPrefix
   opcionesSubBot.command = command
   opcionesSubBot.fromCommand = true
+  if (process.env.PAIN_ROLE === 'primary') {
+    const leaseGranted = await requestSessionLease(id)
+    if (!leaseGranted) {
+      return conn.reply(m.chat, 'No se pudo reservar esta sesión para vincularla sin conexiones duplicadas. Intenta de nuevo.', m)
+    }
+    opcionesSubBot.supervisorHandoff = true
+  }
   opcionesSubBot.phoneNumber = phoneNumber
   opcionesSubBot.replyJid = replyJid
 
@@ -249,6 +257,7 @@ async function iniciarSubBot(options) {
     fromCommand = true,
     phoneNumber = null,
     replyJid = null,
+    supervisorHandoff = false,
     esperarConexion = false,
     timeoutConexionMs = 60_000
   } = options
@@ -292,6 +301,7 @@ async function iniciarSubBot(options) {
       const previa = JSON.parse(fs.readFileSync(rutaCreds, 'utf8'))
       if (previa?.registered && !fs.existsSync(path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE))) {
         if (m && conn) await avisarSesionExistente(conn, m, path.basename(pathAYBot), 'guardada', usedPrefix)
+        if (supervisorHandoff) releaseSessionLease(path.basename(pathAYBot))
         return
       }
     } catch {}
@@ -644,6 +654,14 @@ async function iniciarSubBot(options) {
 
       if (connection === 'close') {
         detenerPrekeys(sock)
+        if (sock._painSupervisorHandoff) {
+          detenerWatchdog()
+          if (temporizadorReconexion) clearTimeout(temporizadorReconexion)
+          if (Array.isArray(global.conns)) global.conns = global.conns.filter((item) => item !== sock)
+          sock.ev.removeAllListeners()
+          releaseSessionLease(idCarpetaBot)
+          return
+        }
         const esFlujoEmparejamiento = codigoM && !estadoConn.creds.registered
 
         if (emparejamientoEnCurso) {
@@ -777,6 +795,17 @@ async function iniciarSubBot(options) {
               configPath: rutaConfig,
               subConfig: configSub
             })
+          }
+
+          if (supervisorHandoff && !sock._painSupervisorHandoff) {
+            sock._painSupervisorHandoff = true
+            sock._ignorarCierre = true
+            detenerWatchdog()
+            if (temporizadorReconexion) clearTimeout(temporizadorReconexion)
+            detenerPrekeys(sock)
+            try { sock.ws.close() } catch (error) {
+              console.error(`No se pudo ceder la sesión ${idCarpetaBot} al supervisor:`, error?.message || error)
+            }
           }
           
         } catch (error) {

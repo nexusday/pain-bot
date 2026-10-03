@@ -1,120 +1,275 @@
 console.log('⧉ Inicializando Pain...')
 
-import { dirname, join } from 'path'
+import { fork } from 'node:child_process'
+import { existsSync, readdirSync, statSync } from 'fs'
+import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
-import cluster from 'node:cluster'
+import {
+  acceptModeRequest,
+  assignSessions,
+  canStartSessions,
+  readModeState,
+  writeModeState
+} from './lib/process-isolation.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { setupMaster, fork } = cluster
-const REINICIO_GRACIOSO_MS = 1000
-const REINICIO_FORZADO_MS = 10_000
-const REINICIO_MAX_MS = 30_000
-const TIEMPO_ESTABLE_MS = 60_000
-
-let workerActual = null
-let temporizadorReinicio = null
-let temporizadorForzado = null
-let reinicioSolicitado = false
-let apagando = false
-let fallosConsecutivos = 0
+const mainPath = join(__dirname, 'main.js')
+const modePath = join(__dirname, 'storage', 'process-mode.json')
 
 try {
   const { default: cfonts } = await import('cfonts')
-  cfonts.say('PAIN\nBOT', {
-    font: 'block',
-    align: 'center',
-    gradient: ['cyan', 'blue']
-  })
-  cfonts.say('WhatsApp Multi-Bot-Official', {
-    font: 'simple',
-    align: 'center',
-    gradient: ['blue', 'white']
-  })
+  cfonts.say('PAIN\nBOT', { font: 'block', align: 'center', gradient: ['cyan', 'blue'] })
+  cfonts.say('WhatsApp Multi-Bot-Official', { font: 'simple', align: 'center', gradient: ['blue', 'white'] })
 } catch {
   console.log('PAIN BOT')
 }
 
-setupMaster({
-  exec: join(__dirname, 'main.js'),
-  args: process.argv.slice(2),
-})
+await import('./config.js')
+const configuredIsolation = global.processIsolation === true
+let mode = readModeState(modePath, configuredIsolation)
+const subbotRoot = resolve(__dirname, global.bot || 'Serbot')
+const slots = new Map()
+const leasedSessions = new Set()
+const pendingLeaseRequests = new Map()
+let stopping = false
+let scanTimer
+const STOP_TIMEOUT_MS = 10_000
+const RESTART_MAX_MS = 30_000
+const STABLE_MS = 60_000
 
-function iniciarWorker() {
-  if (apagando || workerActual) return
+function listSessions() {
+  if (!existsSync(subbotRoot)) return []
+  return readdirSync(subbotRoot).filter((folder) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(folder)) return false
+    try {
+      const sessionPath = join(subbotRoot, folder)
+      return statSync(sessionPath).isDirectory() && existsSync(join(sessionPath, 'creds.json'))
+    } catch {
+      return false
+    }
+  }).filter((folder) => !leasedSessions.has(folder)).sort()
+}
 
-  const iniciadoEn = Date.now()
-  const worker = fork()
-  workerActual = worker
+function makeTargets() {
+  const targets = new Map([['primary', { role: 'primary', sessions: [] }]])
+  for (const [id, sessions] of assignSessions(mode, listSessions())) {
+    targets.set(id, { role: 'subbot', sessions })
+  }
+  return targets
+}
 
-  worker.on('message', (mensaje) => {
-    if (worker !== workerActual) return
+function fingerprint(target) {
+  return JSON.stringify({ role: target.role, sessions: target.sessions })
+}
 
-    if (mensaje === 'uptime') {
-      worker.send(process.uptime())
+function ensureTarget(id, target) {
+  const wantedFingerprint = fingerprint(target)
+  let slot = slots.get(id)
+  if (slot && slot.fingerprint !== wantedFingerprint) {
+    if (slot.child) return
+    if (slot.restartTimer) clearTimeout(slot.restartTimer)
+    slots.delete(id)
+    slot = null
+  }
+  if (!slot) {
+    slot = {
+      target,
+      fingerprint: wantedFingerprint,
+      child: null,
+      failures: 0,
+      restartAt: 0,
+      startedAt: 0,
+      stopping: false,
+      restartTimer: null,
+      forceTimer: null
+    }
+    slots.set(id, slot)
+  }
+  startSlot(id, slot)
+}
+
+function startSlot(id, slot) {
+  if (stopping || slot.child || Date.now() < slot.restartAt) return
+  const liveAssignments = [...slots]
+    .filter(([ownerId, owner]) => owner.child && owner.child.exitCode === null && owner.child.signalCode === null)
+    .map(([ownerId, owner]) => [ownerId, owner.target.sessions])
+  if (!canStartSessions(slot.target.sessions, liveAssignments, id)) return
+  slot.stopping = false
+  slot.startedAt = Date.now()
+  const child = fork(mainPath, process.argv.slice(2), {
+    cwd: __dirname,
+    env: {
+      ...process.env,
+      PAIN_ROLE: slot.target.role,
+      PAIN_WORKER_ID: id,
+      PAIN_SESSIONS_JSON: JSON.stringify(slot.target.sessions),
+      PAIN_PROCESS_MODE: String(mode)
+    },
+    stdio: ['inherit', 'inherit', 'inherit', 'ipc']
+  })
+  slot.child = child
+  child.on('message', (message) => {
+    if (slot.child !== child) return
+    if ((message === 'reset' || message === 'restart') && id === 'primary') {
+      stopSlot(id, slot)
       return
     }
-
-    if (mensaje !== 'reset' && mensaje !== 'restart') return
-
-    reinicioSolicitado = true
-    console.warn('Worker solicitó reinicio; reiniciando el proceso del bot...')
-    worker.kill('SIGTERM')
-    temporizadorForzado = setTimeout(() => {
-      if (worker === workerActual && !worker.isDead()) worker.kill('SIGKILL')
-    }, REINICIO_FORZADO_MS)
-  })
-
-  worker.on('error', (error) => {
-    console.error('Error del worker principal:', error)
-  })
-
-  worker.on('exit', (code, signal) => {
-    if (worker !== workerActual) return
-    workerActual = null
-    if (temporizadorForzado) clearTimeout(temporizadorForzado)
-    temporizadorForzado = null
-
-    if (apagando) {
-      process.exit(0)
+    if (id !== 'primary' || !message || typeof message !== 'object') return
+    if (message.type === 'lease-session' && /^[a-zA-Z0-9_-]+$/.test(message.session || '') &&
+        typeof message.requestId === 'string') {
+      leasedSessions.add(message.session)
+      pendingLeaseRequests.set(message.requestId, message.session)
+      reconcile()
+      resolveLeaseRequests(child)
       return
     }
-
-    const duracion = Date.now() - iniciadoEn
-    if (duracion >= TIEMPO_ESTABLE_MS) fallosConsecutivos = 0
-
-    const demora = reinicioSolicitado
-      ? REINICIO_GRACIOSO_MS
-      : Math.min(1000 * (2 ** fallosConsecutivos++), REINICIO_MAX_MS)
-    reinicioSolicitado = false
-
+    if (message.type === 'release-session' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
+      leasedSessions.delete(message.session)
+      for (const [requestId, session] of pendingLeaseRequests) {
+        if (session === message.session) pendingLeaseRequests.delete(requestId)
+      }
+      reconcile()
+      return
+    }
+    if (message.type !== 'set-mode') return
+    const authorized = acceptModeRequest({
+      senderRole: slot.target.role,
+      authenticatedOwner: message.authenticatedOwner === true,
+      mode: message.mode
+    })
+    if (!authorized) {
+      console.warn('Solicitud IPC de cambio de modo rechazada.')
+      return
+    }
+    try {
+      mode = writeModeState(modePath, message.mode)
+      console.log(`Modo de procesos actualizado a /pri ${mode}.`)
+      reconcile()
+    } catch (error) {
+      console.error('No se pudo guardar el modo de procesos:', error?.message || error)
+    }
+  })
+  child.on('error', (error) => console.error(`Error del proceso ${id}:`, error?.message || error))
+  child.on('exit', (code, signal) => {
+    if (slot.child !== child) return
+    slot.child = null
+    if (slot.forceTimer) clearTimeout(slot.forceTimer)
+    slot.forceTimer = null
+    const stoppedIntentionally = slot.stopping || stopping
+    slot.stopping = false
+    if (id === 'primary') {
+      for (const lease of leasedSessions) leasedSessions.delete(lease)
+      pendingLeaseRequests.clear()
+    }
+    if (stoppedIntentionally) {
+      slots.delete(id)
+      if (!stopping) reconcile()
+      else finishShutdownIfReady()
+      return
+    }
+    const runtime = Date.now() - slot.startedAt
+    if (runtime >= STABLE_MS) slot.failures = 0
+    const delay = Math.min(1000 * (2 ** slot.failures++), RESTART_MAX_MS)
+    slot.restartAt = Date.now() + delay
     console.error(
-      `Worker terminó (código ${code ?? 'desconocido'}, señal ${signal || 'ninguna'}). ` +
-      `Nuevo intento en ${demora / 1000}s.`
+      `Proceso ${id} terminó (código ${code ?? 'desconocido'}, señal ${signal || 'ninguna'}). ` +
+      `Se reiniciará en ${delay / 1000}s.`
     )
-    temporizadorReinicio = setTimeout(iniciarWorker, demora)
+    slot.restartTimer = setTimeout(() => {
+      slot.restartTimer = null
+      reconcile()
+    }, delay)
+    slot.restartTimer.unref?.()
+    reconcile()
   })
 }
 
-function apagar(signal) {
-  if (apagando) return
-  apagando = true
-  if (temporizadorReinicio) clearTimeout(temporizadorReinicio)
-
-  const worker = workerActual
-  if (!worker || worker.isDead()) {
-    process.exit(0)
+function stopSlot(id, slot) {
+  if (!slot.child) {
+    if (slot.restartTimer) clearTimeout(slot.restartTimer)
+    slots.delete(id)
     return
   }
-
-  worker.once('exit', () => process.exit(0))
-  worker.kill(signal)
-  temporizadorForzado = setTimeout(() => {
-    if (!worker.isDead()) worker.kill('SIGKILL')
-    process.exit(1)
-  }, REINICIO_FORZADO_MS)
+  if (slot.stopping) return
+  slot.stopping = true
+  slot.child.kill('SIGTERM')
+  slot.forceTimer = setTimeout(() => {
+    if (slot.child && slot.child.exitCode === null && slot.child.signalCode === null) {
+      slot.child.kill('SIGKILL')
+    }
+  }, STOP_TIMEOUT_MS)
 }
 
-process.once('SIGINT', () => apagar('SIGINT'))
-process.once('SIGTERM', () => apagar('SIGTERM'))
+function resolveLeaseRequests(primaryChild) {
+  const liveAssignments = [...slots]
+    .filter(([id, slot]) => id !== 'primary' && slot.child &&
+      slot.child.exitCode === null && slot.child.signalCode === null)
+    .flatMap(([, slot]) => slot.target.sessions)
+  for (const [requestId, session] of pendingLeaseRequests) {
+    if (liveAssignments.includes(session)) continue
+    pendingLeaseRequests.delete(requestId)
+    if (primaryChild.connected) {
+      primaryChild.send({ type: 'lease-session-ack', requestId, session })
+    }
+  }
+}
 
-iniciarWorker()
+function reconcile() {
+  if (stopping) return
+  const desired = makeTargets()
+  for (const [id, slot] of slots) {
+    const target = desired.get(id)
+    if (!target || fingerprint(target) !== slot.fingerprint) {
+      stopSlot(id, slot)
+      continue
+    }
+  }
+
+  const drainingSubbot = [...slots].some(([id, slot]) => {
+    const target = desired.get(id)
+    return slot.target.role === 'subbot' && slot.child &&
+      (!target || fingerprint(target) !== slot.fingerprint)
+  })
+  const primaryTarget = desired.get('primary')
+  if (primaryTarget) ensureTarget('primary', primaryTarget)
+  if (drainingSubbot) return
+
+  for (const [id, target] of desired) {
+    if (id !== 'primary') ensureTarget(id, target)
+  }
+  const primary = slots.get('primary')?.child
+  if (primary) resolveLeaseRequests(primary)
+}
+
+function finishShutdownIfReady() {
+  if ([...slots.values()].some(({ child }) => child)) return
+  clearTimeout(shutdownTimer)
+  process.exit(0)
+}
+
+let shutdownTimer
+function shutdown(signal) {
+  if (stopping) return
+  stopping = true
+  clearInterval(scanTimer)
+  for (const [id, slot] of slots) {
+    if (slot.restartTimer) clearTimeout(slot.restartTimer)
+    if (slot.child) stopSlot(id, slot)
+    else slots.delete(id)
+  }
+  shutdownTimer = setTimeout(() => {
+    for (const slot of slots.values()) {
+      if (slot.child) slot.child.kill('SIGKILL')
+    }
+    process.exit(1)
+  }, STOP_TIMEOUT_MS + 1000)
+  shutdownTimer.unref?.()
+  finishShutdownIfReady()
+  console.log(`Supervisor apagando por ${signal}.`)
+}
+
+process.once('SIGINT', () => shutdown('SIGINT'))
+process.once('SIGTERM', () => shutdown('SIGTERM'))
+
+reconcile()
+scanTimer = setInterval(reconcile, 20_000)

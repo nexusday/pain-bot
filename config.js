@@ -28,6 +28,10 @@ global.sessions = 'Sessions'
 global.bot = 'Serbot' 
 global.AFBots = true
 
+// Modo inicial de procesos: true = /pri 2 (uno por sub-bot), false = /pri 1 (grupos).
+// La selección guardada en storage/process-mode.json tiene prioridad tras el primer cambio.
+global.processIsolation = false
+
 global.packname = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧 𝗠𝗗'
 global.namebot = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧 𝗠𝗗'
 global.author = 'Sunkovv'

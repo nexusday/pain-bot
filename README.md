@@ -330,3 +330,11 @@ Uso personal o educativo. Respeta las [políticas de WhatsApp](https://www.whats
 ---
 
 *Pain Bot — By Sunkovv*
+# Sub-bot process modes
+
+`/pri 1` keeps the main bot in its own process and assigns sub-bots to at most two
+stable grouped workers. `/pri 2` assigns one supervised process to each sub-bot.
+Only an owner using the main bot can change the mode. The supervisor saves the
+runtime choice in `storage/process-mode.json`; that saved choice takes precedence
+over `global.processIsolation` in `config.js` after restart. Without a saved
+choice, `true` selects mode 2 and `false` selects mode 1.
