@@ -35,10 +35,6 @@ import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
-const delay = ms => isNumber(ms) && new Promise(resolve => setTimeout(function () {
-clearTimeout(this)
-resolve()
-}, ms))
 
 let cachePlugins = null
 let imprimirMensaje = null
@@ -189,7 +185,6 @@ function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
 }
 
 export async function handler(chatUpdate) {
-this.msgqueque = this.msgqueque || []
 if (!chatUpdate) return
 if (chatUpdate.type && chatUpdate.type !== 'notify') {
   const ultimo = chatUpdate.messages?.[chatUpdate.messages.length - 1]
@@ -320,7 +315,6 @@ const crearIdsOwner = (numero) => {
 
 const listaOwner = Array.isArray(global.owner) ? global.owner : []
 const listaOwnerLid = Array.isArray(global.ownerLid) ? global.ownerLid : []
-const listaMods = Array.isArray(global.mods) ? global.mods : []
 const listaPrems = Array.isArray(global.prems) ? global.prems : []
 
 const numBotActual = String(conn.user?.jid || conn.user?.id || '').split('@')[0].split(':')[0].replace(/\D/g, '')
@@ -351,22 +345,9 @@ const todosIdsOwner = [
 const idsRemitente = candidatosJidRemitente(m, this)
 const isROwner = jidsSeSolapan(idsRemitente, todosIdsOwner)
 const isOwner = isROwner || m.fromMe
-const isMods = isOwner || listaMods.some(v =>
-  jidsSeSolapan(idsRemitente, crearIdsOwner(v))
-)
 const isPrems = isROwner || listaPrems.some(v =>
   jidsSeSolapan(idsRemitente, crearIdsOwner(v))
 ) || _user?.prem == true  
-
-if (opts['queque'] && m.text && !(isMods || isPrems)) {  
-  let cola = this.msgqueque, tiempo = 1000 * 5  
-  const idAnterior = cola[cola.length - 1]  
-  cola.push(m.id || m.key.id)  
-  setInterval(async function () {  
-    if (cola.indexOf(idAnterior) === -1) clearInterval(this)  
-    await delay(tiempo)  
-  }, tiempo)  
-}  
 
 if (m.isBaileys) return
 
@@ -986,11 +967,6 @@ global.dfail = (type, m, conn) => {
 } catch (e) {
 console.error(e)
 } finally {
-if (opts['queque'] && m.text) {
-const indiceCola = this.msgqueque.indexOf(m.id || m.key.id)
-if (indiceCola !== -1) this.msgqueque.splice(indiceCola, 1)
-}
-
 let user, stats = global.db.data.stats  
 if (m) {  
   if (m.sender && (user = global.db.data.users[m.sender])) {  
