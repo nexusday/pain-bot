@@ -38,7 +38,7 @@ import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-estable.js'
-import { sesionRequiereVincular } from './lib/subbot-recovery.js'
+import { sesionRequiereVincular, vinculacionEnCurso } from './lib/subbot-recovery.js'
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoJsonCompacto } from './lib/db-json.js'
@@ -635,7 +635,8 @@ global.reconnectSubBots = async function() {
     sesionRequiereVincular(join(serbotDir, folder))
   ).length
   const sesionesRevisables = sesionesSubBot.filter(folder =>
-    !sesionRequiereVincular(join(serbotDir, folder))
+    !sesionRequiereVincular(join(serbotDir, folder)) &&
+    !vinculacionEnCurso(join(serbotDir, folder))
   )
 
   if (sesionesSubBot.length === 0) {

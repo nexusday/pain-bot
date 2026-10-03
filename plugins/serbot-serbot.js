@@ -14,7 +14,12 @@ import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPriva
 import { esModoIos } from '../lib/menu-modo.js'
 import { getSubBotsLogsJid } from '../lib/newsletter-rcanal.js'
 import { canRegisterSubBot, getSubBotSlotsInfo } from "../lib/max-subs.js"
-import { ARCHIVO_REENLACE_PENDIENTE, limpiarMarcaReenlace } from '../lib/subbot-recovery.js'
+import {
+  ARCHIVO_REENLACE_PENDIENTE,
+  finalizarVinculacion,
+  limpiarMarcaReenlace,
+  marcarVinculacionEnCurso
+} from '../lib/subbot-recovery.js'
 import { fileURLToPath } from "url"
 import { tr } from '../lib/lang.js'
 
@@ -124,7 +129,8 @@ function limpiarAuthSubBot(pathAYBot) {
   const preservar = new Set([
     'config.json',
     'staff.json',
-    'soporte.json'
+    'soporte.json',
+    ARCHIVO_REENLACE_PENDIENTE
   ])
   for (const entradaFs of fs.readdirSync(pathAYBot)) {
     if (preservar.has(entradaFs)) continue
@@ -272,6 +278,8 @@ async function iniciarSubBot(options) {
   }
 
   const codigoM = args[0] && /(--code|code)/.test(args[0].trim()) ? true : args[1] && /(--code|code)/.test(args[1].trim()) ? true : false
+  const rutaMarcaReenlace = path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE)
+  const reenlaceEnCurso = fromCommand && fs.existsSync(rutaMarcaReenlace)
   let txtCodigo, codeBot, txtQR
 
   if (codigoM) {
@@ -326,6 +334,8 @@ async function iniciarSubBot(options) {
     return
   }
 
+  if (reenlaceEnCurso) marcarVinculacionEnCurso(pathAYBot)
+
   let resolverConexion
   let rechazarConexion
   const promesaConexion = new Promise((resolve, reject) => {
@@ -348,6 +358,7 @@ async function iniciarSubBot(options) {
   function terminarIntento(error = null, socket = null) {
     if (intento.temporizador) clearTimeout(intento.temporizador)
     intento.temporizador = null
+    if (reenlaceEnCurso) finalizarVinculacion(pathAYBot)
     if (iniciosSubBot.get(claveInicio) === intento) iniciosSubBot.delete(claveInicio)
     if (error) rechazarConexion(error)
     else resolverConexion(socket)
@@ -646,7 +657,18 @@ async function iniciarSubBot(options) {
           return
         }
 
-        
+        if (esMotivoSesionFatal(motivo) && !estadoConn.creds.registered) {
+          terminarIntento(new Error(`Emparejamiento de sub-bot ${idCarpetaBot} interrumpido`))
+          console.log(chalk.bold.yellow(
+            `\n┆ Emparejamiento de (+${idCarpetaBot}) interrumpido antes de registrar la sesión; ` +
+            `no se marca como una sesión que requiera volver a vincular.\n`
+          ))
+          try { sock.ws.close() } catch {}
+          quitarSockDeConns(sock)
+          detenerWatchdog()
+          return
+        }
+
         if (esMotivoSesionFatal(motivo)) {
           terminarIntento(new Error(`Sesión de sub-bot ${idCarpetaBot} cerrada con código ${motivo ?? 'desconocido'}`))
           try {

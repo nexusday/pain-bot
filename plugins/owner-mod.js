@@ -10,9 +10,7 @@ import {
   etiquetaScope,
   esBotPrincipal
 } from '../lib/staff.js'
-import { resolveGroupTarget, collectGroupTargetCandidates } from '../lib/resolve-group-target.js'
-import { resolvePhoneNumber } from '../lib/resolve-phone.js'
-import { jidsParticipante } from '../lib/group-participant.js'
+import { buscarParticipanteGrupo, jidsParticipante } from '../lib/group-participant.js'
 
 function digitosDe(valor = '') {
   return String(valor || '').split('@')[0].split(':')[0].replace(/\D/g, '')
@@ -45,52 +43,44 @@ function ayuda(usedPrefix, command, conn) {
     `• No se pueden quitar owners de *config*`
 }
 
-async function recolectarIdsCompletos(m, args, conn, participants) {
+export async function recolectarIdsCompletos(m, args, conn, participants) {
   const ids = new Set()
-  const add = (j) => {
-    if (!j) return
-    ids.add(String(j))
-    const d = digitosDe(j)
-    if (d) {
-      ids.add(`${d}@s.whatsapp.net`)
-      ids.add(`${d}@lid`)
-      ids.add(d)
-    }
+  const candidatos = new Set()
+  const agregarCandidato = (jid) => {
+    if (typeof jid !== 'string' || !jid) return
+    if (jid.endsWith('@g.us') || jid.endsWith('@broadcast')) return
+    candidatos.add(jid)
   }
 
-  const objetivo = await resolveGroupTarget(m, args, conn, participants || [])
-  if (objetivo.ok) {
-    for (const j of objetivo.ids || []) add(j)
-    add(objetivo.quien)
-    for (const j of jidsParticipante(objetivo.participante, conn)) add(j)
-  } else {
-    const candidatos = await collectGroupTargetCandidates(m, args, conn, participants || [])
-    for (const j of candidatos) add(j)
+  for (const jid of m.mentionedJid || []) agregarCandidato(jid)
+
+  const contextInfo = m.msg?.contextInfo || {}
+  if (contextInfo.stanzaId || contextInfo.quotedMessage || m.quoted) {
+    agregarCandidato(contextInfo.participant)
+    agregarCandidato(m.quoted?.sender)
   }
 
   for (const arg of args || []) {
     const d = digitosDe(arg)
-    if (d.length >= 8) {
-      add(d)
-      add(`${d}@s.whatsapp.net`)
-      add(`${d}@lid`)
+    if (d.length >= 8 && d.length <= 13) agregarCandidato(`${d}@s.whatsapp.net`)
+    else if (d.length >= 14) agregarCandidato(`${d}@lid`)
+  }
+
+  for (const candidato of candidatos) {
+    ids.add(candidato)
+    const participante = buscarParticipanteGrupo(participants, candidato, conn)
+    if (participante) {
+      for (const jid of jidsParticipante(participante, conn)) ids.add(jid)
     }
   }
 
-  for (const j of [...ids]) {
-    if (!esJidLid(j) && !String(j).includes('@lid')) continue
+  const lids = [...ids].filter(esJidLid)
+  await Promise.all(lids.map(async (jid) => {
     try {
-      const pn = await conn?.signalRepository?.lidMapping?.getPNForLID?.(j.includes('@') ? j : `${j}@lid`)
-      if (pn) add(pn)
+      const pn = await conn?.signalRepository?.lidMapping?.getPNForLID?.(jid)
+      if (pn) ids.add(pn)
     } catch {}
-    try {
-      const phone = await resolvePhoneNumber(j, conn, null, m, {
-        participants,
-        groupId: m.isGroup ? m.chat : null
-      })
-      if (phone) add(`${phone}@s.whatsapp.net`)
-    } catch {}
-  }
+  }))
 
   return [...ids]
 }
@@ -122,9 +112,9 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
   }
 
   const sub = String(args[0] || '').toLowerCase().trim()
-  const partes = m.isGroup
-    ? (((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(() => null))?.participants || participants || [])
-    : []
+  const partes = participants?.length
+    ? participants
+    : (conn.chats?.[m.chat]?.metadata?.participants || [])
   const scopeLabel = etiquetaScope(conn)
   const clave = claveStaffBot(conn)
 
@@ -205,17 +195,17 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
     }
     const tag =
       eliminado.ids?.find(j => String(j).includes('@')) ||
-      (eliminado.numbers?.[0] ? `${eliminado.numbers[0]}@s.whatsapp.net` : m.sender)
+      (eliminado.numbers?.[0] ? `${eliminado.numbers[0]}@s.whatsapp.net` : null)
     return conn.sendMessage(
       m.chat,
       {
         text:
           `✅ *Staff eliminado* _(ámbito: ${scopeLabel})_\n\n` +
           `› Nombre: *${eliminado.name}*\n` +
-          `› @${String(tag).split('@')[0]}`,
+          (tag ? `› @${String(tag).split('@')[0]}` : ''),
         contextInfo: {
           ...global.rcanal?.contextInfo,
-          mentionedJid: [tag]
+          mentionedJid: tag ? [tag] : []
         }
       },
       { quoted: m }
@@ -258,7 +248,7 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
     guardado.ids?.find(j => String(j).endsWith('@s.whatsapp.net')) ||
     guardado.ids?.find(j => String(j).includes('@')) ||
     m.mentionedJid?.[0] ||
-    m.sender
+    null
 
   return conn.sendMessage(
     m.chat,
@@ -273,7 +263,7 @@ let handler = async (m, { conn, args, participants, usedPrefix, command }) => {
         `› Guardado en *staff* (solo este bot).`,
       contextInfo: {
         ...global.rcanal?.contextInfo,
-        mentionedJid: [tag]
+        mentionedJid: tag ? [tag] : []
       }
     },
     { quoted: m }
