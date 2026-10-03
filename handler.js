@@ -67,6 +67,9 @@ function pluginsEnCache() {
   const lista = []
   const conAll = []
   const comandos = new Set()
+  const pluginsPorComando = new Map()
+  const pluginsConComandoRegex = []
+  const pluginsConPrefijoPropio = []
 
   for (const name in global.plugins) {
     const plugin = global.plugins[name]
@@ -93,14 +96,31 @@ function pluginsEnCache() {
     }
 
     for (const cmd of command) {
-      if (typeof cmd === 'string' && cmd) comandos.add(cmd.toLowerCase())
+      if (typeof cmd === 'string' && cmd) {
+        const nombreComando = cmd.toLowerCase()
+        comandos.add(nombreComando)
+        if (!pluginsPorComando.has(nombreComando)) pluginsPorComando.set(nombreComando, [])
+        pluginsPorComando.get(nombreComando).push(normalizado)
+      } else if (cmd instanceof RegExp) {
+        pluginsConComandoRegex.push(normalizado)
+      }
     }
 
     lista.push(normalizado)
+    if (normalizado.customPrefix) pluginsConPrefijoPropio.push(normalizado)
     if (typeof normalizado.all === 'function') conAll.push(normalizado)
   }
 
-  cachePlugins = { epoch, lista, conAll, comandos }
+  cachePlugins = {
+    epoch,
+    lista,
+    conAll,
+    comandos,
+    pluginsPorComando,
+    pluginsConComandoRegex,
+    pluginsConPrefijoPropio,
+    ordenPlugins: new Map(lista.map((plugin, index) => [plugin, index]))
+  }
   return cachePlugins
 }
 
@@ -182,6 +202,44 @@ function textoPuedeSerComando(m, isOwner, isROwner, comandos) {
   if (!permiteSinPrefijo) return false
   const palabra = texto.split(/\s+/)[0]?.toLowerCase() || ''
   return comandos.has(palabra)
+}
+
+function pluginsCandidatosComando(texto, conn, m, isOwner, isROwner, cache) {
+  const prefijo = conn.prefix || global.prefix
+  let match = null
+
+  if (prefijo instanceof RegExp) {
+    match = prefijo.exec(texto)
+  } else if (Array.isArray(prefijo)) {
+    for (const item of prefijo) {
+      const regex = item instanceof RegExp
+        ? item
+        : new RegExp(String(item).replace(/[|\\{}()[\]^$+*?.]/g, '\\$&'))
+      match = regex.exec(texto)
+      if (match) break
+    }
+  } else if (typeof prefijo === 'string') {
+    const regex = new RegExp(prefijo.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&'))
+    match = regex.exec(texto)
+  }
+
+  let comando
+  if (match) {
+    comando = texto.slice(match[0].length).trim().split(/\s+/)[0]?.toLowerCase()
+  } else {
+    const antiprefijo = m.isGroup && global.db?.data?.antiprefijo?.[m.chat] === true
+    if (!isOwner && !isROwner && !antiprefijo) return cache.pluginsConPrefijoPropio
+    comando = texto.trim().split(/\s+/)[0]?.toLowerCase()
+  }
+
+  const candidatos = new Set([
+    ...(cache.pluginsPorComando.get(comando) || []),
+    ...cache.pluginsConComandoRegex,
+    ...cache.pluginsConPrefijoPropio
+  ])
+  return [...candidatos].sort(
+    (a, b) => cache.ordenPlugins.get(a) - cache.ordenPlugins.get(b)
+  )
 }
 
 export async function handler(chatUpdate) {
@@ -511,7 +569,7 @@ for (const plugin of conAll) {
 }
 
 if (textoPuedeSerComando(m, isOwner, isROwner, comandos)) {
-for (let plugin of pluginsProcesados) {
+for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, pluginsEnCache())) {
   const __filename = join(___dirname, plugin.name)
 
   

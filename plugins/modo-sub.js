@@ -1,6 +1,10 @@
 import ws from 'ws'
 import fs from 'fs'
 import { join, basename } from 'path'
+import {
+  algunParticipanteCoincideConIds,
+  participanteCoincideConIdentidadActiva
+} from '../lib/group-participant.js'
 
 export function limpiarNumBot(jidONum = '') {
   return String(jidONum).split('@')[0].split(':')[0].replace(/\D/g, '')
@@ -60,20 +64,7 @@ export function esteBotCoincideConActivo(conn, activo, participants = []) {
   if (!activo) return true
   const ids = numerosIdentidadBot(conn)
   if (ids.has(activo)) return true
-
-  for (const p of participants || []) {
-    const digitosPart = [
-      p?.phoneNumber,
-      p?.id,
-      p?.jid,
-      p?.lid,
-    ].map(limpiarNumBot).filter(n => n.length >= 6)
-
-    const esEsteBot = digitosPart.some(d => ids.has(d))
-    if (!esEsteBot) continue
-    if (digitosPart.includes(activo)) return true
-  }
-  return false
+  return participanteCoincideConIdentidadActiva(ids, activo, participants, conn)
 }
 
 /** Número estable para modosub (preferir teléfono real, no LID). */
@@ -124,19 +115,7 @@ function decodificarJid(conn, jid) {
 function botEnParticipantes(connBot, participants = []) {
   if (!connBot?.user) return false
   const idsBot = numerosIdentidadBot(connBot)
-  if (!idsBot.size) return false
-
-  for (const p of participants) {
-    const digitos = [
-      p.id,
-      p.jid,
-      p.lid,
-      p.phoneNumber
-    ].map(limpiarNumBot).filter(n => n.length >= 6)
-
-    if (digitos.some(d => idsBot.has(d))) return true
-  }
-  return false
+  return idsBot.size > 0 && algunParticipanteCoincideConIds(idsBot, participants, connBot)
 }
 
 function obtenerNombreVisibleBot(connBot, esPrincipal) {
