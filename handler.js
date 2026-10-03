@@ -18,7 +18,14 @@ import { handleModoDescargas } from './lib/Modos/modo-descargas.js'
 import { isViewOnceCandidate, isKnownViewOnce, runAntiViewOnce } from './lib/viewOnce.js'
 import { checkGroupRental, isRentalBypassCommand } from './lib/alquiler.js'
 import { checkCmd18Command } from './lib/cmd18.js'
-import { findGroupParticipant, findBotParticipant, candidatosJidRemitente, jidsSeSolapan } from './lib/group-participant.js'
+import {
+  findGroupParticipant,
+  findBotParticipant,
+  findCurrentBotParticipant,
+  isAdminRole,
+  candidatosJidRemitente,
+  jidsSeSolapan
+} from './lib/group-participant.js'
 import { metadataGrupo } from './lib/group-meta-cache.js'
 import { antiActivo } from './lib/Antis/anti-modo.js'
 import { shouldSkipGroupMessageEarly, extraerTextoMensajeCrudo } from './plugins/modo-sub.js'
@@ -428,11 +435,11 @@ if (m.isGroup) {
   groupMetadata = (await metadataGrupo(this, m.chat)) || (this.chats[m.chat] || {}).metadata || {}
   participants = groupMetadata.participants || []
 }
-const user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}  
-const bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}  
-const isRAdmin = user?.admin == 'superadmin' || false  
-const isAdmin = isRAdmin || user?.admin == 'admin' || false  
-const isBotAdmin = bot?.admin === 'admin' || bot?.admin === 'superadmin'  
+let user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}
+let bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}
+let isRAdmin = user?.admin === 'superadmin'
+let isAdmin = isAdminRole(user?.admin)
+let isBotAdmin = isAdminRole(bot?.admin)
 
 if (shouldBlockByGrupoOff(m, this)) return
 
@@ -668,6 +675,22 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
       m.commandExecuted = true
       avisarPermiso('owner', m, this)
       continue
+    }
+    if (
+      m.isGroup &&
+      ((plugin.admin && !isAdmin && !isOwner && !isROwner) ||
+        (plugin.botAdmin && !isBotAdmin))
+    ) {
+      const metadataActualizada = await metadataGrupo(this, m.chat, { esperar: true })
+      if (metadataActualizada?.participants?.length) {
+        groupMetadata = metadataActualizada
+        participants = metadataActualizada.participants
+        user = findGroupParticipant(participants, m, this) || {}
+        bot = await findCurrentBotParticipant(this, participants) || {}
+        isRAdmin = user?.admin === 'superadmin'
+        isAdmin = isAdminRole(user?.admin)
+        isBotAdmin = isAdminRole(bot?.admin)
+      }
     }
     if (plugin.admin && m.isGroup && !isAdmin && !isOwner && !isROwner) {
       comandoEjecutado = true
