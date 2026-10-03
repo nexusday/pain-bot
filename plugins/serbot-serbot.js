@@ -151,16 +151,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   const telefonoExplicito = extractPhoneFromArgs(args)
 
  
-  let participantesGrupo = participants || []
-  if (m.isGroup) {
-    try {
-      const fresco = await conn.groupMetadata(m.chat)
-      if (fresco?.participants?.length) {
-        participantesGrupo = fresco.participants
-        if (conn.chats?.[m.chat]) conn.chats[m.chat].metadata = fresco
-      }
-    } catch {}
-  }
+  const metadataLocal = metadatosGrupo || conn.chats?.[m.chat]?.metadata
+  const participantesGrupo = participants?.length
+    ? participants
+    : metadataLocal?.participants || []
 
   let phoneNumber = await resolvePhoneNumber(quien, conn, telefonoExplicito, m, {
     participants: participantesGrupo,
