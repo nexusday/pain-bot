@@ -49,11 +49,42 @@ export function numerosIdentidadBot(conn) {
   return nums
 }
 
+const ARCHIVO_PRINCIPAL = join('storage', 'process-status', 'main-bot.txt')
+let cachePrincipal = { en: 0, conn: null }
+
+/**
+ * Socket del bot principal. En el worker de sub-bots el principal vive en otro proceso:
+ * se reconstruye desde el número que publica el principal. Sin esto el worker tomaba
+ * al primer sub-bot como si fuera el principal.
+ */
+export function obtenerConnPrincipal() {
+  if (process.env.PAIN_ROLE !== 'subbot') return global.conn
+  const ahora = Date.now()
+  if (ahora - cachePrincipal.en < 10_000) return cachePrincipal.conn
+  let conn = null
+  try {
+    const n = limpiarNumBot(fs.readFileSync(join(process.cwd(), ARCHIVO_PRINCIPAL), 'utf8'))
+    if (n.length >= 6) {
+      conn = {
+        user: { jid: `${n}@s.whatsapp.net` },
+        phoneNumber: n,
+        botNumber: n,
+        decodeJid: (jid) => String(jid || ''),
+        _principalRemoto: true
+      }
+    }
+  } catch {}
+  cachePrincipal = { en: ahora, conn }
+  return conn
+}
+
 export function esConnBotPrincipal(conn) {
   if (!conn) return false
-  if (conn === global.conn) return true
+  const principal = obtenerConnPrincipal()
+  if (!principal) return false
+  if (conn === principal) return true
   const mios = numerosIdentidadBot(conn)
-  const principales = numerosIdentidadBot(global.conn)
+  const principales = numerosIdentidadBot(principal)
   for (const n of mios) {
     if (principales.has(n)) return true
   }
@@ -137,7 +168,7 @@ function obtenerNombreVisibleBot(connBot, esPrincipal) {
  */
 export function listarBotsEnGrupo(participants = []) {
   const bots = []
-  const principalConn = global.conn
+  const principalConn = obtenerConnPrincipal()
 
   if (principalConn?.user && botEnParticipantes(principalConn, participants)) {
     bots.push({
@@ -204,7 +235,7 @@ export function listarNumerosBotsConocidos() {
   }
 
   const nums = new Set()
-  for (const n of numerosIdentidadBot(global.conn)) nums.add(n)
+  for (const n of numerosIdentidadBot(obtenerConnPrincipal())) nums.add(n)
   for (const c of lista) {
     for (const n of numerosIdentidadBot(c)) nums.add(n)
   }
@@ -438,6 +469,9 @@ export function elegirBotResponsableGrupo(idChat, participants = []) {
 
 /** ¿Este socket es el que debe aplicar anti-media / borrados en el grupo? */
 export function esteBotEsResponsableDelGrupo(conn, idChat, participants = []) {
+  // Con bot elegido, cada proceso decide por sí mismo: ninguno ve los sockets de los demás.
+  const activo = obtenerBotActivoDelGrupo(idChat)
+  if (activo) return esteBotCoincideConActivo(conn, activo, participants)
   const responsable = elegirBotResponsableGrupo(idChat, participants)
   if (!responsable) return true
   return mismoSocketConn(conn, responsable)
@@ -527,6 +561,7 @@ export {
   elegirBotResponsableGrupo as pickGroupResponsibleBot,
   esteBotEsResponsableDelGrupo as isGroupResponsibleBot,
   esConnBotPrincipal as isMainBotConn,
+  obtenerConnPrincipal as getMainBotConn,
   listarBotsEnGrupo as listBotsInGroup,
   obtenerBotActivoDelGrupo as getActiveBotForGroup,
   establecerBotActivoDelGrupo as setActiveBotForGroup,

@@ -29,7 +29,7 @@ import { register } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { platform } from 'process'
 import * as ws from 'ws'
-import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, watch, mkdirSync } from 'fs'
+import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, writeFileSync, watch, mkdirSync } from 'fs'
 import yargs from 'yargs'
 import chalk from 'chalk'
 import syntaxerror from 'syntax-error'
@@ -112,7 +112,12 @@ global.prefix = new RegExp(
 global.db = new Low(new ArchivoSqliteCompartido(
   'storage/databases/database.sqlite',
   'storage/databases/database.json',
-  { persistConnections: true, refreshMinIntervalMs: 250 }
+  {
+    persistConnections: true,
+    // El refresh por comando del handler queda limitado a esta frecuencia;
+    // la vista se mantiene fresca con el sync de fondo cada 5s.
+    refreshMinIntervalMs: Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) || 5000,
+  }
 ))
 
 global.DATABASE = global.db
@@ -339,10 +344,16 @@ if (!opts['test']) {
       phase ^= character.charCodeAt(0)
       phase = Math.imul(phase, 16777619)
     }
-    const initialDelay = (phase >>> 0) % 60_000
+    // Guardado periódico espaciado: serializar la DB congela el event loop,
+    // así que por defecto es cada 3 min (ajustable con PAIN_DB_SAVE_MS).
+    const intervaloGuardado = Math.max(
+      Number.parseInt(process.env.PAIN_DB_SAVE_MS, 10) || 180_000,
+      30_000
+    )
+    const initialDelay = (phase >>> 0) % intervaloGuardado
     const firstSave = setTimeout(() => {
       void guardarDb()
-      const interval = setInterval(() => void guardarDb(), 60_000)
+      const interval = setInterval(() => void guardarDb(), intervaloGuardado)
       interval.unref?.()
     }, initialDelay)
     firstSave.unref?.()
@@ -408,6 +419,13 @@ async function connectionUpdate(update) {
     reconectandoPrincipal = false
     console.log(chalk.yellow('Conectado correctamente.'))
     global.mainBotJid = sock.user?.jid?.split('@')[0] || sock.user?.id?.split('@')[0]
+    try {
+      const numeroPrincipal = String(global.mainBotJid || '').split(':')[0].replace(/\D/g, '')
+      if (numeroPrincipal) {
+        mkdirSync(join(__dirname, 'storage', 'process-status'), { recursive: true })
+        writeFileSync(join(__dirname, 'storage', 'process-status', 'main-bot.txt'), numeroPrincipal)
+      }
+    } catch {}
     try {
       const { markBotStart } = await import('./lib/bot-uptime.js')
       markBotStart(sock)

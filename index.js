@@ -42,7 +42,7 @@ let scanTimer
 const STOP_TIMEOUT_MS = 10_000
 const RESTART_MAX_MS = 30_000
 const STABLE_MS = 60_000
-// GeneraciÛn joven m·s grande: el GC llegÛ a ocupar ~20 % del tiempo por la cantidad de objetos pequeÒos.
+// Generaci√≥n joven m√°s grande: el GC lleg√≥ a ocupar ~20 % del tiempo por la cantidad de objetos peque√±os.
 const SEMI_SPACE_MB = Math.min(Math.max(Number.parseInt(process.env.PAIN_SEMI_SPACE_MB, 10) || 16, 16), 128)
 
 function listSessions() {

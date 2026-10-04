@@ -44,6 +44,7 @@ const rcanal = global.rcanal || {
 const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
 const SOCKET_CONEXION_MAX_MS = 60_000
 const SOCKET_INACTIVO_MAX_MS = 90_000
+const MAX_FALLOS_RECONEXION = 8
 let versionBaileysCache = null
 const iniciosSubBot = new Map()
 
@@ -466,6 +467,7 @@ async function iniciarSubBot(options) {
     let temporizadorWatchdog = null
     let temporizadorReconexion = null
     let reemplazosConsecutivos = 0
+    let fallosConsecutivos = 0
     const telefonoEmparejamiento = phoneNumber
     const idCarpetaBot = path.basename(pathAYBot)
 
@@ -779,6 +781,7 @@ async function iniciarSubBot(options) {
         }
         reconectando = false
         reemplazosConsecutivos = 0
+        fallosConsecutivos = 0
         vistoUsuarioEn = Date.now()
         await borrarMensajeVinculo().catch(() => {})
         if (intento.cancelado) return
@@ -971,10 +974,24 @@ async function iniciarSubBot(options) {
       reconectando = true
       const dispersarMs = (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
       const esReemplazo = motivo === DisconnectReason.connectionReplaced
+      if (!esReemplazo && fallosConsecutivos >= MAX_FALLOS_RECONEXION) {
+        console.log(chalk.bold.red(
+          `\n┆ Subbot (+${idCarpetaBot}) no logró reconectar tras ${MAX_FALLOS_RECONEXION} intentos ` +
+          `(último código ${motivo ?? 'sin código'}). Se deja de intentar; la sesión se conserva y se retoma al reiniciar.\n`
+        ))
+        reconectando = true
+        sock._ignorarCierre = true
+        try { sock.ws.close() } catch {}
+        try { sock.ev.removeAllListeners() } catch {}
+        quitarSockDeConns(sock)
+        detenerWatchdog()
+        return
+      }
       const cola = esReemplazo
         ? Math.min(60_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 15 * 60_000) + dispersarMs
-        : 5000 + dispersarMs
+        : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 6)), 5 * 60_000) + dispersarMs
       if (esReemplazo) reemplazosConsecutivos++
+      else fallosConsecutivos++
       console.log(chalk.bold.magentaBright(
         `\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). ` +
         `${detalle ? `Motivo: ${detalle}. ` : ''}` +

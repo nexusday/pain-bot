@@ -18,7 +18,7 @@ test('splits sub-bots into stable groups without losing or duplicating sessions'
   const all = [...grouped.values()].flat()
   assert.deepEqual(all.slice().sort(), sessions.slice().sort())
   for (const [id, list] of grouped) {
-    assert.ok(list.length > 80 / 3 / 2, `${id} qued� casi vac�o`)
+    assert.ok(list.length > 80 / 3 / 2, `${id} quedó casi vacío`)
     for (const session of list) assert.equal(groupIdForSession(session, 3), id)
   }
   assert.deepEqual(assignSessions(sessions.slice().reverse(), 3), grouped)
