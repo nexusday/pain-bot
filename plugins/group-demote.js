@@ -1,6 +1,7 @@
 ﻿import {
   findGroupParticipant,
   findBotParticipant,
+  identidadesJidBot,
   jidsParticipante,
   jidsSeSolapan
 } from '../lib/group-participant.js'
@@ -19,7 +20,7 @@ let handler = async (m, { conn, args, participants, isAdmin, usedPrefix, command
   }
 
   const metadatos =
-    (conn.chats[m.chat] || {}).metadata ||
+    (participants?.length ? { ...(conn.chats[m.chat] || {}).metadata, participants } : null) ||
     (await conn.groupMetadata(m.chat).catch(_ => null)) ||
     {}
   const partes = metadatos.participants || participants || []
@@ -36,16 +37,6 @@ let handler = async (m, { conn, args, participants, isAdmin, usedPrefix, command
   }
 
   const botPart = findBotParticipant(partes, conn)
-  if (!(botPart?.admin === 'admin' || botPart?.admin === 'superadmin')) {
-    return conn.sendMessage(
-      m.chat,
-      {
-        text: '[❗] Necesito ser administrador del grupo.',
-        contextInfo: { ...rcanal.contextInfo }
-      },
-      { quoted: m }
-    )
-  }
 
   const objetivo = await resolveGroupTarget(m, args, conn, partes)
   if (!objetivo.ok) {
@@ -64,9 +55,7 @@ let handler = async (m, { conn, args, participants, isAdmin, usedPrefix, command
 
   const { quien, participante, ids } = objetivo
 
-  const idsBot = jidsParticipante(botPart, conn).concat(
-    [conn.user?.jid, conn.user?.id].filter(Boolean)
-  )
+  const idsBot = jidsParticipante(botPart, conn).concat(identidadesJidBot(conn))
   if (jidsSeSolapan(ids, idsBot)) {
     return conn.sendMessage(
       m.chat,

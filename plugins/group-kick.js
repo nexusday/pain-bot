@@ -1,6 +1,7 @@
 import {
   findGroupParticipant,
   findBotParticipant,
+  identidadesJidBot,
   jidsParticipante,
   jidsSeSolapan,
   quitarParticipanteActual
@@ -11,7 +12,7 @@ import {
   isSenderBotOwner
 } from '../lib/resolve-group-target.js'
 
-let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPrefix, command }) => {
+let handler = async (m, { conn, args, participants, isAdmin, usedPrefix, command }) => {
   if (!m.isGroup) {
     return conn.sendMessage(
       m.chat,
@@ -24,7 +25,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
   }
 
   const metadatos =
-    (conn.chats[m.chat] || {}).metadata ||
+    (participants?.length ? { ...(conn.chats[m.chat] || {}).metadata, participants } : null) ||
     (await conn.groupMetadata(m.chat).catch(_ => null)) ||
     {}
   const partes = metadatos.participants || participants || []
@@ -41,20 +42,6 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
   }
 
   const botPart = findBotParticipant(partes, conn)
-  const botEsAdmin =
-    Boolean(isBotAdmin) ||
-    botPart?.admin === 'admin' ||
-    botPart?.admin === 'superadmin'
-  if (!botEsAdmin) {
-    return conn.sendMessage(
-      m.chat,
-      {
-        text: '[❗] Necesito ser administrador del grupo para banear.',
-        contextInfo: { ...rcanal.contextInfo }
-      },
-      { quoted: m }
-    )
-  }
 
   const objetivo = await resolveGroupTarget(m, args, conn, partes)
   if (!objetivo.ok) {
@@ -95,9 +82,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, usedPre
     )
   }
 
-  const idsBot = jidsParticipante(botPart, conn).concat(
-    [conn.user?.jid, conn.user?.id].filter(Boolean)
-  )
+  const idsBot = jidsParticipante(botPart, conn).concat(identidadesJidBot(conn))
   if (jidsSeSolapan(ids, idsBot)) {
     return conn.sendMessage(
       m.chat,
