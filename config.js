@@ -64,7 +64,12 @@ vreden: { url: "https://api.vreden.web.id", key: null },
 delirius: { url: "https://api.delirius.online", key: null },
 alex: { url: "https://alex-api-scraper2-1.onrender.com", key: "ALEX-93F60DF06184B790FDFE98E8F5D8C520" },
 zenzxz: { url: "https://api.zenzxz.my.id", key: null },
-siputzx: { url: "https://api.siputzx.my.id", key: null }
+siputzx: { url: "https://api.siputzx.my.id", key: null },
+qasim: {
+  url: "https://api.qasimdev.dpdns.org",
+  key: "qasim-dev",
+  openRouterKey: process.env.OPENROUTER_API_KEY || null
+}
 }
 
 import { syncRcanalFromConfig } from './lib/newsletter-rcanal.js'
