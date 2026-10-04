@@ -9,6 +9,7 @@ storage/databases/database.sqlite.claims.sqlite
 storage/databases/database.sqlite.claims.sqlite.lock/
 storage/databases/database.sqlite.*.tmp
 storage/process-mode.json
+storage/process-status/
 storage/staff.json
 storage/maxsubs.json
 storage/soporte.json

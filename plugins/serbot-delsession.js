@@ -6,6 +6,7 @@ import { cleanBotNum, numerosIdentidadBot, numeroPublicoBot } from './modo-sub.j
 import { resolvePhoneNumber } from '../lib/resolve-phone.js'
 import { candidatosJidRemitente, jidsSeSolapan } from '../lib/group-participant.js'
 import { sesionRequiereVincular } from '../lib/subbot-recovery.js'
+import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
 
 function dirSerbot() {
   return path.join(process.cwd(), global.bot || 'Serbot')
@@ -68,6 +69,15 @@ function listarSubsConectados() {
     vistos.add(num)
     lista.push({ num, conn: c, online: true })
   }
+  for (const worker of readSubbotWorkerStatuses(process.cwd())) {
+    for (const session of worker.sessions) {
+      if (!session.connected) continue
+      const num = digitos(session.number || session.folder)
+      if (num.length < 8 || vistos.has(num)) continue
+      vistos.add(num)
+      lista.push({ num, conn: null, online: true })
+    }
+  }
   return lista
 }
 
@@ -116,6 +126,7 @@ async function eliminarSesionSubBot(num) {
   }
 
   const sock = buscarConnSub(n)
+  const estabaConectado = Boolean(sock) || listarSubsConectados().some(({ num: conectado }) => conectado === n)
   if (sock) {
     try { await sock.logout?.() } catch {}
     try { sock.ev?.removeAllListeners?.() } catch {}
@@ -140,8 +151,13 @@ async function eliminarSesionSubBot(num) {
       fs.rmSync(path.join(ruta, 'creds.json'), { force: true })
     }
   }
+  if (typeof process.send === 'function') {
+    process.send({ type: 'reconcile-sessions' }, (error) => {
+      if (error) console.error('[delsession] No se pudo actualizar la asignación del supervisor:', error.message)
+    })
+  }
 
-  return { num: n, estabaConectado: Boolean(sock) }
+  return { num: n, estabaConectado }
 }
 
 function ayuda(usedPrefix) {
@@ -249,7 +265,7 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
   }
 
   const ruta = rutaSesionSub(objetivo)
-  const conectado = Boolean(buscarConnSub(objetivo))
+  const conectado = listarSubsConectados().some(({ num }) => num === objetivo)
   if (!conectado && !fs.existsSync(ruta)) {
     return conn.reply(m.chat, `[❗] No hay sesión para +${objetivo}.`, m)
   }

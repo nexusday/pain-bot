@@ -117,6 +117,10 @@ function startSlot(id, slot) {
   slot.child = child
   child.on('message', (message) => {
     if (slot.child !== child) return
+    if (message?.type === 'reconcile-sessions') {
+      reconcile()
+      return
+    }
     if ((message === 'reset' || message === 'restart') && id === 'primary') {
       stopSlot(id, slot)
       return

@@ -42,6 +42,7 @@ import { sesionRequiereVincular, vinculacionEnCurso } from './lib/subbot-recover
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
+import { removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
@@ -184,6 +185,7 @@ let saveCreds = async () => {}
 let connectionOptions = null
 let conn
 
+let workerStatusInterval = null
 if (!isSubbotWorker) {
   const authState = await useMultiFileAuthState(global.authFile)
   state = authState.state
@@ -669,6 +671,35 @@ if (!isSubbotWorker) {
   const sessions = [...new Set(assignedSessions)].filter(folder =>
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
+  const workerId = process.env.PAIN_WORKER_ID || 'subbot'
+  const publishWorkerStatus = () => {
+    writeSubbotWorkerStatus(__dirname, workerId, sessions.map((folder) => {
+      const socket = global.conns.find((connection) =>
+        connection?.pathAYBot && resolve(connection.pathAYBot) === join(serbotDir, folder)
+      )
+      const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
+      return {
+        folder,
+        number: socket?.phoneNumber || socket?.botNumber ||
+          socket?.user?.jid || socket?.user?.id || folder,
+        name: socket?.user?.name || socket?.authState?.creds?.me?.name || '',
+        connected: Boolean(
+          (socket?.user?.jid || socket?.user?.id) &&
+          (socket?.ws?.isOpen === true || readyState === ws.OPEN)
+        ),
+        requiresRelink: existsSync(join(serbotDir, folder, '.needs-relink')),
+      }
+    }))
+  }
+  publishWorkerStatus()
+  workerStatusInterval = setInterval(() => {
+    try {
+      publishWorkerStatus()
+    } catch (error) {
+      console.error(`Worker ${workerId}: no se pudo publicar el estado de sus sesiones:`, error?.message || error)
+    }
+  }, 10_000)
+  workerStatusInterval.unref?.()
   const batchSize = 4
   let started = 0
   let skipped = 0
@@ -708,13 +739,17 @@ if (!isSubbotWorker) {
     }
   }
   console.log(
-    `Worker ${process.env.PAIN_WORKER_ID || 'subbot'} inició ${started}/${sessions.length} sesión(es); ` +
+    `Worker ${workerId} inició ${started}/${sessions.length} sesión(es); ` +
     `${skipped} omitida(s), ${failed} con error.`
   )
 }
 
 function cerrarConexionesDelProceso(signal) {
   console.log(`Proceso ${process.env.PAIN_WORKER_ID || 'primary'} cerrando por ${signal}.`)
+  if (isSubbotWorker) {
+    if (workerStatusInterval) clearInterval(workerStatusInterval)
+    removeSubbotWorkerStatus(__dirname, process.env.PAIN_WORKER_ID || 'subbot')
+  }
   const sockets = new Set([global.conn, ...(global.conns || [])])
   for (const socket of sockets) {
     if (!socket) continue
