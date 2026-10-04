@@ -4,25 +4,33 @@ import {
   assignSessions,
   canStartSessions,
   requestSessionLease,
+  SUBBOT_WORKER_COUNT
 } from '../lib/process-isolation.js'
 import { EventEmitter } from 'events'
 
-test('assigns every valid sub-bot session to the single shared worker', () => {
-  const sessions = ['5212222222222', '5211111111111', '5213333333333']
+test('distributes every valid sub-bot session across four stable worker groups', () => {
+  const sessions = Array.from({ length: 80 }, (_, index) => `521${String(index).padStart(10, '0')}`)
   const grouped = assignSessions(sessions)
-  assert.deepEqual([...grouped.keys()], ['subbot-group-0'])
-  assert.equal([...grouped.values()].flat().length, sessions.length)
-  assert.deepEqual([...grouped.values()].flat().sort(), sessions.slice().sort())
-  assert.deepEqual(assignSessions([...sessions, sessions[0], '../invalid']).get('subbot-group-0'), sessions.slice().sort())
+  const assigned = [...grouped.values()].flat()
+  assert.equal(SUBBOT_WORKER_COUNT, 4)
+  assert.equal(grouped.size, 4)
+  assert.equal(assigned.length, sessions.length)
+  assert.deepEqual(assigned.sort(), sessions.slice().sort())
+  assert.deepEqual(assignSessions(sessions.slice().reverse()), grouped)
+  assert.deepEqual(
+    [...assignSessions([...sessions, sessions[0], '../invalid']).values()].flat().sort(),
+    sessions.slice().sort()
+  )
+  assert.ok([...grouped.values()].every(group => group.length >= 10 && group.length <= 30))
 })
 
 test('does not start duplicate workers while another live worker owns a session', () => {
-  const oldAssignment = new Map([['subbot-group-0', ['5211111111111', '5212222222222']]])
-  const target = assignSessions(['5211111111111']).get('subbot-group-0')
-  assert.equal(canStartSessions(target, oldAssignment, 'subbot-group-0'), true)
+  const [[ownerId, target]] = assignSessions(['5211111111111'])
+  const oldAssignment = new Map([[ownerId, target]])
+  assert.equal(canStartSessions(target, oldAssignment, ownerId), true)
   assert.equal(canStartSessions(target, oldAssignment, 'other-worker'), false)
 
-  oldAssignment.delete('subbot-group-0')
+  oldAssignment.delete(ownerId)
   assert.equal(canStartSessions(target, oldAssignment, 'other-worker'), true)
 })
 
