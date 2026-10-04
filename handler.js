@@ -718,7 +718,10 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
     )) || /^rpg[-_]/i.test(plugin.name)
     const idMensaje = String(m.key?.id || m.id || '')
     let reclamoJuegoAdquirido = false
-    if (esComandoJuego && idMensaje) {
+    const usaReclamoEconomicoAtomico = [
+      'daily', 'day', 'diario', 'crimen', 'crime'
+    ].includes(command)
+    if (esComandoJuego && idMensaje && !usaReclamoEconomicoAtomico) {
       const claimKey = `game:${m.chat}:${idMensaje}`
       try {
         const adquirido = await global.db.adapter.claimCommand(global.db.data, claimKey)
