@@ -23,7 +23,11 @@ import {
 } from '../lib/subbot-recovery.js'
 import { fileURLToPath } from "url"
 import { tr } from '../lib/lang.js'
-import { releaseSessionLease, requestSessionLease } from '../lib/process-isolation.js'
+import {
+  confirmSessionLease,
+  releaseSessionLease,
+  requestSessionLease
+} from '../lib/process-isolation.js'
 
 
 const rcanal = global.rcanal || {
@@ -233,6 +237,22 @@ handler.command = ['qr', 'qrr', 'code']
 export { iniciarSubBot as AYBot }
 export default handler
 
+export async function retirarSesionDeWorker(pathAYBot, { handoff = false } = {}) {
+  const clave = path.resolve(pathAYBot)
+  const intento = iniciosSubBot.get(clave)
+  if (intento) {
+    if (handoff) await intento.ceder?.()
+    else intento.cancelar?.()
+    return
+  }
+  const socket = global.conns?.find((item) =>
+    item?.pathAYBot && path.resolve(item.pathAYBot) === clave
+  )
+  if (!socket) return
+  if (handoff) await socket.cederSesionPain?.()
+  else await socket.cerrarSesionPain?.()
+}
+
 async function iniciarSubBot(options) {
   let {
     pathAYBot,
@@ -353,6 +373,22 @@ async function iniciarSubBot(options) {
     if (iniciosSubBot.get(claveInicio) === intento) iniciosSubBot.delete(claveInicio)
     if (error) rechazarConexion(error)
     else resolverConexion(socket)
+  }
+
+  intento.ceder = async () => {
+    intento.cancelado = true
+    intento.limpiarAuxiliares?.()
+    const socket = intento.sock
+    if (socket) {
+      socket._painSupervisorHandoff = true
+      socket._ignorarCierre = true
+      socket.ev?.removeAllListeners?.()
+      try { socket.ws?.close?.() } catch {}
+      if (Array.isArray(global.conns)) {
+        global.conns = global.conns.filter((conexion) => conexion !== socket)
+      }
+    }
+    terminarIntento(null)
   }
 
   intento.cancelar = () => {
@@ -645,6 +681,12 @@ async function iniciarSubBot(options) {
 
       if (connection === 'close') {
         detenerPrekeys(sock)
+        if (sock._painLeaseHandoff) {
+          intento.limpiarAuxiliares?.()
+          quitarSockDeConns(sock)
+          confirmSessionLease(idCarpetaBot)
+          return
+        }
         if (sock._painDeletingSession) {
           intento.limpiarAuxiliares?.()
           return
@@ -905,6 +947,18 @@ async function iniciarSubBot(options) {
           try { sock.ws?.close?.() } catch {}
           quitarSockDeConns(sock)
         }
+      }
+      sock.cederSesionPain = async () => {
+        sock._painLeaseHandoff = true
+        sock._painSupervisorHandoff = true
+        sock._ignorarCierre = true
+        reconectando = true
+        intento.cancelado = true
+        intento.limpiarAuxiliares?.()
+        detenerPrekeys(sock)
+        sock.ev.removeAllListeners()
+        try { sock.ws?.close?.() } catch {}
+        quitarSockDeConns(sock)
       }
 
       esInit = false

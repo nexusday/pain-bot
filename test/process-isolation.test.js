@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   assignSessions,
+  addedSessions,
   canStartSessions,
   requestSessionLease,
   removedSessions
@@ -38,6 +39,8 @@ test('removes sessions from a running worker without treating additions as remov
   )
   assert.equal(removedSessions(['one'], ['one', 'two']), null)
   assert.equal(removedSessions(['one'], ['one']), null)
+  assert.deepEqual(addedSessions(['one'], ['one', 'two']), ['two'])
+  assert.equal(addedSessions(['one', 'two'], ['one']), null)
 })
 
 test('session lease request waits for supervisor acknowledgement', async () => {

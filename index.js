@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import {
   assignSessions,
+  addedSessions,
   canStartSessions,
   removedSessions
 } from './lib/process-isolation.js'
@@ -34,6 +35,7 @@ const subbotRoot = resolve(__dirname, global.bot || 'Serbot')
 const slots = new Map()
 const leasedSessions = new Set()
 const pendingLeaseRequests = new Map()
+const pendingSessionRemovals = new Set()
 let stopping = false
 let scanTimer
 const STOP_TIMEOUT_MS = 10_000
@@ -94,19 +96,20 @@ function ensureTarget(id, target) {
   startSlot(id, slot)
 }
 
-function removeSessionFromWorker(slot, target, session) {
+function removeSessionFromWorker(slot, target, session, { handoff = false } = {}) {
   const removed = removedSessions(slot.target.sessions, target.sessions)
   if (!removed?.includes(session) || !slot.child?.connected) return false
 
   const child = slot.child
   const previousTarget = slot.target
   const previousFingerprint = slot.fingerprint
-  const queued = child.send({ type: 'remove-sessions', sessions: [session] }, (error) => {
+  const queued = child.send({ type: 'remove-sessions', sessions: [session], handoff }, (error) => {
     if (error) {
       console.error(
         `No se pudieron cerrar las sesiones eliminadas en ${previousTarget.role}:`,
         error.message
       )
+      pendingSessionRemovals.delete(session)
       if (slot.child === child) {
         slot.target = previousTarget
         slot.fingerprint = previousFingerprint
@@ -116,12 +119,41 @@ function removeSessionFromWorker(slot, target, session) {
   })
   if (!queued) return false
 
+  if (handoff) pendingSessionRemovals.add(session)
   console.log(
     `Actualizando ${slot.target.role} sin reiniciar el worker; ` +
     `se eliminó la sesión ${session}.`
   )
   slot.target = target
   slot.fingerprint = fingerprint(target)
+  return true
+}
+
+function addSessionsToWorker(slot, target) {
+  const added = addedSessions(slot.target.sessions, target.sessions)
+  if (!added || !slot.child?.connected) return false
+
+  const child = slot.child
+  const previousTarget = slot.target
+  const previousFingerprint = slot.fingerprint
+  const queued = child.send({ type: 'add-sessions', sessions: added }, (error) => {
+    if (error) {
+      console.error(`No se pudieron iniciar las nuevas sesiones en ${previousTarget.role}:`, error.message)
+      if (slot.child === child) {
+        slot.target = previousTarget
+        slot.fingerprint = previousFingerprint
+        reconcile()
+      }
+    }
+  })
+  if (!queued) return false
+
+  slot.target = target
+  slot.fingerprint = fingerprint(target)
+  console.log(
+    `Actualizando ${slot.target.role} sin reiniciar el worker; ` +
+    `${added.length} sesión(es) nueva(s).`
+  )
   return true
 }
 
@@ -146,10 +178,23 @@ function startSlot(id, slot) {
   slot.child = child
   child.on('message', (message) => {
     if (slot.child !== child) return
+    if (message?.type === 'session-removed' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
+      pendingSessionRemovals.delete(message.session)
+      const primary = slots.get('primary')?.child
+      if (primary) resolveLeaseRequests(primary)
+      return
+    }
     if (message?.type === 'remove-session' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
       const target = makeTargets().get('subbot-group-0')
       const worker = slots.get('subbot-group-0')
       if (target && worker) removeSessionFromWorker(worker, target, message.session)
+      reconcile()
+      return
+    }
+    if (message?.type === 'session-added' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
+      const target = makeTargets().get('subbot-group-0')
+      const worker = slots.get('subbot-group-0')
+      if (target && worker) addSessionsToWorker(worker, target)
       reconcile()
       return
     }
@@ -166,6 +211,11 @@ function startSlot(id, slot) {
         typeof message.requestId === 'string') {
       leasedSessions.add(message.session)
       pendingLeaseRequests.set(message.requestId, message.session)
+      const target = makeTargets().get('subbot-group-0')
+      const worker = slots.get('subbot-group-0')
+      if (target && worker) {
+        removeSessionFromWorker(worker, target, message.session, { handoff: true })
+      }
       reconcile()
       resolveLeaseRequests(child)
       return
@@ -175,6 +225,9 @@ function startSlot(id, slot) {
       for (const [requestId, session] of pendingLeaseRequests) {
         if (session === message.session) pendingLeaseRequests.delete(requestId)
       }
+      const target = makeTargets().get('subbot-group-0')
+      const worker = slots.get('subbot-group-0')
+      if (target && worker) addSessionsToWorker(worker, target)
       reconcile()
       return
     }
@@ -236,6 +289,7 @@ function resolveLeaseRequests(primaryChild) {
       slot.child.exitCode === null && slot.child.signalCode === null)
     .flatMap(([, slot]) => slot.target.sessions)
   for (const [requestId, session] of pendingLeaseRequests) {
+    if (pendingSessionRemovals.has(session)) continue
     if (liveAssignments.includes(session)) continue
     pendingLeaseRequests.delete(requestId)
     if (primaryChild.connected) {
@@ -250,6 +304,8 @@ function reconcile() {
   for (const [id, slot] of slots) {
     const target = desired.get(id)
     if (!target || fingerprint(target) !== slot.fingerprint) {
+      if (target && id !== 'primary' &&
+          addSessionsToWorker(slot, target)) continue
       stopSlot(id, slot)
       continue
     }

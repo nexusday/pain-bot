@@ -48,6 +48,7 @@ import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
+import { confirmSessionLease } from './lib/process-isolation.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
@@ -736,6 +737,48 @@ if (!isSubbotWorker) {
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
   const workerId = process.env.PAIN_WORKER_ID || 'subbot'
+  const sesionesIniciando = new Map()
+  const sesionesRetiradas = new Set()
+  const iniciarSesion = (folder) => {
+    if (sesionesRetiradas.has(folder)) return Promise.resolve('skipped')
+    const existing = sesionesIniciando.get(folder)
+    if (existing) return existing
+    const botPath = join(serbotDir, folder)
+    if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) {
+      try {
+        limpiarCredencialesSubBot(botPath)
+        console.warn(`Worker subbot: se omite ${folder}, requiere volver a vincular.`)
+      } catch (error) {
+        console.error(`Worker subbot: no se pudieron limpiar las credenciales de ${folder}:`, error?.message || error)
+      }
+      return Promise.resolve('skipped')
+    }
+    if (!existsSync(join(botPath, 'creds.json'))) {
+      console.warn(`Worker subbot: se omite ${folder}, no tiene creds.json.`)
+      return Promise.resolve('skipped')
+    }
+    const promise = serbotModule.AYBot({
+      pathAYBot: botPath,
+      m: null,
+      conn: global.conn,
+      args: [],
+      usedPrefix: '.',
+      command: 'qr',
+      fromCommand: false,
+      esperarConexion: false
+    }).then((started) => {
+      if (!started) {
+        console.error(`Worker subbot: no se pudo iniciar la sesión ${folder}.`)
+        return 'failed'
+      }
+      return 'started'
+    }).catch((error) => {
+      console.error(`Worker subbot: error iniciando ${folder}:`, error?.message || error)
+      return 'failed'
+    }).finally(() => sesionesIniciando.delete(folder))
+    sesionesIniciando.set(folder, promise)
+    return promise
+  }
   const publishWorkerStatus = () => {
     const socketsBySessionPath = new Map()
     for (const socket of global.conns) {
@@ -767,24 +810,34 @@ if (!isSubbotWorker) {
   }, 10_000)
   workerStatusInterval.unref?.()
   process.on('message', async (message) => {
+    if (message?.type === 'add-sessions' && Array.isArray(message.sessions)) {
+      const added = [...new Set(message.sessions)].filter(folder =>
+        typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
+      )
+      for (const folder of added) {
+        sesionesRetiradas.delete(folder)
+        if (!sessions.includes(folder)) sessions.push(folder)
+      }
+      await Promise.all(added.map(iniciarSesion))
+      try {
+        publishWorkerStatus()
+      } catch (error) {
+        console.error(`Worker ${workerId}: no se pudo actualizar el estado tras añadir sesiones:`, error?.message || error)
+      }
+      return
+    }
     if (message?.type !== 'remove-sessions' || !Array.isArray(message.sessions)) return
     const removed = new Set(message.sessions.filter(folder =>
       typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
     ))
     if (!removed.size) return
-
-    const cierres = []
-    for (const socket of [...global.conns]) {
-      const folder = socket?.pathAYBot ? path.basename(socket.pathAYBot) : ''
-      if (!removed.has(folder)) continue
-      if (typeof socket.cerrarSesionPain !== 'function') {
-        console.error(`Worker ${workerId}: no hay cierre controlado para la sesión ${folder}.`)
-        continue
-      }
-      cierres.push(socket.cerrarSesionPain().catch((error) => {
-        console.error(`Worker ${workerId}: no se pudo cerrar la sesión ${folder}:`, error?.message || error)
-      }))
-    }
+    for (const folder of removed) sesionesRetiradas.add(folder)
+    const cierres = [...removed].map((folder) =>
+      serbotModule.retirarSesionDeWorker(
+        join(serbotDir, folder),
+        { handoff: message.handoff === true }
+      )
+    )
     sessions = sessions.filter(folder => !removed.has(folder))
     await Promise.all(cierres)
     try {
@@ -792,53 +845,22 @@ if (!isSubbotWorker) {
     } catch (error) {
       console.error(`Worker ${workerId}: no se pudo actualizar el estado tras eliminar sesiones:`, error?.message || error)
     }
+    for (const folder of removed) confirmSessionLease(folder)
   })
   const batchSize = 2
+  const initialSessions = [...sessions]
   let started = 0
   let skipped = 0
   let failed = 0
-  for (let i = 0; i < sessions.length; i += batchSize) {
-    const batch = sessions.slice(i, i + batchSize)
-    await Promise.all(batch.map(async (folder) => {
-      const botPath = join(serbotDir, folder)
-      if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) {
-        try {
-          limpiarCredencialesSubBot(botPath)
-          skipped++
-          console.warn(`Worker subbot: se omite ${folder}, requiere volver a vincular.`)
-        } catch (error) {
-          failed++
-          console.error(`Worker subbot: no se pudieron limpiar las credenciales de ${folder}:`, error?.message || error)
-        }
-        return
-      }
-      if (!existsSync(join(botPath, 'creds.json'))) {
-        skipped++
-        console.warn(`Worker subbot: se omite ${folder}, no tiene creds.json.`)
-        return
-      }
-      try {
-        const iniciado = await serbotModule.AYBot({
-          pathAYBot: botPath,
-          m: null,
-          conn: global.conn,
-          args: [],
-          usedPrefix: '.',
-          command: 'qr',
-          fromCommand: false,
-          esperarConexion: false
-        })
-        if (iniciado) started++
-        else {
-          failed++
-          console.error(`Worker subbot: no se pudo iniciar la sesión ${folder}.`)
-        }
-      } catch (error) {
-        failed++
-        console.error(`Worker subbot: error iniciando ${folder}:`, error?.message || error)
-      }
+  for (let i = 0; i < initialSessions.length; i += batchSize) {
+    const batch = initialSessions.slice(i, i + batchSize)
+    const results = await Promise.all(batch.map(async (folder) => {
+      return iniciarSesion(folder)
     }))
-    if (i + batchSize < sessions.length) {
+    started += results.filter(result => result === 'started').length
+    skipped += results.filter(result => result === 'skipped').length
+    failed += results.filter(result => result === 'failed').length
+    if (i + batchSize < initialSessions.length) {
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
