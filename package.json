@@ -76,7 +76,7 @@
     "sharp": "0.34.1",
     "similarity": "^1.2.1",
     "sql.js": "^1.14.2",
-    "sqlite3": "^6.0.1",
+    "sqlite3": "5.1.7",
     "syntax-error": "^1.4.0",
     "tesseract.js": "^7.0.0",
     "url-file-size": "^1.0.5-1",

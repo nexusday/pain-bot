@@ -87,10 +87,11 @@ sudo apt update
 sudo apt install -y ffmpeg git
 ```
 
-El comando `npm start` comprueba el módulo nativo `sqlite3`. Si el binario
-precompilado requiere una versión de GLIBC que el contenedor no tiene, compila
-SQLite desde el código fuente local para la plataforma del servidor. Si necesitas
-repetir la comprobación manualmente:
+El comando `npm start` comprueba el módulo nativo `sqlite3` y fija la versión 5.1.7,
+compatible con runtimes Node 20 en contenedores Linux con GLIBC anterior. Si el
+precompilado no sirve para la plataforma, compila SQLite desde el código fuente
+local y muestra el diagnóstico completo si falla. Si necesitas repetir la
+comprobación manualmente:
 
 ```bash
 node scripts/ensure-sqlite.js
