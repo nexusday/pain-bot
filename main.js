@@ -54,6 +54,7 @@ import readline from 'readline'
 import NodeCache from 'node-cache'
 import qrcode from 'qrcode-terminal'
 import { EventEmitter } from 'node:events'
+import os from 'node:os'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const {
@@ -178,6 +179,10 @@ await global.loadDatabase()
 const isSubbotWorker = process.env.PAIN_ROLE === 'subbot'
 const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
 global.processRole = isSubbotWorker ? 'subbot' : 'primary'
+// Los sub-bots no deben quitarle CPU al bot principal.
+if (isSubbotWorker) {
+  try { os.setPriority(10) } catch {}
+}
 
 if (isSubbotWorker || isManagedPrimary) {
   const syncDatabase = setInterval(() => {

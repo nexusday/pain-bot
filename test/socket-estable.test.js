@@ -1,13 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { conSocketEstable } from '../lib/socket-estable.js'
+import { conSocketEstable, ignorarJidInutil } from '../lib/socket-estable.js'
 
-test('keeps the configured short keepalive interval for sub-bot sockets', () => {
-  const options = conSocketEstable({ keepAliveIntervalMs: 10_000 })
-  assert.equal(options.keepAliveIntervalMs, 10_000)
-})
-
-test('keeps primary sockets on the shared default keepalive interval', () => {
-  const options = conSocketEstable()
-  assert.equal(options.keepAliveIntervalMs, 30_000)
+test('descarta estados y canales pero no chats ni grupos', () => {
+  assert.equal(ignorarJidInutil('status@broadcast'), true)
+  assert.equal(ignorarJidInutil('120363409634472801@newsletter'), true)
+  assert.equal(ignorarJidInutil('120363429031140094@g.us'), false)
+  assert.equal(ignorarJidInutil('51999999999@s.whatsapp.net'), false)
+  assert.equal(conSocketEstable().shouldIgnoreJid, ignorarJidInutil)
 })

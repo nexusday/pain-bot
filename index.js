@@ -42,6 +42,8 @@ let scanTimer
 const STOP_TIMEOUT_MS = 10_000
 const RESTART_MAX_MS = 30_000
 const STABLE_MS = 60_000
+// Generación joven más grande: el GC llegó a ocupar ~20 % del tiempo por la cantidad de objetos pequeños.
+const SEMI_SPACE_MB = Math.min(Math.max(Number.parseInt(process.env.PAIN_SEMI_SPACE_MB, 10) || 32, 16), 128)
 
 function listSessions() {
   if (!existsSync(subbotRoot)) return []
@@ -168,6 +170,7 @@ function startSlot(id, slot) {
   slot.startedAt = Date.now()
   const child = fork(mainPath, process.argv.slice(2), {
     cwd: __dirname,
+    execArgv: [...process.execArgv, `--max-semi-space-size=${SEMI_SPACE_MB}`],
     env: {
       ...process.env,
       PAIN_ROLE: slot.target.role,
