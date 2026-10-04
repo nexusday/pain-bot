@@ -13,7 +13,7 @@
     "node": ">=20.17.0"
   },
   "scripts": {
-    "start": "node scripts/ensure-sharp.js && node index.js",
+    "start": "node scripts/ensure-sharp.js && node scripts/ensure-sqlite.js && node index.js",
     "start:raw": "node index.js",
     "fix:sharp": "node scripts/ensure-sharp.js",
     "sync:chars": "node scripts/sync-characters-catalog.js --batch 200 --concurrency 5 --delay 200",

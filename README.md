@@ -87,8 +87,9 @@ sudo apt update
 sudo apt install -y ffmpeg git
 ```
 
-Si `sqlite3` muestra `invalid ELF header` en Linux, se copió un binario de otra
-plataforma. Recompílalo en el servidor y vuelve a iniciar:
+El comando `npm start` comprueba que el módulo nativo `sqlite3` funcione en este
+sistema y lo reconstruye automáticamente si detecta un binario de otra plataforma.
+Si necesitas hacerlo manualmente:
 
 ```bash
 npm rebuild sqlite3
