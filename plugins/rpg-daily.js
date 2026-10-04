@@ -7,6 +7,17 @@ function obtenerPremioDiario(racha) {
   return BASE_DIARIO + (racha - 1) * PASO_RACHA_DIARIO
 }
 
+function obtenerMensajeCooldown(usuario, ahora, tiempoRestanteForzado, proximaRachaForzada) {
+  const tiempoRestante = tiempoRestanteForzado ??
+    ENFRIAMIENTO_DIARIO - (ahora - (usuario?.lastDaily || 0))
+  if (tiempoRestante <= 0) return null
+  const horas = Math.floor(tiempoRestante / 3600000)
+  const minutos = Math.floor((tiempoRestante % 3600000) / 60000)
+  const segundos = Math.floor((tiempoRestante % 60000) / 1000)
+  const proximaRacha = proximaRachaForzada ?? (usuario?.dailyStreak || 0) + 1
+  return `[❗] Ya reclamaste tu daily hoy.\n\n> *Tiempo restante:* ${horas}h ${minutos}m ${segundos}s\n> *Próxima racha:* ${proximaRacha}\n> *Próximo premio:* ${obtenerPremioDiario(proximaRacha).toLocaleString()} ${global.moneda}`
+}
+
 let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
     const reclamo = await global.db.adapter.claimAndUpdate(
@@ -54,13 +65,15 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const resultado = reclamo.result
 
     if (!reclamo.acquired || resultado?.tiempoRestante > 0) {
-      const tiempoRestante = resultado?.tiempoRestante || ENFRIAMIENTO_DIARIO
-      const horas = Math.floor(tiempoRestante / 3600000)
-      const minutos = Math.floor((tiempoRestante % 3600000) / 60000)
-      const segundos = Math.floor((tiempoRestante % 60000) / 1000)
-      const proximaRacha = resultado?.proximaRacha || 1
+      const usuario = global.db.data.users[m.sender]
+      const textoCooldown = obtenerMensajeCooldown(
+        usuario,
+        Date.now(),
+        resultado?.tiempoRestante,
+        resultado?.proximaRacha
+      )
       return conn.sendMessage(m.chat, {
-        text: `[❗] Ya reclamaste tu daily hoy.\n\n> *Tiempo restante:* ${horas}h ${minutos}m ${segundos}s\n> *Próxima racha:* ${proximaRacha}\n> *Próximo premio:* ${obtenerPremioDiario(proximaRacha).toLocaleString()} ${global.moneda}`,
+        text: textoCooldown || '[❌] No se pudo completar el reclamo. Inténtalo de nuevo.',
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
@@ -97,6 +110,20 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }, { quoted: m })
   } catch (error) {
     console.error('Error en daily:', error)
+    if (error?.code === 'ERR_SQLITE_LOCK_TIMEOUT') {
+      try {
+        await global.db.adapter.refresh(global.db.data)
+      } catch (refreshError) {
+        console.error('[daily] No se pudo actualizar el estado compartido para verificar el cooldown:', refreshError?.message || refreshError)
+      }
+      const textoCooldown = obtenerMensajeCooldown(global.db.data.users[m.sender], Date.now())
+      if (textoCooldown) {
+        return conn.sendMessage(m.chat, {
+          text: textoCooldown,
+          contextInfo: { ...rcanal.contextInfo }
+        }, { quoted: m })
+      }
+    }
     return conn.sendMessage(m.chat, {
       text: '[❌] Ocurrió un error al reclamar el daily.',
       contextInfo: { ...rcanal.contextInfo }

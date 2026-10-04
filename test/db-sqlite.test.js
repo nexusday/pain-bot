@@ -34,6 +34,26 @@ test('imports the complete JSON database and preserves the original backup', asy
   }
 })
 
+test('uses SQLite after migration and does not import later changes from the legacy JSON', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10 } }, chats: {} }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy)
+    const state = await adapter.read()
+    state.users.alice.coins = 25
+    await adapter.write(state)
+
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 999 } }, chats: {} }))
+    const restartedAdapter = new ArchivoSqliteCompartido(sqlite, legacy)
+    assert.equal((await restartedAdapter.read()).users.alice.coins, 25)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('merges concurrent process snapshots when they modify independent fields', async () => {
   const directory = await crearDirectorioTemporal()
   const legacy = path.join(directory, 'database.json')
@@ -280,14 +300,111 @@ test('claimAndUpdate atomically applies one cooldown action and persists it to e
       data.users.alice.lastCrime = now
       return { coins: data.users.alice.coins }
     })
-    const second = await workerB.claimAndUpdate(stateB, key, 60_000, (data) => {
+    const second = await workerB.claimAndUpdate(stateB, key, 60_000, (data, now) => {
+      const remaining = 60_000 - (now - data.users.alice.lastCrime)
+      if (remaining > 0) return { claim: false, remaining }
       data.users.alice.coins += 25
+      data.users.alice.lastCrime = now
       return { coins: data.users.alice.coins }
     })
 
     assert.deepEqual(first, { acquired: true, result: { coins: 35 } })
-    assert.equal(second.acquired, false)
+    assert.equal(second.acquired, true)
+    assert.ok(second.result.remaining > 0)
     assert.equal((await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice.coins, 35)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('returns the remaining cooldown from the committed shared state on a duplicate daily claim', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+  const cooldown = 24 * 60 * 60 * 1000
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10 } }, chats: {} }))
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy)
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+    const claimKey = 'daily-user:alice'
+
+    const first = await workerA.claimAndUpdate(stateA, claimKey, cooldown, (data, now) => {
+      data.users.alice.coins += 9000
+      data.users.alice.lastDaily = now
+      data.users.alice.dailyStreak = 1
+      return { coins: data.users.alice.coins }
+    })
+    const duplicate = await workerB.claimAndUpdate(stateB, claimKey, cooldown, (data, now) => {
+      const remaining = cooldown - (now - data.users.alice.lastDaily)
+      return remaining > 0
+        ? { claim: false, tiempoRestante: remaining, proximaRacha: data.users.alice.dailyStreak + 1 }
+        : { claim: true }
+    })
+
+    assert.equal(first.acquired, true)
+    assert.equal(duplicate.acquired, true)
+    assert.ok(duplicate.result.tiempoRestante > 0)
+    assert.ok(duplicate.result.tiempoRestante <= cooldown)
+    assert.equal(duplicate.result.proximaRacha, 2)
+    assert.equal((await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice.coins, 9010)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('serializes concurrent daily-style claims from multiple workers without losing balances', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: {}, chats: {} }))
+    const adapters = await Promise.all(
+      Array.from({ length: 12 }, async () => {
+        const adapter = new ArchivoSqliteCompartido(sqlite, legacy, { lockTimeoutMs: 10_000 })
+        return { adapter, state: await adapter.read() }
+      })
+    )
+    await Promise.all(adapters.map(({ adapter, state }, index) =>
+      adapter.claimAndUpdate(state, `daily-user:user-${index}`, 60_000, (data) => {
+        data.users[`user-${index}`] = { coins: 9000 }
+        return { coins: 9000 }
+      })
+    ))
+
+    const finalState = await new ArchivoSqliteCompartido(sqlite, legacy).read()
+    assert.equal(Object.keys(finalState.users).length, 12)
+    assert.ok(Object.values(finalState.users).every(({ coins }) => coins === 9000))
+    assert.equal(await fs.stat(`${sqlite}.lock`).then(() => true, () => false), false)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('queues a burst of daily-style transactions on one worker instead of racing for its file lock', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: {}, chats: {} }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy, { lockTimeoutMs: 3000 })
+    const state = await adapter.read()
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        adapter.claimAndUpdate(state, `daily-user:burst-${index}`, 60_000, (data) => {
+          data.users[`burst-${index}`] = { coins: 9000 }
+          return { coins: 9000 }
+        })
+      )
+    )
+
+    assert.ok(results.every(({ acquired }) => acquired))
+    assert.equal(Object.keys(state.users).length, 20)
+    assert.equal(await fs.stat(`${sqlite}.lock`).then(() => true, () => false), false)
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
   }
@@ -374,10 +491,16 @@ test('reports a command-claim lock timeout against its dedicated sidecar lock', 
     const adapter = new ArchivoSqliteCompartido(sqlite, legacy, { lockTimeoutMs: 30 })
     const state = await adapter.read()
     await fs.mkdir(claimsLock)
+    await fs.writeFile(
+      path.join(claimsLock, 'owner.json'),
+      JSON.stringify({ pid: 2147483647, host: os.hostname(), token: 'holder' })
+    )
 
     await assert.rejects(
       adapter.claimCommand(state, 'rpg-progress:group:message'),
-      error => error.code === 'ERR_SQLITE_LOCK_TIMEOUT' && error.message.includes(claimsLock)
+      error => error.code === 'ERR_SQLITE_LOCK_TIMEOUT' &&
+        error.message.includes(claimsLock) &&
+        error.message.includes('pid=2147483647')
     )
   } finally {
     await fs.rm(directory, { recursive: true, force: true })

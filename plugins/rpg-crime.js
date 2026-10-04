@@ -63,27 +63,50 @@ function elegir(lista) {
 }
 
 let handler = async (m, { conn }) => {
-  const reclamo = await global.db.adapter.claimAndUpdate(
-    global.db.data,
-    `cooldown:crime:${m.sender}`,
-    espera,
-    (datos, ahora) => {
-      if (!datos.users[m.sender]) {
-        datos.users[m.sender] = { coins: 100, exp: 0, level: 0, registered: true }
-      }
-      const usuario = datos.users[m.sender]
-      if (!Number.isFinite(usuario.coins)) usuario.coins = 0
-      const falta = espera - (ahora - (usuario.lastCrime || 0))
-      if (falta > 0) return { claim: false, falta }
+  let reclamo
+  try {
+    reclamo = await global.db.adapter.claimAndUpdate(
+      global.db.data,
+      `cooldown:crime:${m.sender}`,
+      espera,
+      (datos, ahora) => {
+        if (!datos.users[m.sender]) {
+          datos.users[m.sender] = { coins: 100, exp: 0, level: 0, registered: true }
+        }
+        const usuario = datos.users[m.sender]
+        if (!Number.isFinite(usuario.coins)) usuario.coins = 0
+        const falta = espera - (ahora - (usuario.lastCrime || 0))
+        if (falta > 0) return { claim: false, falta }
 
-      const caso = elegir(casos)
-      const monto = entre(caso.min, caso.max)
-      usuario.lastCrime = ahora
-      if (caso.ok) usuario.coins += monto
-      else usuario.coins = Math.max(0, usuario.coins - monto)
-      return { caso, monto, coins: usuario.coins }
+        const caso = elegir(casos)
+        const monto = entre(caso.min, caso.max)
+        usuario.lastCrime = ahora
+        if (caso.ok) usuario.coins += monto
+        else usuario.coins = Math.max(0, usuario.coins - monto)
+        return { caso, monto, coins: usuario.coins }
+      }
+    )
+  } catch (error) {
+    if (error?.code !== 'ERR_SQLITE_LOCK_TIMEOUT') throw error
+    console.error('[rpg] No se pudo completar el crimen:', error.message)
+    await global.db.adapter.refresh(global.db.data)
+    const tiempoRestante = espera - (Date.now() - (global.db.data.users[m.sender]?.lastCrime || 0))
+    if (tiempoRestante > 0) {
+      const minutos = Math.ceil(tiempoRestante / 60000)
+      return conn.sendMessage(m.chat, {
+        text: tr(conn,
+          `[❗] Ya reclamaste el crimen. Debes esperar *${minutos} minuto${minutos !== 1 ? 's' : ''}* para otro.`,
+          `[❗] Wait *${minutos} minute${minutos !== 1 ? 's' : ''}* before another crime.`,
+          `[❗] Espera *${minutos} minuto${minutos !== 1 ? 's' : ''}* para outro crime.`
+        ),
+        contextInfo: { ...rcanal.contextInfo }
+      }, { quoted: m })
     }
-  )
+    return conn.sendMessage(m.chat, {
+      text: '[❌] No se pudo completar el crimen. Inténtalo de nuevo.',
+      contextInfo: { ...rcanal.contextInfo }
+    }, { quoted: m })
+  }
 
   if (!reclamo.acquired || reclamo.result?.falta > 0) {
     const falta = reclamo.result?.falta || espera
