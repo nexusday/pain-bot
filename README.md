@@ -16,11 +16,13 @@
 
 Bot de WhatsApp multi-dispositivo (Baileys). Descargas, IA, administración de grupos, RPG, stickers y más.
 
-El repositorio **incluye `node_modules`**. No es necesario ejecutar `npm install`: clona y arranca.
+SQLite usa un módulo nativo que debe instalarse para el sistema operativo del servidor.
+No copies `node_modules` de Windows a Linux ni entre arquitecturas.
 
 ```
 git clone https://github.com/nexusday/pain-bot.git
 cd pain-bot
+npm install
 npm start
 ```
 
@@ -29,8 +31,8 @@ npm start
 | **Repositorio** | [github.com/nexusday/pain-bot](https://github.com/nexusday/pain-bot) |
 | **Comunidad** | [Grupo de WhatsApp](https://chat.whatsapp.com/DlkiS0Xmqby3Rc8EBlL7k7) |
 | **Hosting** | [NexCodea — hosting para bot barato](https://clientes.nexcodea.com/) |
-| **Runtime** | Node.js 20+ |
-| **Dependencias** | Incluidas en el repo (`node_modules`) |
+| **Runtime** | Node.js 20.17+ |
+| **Dependencias** | Instalar en el sistema operativo donde correrá el bot |
 | **Licencia** | GPL-3.0-or-later |
 
 ---
@@ -55,12 +57,13 @@ npm start
 
 | Componente | Detalle |
 |------------|---------|
-| Node.js | 20 LTS o superior |
+| Node.js | 20.17 o superior |
 | Git | versión reciente |
 | FFmpeg | recomendado (audio, video, stickers) |
-| Espacio | el clone es pesado por `node_modules` (~cientos de MB) |
+| npm | instala los módulos nativos para la plataforma actual |
 
-No hace falta `npm` salvo que quieras reinstalar dependencias a mano.
+No reutilices `node_modules` instalado en otro sistema operativo: incluye el binario
+nativo de SQLite y debe corresponder a Linux, Windows o Termux donde se ejecutará.
 
 ---
 
@@ -71,10 +74,11 @@ Windows, Linux o macOS:
 ```bash
 git clone https://github.com/nexusday/pain-bot.git
 cd pain-bot
+npm install
 npm start
 ```
 
-Listo. Las dependencias ya vienen en el proyecto.
+`npm install` prepara las dependencias y el módulo nativo SQLite para este sistema.
 
 En Debian/Ubuntu, si te falta FFmpeg:
 
@@ -83,11 +87,11 @@ sudo apt update
 sudo apt install -y ffmpeg git
 ```
 
-Solo si algo falla al arrancar (módulos rotos o incompletos):
+Si `sqlite3` muestra `invalid ELF header` en Linux, se copió un binario de otra
+plataforma. Recompílalo en el servidor y vuelve a iniciar:
 
 ```bash
-npm install
-# o: npm install --legacy-peer-deps
+npm rebuild sqlite3
 ```
 
 ---
@@ -112,16 +116,17 @@ node -v && git --version
 
 ### Clonar y arrancar
 
-**No hace falta `npm install`.** Con clonar basta:
+Instala las dependencias en Termux para compilar/seleccionar los módulos nativos:
 
 ```bash
 cd ~
 git clone https://github.com/nexusday/pain-bot.git
 cd pain-bot
+npm install
 npm start
 ```
 
-Si por algún error de módulos necesitas reinstalar (opcional):
+Si ya clonaste el proyecto en Termux y necesitas reparar dependencias:
 
 ```bash
 npm install --no-bin-links
@@ -256,7 +261,7 @@ pain-bot/
 ├── handler.js        Mensajes y comandos
 ├── plugins/          Comandos (hot reload)
 ├── lib/              Utilidades y modos
-├── node_modules/     Dependencias (incluidas en el repo)
+├── node_modules/     Dependencias instaladas para esta plataforma
 ├── storage/          Datos persistentes
 ├── Sessions/         Sesión de WhatsApp (no versionar)
 └── package.json
@@ -271,11 +276,13 @@ Los plugins suelen recargarse al guardar. Si no aparece uno nuevo, reinicia con 
 ```bash
 cd pain-bot
 git pull origin main
+npm install
 npm start
 # o: pm2 restart painbot
 ```
 
-No hace falta `npm install` tras el pull mientras `node_modules` venga actualizado en el repo.
+Ejecuta `npm install` también después de actualizar: el módulo nativo de SQLite
+debe coincidir con la plataforma del servidor.
 
 Haz backup de `Sessions/` y de tu `config.js` antes de un `git pull` si tocaste owners o APIs.
 
@@ -290,7 +297,7 @@ Escribe `code` (no `qr`) cuando pregunte el método. Cierra otras instancias del
 Pide uno nuevo reiniciando. En WhatsApp usa *Vincular con número de teléfono*, no el escáner de cámara.
 
 **Error de módulos / “Cannot find module”**  
-El repo ya trae `node_modules`. Si falta o está dañado:
+Instala las dependencias para la plataforma actual:
 
 ```bash
 # PC

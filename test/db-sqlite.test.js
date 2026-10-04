@@ -11,7 +11,7 @@ async function crearDirectorioTemporal() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'painbot-sqlite-'))
 }
 
-test('imports the complete JSON database and preserves the original backup', async () => {
+test('imports the complete JSON database without creating a JSON backup', async () => {
   const directory = await crearDirectorioTemporal()
   const legacy = path.join(directory, 'database.json')
   const sqlite = path.join(directory, 'database.sqlite')
@@ -28,8 +28,8 @@ test('imports the complete JSON database and preserves the original backup', asy
     const adapter = new ArchivoSqliteCompartido(sqlite, legacy)
 
     assert.deepEqual(await adapter.read(), migrado)
-    assert.deepEqual(await fs.readFile(`${legacy}.pre-sqlite.bak`), originalBytes)
     assert.deepEqual(JSON.parse(await fs.readFile(legacy, 'utf8')), original)
+    await assert.rejects(fs.access(`${legacy}.pre-sqlite.bak`), { code: 'ENOENT' })
     assert.equal(await fs.stat(sqlite).then(info => info.isFile()), true)
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
