@@ -32,3 +32,22 @@ test('returns null only after every provider fails', async () => {
 
   assert.equal(audio, null)
 })
+
+test('skips an unavailable provider without calling its downloader', async () => {
+  const intentos = []
+  const audio = await probarProveedoresAudio([
+    {
+      nombre: 'caido',
+      disponible: async () => false,
+      obtener: async () => { intentos.push('caido'); return null }
+    },
+    {
+      nombre: 'respaldo',
+      disponible: async () => true,
+      obtener: async () => { intentos.push('respaldo'); return { urlAudio: 'https://audio.test/file.mp3' } }
+    }
+  ])
+
+  assert.deepEqual(intentos, ['respaldo'])
+  assert.equal(audio.urlAudio, 'https://audio.test/file.mp3')
+})

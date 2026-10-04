@@ -1,6 +1,9 @@
 import fetch from "node-fetch"
 import yts from "yt-search"
 import { probarProveedoresAudio } from "../lib/audio-provider-fallback.js"
+import { crearVerificadorApi } from "../lib/api-health.js"
+
+const apiDisponible = crearVerificadorApi({ fetchImpl: fetch })
 
 function nombreAutor(autor) {
   if (!autor) return '—'
@@ -21,10 +24,10 @@ function pareceHtml(texto) {
   return !limpio || limpio[0] === "<" || /^<!doctype/i.test(limpio)
 }
 
-async function pedirJson(url) {
-  for (let intento = 0; intento < 3; intento++) {
+async function pedirJson(url, { timeoutMs = 7_000, intentos = 1 } = {}) {
+  for (let intento = 0; intento < intentos; intento++) {
     const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 20000)
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
     try {
       const res = await fetch(url, {
         signal: ctrl.signal,
@@ -35,12 +38,12 @@ async function pedirJson(url) {
       })
       const texto = await res.text()
       if (pareceHtml(texto)) {
-        await espera(800 * (intento + 1))
+        if (intento + 1 < intentos) await espera(800 * (intento + 1))
         continue
       }
       return JSON.parse(texto)
     } catch {
-      await espera(800 * (intento + 1))
+      if (intento + 1 < intentos) await espera(800 * (intento + 1))
     } finally {
       clearTimeout(timer)
     }
@@ -49,7 +52,10 @@ async function pedirJson(url) {
 }
 
 async function buscarCancion(text) {
-  const json = await pedirJson(`${baseApi()}/search/ytsearch?q=${encodeURIComponent(text)}`)
+  const disponible = await apiDisponible(baseApi())
+  const json = disponible
+    ? await pedirJson(`${baseApi()}/search/ytsearch?q=${encodeURIComponent(text)}`, { timeoutMs: 5_000 })
+    : null
   const primero = json?.status && Array.isArray(json.data) ? json.data[0] : null
   if (primero?.url || primero?.videoId) {
     return {
@@ -75,7 +81,7 @@ async function buscarCancion(text) {
 
 async function urlEsAudio(url) {
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 12000)
+  const timer = setTimeout(() => ctrl.abort(), 5_000)
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -84,7 +90,10 @@ async function urlEsAudio(url) {
     })
     const tipo = res.headers.get("content-type") || ""
     if (/text\/html|text\/plain/i.test(tipo)) return false
-    const trozo = Buffer.from(await res.arrayBuffer()).slice(0, 24).toString("utf8")
+    const cuerpo = res.body
+    const primerChunk = await cuerpo[Symbol.asyncIterator]().next()
+    cuerpo.destroy()
+    const trozo = Buffer.from(primerChunk.value || []).subarray(0, 24).toString("utf8")
     if (pareceHtml(trozo)) return false
     return res.ok || res.status === 206
   } catch {
@@ -104,8 +113,12 @@ async function pedirAudio(urlVideo) {
   return probarProveedoresAudio([
     {
       nombre: "Delirius",
+      disponible: () => apiDisponible(baseApi()),
       obtener: async () => {
-        const json = await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
+        const json = await pedirJson(
+          `${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`,
+          { timeoutMs: 7_000 }
+        )
         const datos = json?.status ? json.data : null
         const urlAudio = typeof datos?.download === "string" ? datos.download : datos?.download?.url
         if (!urlAudio || pareceHtml(urlAudio) || !(await urlEsAudio(urlAudio))) return null
@@ -115,7 +128,7 @@ async function pedirAudio(urlVideo) {
     {
       nombre: "Alex",
       obtener: async () => {
-        const json = await pedirJson(consultaAlex.toString())
+        const json = await pedirJson(consultaAlex.toString(), { timeoutMs: 15_000 })
         const resultado = json?.status === true ? json.result : null
         const urlAudio = resultado?.audio_url
         if (typeof urlAudio !== "string" || pareceHtml(urlAudio) || !(await urlEsAudio(urlAudio))) {
