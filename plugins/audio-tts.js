@@ -1,8 +1,7 @@
 import { createRequire } from 'module'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { mkdir, readFile, unlink } from 'fs/promises'
-import { existsSync } from 'fs'
+import { access, mkdir, readFile, unlink } from 'node:fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
@@ -52,7 +51,10 @@ function resolverEntradaTts(m, args) {
 async function convertirAOgg(rutaEntrada, rutaSalida) {
   const cmd = `ffmpeg -y -i "${rutaEntrada}" -c:a libopus -b:a 128k -ac 1 "${rutaSalida}"`
   await ejecutarPromesa(cmd)
-  if (!existsSync(rutaSalida)) throw new Error('No se pudo convertir el audio')
+  await access(rutaSalida).catch(error => {
+    if (error?.code === 'ENOENT') throw new Error('No se pudo convertir el audio', { cause: error })
+    throw error
+  })
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
@@ -78,7 +80,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
     const dirTmp = join(tmpdir(), 'pain-tts')
-    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
+    await mkdir(dirTmp, { recursive: true })
 
     rutaMp3 = join(dirTmp, `tts_${id}.mp3`)
     rutaOgg = join(dirTmp, `tts_${id}.ogg`)

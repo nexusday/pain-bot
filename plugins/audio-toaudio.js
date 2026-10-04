@@ -1,7 +1,7 @@
 import { exec } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
+import { writeFile, readFile, unlink } from 'node:fs/promises'
 import { promisify } from 'util'
 
 const ejecutarPromesa = promisify(exec)
@@ -86,7 +86,7 @@ let handler = async (m, { conn }) => {
 
     rutaEntrada = join(tmpdir(), `vid2aud_in_${id}.${ext}`)
     rutaSalida = join(tmpdir(), `vid2aud_out_${id}.mp3`)
-    writeFileSync(rutaEntrada, medio)
+    await writeFile(rutaEntrada, medio)
 
   
     const comando = `ffmpeg -y -i "${rutaEntrada}" -t ${MAX_SEGUNDOS} -vn -c:a libmp3lame -b:a 128k -ac 2 -ar 44100 "${rutaSalida}"`
@@ -96,11 +96,12 @@ let handler = async (m, { conn }) => {
       timeout: 12 * 60 * 1000
     })
 
-    if (!existsSync(rutaSalida)) {
-      throw new Error('FFmpeg no generó el audio.')
-    }
-
-    const bufer = readFileSync(rutaSalida)
+    const bufer = await readFile(rutaSalida).catch(error => {
+      if (error?.code === 'ENOENT') {
+        throw new Error('FFmpeg no generó el audio.', { cause: error })
+      }
+      throw error
+    })
     if (!bufer.length) {
       throw new Error('El audio generado está vacío.')
     }
@@ -121,8 +122,14 @@ let handler = async (m, { conn }) => {
       m.reply('[❗] No se pudo convertir: ' + (err?.message || err))
     } catch {}
   } finally {
-    try { if (rutaEntrada && existsSync(rutaEntrada)) unlinkSync(rutaEntrada) } catch {}
-    try { if (rutaSalida && existsSync(rutaSalida)) unlinkSync(rutaSalida) } catch {}
+    for (const ruta of [rutaEntrada, rutaSalida]) {
+      if (!ruta) continue
+      try {
+        await unlink(ruta)
+      } catch (error) {
+        if (error?.code !== 'ENOENT') console.error('[audio] cleanup:', error?.message || error)
+      }
+    }
   }
 }
 

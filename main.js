@@ -53,7 +53,10 @@ import readline from 'readline'
 import NodeCache from 'node-cache'
 import qrcode from 'qrcode-terminal'
 import { EventEmitter } from 'node:events'
-import { monitorEventLoopDelay } from 'node:perf_hooks'
+import {
+  monitorEventLoopDelay,
+  PerformanceObserver
+} from 'node:perf_hooks'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const {
@@ -180,16 +183,43 @@ const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
 global.processRole = isSubbotWorker ? 'subbot' : 'primary'
 const eventLoopDelay = monitorEventLoopDelay({ resolution: 20 })
 eventLoopDelay.enable()
+let gcPauseCount = 0
+let gcPauseTotalMs = 0
+let gcPauseMaxMs = 0
+const gcObserver = new PerformanceObserver((list) => {
+  for (const entry of list.getEntries()) {
+    gcPauseCount++
+    gcPauseTotalMs += entry.duration
+    gcPauseMaxMs = Math.max(gcPauseMaxMs, entry.duration)
+  }
+})
+gcObserver.observe({ entryTypes: ['gc'] })
+let previousCpu = process.cpuUsage()
+let previousCpuSampleAt = process.hrtime.bigint()
 const eventLoopMonitor = setInterval(() => {
   const maxDelayMs = eventLoopDelay.max / 1e6
   const p99DelayMs = eventLoopDelay.percentile(99) / 1e6
+  const now = process.hrtime.bigint()
+  const elapsedUs = Number(now - previousCpuSampleAt) / 1000
+  const cpu = process.cpuUsage(previousCpu)
+  const cpuPercent = elapsedUs > 0 ? ((cpu.user + cpu.system) / elapsedUs) * 100 : 0
+  previousCpu = process.cpuUsage()
+  previousCpuSampleAt = now
+  const memory = process.memoryUsage()
+  const gcDetails = `${gcPauseCount} pausas, ${Math.round(gcPauseTotalMs)}ms total, ` +
+    `${Math.round(gcPauseMaxMs)}ms máximo`
   eventLoopDelay.reset()
   if (maxDelayMs >= 1500) {
     console.warn(
       `[event-loop] ${process.env.PAIN_WORKER_ID || 'primary'} tuvo retraso ` +
-      `máximo ${Math.round(maxDelayMs)}ms (p99 ${Math.round(p99DelayMs)}ms).`
+      `máximo ${Math.round(maxDelayMs)}ms (p99 ${Math.round(p99DelayMs)}ms); ` +
+      `CPU ${cpuPercent.toFixed(1)}%; RSS ${Math.round(memory.rss / 1024 / 1024)}MB, ` +
+      `heap ${Math.round(memory.heapUsed / 1024 / 1024)}MB; GC ${gcDetails}.`
     )
   }
+  gcPauseCount = 0
+  gcPauseTotalMs = 0
+  gcPauseMaxMs = 0
 }, 30_000)
 eventLoopMonitor.unref?.()
 if (isSubbotWorker || isManagedPrimary) {

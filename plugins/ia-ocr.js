@@ -1,6 +1,5 @@
-import { mkdir, writeFile, unlink } from 'fs/promises'
+import { mkdir, writeFile, unlink } from 'node:fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
 import sharp from '../lib/sharp.js'
 import { createWorker } from 'tesseract.js'
 import { webp2png } from '../lib/webp2mp4.js'
@@ -213,7 +212,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (!medio?.length) throw new Error('No se pudo descargar la imagen')
 
     const dirTmp = join(process.cwd(), 'tmp')
-    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
+    await mkdir(dirTmp, { recursive: true })
 
     const buferImagen = await aBuferImagen(medio, mime)
     rutaTmp = join(dirTmp, `ocr_${Date.now()}.png`)

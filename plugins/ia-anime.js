@@ -1,5 +1,5 @@
 import fetch from 'node-fetch'
-import fs from 'fs'
+import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import path from 'path'
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
@@ -47,18 +47,22 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     }
 
     
+    const dirTmp = path.join(process.cwd(), 'tmp')
+    const archivoTmp = path.join(dirTmp, `ia-anime-${Date.now()}.png`)
     try {
-      const dirTmp = path.join(process.cwd(), 'tmp')
-      if (!fs.existsSync(dirTmp)) fs.mkdirSync(dirTmp, { recursive: true })
-      const archivoTmp = path.join(dirTmp, `ia-anime-${Date.now()}.png`)
-      fs.writeFileSync(archivoTmp, buferImagen)
+      await mkdir(dirTmp, { recursive: true })
+      await writeFile(archivoTmp, buferImagen)
       await conn.sendMessage(m.chat, { image: { url: archivoTmp }, caption: leyenda, contextInfo: { ...rcanal?.contextInfo } }, { quoted: m })
-      try { fs.unlinkSync(archivoTmp) } catch (e) { }
       return
     } catch (errArchivo) {
       console.error('falló:', errArchivo)
-      
       throw new Error('No se pudo enviar la imagen generada.')
+    } finally {
+      try {
+        await unlink(archivoTmp)
+      } catch (error) {
+        if (error?.code !== 'ENOENT') console.error('[ia-anime] cleanup:', error?.message || error)
+      }
     }
 
   } catch (e) {

@@ -2,7 +2,7 @@ import { smsg } from './lib/simple.js'
 import { format } from 'util'
 import { fileURLToPath } from 'url'
 import path, { join } from 'path'
-import { readFileSync, existsSync } from 'fs'
+import { readFile } from 'node:fs/promises'
 import fetch from 'node-fetch'
 
 import { antipvDebeIgnorar } from './lib/Antis/anti-pv.js'
@@ -1148,8 +1148,14 @@ if (esSubBot) {
         numeroBot ? `./Serbot/${numeroBot}/config.json` : ''
       ].filter(Boolean)
       for (const rutaConfig of rutas) {
-        if (!existsSync(rutaConfig)) continue
-        const config = JSON.parse(readFileSync(rutaConfig, 'utf-8'))
+        let contenido
+        try {
+          contenido = await readFile(rutaConfig, 'utf-8')
+        } catch (error) {
+          if (error?.code === 'ENOENT') continue
+          throw error
+        }
+        const config = JSON.parse(contenido)
         debeAutoLeer = config.autoRead === true
         break
       }

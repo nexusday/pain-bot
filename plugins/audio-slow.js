@@ -1,7 +1,7 @@
 import { exec } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
+import { writeFile, readFile, unlink } from 'node:fs/promises'
 import { promisify } from 'util'
 
 const ejecutarPromesa = promisify(exec)
@@ -57,7 +57,7 @@ let handler = async (m, { conn, text }) => {
     rutaEntrada = join(tmpdir(), `input_${id}.${ext}`)
     rutaSalida = join(tmpdir(), `output_${id}.mp3`)
 
-    writeFileSync(rutaEntrada, Buffer.from(medio))
+    await writeFile(rutaEntrada, Buffer.from(medio))
 
    const comandoFfmpeg = `ffmpeg -y -i "${rutaEntrada}" \
 -af "asetrate=44100*0.80,aresample=44100,bass=g=6" \
@@ -68,11 +68,12 @@ let handler = async (m, { conn, text }) => {
     await ejecutarPromesa(comandoFfmpeg)
 
    
-    if (!existsSync(rutaSalida)) {
-      throw new Error('FFmpeg no pudo generar el archivo de salida.')
-    }
-
-    const buferAudioFinal = readFileSync(rutaSalida)
+    const buferAudioFinal = await readFile(rutaSalida).catch(error => {
+      if (error?.code === 'ENOENT') {
+        throw new Error('FFmpeg no pudo generar el archivo de salida.', { cause: error })
+      }
+      throw error
+    })
 
     if (buferAudioFinal.length === 0) {
       throw new Error('El archivo generado por FFmpeg está vacío.')
@@ -90,9 +91,14 @@ let handler = async (m, { conn, text }) => {
     console.error('Error crítico en el plugin slow:', err)
     try { m.reply(' FFmpeg: ' + (err.message || err)) } catch {}
   } finally {
-    
-    try { if (rutaEntrada && existsSync(rutaEntrada)) unlinkSync(rutaEntrada) } catch {}
-    try { if (rutaSalida && existsSync(rutaSalida)) unlinkSync(rutaSalida) } catch {}
+    for (const ruta of [rutaEntrada, rutaSalida]) {
+      if (!ruta) continue
+      try {
+        await unlink(ruta)
+      } catch (error) {
+        if (error?.code !== 'ENOENT') console.error('[slow] cleanup:', error?.message || error)
+      }
+    }
   }
 }
 

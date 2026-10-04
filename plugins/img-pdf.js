@@ -1,6 +1,5 @@
-import { mkdir, writeFile, unlink } from 'fs/promises'
+import { mkdir, writeFile, unlink } from 'node:fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
 import fetch from 'node-fetch'
 import sharp from '../lib/sharp.js'
 import { PDFDocument } from 'pdf-lib'
@@ -96,7 +95,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (!bytesPdf.length) throw new Error('El PDF generado está vacío')
 
     const dirTmp = join(process.cwd(), 'tmp')
-    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
+    await mkdir(dirTmp, { recursive: true })
 
     rutaPdf = join(dirTmp, `pdf_${Date.now()}_${fileName}`)
     await writeFile(rutaPdf, bytesPdf)

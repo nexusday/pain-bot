@@ -1,4 +1,4 @@
-import fs from 'fs'
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import path from 'path'
 
 const SEP = '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈'
@@ -6,9 +6,7 @@ const tip = (v) => `\`${String(v ?? '').replace(/`/g, "'")}\``
 
 function dirImagenGrupo(chatId) {
   const safe = String(chatId).replace(/[^a-zA-Z0-9._@-]/g, '_')
-  const dir = path.join(process.cwd(), 'storage', 'welcome', safe)
-  fs.mkdirSync(dir, { recursive: true })
-  return dir
+  return path.join(process.cwd(), 'storage', 'welcome', safe)
 }
 
 function rutaImagenTipo(chatId, tipo) {
@@ -16,20 +14,25 @@ function rutaImagenTipo(chatId, tipo) {
 }
 
 
-function payloadImagen(rutaOUrl) {
+async function payloadImagen(rutaOUrl) {
   if (!rutaOUrl || !String(rutaOUrl).trim()) return null
   const v = String(rutaOUrl).trim()
   if (/^https?:\/\//i.test(v)) return { url: v }
   try {
-    if (fs.existsSync(v)) return fs.readFileSync(v)
-  } catch {}
+    return await readFile(v)
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
   return null
 }
 
-function borrarArchivoSiExiste(ruta) {
+async function borrarArchivoSiExiste(ruta) {
+  if (!ruta) return
   try {
-    if (ruta && fs.existsSync(ruta)) fs.unlinkSync(ruta)
-  } catch {}
+    await unlink(ruta)
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
 }
 
 function mensajeBienvenidaPorDefecto() {
@@ -134,7 +137,7 @@ async function enviarTexto(conn, m, text, mentions = []) {
 
 async function enviarVistaConImagen(conn, m, caption, rutaOUrl, mentions = [m.sender]) {
   try {
-    let image = payloadImagen(rutaOUrl)
+    let image = await payloadImagen(rutaOUrl)
     if (!image) {
       const pp = await conn.profilePictureUrl(m.chat, 'image').catch(() => null)
       if (pp) image = { url: pp }
@@ -315,8 +318,8 @@ reset:
 
       if (extra === 'reset') {
         const rutaVieja = tipo === 'welcome' ? cfg.welcomeImg : cfg.goodbyeImg
-        borrarArchivoSiExiste(rutaVieja)
-        borrarArchivoSiExiste(rutaImagenTipo(m.chat, tipo))
+        await borrarArchivoSiExiste(rutaVieja)
+        await borrarArchivoSiExiste(rutaImagenTipo(m.chat, tipo))
         if (tipo === 'welcome') cfg.welcomeImg = ''
         else cfg.goodbyeImg = ''
         return enviarTexto(conn, m, `
@@ -352,9 +355,10 @@ responde a una *foto* con:
 
       const ruta = rutaImagenTipo(m.chat, tipo)
       const anterior = tipo === 'welcome' ? cfg.welcomeImg : cfg.goodbyeImg
-      if (anterior && anterior !== ruta) borrarArchivoSiExiste(anterior)
+      if (anterior && anterior !== ruta) await borrarArchivoSiExiste(anterior)
 
-      fs.writeFileSync(ruta, buffer)
+      await mkdir(path.dirname(ruta), { recursive: true })
+      await writeFile(ruta, buffer)
       if (tipo === 'welcome') cfg.welcomeImg = ruta
       else cfg.goodbyeImg = ruta
 

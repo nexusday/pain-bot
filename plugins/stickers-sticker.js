@@ -1,4 +1,4 @@
-import fs from 'fs'
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import path from 'path'
 import fetch from 'node-fetch'
 import fluent from 'fluent-ffmpeg'
@@ -74,16 +74,16 @@ export function resolverMetaSticker(m, conn) {
 }
 
 
-function limpiarArchivosTemporales(...rutasArchivos) {
-  rutasArchivos.forEach(rutaArchivo => {
+async function limpiarArchivosTemporales(...rutasArchivos) {
+  for (const rutaArchivo of rutasArchivos) {
     try {
-      if (fs.existsSync(rutaArchivo)) {
-        fs.unlinkSync(rutaArchivo)
-      }
+      await unlink(rutaArchivo)
     } catch (error) {
-      console.error('Error cleaning up temp file:', rutaArchivo, error.message)
+      if (error?.code !== 'ENOENT') {
+        console.error('Error cleaning up temp file:', rutaArchivo, error.message)
+      }
     }
-  })
+  }
 }
 
 /** Detecta WebP animado (ANIM/ANMF o flag VP8X). */
@@ -125,12 +125,12 @@ async function aWebp(bufer) {
     /gif/i.test(mime || '')
 
   const directorioTemp = path.join(process.cwd(), 'tmp')
-  if (!fs.existsSync(directorioTemp)) fs.mkdirSync(directorioTemp, { recursive: true })
+  await mkdir(directorioTemp, { recursive: true })
 
   const sello = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const entrada = path.join(directorioTemp, `${sello}.${ext}`)
   const salida = path.join(directorioTemp, `${sello}.webp`)
-  fs.writeFileSync(entrada, bufer)
+  await writeFile(entrada, bufer)
 
   const ejecutarFfmpeg = (lado = 320, duracionSeg = 7) =>
     new Promise((resolver, rechazar) => {
@@ -159,9 +159,9 @@ async function aWebp(bufer) {
         .addOutputOptions(opciones)
         .toFormat('webp')
         .save(salida)
-        .on('end', () => {
+        .on('end', async () => {
           try {
-            resolver(fs.readFileSync(salida))
+            resolver(await readFile(salida))
           } catch (err) {
             rechazar(err)
           }
@@ -182,7 +182,7 @@ async function aWebp(bufer) {
 
     return resultado
   } finally {
-    limpiarArchivosTemporales(entrada, salida)
+    await limpiarArchivosTemporales(entrada, salida)
   }
 }
 

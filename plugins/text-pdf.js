@@ -1,5 +1,4 @@
-import { mkdir, writeFile, unlink } from 'fs/promises'
-import { readFileSync, existsSync } from 'fs'
+import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import fetch from 'node-fetch'
@@ -40,27 +39,37 @@ const segmentadorGrafemas = typeof Intl !== 'undefined' && Intl.Segmenter
   ? new Intl.Segmenter('und', { granularity: 'grapheme' })
   : null
 
-function cargarBytesFuente() {
+async function cargarBytesFuente() {
   if (cacheBytesFuente) return cacheBytesFuente
 
-  cacheBytesFuente = {}
-  for (const [clave, archivo] of Object.entries(ARCHIVOS_FUENTE)) {
-    const filePath = join(DIR_FUENTES, archivo)
-    if (existsSync(filePath)) {
-      cacheBytesFuente[clave] = readFileSync(filePath)
+  const carga = Promise.all(
+    Object.entries(ARCHIVOS_FUENTE).map(async ([clave, archivo]) => {
+      try {
+        return [clave, await readFile(join(DIR_FUENTES, archivo))]
+      } catch (error) {
+        if (error?.code === 'ENOENT') return [clave, null]
+        throw error
+      }
+    })
+  ).then(entradas => {
+    const bytes = Object.fromEntries(entradas.filter(([, datos]) => datos))
+    if (!bytes.regular || !bytes.bold) {
+      throw new Error('Fuentes base no encontradas en lib/fonts')
     }
+    return bytes
+  })
+  cacheBytesFuente = carga
+  try {
+    return await carga
+  } catch (error) {
+    if (cacheBytesFuente === carga) cacheBytesFuente = null
+    throw error
   }
-
-  if (!cacheBytesFuente.regular || !cacheBytesFuente.bold) {
-    throw new Error('Fuentes base no encontradas en lib/fonts')
-  }
-
-  return cacheBytesFuente
 }
 
 async function incrustarFuentesUtf8(docPdf) {
   docPdf.registerFontkit(fontkit)
-  const bytes = cargarBytesFuente()
+  const bytes = await cargarBytesFuente()
   const fuentes = {}
 
   for (const [clave, datos] of Object.entries(bytes)) {
@@ -527,7 +536,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     })
 
     const dirTmp = join(process.cwd(), 'tmp')
-    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
+    await mkdir(dirTmp, { recursive: true })
 
     rutaPdf = join(dirTmp, `tepdf_${Date.now()}_${fileName}`)
     await writeFile(rutaPdf, bytesPdf)

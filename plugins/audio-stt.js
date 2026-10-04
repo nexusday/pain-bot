@@ -2,7 +2,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
+import { writeFile, access, unlink } from 'node:fs/promises'
 import {
   convertAudioToWav,
   getAudioDurationSeconds,
@@ -87,7 +87,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     rutaEntrada = join(tmpdir(), `stt_in_${id}.${fuente.ext}`)
     rutaWav = join(tmpdir(), `stt_${id}.wav`)
 
-    writeFileSync(rutaEntrada, Buffer.from(fuente.media))
+    await writeFile(rutaEntrada, Buffer.from(fuente.media))
 
     const duracion = await getAudioDurationSeconds(rutaEntrada)
     if (duracion > getMaxAudioDuration()) {
@@ -108,9 +108,12 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     await convertAudioToWav(rutaEntrada, rutaWav)
 
-    if (!existsSync(rutaWav)) {
-      throw new Error('No se pudo convertir el audio (FFmpeg)')
-    }
+    await access(rutaWav).catch(error => {
+      if (error?.code === 'ENOENT') {
+        throw new Error('No se pudo convertir el audio (FFmpeg)', { cause: error })
+      }
+      throw error
+    })
 
     const text = await transcribeWavFile(rutaWav, idioma, duracion)
 
@@ -140,7 +143,12 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }, { quoted: m })
   } finally {
     for (const archivo of [rutaEntrada, rutaWav]) {
-      try { if (archivo && existsSync(archivo)) unlinkSync(archivo) } catch {}
+      if (!archivo) continue
+      try {
+        await unlink(archivo)
+      } catch (error) {
+        if (error?.code !== 'ENOENT') console.error('[stt] cleanup:', error?.message || error)
+      }
     }
   }
 }

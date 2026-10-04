@@ -1,6 +1,5 @@
-import { mkdir, writeFile, unlink } from 'fs/promises'
+import { mkdir, writeFile, unlink } from 'node:fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
 import fetch from 'node-fetch'
 import sharp from '../lib/sharp.js'
 import { webp2png } from '../lib/webp2mp4.js'
@@ -147,7 +146,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const { bufer, ancho, alto } = await redimensionarImagen(fuente, dims)
 
     const dirTmp = join(process.cwd(), 'tmp')
-    if (!existsSync(dirTmp)) await mkdir(dirTmp, { recursive: true })
+    await mkdir(dirTmp, { recursive: true })
 
     rutaTmp = join(dirTmp, `resize_${Date.now()}.jpg`)
     await writeFile(rutaTmp, bufer)

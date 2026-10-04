@@ -1,4 +1,4 @@
-import fs from 'fs'
+import { mkdir, readFile, rm } from 'node:fs/promises'
 import path from 'path'
 import fluent from 'fluent-ffmpeg'
 import sharp from '../lib/sharp.js'
@@ -143,7 +143,7 @@ function resolverTexto(m, args) {
 async function renderizarFotogramas(texto) {
   const diseno = calcularDiseno(texto)
   const dirTemp = path.join(process.cwd(), 'tmp', `st_${Date.now()}`)
-  fs.mkdirSync(dirTemp, { recursive: true })
+  await mkdir(dirTemp, { recursive: true })
 
   const rutasFotogramas = []
 
@@ -183,9 +183,9 @@ async function fotogramasAWebpAnimado(dirTemp) {
       ])
       .toFormat('webp')
       .save(salida)
-      .on('end', () => {
+      .on('end', async () => {
         try {
-          resolve(fs.readFileSync(salida))
+          resolve(await readFile(salida))
         } catch (error) {
           reject(error)
         }
@@ -194,14 +194,13 @@ async function fotogramasAWebpAnimado(dirTemp) {
   })
 }
 
-function limpiarDirectorio(directorio) {
-  if (!directorio || !fs.existsSync(directorio)) return
+async function limpiarDirectorio(directorio) {
+  if (!directorio) return
   try {
-    for (const archivo of fs.readdirSync(directorio)) {
-      fs.unlinkSync(path.join(directorio, archivo))
-    }
-    fs.rmdirSync(directorio)
-  } catch {}
+    await rm(directorio, { recursive: true, force: true })
+  } catch (error) {
+    console.error('[st] cleanup:', error?.message || error)
+  }
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
@@ -242,7 +241,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       contextInfo: { ...rcanal.contextInfo }
     }, { quoted: m })
   } finally {
-    limpiarDirectorio(dirTemp)
+    await limpiarDirectorio(dirTemp)
   }
 }
 
