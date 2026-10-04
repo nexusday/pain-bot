@@ -410,6 +410,9 @@ async function iniciarSubBot(options) {
 
     let sock = makeWASocket(opcionesConexion)
     intento.sock = sock
+    sock.phoneNumber = path.basename(pathAYBot)
+    sock.botNumber = path.basename(pathAYBot)
+    sock.pathAYBot = pathAYBot
     let inicioSocketEn = Date.now()
     let firmaCanalesResuelta = null
     let resolucionCanalesPendiente = null
@@ -642,6 +645,10 @@ async function iniciarSubBot(options) {
 
       if (connection === 'close') {
         detenerPrekeys(sock)
+        if (sock._painDeletingSession) {
+          intento.limpiarAuxiliares?.()
+          return
+        }
         if (sock._painSupervisorHandoff) {
           detenerWatchdog()
           if (temporizadorReconexion) clearTimeout(temporizadorReconexion)
@@ -832,6 +839,9 @@ async function iniciarSubBot(options) {
         sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
         cierrePropio = false
         intento.sock = sock
+        sock.phoneNumber = idCarpetaBot
+        sock.botNumber = idCarpetaBot
+        sock.pathAYBot = pathAYBot
         inicioSocketEn = Date.now()
         esInit = true
         try {
@@ -879,6 +889,22 @@ async function iniciarSubBot(options) {
       sock.reconectarPain = () => {
         if (reconectando) return Promise.resolve(false)
         return recargarHandler(true)
+      }
+      sock.cerrarSesionPain = async () => {
+        sock._painDeletingSession = true
+        sock._ignorarCierre = true
+        reconectando = true
+        intento.cancelado = true
+        intento.limpiarAuxiliares?.()
+        detenerPrekeys(sock)
+        try {
+          await sock.logout?.()
+        } finally {
+          intento.limpiarAuxiliares?.()
+          sock.ev.removeAllListeners()
+          try { sock.ws?.close?.() } catch {}
+          quitarSockDeConns(sock)
+        }
       }
 
       esInit = false

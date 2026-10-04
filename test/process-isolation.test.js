@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import {
   assignSessions,
   canStartSessions,
-  requestSessionLease
+  requestSessionLease,
+  removedSessions
 } from '../lib/process-isolation.js'
 import { EventEmitter } from 'events'
 
@@ -28,6 +29,15 @@ test('does not start duplicate workers while another live worker owns a session'
 
   oldAssignment.delete(ownerId)
   assert.equal(canStartSessions(target, oldAssignment, 'other-worker'), true)
+})
+
+test('removes sessions from a running worker without treating additions as removals', () => {
+  assert.deepEqual(
+    removedSessions(['one', 'two', 'three'], ['one', 'three']),
+    ['two']
+  )
+  assert.equal(removedSessions(['one'], ['one', 'two']), null)
+  assert.equal(removedSessions(['one'], ['one']), null)
 })
 
 test('session lease request waits for supervisor acknowledgement', async () => {

@@ -732,7 +732,7 @@ if (!isSubbotWorker) {
   if (!Array.isArray(assignedSessions)) throw new Error('La asignación de sub-bots no es válida')
   const serbotModule = await import('./plugins/serbot-serbot.js')
   const serbotDir = resolve(__dirname, global.bot || 'Serbot')
-  const sessions = [...new Set(assignedSessions)].filter(folder =>
+  let sessions = [...new Set(assignedSessions)].filter(folder =>
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
   const workerId = process.env.PAIN_WORKER_ID || 'subbot'
@@ -766,6 +766,33 @@ if (!isSubbotWorker) {
     }
   }, 10_000)
   workerStatusInterval.unref?.()
+  process.on('message', async (message) => {
+    if (message?.type !== 'remove-sessions' || !Array.isArray(message.sessions)) return
+    const removed = new Set(message.sessions.filter(folder =>
+      typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
+    ))
+    if (!removed.size) return
+
+    const cierres = []
+    for (const socket of [...global.conns]) {
+      const folder = socket?.pathAYBot ? path.basename(socket.pathAYBot) : ''
+      if (!removed.has(folder)) continue
+      if (typeof socket.cerrarSesionPain !== 'function') {
+        console.error(`Worker ${workerId}: no hay cierre controlado para la sesión ${folder}.`)
+        continue
+      }
+      cierres.push(socket.cerrarSesionPain().catch((error) => {
+        console.error(`Worker ${workerId}: no se pudo cerrar la sesión ${folder}:`, error?.message || error)
+      }))
+    }
+    sessions = sessions.filter(folder => !removed.has(folder))
+    await Promise.all(cierres)
+    try {
+      publishWorkerStatus()
+    } catch (error) {
+      console.error(`Worker ${workerId}: no se pudo actualizar el estado tras eliminar sesiones:`, error?.message || error)
+    }
+  })
   const batchSize = 2
   let started = 0
   let skipped = 0

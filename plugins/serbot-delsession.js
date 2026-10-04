@@ -128,12 +128,16 @@ async function eliminarSesionSubBot(num) {
   const sock = buscarConnSub(n)
   const estabaConectado = Boolean(sock) || listarSubsConectados().some(({ num: conectado }) => conectado === n)
   if (sock) {
-    try { await sock.logout?.() } catch {}
-    try { sock.ev?.removeAllListeners?.() } catch {}
-    try { sock.ws?.close?.() } catch {}
-    try { sock.end?.() } catch {}
-    if (Array.isArray(global.conns)) {
-      global.conns = global.conns.filter(c => c !== sock)
+    if (typeof sock.cerrarSesionPain === 'function') {
+      await sock.cerrarSesionPain()
+    } else {
+      try { await sock.logout?.() } catch {}
+      try { sock.ev?.removeAllListeners?.() } catch {}
+      try { sock.ws?.close?.() } catch {}
+      try { sock.end?.() } catch {}
+      if (Array.isArray(global.conns)) {
+        global.conns = global.conns.filter(c => c !== sock)
+      }
     }
   }
 
@@ -152,7 +156,7 @@ async function eliminarSesionSubBot(num) {
     }
   }
   if (typeof process.send === 'function') {
-    process.send({ type: 'reconcile-sessions' }, (error) => {
+    process.send({ type: 'remove-session', session: n }, (error) => {
       if (error) console.error('[delsession] No se pudo actualizar la asignación del supervisor:', error.message)
     })
   }

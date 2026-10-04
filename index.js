@@ -6,7 +6,8 @@ import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import {
   assignSessions,
-  canStartSessions
+  canStartSessions,
+  removedSessions
 } from './lib/process-isolation.js'
 import { ARCHIVO_REENLACE_PENDIENTE } from './lib/subbot-recovery.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
@@ -93,6 +94,37 @@ function ensureTarget(id, target) {
   startSlot(id, slot)
 }
 
+function removeSessionFromWorker(slot, target, session) {
+  const removed = removedSessions(slot.target.sessions, target.sessions)
+  if (!removed?.includes(session) || !slot.child?.connected) return false
+
+  const child = slot.child
+  const previousTarget = slot.target
+  const previousFingerprint = slot.fingerprint
+  const queued = child.send({ type: 'remove-sessions', sessions: [session] }, (error) => {
+    if (error) {
+      console.error(
+        `No se pudieron cerrar las sesiones eliminadas en ${previousTarget.role}:`,
+        error.message
+      )
+      if (slot.child === child) {
+        slot.target = previousTarget
+        slot.fingerprint = previousFingerprint
+        reconcile()
+      }
+    }
+  })
+  if (!queued) return false
+
+  console.log(
+    `Actualizando ${slot.target.role} sin reiniciar el worker; ` +
+    `se eliminó la sesión ${session}.`
+  )
+  slot.target = target
+  slot.fingerprint = fingerprint(target)
+  return true
+}
+
 function startSlot(id, slot) {
   if (stopping || slot.child || Date.now() < slot.restartAt) return
   const liveAssignments = [...slots]
@@ -114,6 +146,13 @@ function startSlot(id, slot) {
   slot.child = child
   child.on('message', (message) => {
     if (slot.child !== child) return
+    if (message?.type === 'remove-session' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
+      const target = makeTargets().get('subbot-group-0')
+      const worker = slots.get('subbot-group-0')
+      if (target && worker) removeSessionFromWorker(worker, target, message.session)
+      reconcile()
+      return
+    }
     if (message?.type === 'reconcile-sessions') {
       reconcile()
       return
