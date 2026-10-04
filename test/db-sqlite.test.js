@@ -157,6 +157,47 @@ test('adds concurrent message and command counter increments without conflict', 
   }
 })
 
+test('merges concurrent plugin totals, successes, and timestamps without conflicts', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+  const baseline = {
+    users: {},
+    chats: {},
+    stats: {
+      'rpg-daily.js': { total: 10, success: 9, last: 100, lastSuccess: 90 },
+    },
+  }
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify(baseline))
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy)
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+    Object.assign(stateA.stats['rpg-daily.js'], {
+      total: 11,
+      success: 10,
+      last: 200,
+      lastSuccess: 190,
+    })
+    Object.assign(stateB.stats['rpg-daily.js'], {
+      total: 11,
+      success: 10,
+      last: 300,
+      lastSuccess: 290,
+    })
+
+    await workerA.write(stateA)
+    await workerB.write(stateB)
+
+    const stats = (await new ArchivoSqliteCompartido(sqlite, legacy).read()).stats['rpg-daily.js']
+    assert.deepEqual(stats, { total: 12, success: 11, last: 300, lastSuccess: 290 })
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('only one worker can claim a game message and claims survive ordinary DB writes', async () => {
   const directory = await crearDirectorioTemporal()
   const legacy = path.join(directory, 'database.json')

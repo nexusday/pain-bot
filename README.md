@@ -87,9 +87,10 @@ sudo apt update
 sudo apt install -y ffmpeg git
 ```
 
-El comando `npm start` comprueba que el módulo nativo `sqlite3` funcione en este
-sistema y lo reconstruye automáticamente si detecta un binario de otra plataforma.
-Si necesitas hacerlo manualmente:
+El comando `npm start` comprueba el módulo nativo `sqlite3`. Si el binario
+precompilado requiere una versión de GLIBC que el contenedor no tiene, compila
+SQLite desde el código fuente local para la plataforma del servidor. Si necesitas
+repetir la comprobación manualmente:
 
 ```bash
 node scripts/ensure-sqlite.js

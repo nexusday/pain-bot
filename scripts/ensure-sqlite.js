@@ -20,38 +20,61 @@ const db = new sqlite3.Database(':memory:', (error) => {
 function ejecutarNode(argumentos, cwd = root) {
   return spawnSync(process.execPath, argumentos, {
     cwd,
-    stdio: 'inherit',
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024,
   })
 }
 
 function probarSqlite() {
   const resultado = ejecutarNode(['-e', probe])
-  return resultado.status === 0
+  if (resultado.status === 0) {
+    const salida = resultado.stdout.trim()
+    if (salida) console.log(salida)
+    return { ok: true }
+  }
+  const diagnostico = `${resultado.stderr || ''}\n${resultado.error?.message || ''}`
+    .split(/\r?\n/)
+    .find((linea) => /Error:|GLIBC_|invalid ELF|ERR_DLOPEN_FAILED/i.test(linea))
+    ?.trim()
+  return { ok: false, diagnostico: diagnostico || 'No se pudo cargar el módulo nativo.' }
 }
 
 function resultadoCorrecto(resultado) {
-  if (resultado.error) return false
-  return resultado.status === 0
+  return !resultado.error && resultado.status === 0
 }
 
 function main() {
-  if (probarSqlite()) return
+  const inicial = probarSqlite()
+  if (inicial.ok) return
 
-  console.warn('[sqlite3] El binario nativo no corresponde a este contenedor; reconstruyéndolo aquí...')
+  console.warn(`[sqlite3] El binario nativo no funciona en este contenedor: ${inicial.diagnostico}`)
   const sqlitePackage = join(root, 'node_modules', 'sqlite3')
   const prebuild = join(root, 'node_modules', 'prebuild-install', 'bin.js')
   const nodeGyp = join(root, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js')
-  const prebuilt = ejecutarNode([prebuild, '-r', 'napi'], sqlitePackage)
-  if (!resultadoCorrecto(prebuilt)) {
-    console.warn('[sqlite3] No se pudo descargar un binario precompilado; compilando desde código fuente...')
-    const compilado = ejecutarNode([nodeGyp, 'rebuild'], sqlitePackage)
-    if (!resultadoCorrecto(compilado)) {
-      if (compilado.error) throw compilado.error
-      throw new Error(`node-gyp terminó con código ${compilado.status ?? 'desconocido'}.`)
-    }
+  console.log('[sqlite3] Probando un binario precompilado para este sistema...')
+  const prebuildResult = ejecutarNode([prebuild, '-r', 'napi'], sqlitePackage)
+  if (!resultadoCorrecto(prebuildResult)) {
+    const diagnostico = prebuildResult.stderr?.trim() || prebuildResult.error?.message
+    if (diagnostico) console.warn(`[sqlite3] No se pudo usar el precompilado: ${diagnostico.split(/\r?\n/)[0]}`)
   }
-  if (!probarSqlite()) {
-    throw new Error('sqlite3 sigue sin cargar después de instalar o compilar su binario para esta plataforma.')
+  const precompilado = probarSqlite()
+  if (precompilado.ok) return
+
+  console.warn(
+    `[sqlite3] El binario precompilado no es compatible (${precompilado.diagnostico}); ` +
+    'se compilará SQLite desde el código fuente del contenedor.'
+  )
+  const compilado = ejecutarNode([nodeGyp, 'rebuild'], sqlitePackage)
+  if (!resultadoCorrecto(compilado)) {
+    if (compilado.error) throw compilado.error
+    throw new Error(`node-gyp terminó con código ${compilado.status ?? 'desconocido'}.`)
+  }
+
+  const verificado = probarSqlite()
+  if (!verificado.ok) {
+    throw new Error(
+      `sqlite3 sigue sin funcionar después de compilarlo para este contenedor: ${verificado.diagnostico}`
+    )
   }
 }
 
