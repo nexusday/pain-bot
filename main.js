@@ -808,7 +808,9 @@ if (!isSubbotWorker) {
     }
     for (const folder of removed) confirmSessionLease(folder)
   })
-  const batchSize = 2
+  const batchSize = 1
+  const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
+  if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
   const initialSessions = [...sessions]
   let started = 0
   let skipped = 0
@@ -822,7 +824,7 @@ if (!isSubbotWorker) {
     skipped += results.filter(result => result === 'skipped').length
     failed += results.filter(result => result === 'failed').length
     if (i + batchSize < initialSessions.length) {
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 3000))
     }
   }
   console.log(

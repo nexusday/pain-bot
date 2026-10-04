@@ -43,7 +43,7 @@ const STOP_TIMEOUT_MS = 10_000
 const RESTART_MAX_MS = 30_000
 const STABLE_MS = 60_000
 // Generación joven más grande: el GC llegó a ocupar ~20 % del tiempo por la cantidad de objetos pequeños.
-const SEMI_SPACE_MB = Math.min(Math.max(Number.parseInt(process.env.PAIN_SEMI_SPACE_MB, 10) || 32, 16), 128)
+const SEMI_SPACE_MB = Math.min(Math.max(Number.parseInt(process.env.PAIN_SEMI_SPACE_MB, 10) || 16, 16), 128)
 
 function listSessions() {
   if (!existsSync(subbotRoot)) return []
@@ -160,6 +160,12 @@ function addSessionsToWorker(slot, target) {
   return true
 }
 
+// Los grupos de sub-bots no arrancan a la vez: cada uno espera su turno para no saturar la CPU.
+function startDelayMs(id) {
+  const n = Number.parseInt(/^subbot-group-(\d+)$/.exec(id)?.[1], 10)
+  return Number.isInteger(n) ? 8_000 + n * 25_000 : 0
+}
+
 function startSlot(id, slot) {
   if (stopping || slot.child || Date.now() < slot.restartAt) return
   const liveAssignments = [...slots]
@@ -175,6 +181,7 @@ function startSlot(id, slot) {
       ...process.env,
       PAIN_ROLE: slot.target.role,
       PAIN_WORKER_ID: id,
+      PAIN_START_DELAY_MS: String(startDelayMs(id)),
       PAIN_SESSIONS_JSON: JSON.stringify(slot.target.sessions)
     },
     stdio: ['inherit', 'inherit', 'inherit', 'ipc']
