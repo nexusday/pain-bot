@@ -4,6 +4,8 @@ Serbot/
 storage/databases/database.json
 storage/databases/database.json.pre-sqlite.bak
 storage/databases/database.sqlite
+storage/databases/*.sqlite-wal
+storage/databases/*.sqlite-shm
 storage/databases/database.sqlite.lock/
 storage/databases/database.sqlite.claims.sqlite
 storage/databases/database.sqlite.claims.sqlite.lock/
