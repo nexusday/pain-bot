@@ -4,6 +4,8 @@
  */
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { mkdtemp, mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sharpInstallPlan } from '../lib/sharp-install-plan.js'
@@ -41,28 +43,93 @@ async function canUseSharp() {
   return false
 }
 
-function ejecutarNpm(args, overridesEnv) {
-  const npmArgs = args
+function ejecutarNpm(args, {
+  envOverrides = {},
+  cwd = root,
+  captureOutput = false,
+  clearPlatformConfig = false
+} = {}) {
   const env = {
     ...process.env,
-    ...overridesEnv,
+    ...envOverrides,
     npm_config_fund: 'false',
     npm_config_audit: 'false'
   }
-  if (!Object.hasOwn(overridesEnv, 'npm_config_cpu')) delete env.npm_config_cpu
+  if (clearPlatformConfig) {
+    for (const key of [
+      'npm_config_arch', 'npm_config_os', 'npm_config_libc', 'npm_config_cpu', 'npm_config_platform',
+      'NPM_CONFIG_ARCH', 'NPM_CONFIG_OS', 'NPM_CONFIG_LIBC', 'NPM_CONFIG_CPU', 'NPM_CONFIG_PLATFORM'
+    ]) delete env[key]
+  }
+  const stdio = captureOutput ? 'pipe' : 'inherit'
 
   const npmExecPath = process.env.npm_execpath
   const resultado = npmExecPath
-    ? spawnSync(process.execPath, [npmExecPath, ...npmArgs], { cwd: root, stdio: 'inherit', env })
-    : spawnSync('npm', npmArgs, {
-        cwd: root,
-        stdio: 'inherit',
+    ? spawnSync(process.execPath, [npmExecPath, ...args], {
+        cwd,
+        stdio,
+        encoding: captureOutput ? 'utf8' : undefined,
+        env
+      })
+    : spawnSync('npm', args, {
+        cwd,
+        stdio,
+        encoding: captureOutput ? 'utf8' : undefined,
         shell: process.platform === 'win32',
         env
       })
 
   if (resultado.error) throw resultado.error
-  return resultado.status === 0
+  return resultado
+}
+
+async function instalarPaquetesLinux(paquetes) {
+  const temporales = await mkdtemp(join(tmpdir(), 'pain-sharp-'))
+  const directorioImg = join(root, 'node_modules', '@img')
+  await mkdir(directorioImg, { recursive: true })
+
+  try {
+    for (const paquete of paquetes) {
+      const spec = `@img/${paquete.name}@${paquete.version}`
+      const directorioPaquete = join(temporales, paquete.name)
+      await mkdir(directorioPaquete)
+      console.log(`[sharp] descargando ${spec}...`)
+      const empaquetado = ejecutarNpm(
+        ['pack', spec, '--pack-destination', directorioPaquete, '--silent', '--ignore-scripts'],
+        { cwd: directorioPaquete, captureOutput: true, clearPlatformConfig: true }
+      )
+      if (empaquetado.status !== 0) {
+        const detalle = empaquetado.stderr?.trim() || empaquetado.stdout?.trim() || empaquetado.error?.message
+        throw new Error(`npm pack falló para ${spec}${detalle ? `: ${detalle}` : '.'}`)
+      }
+
+      const archivo = (await readdir(directorioPaquete)).find((nombre) => nombre.endsWith('.tgz'))
+      if (!archivo) throw new Error(`npm pack no generó el archivo de ${spec}.`)
+      const destino = join(directorioImg, paquete.name)
+      await mkdir(destino, { recursive: true })
+      const extraido = spawnSync('tar', [
+        '-xzf',
+        join(directorioPaquete, archivo),
+        '-C',
+        destino,
+        '--strip-components=1'
+      ], { cwd: root, stdio: 'inherit' })
+      if (extraido.error) throw extraido.error
+      if (extraido.status !== 0) throw new Error(`No se pudo extraer ${spec}.`)
+
+      const archivoRuntime = join(destino, paquete.file)
+      let existeRuntime = false
+      try {
+        const runtime = await stat(archivoRuntime)
+        existeRuntime = paquete.file === 'lib' ? runtime.isDirectory() : runtime.isFile()
+      } catch {}
+      if (!existeRuntime) {
+        throw new Error(`${spec} se extrajo, pero falta ${paquete.file}.`)
+      }
+    }
+  } finally {
+    await rm(temporales, { recursive: true, force: true })
+  }
 }
 
 async function main() {
@@ -77,18 +144,24 @@ async function main() {
     const sharpRequire = createRequire(require.resolve('sharp'))
     libc = sharpRequire('detect-libc').familySync() || ''
   }
-  const { args, env: npmEnv } = sharpInstallPlan(android, {
+  const { args, env: npmEnv, packages } = sharpInstallPlan(android, {
     platform: process.platform,
     arch: process.arch,
     libc
   })
-  console.log(android
-    ? '[sharp] instalando soporte WebAssembly para Termux/Android...'
-    : `[sharp] instalando sharp y sus dependencias opcionales para ${process.platform}-${process.arch}...`
-  )
 
-  if (!ejecutarNpm(args, npmEnv)) {
-    throw new Error('npm no pudo instalar sharp y sus dependencias para esta plataforma.')
+  if (packages.length) {
+    console.log(`[sharp] instalando binarios oficiales directamente para ${process.platform}-${process.arch}...`)
+    await instalarPaquetesLinux(packages)
+  } else {
+    if (!args.length) {
+      throw new Error(`No hay un runtime Sharp compatible definido para ${process.platform}-${process.arch}.`)
+    }
+    console.log('[sharp] instalando soporte WebAssembly para Termux/Android...')
+    const instalado = ejecutarNpm(args, { envOverrides: npmEnv })
+    if (instalado.status !== 0) {
+      throw new Error(`npm no pudo instalar Sharp (código ${instalado.status ?? 'desconocido'}).`)
+    }
   }
 
   if (!(await canUseSharp())) {
