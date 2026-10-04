@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import {
   assignSessions,
+  groupIdForSession,
   addedSessions,
   canStartSessions,
   removedSessions
@@ -185,15 +186,17 @@ function startSlot(id, slot) {
       return
     }
     if (message?.type === 'remove-session' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
-      const target = makeTargets().get('subbot-group-0')
-      const worker = slots.get('subbot-group-0')
+      const groupId = groupIdForSession(message.session)
+      const target = makeTargets().get(groupId)
+      const worker = slots.get(groupId)
       if (target && worker) removeSessionFromWorker(worker, target, message.session)
       reconcile()
       return
     }
     if (message?.type === 'session-added' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
-      const target = makeTargets().get('subbot-group-0')
-      const worker = slots.get('subbot-group-0')
+      const groupId = groupIdForSession(message.session)
+      const target = makeTargets().get(groupId)
+      const worker = slots.get(groupId)
       if (target && worker) addSessionsToWorker(worker, target)
       reconcile()
       return
@@ -211,8 +214,9 @@ function startSlot(id, slot) {
         typeof message.requestId === 'string') {
       leasedSessions.add(message.session)
       pendingLeaseRequests.set(message.requestId, message.session)
-      const target = makeTargets().get('subbot-group-0')
-      const worker = slots.get('subbot-group-0')
+      const groupId = groupIdForSession(message.session)
+      const target = makeTargets().get(groupId)
+      const worker = slots.get(groupId)
       if (target && worker) {
         removeSessionFromWorker(worker, target, message.session, { handoff: true })
       }
@@ -225,8 +229,9 @@ function startSlot(id, slot) {
       for (const [requestId, session] of pendingLeaseRequests) {
         if (session === message.session) pendingLeaseRequests.delete(requestId)
       }
-      const target = makeTargets().get('subbot-group-0')
-      const worker = slots.get('subbot-group-0')
+      const groupId = groupIdForSession(message.session)
+      const target = makeTargets().get(groupId)
+      const worker = slots.get(groupId)
       if (target && worker) addSessionsToWorker(worker, target)
       reconcile()
       return

@@ -1,4 +1,5 @@
 import ws from 'ws'
+import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
 import fs from 'fs'
 import { join, basename } from 'path'
 import {
@@ -207,6 +208,15 @@ export function listarNumerosBotsConocidos() {
   for (const c of lista) {
     for (const n of numerosIdentidadBot(c)) nums.add(n)
   }
+  // Sub-bots que viven en otros procesos (grupos de workers).
+  try {
+    for (const worker of readSubbotWorkerStatuses(process.cwd())) {
+      for (const s of worker.sessions) {
+        const n = limpiarNumBot(s.number) || limpiarNumBot(s.folder)
+        if (n.length >= 6) nums.add(n)
+      }
+    }
+  } catch {}
   cacheBotsConocidos = nums
   cacheBotsLargo = lista.length
   cacheBotsHasta = ahora + 5000

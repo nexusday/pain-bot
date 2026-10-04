@@ -440,7 +440,8 @@ async function iniciarSubBot(options) {
       browser: Browsers.ubuntu('Chrome'),
       version,
       markOnlineOnConnect: false,
-      keepAliveIntervalMs: 10_000,
+      // Baileys corta con 408 si pasan keepAlive+5s sin datos; 10s cortaba a todos en cada pausa del hilo.
+      keepAliveIntervalMs: 30_000,
       qrTimeout: 120_000,
     })
 
