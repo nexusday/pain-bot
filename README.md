@@ -272,11 +272,10 @@ pain-bot/
 
 Los plugins suelen recargarse al guardar. Si no aparece uno nuevo, reinicia con `npm start` o `pm2 restart painbot`.
 
-El modo recomendado de sub-bots es `/pri 1` (dos workers agrupados). Si quedó
-guardado `/pri 2` y `global.processIsolation` está desactivado, el siguiente
-arranque lo restablece a `/pri 1`. El procesamiento de imágenes usa un hilo
-libvips por operación por defecto; puedes ajustar ese límite con
-`PAIN_SHARP_CONCURRENCY`.
+Solo existe `/pri 1`: el bot principal tiene su proceso y todos los sub-bots
+comparten un único worker. `/pri 2` fue retirado y cualquier modo antiguo
+guardado se ignora. El procesamiento de imágenes usa un hilo libvips por
+operación por defecto; puedes ajustar ese límite con `PAIN_SHARP_CONCURRENCY`.
 
 ---
 
@@ -346,11 +345,8 @@ Uso personal o educativo. Respeta las [políticas de WhatsApp](https://www.whats
 ---
 
 *Pain Bot — By Sunkovv*
-# Sub-bot process modes
+# Sub-bot process layout
 
-`/pri 1` keeps the main bot in its own process and assigns sub-bots to at most two
-stable grouped workers. `/pri 2` assigns one supervised process to each sub-bot.
-Only an owner using the main bot can change the mode. The supervisor saves the
-runtime choice in `storage/process-mode.json`; that saved choice takes precedence
-over `global.processIsolation` in `config.js` after restart. Without a saved
-choice, `true` selects mode 2 and `false` selects mode 1.
+The main bot runs in its own process. All sub-bots share one supervised worker.
+`/pri 2` and per-sub-bot worker mode have been removed to keep process count and
+CPU overhead predictable.

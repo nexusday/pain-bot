@@ -5,18 +5,13 @@ import { existsSync, readdirSync, statSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import {
-  acceptModeRequest,
   assignSessions,
-  canStartSessions,
-  limitModeToConfiguration,
-  readModeState,
-  writeModeState
+  canStartSessions
 } from './lib/process-isolation.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const mainPath = join(__dirname, 'main.js')
-const modePath = join(__dirname, 'storage', 'process-mode.json')
 
 try {
   const { default: cfonts } = await import('cfonts')
@@ -33,17 +28,6 @@ await new ArchivoSqliteCompartido(
   join(__dirname, 'storage', 'databases', 'database.json')
 ).read()
 console.log('Base compartida lista.')
-const configuredIsolation = global.processIsolation === true
-const savedMode = readModeState(modePath, configuredIsolation)
-let mode = limitModeToConfiguration(savedMode, configuredIsolation)
-if (mode !== savedMode) {
-  console.warn('El modo /pri 2 guardado consume más recursos; se restablece /pri 1.')
-  try {
-    writeModeState(modePath, mode)
-  } catch (error) {
-    console.error('No se pudo guardar el modo /pri 1:', error?.message || error)
-  }
-}
 const subbotRoot = resolve(__dirname, global.bot || 'Serbot')
 const slots = new Map()
 const leasedSessions = new Set()
@@ -69,7 +53,7 @@ function listSessions() {
 
 function makeTargets() {
   const targets = new Map([['primary', { role: 'primary', sessions: [] }]])
-  for (const [id, sessions] of assignSessions(mode, listSessions())) {
+  for (const [id, sessions] of assignSessions(listSessions())) {
     targets.set(id, { role: 'subbot', sessions })
   }
   return targets
@@ -119,8 +103,7 @@ function startSlot(id, slot) {
       ...process.env,
       PAIN_ROLE: slot.target.role,
       PAIN_WORKER_ID: id,
-      PAIN_SESSIONS_JSON: JSON.stringify(slot.target.sessions),
-      PAIN_PROCESS_MODE: String(mode)
+      PAIN_SESSIONS_JSON: JSON.stringify(slot.target.sessions)
     },
     stdio: ['inherit', 'inherit', 'inherit', 'ipc']
   })
@@ -151,23 +134,6 @@ function startSlot(id, slot) {
       }
       reconcile()
       return
-    }
-    if (message.type !== 'set-mode') return
-    const authorized = acceptModeRequest({
-      senderRole: slot.target.role,
-      authenticatedOwner: message.authenticatedOwner === true,
-      mode: message.mode
-    })
-    if (!authorized) {
-      console.warn('Solicitud IPC de cambio de modo rechazada.')
-      return
-    }
-    try {
-      mode = writeModeState(modePath, message.mode)
-      console.log(`Modo de procesos actualizado a /pri ${mode}.`)
-      reconcile()
-    } catch (error) {
-      console.error('No se pudo guardar el modo de procesos:', error?.message || error)
     }
   })
   child.on('error', (error) => console.error(`Error del proceso ${id}:`, error?.message || error))
