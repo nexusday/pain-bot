@@ -3,11 +3,13 @@
  * Termux/Android usa WebAssembly; el resto instala el runtime nativo de su plataforma.
  */
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sharpInstallPlan } from '../lib/sharp-install-plan.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const require = createRequire(import.meta.url)
 const pruebaSharp = `
 import sharp from 'sharp'
 await sharp({
@@ -32,7 +34,7 @@ async function canUseSharp() {
   )
   if (!resultado.error && resultado.status === 0) return true
 
-  const causa = resultado.stderr?.trim().split(/\r?\n/)[0] ||
+  const causa = resultado.stderr?.trim().slice(0, 2_000) ||
     resultado.error?.message ||
     `proceso de prueba terminó con código ${resultado.status ?? 'desconocido'}`
   console.warn(`[sharp] No se pudo cargar/probar sharp: ${causa}`)
@@ -70,7 +72,16 @@ async function main() {
   }
 
   const android = isTermuxOrAndroid()
-  const { args, env: npmEnv } = sharpInstallPlan(android)
+  let libc = ''
+  if (process.platform === 'linux') {
+    const sharpRequire = createRequire(require.resolve('sharp'))
+    libc = sharpRequire('detect-libc').familySync() || ''
+  }
+  const { args, env: npmEnv } = sharpInstallPlan(android, {
+    platform: process.platform,
+    arch: process.arch,
+    libc
+  })
   console.log(android
     ? '[sharp] instalando soporte WebAssembly para Termux/Android...'
     : `[sharp] instalando sharp y sus dependencias opcionales para ${process.platform}-${process.arch}...`

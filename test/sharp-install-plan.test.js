@@ -18,7 +18,7 @@ test('installs optional native Sharp runtime for the current host', () => {
 })
 
 test('keeps the wasm-only install plan for Android and Termux', () => {
-  const plan = sharpInstallPlan(true)
+  const plan = sharpInstallPlan(true, { platform: 'android', arch: 'arm64' })
 
   assert.ok(plan.args.includes('sharp@0.34.1'))
   assert.ok(plan.args.includes('@img/sharp-wasm32@0.34.1'))
@@ -26,4 +26,18 @@ test('keeps the wasm-only install plan for Android and Termux', () => {
   assert.equal(plan.env.npm_config_cpu, 'wasm32')
   assert.ok(plan.args.includes('--include=optional'))
   assert.ok(plan.args.includes('--package-lock=false'))
+})
+
+test('explicitly installs the Linux x64 Sharp and libvips runtime packages', () => {
+  const plan = sharpInstallPlan(false, { platform: 'linux', arch: 'x64', libc: 'glibc' })
+
+  assert.ok(plan.args.includes('@img/sharp-linux-x64@0.34.1'))
+  assert.ok(plan.args.includes('@img/sharp-libvips-linux-x64@1.1.0'))
+})
+
+test('selects the musl runtime when the Linux container uses musl', () => {
+  const plan = sharpInstallPlan(false, { platform: 'linux', arch: 'x64', libc: 'musl' })
+
+  assert.ok(plan.args.includes('@img/sharp-linuxmusl-x64@0.34.1'))
+  assert.ok(plan.args.includes('@img/sharp-libvips-linuxmusl-x64@1.1.0'))
 })
