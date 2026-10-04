@@ -3,25 +3,21 @@ import assert from 'node:assert/strict'
 import {
   assignSessions,
   canStartSessions,
-  requestSessionLease,
-  SUBBOT_WORKER_COUNT
+  requestSessionLease
 } from '../lib/process-isolation.js'
 import { EventEmitter } from 'events'
 
-test('distributes every valid sub-bot session across four stable worker groups', () => {
+test('assigns all valid sub-bots to the single shared worker', () => {
   const sessions = Array.from({ length: 80 }, (_, index) => `521${String(index).padStart(10, '0')}`)
   const grouped = assignSessions(sessions)
-  const assigned = [...grouped.values()].flat()
-  assert.equal(SUBBOT_WORKER_COUNT, 4)
-  assert.equal(grouped.size, 4)
-  assert.equal(assigned.length, sessions.length)
-  assert.deepEqual(assigned.sort(), sessions.slice().sort())
+  assert.deepEqual([...grouped.keys()], ['subbot-group-0'])
+  assert.equal(grouped.get('subbot-group-0').length, sessions.length)
+  assert.deepEqual(grouped.get('subbot-group-0'), sessions.slice().sort())
   assert.deepEqual(assignSessions(sessions.slice().reverse()), grouped)
   assert.deepEqual(
-    [...assignSessions([...sessions, sessions[0], '../invalid']).values()].flat().sort(),
+    assignSessions([...sessions, sessions[0], '../invalid']).get('subbot-group-0'),
     sessions.slice().sort()
   )
-  assert.ok([...grouped.values()].every(group => group.length >= 10 && group.length <= 30))
 })
 
 test('does not start duplicate workers while another live worker owns a session', () => {
