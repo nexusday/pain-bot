@@ -345,6 +345,24 @@ test('serializes simultaneous independent process writes to the shared database'
   }
 })
 
+test('skips unchanged snapshots without waiting for the shared database lock', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 1 } }, chats: {} }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy, { lockTimeoutMs: 30 })
+    const state = await adapter.read()
+    await fs.mkdir(`${sqlite}.lock`)
+
+    await adapter.write(state)
+    assert.equal(await fs.stat(`${sqlite}.lock`).then(() => true), true)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('reports a command-claim lock timeout against its dedicated sidecar lock', async () => {
   const directory = await crearDirectorioTemporal()
   const legacy = path.join(directory, 'database.json')

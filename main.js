@@ -306,7 +306,7 @@ if (!isSubbotWorker) {
 if (!opts['test']) {
   if (global.db) {
     let escribiendoDb = false
-    setInterval(async () => {
+    const guardarDb = async () => {
       if (escribiendoDb || !global.db.data) return
       escribiendoDb = true
       try {
@@ -319,7 +319,20 @@ if (!opts['test']) {
       } finally {
         escribiendoDb = false
       }
-    }, 30 * 1000)
+    }
+    const workerId = process.env.PAIN_WORKER_ID || 'primary'
+    let phase = 2166136261
+    for (const character of workerId) {
+      phase ^= character.charCodeAt(0)
+      phase = Math.imul(phase, 16777619)
+    }
+    const initialDelay = (phase >>> 0) % 60_000
+    const firstSave = setTimeout(() => {
+      void guardarDb()
+      const interval = setInterval(() => void guardarDb(), 60_000)
+      interval.unref?.()
+    }, initialDelay)
+    firstSave.unref?.()
   }
 }
 
