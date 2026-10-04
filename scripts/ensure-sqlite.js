@@ -29,30 +29,28 @@ function probarSqlite() {
   return resultado.status === 0
 }
 
+function resultadoCorrecto(resultado) {
+  if (resultado.error) return false
+  return resultado.status === 0
+}
+
 function main() {
   if (probarSqlite()) return
 
   console.warn('[sqlite3] El binario nativo no corresponde a este contenedor; reconstruyéndolo aquí...')
-  const argumentos = [
-    'rebuild',
-    'sqlite3',
-    '--foreground-scripts',
-    '--no-audit',
-    '--no-fund',
-  ]
-  const npmExecPath = process.env.npm_execpath
-  if (!npmExecPath && process.platform === 'win32') {
-    throw new Error('Ejecuta el bot con "npm start" para poder reconstruir sqlite3 automáticamente.')
-  }
-  const rebuild = npmExecPath
-    ? ejecutarNode([npmExecPath, ...argumentos])
-    : spawnSync('npm', argumentos, { cwd: root, stdio: 'inherit' })
-  if (rebuild.error) throw rebuild.error
-  if (rebuild.status !== 0) {
-    throw new Error(`npm rebuild sqlite3 terminó con código ${rebuild.status ?? 'desconocido'}.`)
+  const prebuild = join(root, 'node_modules', 'prebuild-install', 'bin.js')
+  const nodeGyp = join(root, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js')
+  const prebuilt = ejecutarNode([prebuild, '-r', 'napi'])
+  if (!resultadoCorrecto(prebuilt)) {
+    console.warn('[sqlite3] No se pudo descargar un binario precompilado; compilando desde código fuente...')
+    const compilado = ejecutarNode([nodeGyp, 'rebuild'])
+    if (!resultadoCorrecto(compilado)) {
+      if (compilado.error) throw compilado.error
+      throw new Error(`node-gyp terminó con código ${compilado.status ?? 'desconocido'}.`)
+    }
   }
   if (!probarSqlite()) {
-    throw new Error('sqlite3 sigue sin cargar después de reconstruirlo en esta plataforma.')
+    throw new Error('sqlite3 sigue sin cargar después de instalar o compilar su binario para esta plataforma.')
   }
 }
 

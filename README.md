@@ -92,7 +92,7 @@ sistema y lo reconstruye automáticamente si detecta un binario de otra platafor
 Si necesitas hacerlo manualmente:
 
 ```bash
-npm rebuild sqlite3
+node scripts/ensure-sqlite.js
 ```
 
 ---
