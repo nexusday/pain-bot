@@ -17,7 +17,8 @@
 Bot de WhatsApp multi-dispositivo (Baileys). Descargas, IA, administración de grupos, RPG, stickers y más.
 
 SQLite usa un módulo nativo que debe instalarse para el sistema operativo del servidor.
-No copies `node_modules` de Windows a Linux ni entre arquitecturas.
+Sharp también necesita su runtime opcional para la plataforma. No copies `node_modules`
+de Windows a Linux ni entre arquitecturas.
 
 ```
 git clone https://github.com/nexusday/pain-bot.git
@@ -79,6 +80,10 @@ npm start
 ```
 
 `npm install` prepara las dependencias y el módulo nativo SQLite para este sistema.
+Al iniciar, `npm start` valida que Sharp pueda procesar una imagen. Si falta el runtime,
+instala las dependencias opcionales de la plataforma (incluido Linux x64 en Pterodactyl);
+si la instalación falla, detiene el arranque y muestra el error en vez de dejar que fallen
+los plugins de imágenes durante su recarga.
 
 En Debian/Ubuntu, si te falta FFmpeg:
 

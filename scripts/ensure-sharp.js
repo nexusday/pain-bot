@@ -1,12 +1,19 @@
 /**
- * Prepara sharp antes de cargar plugins.
- * En Termux/Android no hay binarios nativos: usa sharp + @img/sharp-wasm32.
+ * Prepara y valida sharp antes de cargar plugins.
+ * Termux/Android usa WebAssembly; el resto instala el runtime nativo de su plataforma.
  */
-import { spawnSync } from 'child_process'
-import { dirname, join } from 'path'
-import { fileURLToPath } from 'url'
+import { spawnSync } from 'node:child_process'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { sharpInstallPlan } from '../lib/sharp-install-plan.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const pruebaSharp = `
+import sharp from 'sharp'
+await sharp({
+  create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 0, b: 0 } }
+}).png().toBuffer()
+`
 
 function isTermuxOrAndroid() {
   return (
@@ -18,32 +25,42 @@ function isTermuxOrAndroid() {
 }
 
 async function canUseSharp() {
-  try {
-    const sharp = (await import('sharp')).default
-    await sharp({
-      create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 0, b: 0 } }
-    })
-      .png()
-      .toBuffer()
-    return true
-  } catch {
-    return false
-  }
+  const resultado = spawnSync(
+    process.execPath,
+    ['--input-type=module', '-e', pruebaSharp],
+    { cwd: root, encoding: 'utf8', maxBuffer: 1024 * 1024 }
+  )
+  if (!resultado.error && resultado.status === 0) return true
+
+  const causa = resultado.stderr?.trim().split(/\r?\n/)[0] ||
+    resultado.error?.message ||
+    `proceso de prueba terminó con código ${resultado.status ?? 'desconocido'}`
+  console.warn(`[sharp] No se pudo cargar/probar sharp: ${causa}`)
+  return false
 }
 
-function runNpm(args) {
-  const result = spawnSync('npm', args, {
-    cwd: root,
-    stdio: 'inherit',
-    shell: true,
-    env: {
-      ...process.env,
-      npm_config_cpu: 'wasm32',
-      npm_config_fund: 'false',
-      npm_config_audit: 'false'
-    }
-  })
-  return result.status === 0
+function ejecutarNpm(args, overridesEnv) {
+  const npmArgs = args
+  const env = {
+    ...process.env,
+    ...overridesEnv,
+    npm_config_fund: 'false',
+    npm_config_audit: 'false'
+  }
+  if (!Object.hasOwn(overridesEnv, 'npm_config_cpu')) delete env.npm_config_cpu
+
+  const npmExecPath = process.env.npm_execpath
+  const resultado = npmExecPath
+    ? spawnSync(process.execPath, [npmExecPath, ...npmArgs], { cwd: root, stdio: 'inherit', env })
+    : spawnSync('npm', npmArgs, {
+        cwd: root,
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+        env
+      })
+
+  if (resultado.error) throw resultado.error
+  return resultado.status === 0
 }
 
 async function main() {
@@ -52,43 +69,25 @@ async function main() {
     return
   }
 
-  if (!isTermuxOrAndroid()) {
-    console.log('[sharp] no cargó. En Pterodactyl el bot sigue sin reinstalar paquetes.')
-    console.log('[sharp] las imágenes pueden fallar hasta que sharp esté bien instalado en este sistema.')
-    return
+  const android = isTermuxOrAndroid()
+  const { args, env: npmEnv } = sharpInstallPlan(android)
+  console.log(android
+    ? '[sharp] instalando soporte WebAssembly para Termux/Android...'
+    : `[sharp] instalando sharp y sus dependencias opcionales para ${process.platform}-${process.arch}...`
+  )
+
+  if (!ejecutarNpm(args, npmEnv)) {
+    throw new Error('npm no pudo instalar sharp y sus dependencias para esta plataforma.')
   }
 
-  console.log('[sharp] no carga en Termux/android. Instalando soporte WebAssembly...')
-
-  const ok = runNpm([
-    'install',
-    'sharp@0.34.1',
-    '@img/sharp-wasm32@0.34.1',
-    '--cpu=wasm32',
-    '--no-bin-links'
-  ])
-
-  if (!ok) {
-    console.error('[sharp] instalación WASM falló')
-    console.error('[sharp] ejecuta a mano en Termux:')
-    console.error('  cd ~/pain-bot')
-    console.error('  npm install --cpu=wasm32 sharp@0.34.1 @img/sharp-wasm32@0.34.1 --no-bin-links')
-    if (isTermuxOrAndroid()) {
-      console.error('[sharp] el bot arrancará, pero plugins de imagen (ocr, stickers, hd…) pueden fallar')
-    }
-    return
+  if (!(await canUseSharp())) {
+    throw new Error('sharp sigue sin funcionar después de instalar las dependencias de la plataforma.')
   }
 
-  // invalidar cache de módulos de la carga fallida anterior no aplica en proceso hijo;
-  // el arranque real es un proceso nuevo vía npm start.
-  if (await canUseSharp()) {
-    console.log('[sharp] WASM instalado y funcionando')
-  } else {
-    console.error('[sharp] sigue fallando tras WASM. Revisa espacio y red, luego:')
-    console.error('  npm install --cpu=wasm32 sharp @img/sharp-wasm32 --no-bin-links')
-  }
+  console.log(android ? '[sharp] WASM instalado y funcionando' : '[sharp] runtime instalado y funcionando')
 }
 
-main().catch((e) => {
-  console.error('[sharp] setup error:', e?.message || e)
+main().catch((error) => {
+  console.error('[sharp] No se pudo preparar la dependencia:', error?.message || error)
+  process.exitCode = 1
 })
