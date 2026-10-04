@@ -33,6 +33,14 @@ test('explicitly installs the Linux x64 Sharp and libvips runtime packages', () 
 
   assert.ok(plan.args.includes('@img/sharp-linux-x64@0.34.1'))
   assert.ok(plan.args.includes('@img/sharp-libvips-linux-x64@1.1.0'))
+  assert.ok(plan.args.includes('--os=linux'))
+  assert.ok(plan.args.includes('--cpu=x64'))
+  assert.ok(plan.args.includes('--libc=glibc'))
+  assert.deepEqual(plan.env, {
+    npm_config_os: 'linux',
+    npm_config_arch: 'x64',
+    npm_config_libc: 'glibc'
+  })
 })
 
 test('selects the musl runtime when the Linux container uses musl', () => {
@@ -40,4 +48,5 @@ test('selects the musl runtime when the Linux container uses musl', () => {
 
   assert.ok(plan.args.includes('@img/sharp-linuxmusl-x64@0.34.1'))
   assert.ok(plan.args.includes('@img/sharp-libvips-linuxmusl-x64@1.1.0'))
+  assert.ok(plan.args.includes('--libc=musl'))
 })
