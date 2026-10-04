@@ -38,7 +38,12 @@ import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-estable.js'
-import { sesionRequiereVincular, vinculacionEnCurso } from './lib/subbot-recovery.js'
+import {
+  ARCHIVO_REENLACE_PENDIENTE,
+  limpiarCredencialesSubBot,
+  sesionRequiereVincular,
+  vinculacionEnCurso
+} from './lib/subbot-recovery.js'
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
@@ -739,6 +744,17 @@ if (!isSubbotWorker) {
     const batch = sessions.slice(i, i + batchSize)
     await Promise.all(batch.map(async (folder) => {
       const botPath = join(serbotDir, folder)
+      if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) {
+        try {
+          limpiarCredencialesSubBot(botPath)
+          skipped++
+          console.warn(`Worker subbot: se omite ${folder}, requiere volver a vincular.`)
+        } catch (error) {
+          failed++
+          console.error(`Worker subbot: no se pudieron limpiar las credenciales de ${folder}:`, error?.message || error)
+        }
+        return
+      }
       if (!existsSync(join(botPath, 'creds.json'))) {
         skipped++
         console.warn(`Worker subbot: se omite ${folder}, no tiene creds.json.`)

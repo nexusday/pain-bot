@@ -18,6 +18,7 @@ import {
   ARCHIVO_REENLACE_PENDIENTE,
   finalizarVinculacion,
   limpiarMarcaReenlace,
+  limpiarCredencialesSubBot,
   marcarVinculacionEnCurso
 } from '../lib/subbot-recovery.js'
 import { fileURLToPath } from "url"
@@ -123,20 +124,6 @@ function avisarSesionExistente(conn, m, numero, tipo, usedPrefix = '.') {
 ╰─────────`.trim(),
     contextInfo: { ...rcanal.contextInfo }
   }, { quoted: m })
-}
-
-function limpiarAuthSubBot(pathAYBot) {
-  if (!fs.existsSync(pathAYBot)) return
-  const preservar = new Set([
-    'config.json',
-    'staff.json',
-    'soporte.json',
-    ARCHIVO_REENLACE_PENDIENTE
-  ])
-  for (const entradaFs of fs.readdirSync(pathAYBot)) {
-    if (preservar.has(entradaFs)) continue
-    fs.rmSync(path.join(pathAYBot, entradaFs), { recursive: true, force: true })
-  }
 }
 
 let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants, groupMetadata: metadatosGrupo }) => {
@@ -308,7 +295,7 @@ async function iniciarSubBot(options) {
   }
 
   if (fromCommand) {
-    limpiarAuthSubBot(pathAYBot)
+    limpiarCredencialesSubBot(pathAYBot)
   }
 
   const argCreds = args[0]
@@ -683,13 +670,22 @@ async function iniciarSubBot(options) {
 
         if (esMotivoSesionFatal(motivo)) {
           terminarIntento(new Error(`Sesión de sub-bot ${idCarpetaBot} cerrada con código ${motivo ?? 'desconocido'}`))
+          let marcaCreada = false
           try {
             fs.writeFileSync(
               path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE),
               JSON.stringify({ reason: motivo ?? null, markedAt: new Date().toISOString() }, null, 2)
             )
+            marcaCreada = true
           } catch (error) {
             console.error(`No se pudo marcar el subbot ${idCarpetaBot} para volver a vincular:`, error?.message || error)
+          }
+          if (marcaCreada) {
+            try {
+              limpiarCredencialesSubBot(pathAYBot)
+            } catch (error) {
+              console.error(`No se pudieron limpiar las credenciales de ${idCarpetaBot}:`, error?.message || error)
+            }
           }
           console.log(chalk.bold.magentaBright(
             `\n┆ Sesión (+${idCarpetaBot}) rechazada por WhatsApp (código ${motivo ?? 'desconocido'}). ` +

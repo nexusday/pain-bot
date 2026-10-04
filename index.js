@@ -8,6 +8,7 @@ import {
   assignSessions,
   canStartSessions
 } from './lib/process-isolation.js'
+import { ARCHIVO_REENLACE_PENDIENTE } from './lib/subbot-recovery.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -44,7 +45,10 @@ function listSessions() {
     if (!/^[a-zA-Z0-9_-]+$/.test(folder)) return false
     try {
       const sessionPath = join(subbotRoot, folder)
-      return statSync(sessionPath).isDirectory() && existsSync(join(sessionPath, 'creds.json'))
+      return statSync(sessionPath).isDirectory() && (
+        existsSync(join(sessionPath, 'creds.json')) ||
+        existsSync(join(sessionPath, ARCHIVO_REENLACE_PENDIENTE))
+      )
     } catch {
       return false
     }
