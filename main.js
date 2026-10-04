@@ -687,10 +687,12 @@ if (!isSubbotWorker) {
   )
   const workerId = process.env.PAIN_WORKER_ID || 'subbot'
   const publishWorkerStatus = () => {
+    const socketsBySessionPath = new Map()
+    for (const socket of global.conns) {
+      if (socket?.pathAYBot) socketsBySessionPath.set(resolve(socket.pathAYBot), socket)
+    }
     writeSubbotWorkerStatus(__dirname, workerId, sessions.map((folder) => {
-      const socket = global.conns.find((connection) =>
-        connection?.pathAYBot && resolve(connection.pathAYBot) === join(serbotDir, folder)
-      )
+      const socket = socketsBySessionPath.get(join(serbotDir, folder))
       const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
       return {
         folder,
@@ -714,7 +716,7 @@ if (!isSubbotWorker) {
     }
   }, 10_000)
   workerStatusInterval.unref?.()
-  const batchSize = 4
+  const batchSize = 2
   let started = 0
   let skipped = 0
   let failed = 0

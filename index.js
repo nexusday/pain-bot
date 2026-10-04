@@ -8,6 +8,7 @@ import {
   acceptModeRequest,
   assignSessions,
   canStartSessions,
+  limitModeToConfiguration,
   readModeState,
   writeModeState
 } from './lib/process-isolation.js'
@@ -33,7 +34,16 @@ await new ArchivoSqliteCompartido(
 ).read()
 console.log('Base compartida lista.')
 const configuredIsolation = global.processIsolation === true
-let mode = readModeState(modePath, configuredIsolation)
+const savedMode = readModeState(modePath, configuredIsolation)
+let mode = limitModeToConfiguration(savedMode, configuredIsolation)
+if (mode !== savedMode) {
+  console.warn('El modo /pri 2 guardado consume más recursos; se restablece /pri 1.')
+  try {
+    writeModeState(modePath, mode)
+  } catch (error) {
+    console.error('No se pudo guardar el modo /pri 1:', error?.message || error)
+  }
+}
 const subbotRoot = resolve(__dirname, global.bot || 'Serbot')
 const slots = new Map()
 const leasedSessions = new Set()

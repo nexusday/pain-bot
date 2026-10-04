@@ -4,6 +4,7 @@ import {
   acceptModeRequest,
   assignSessions,
   canStartSessions,
+  limitModeToConfiguration,
   readModeState,
   requestSessionLease,
   resolveMode,
@@ -17,6 +18,12 @@ test('saved process mode takes precedence over the configured default', () => {
   assert.equal(resolveMode({ storedMode: 2, configuredIsolation: false }), 2)
   assert.equal(resolveMode({ storedMode: 0, configuredIsolation: true }), 2)
   assert.equal(resolveMode({ storedMode: null, configuredIsolation: false }), 1)
+})
+
+test('saved mode 2 is limited to mode 1 when high-isolation mode is not configured', () => {
+  assert.equal(limitModeToConfiguration(2, false), 1)
+  assert.equal(limitModeToConfiguration(2, true), 2)
+  assert.equal(limitModeToConfiguration(1, false), 1)
 })
 
 test('mode state persists only valid modes', () => {

@@ -87,11 +87,11 @@ sudo apt update
 sudo apt install -y ffmpeg git
 ```
 
-El comando `npm start` comprueba el módulo nativo `sqlite3` y fija la versión 5.1.7,
-compatible con runtimes Node 20 en contenedores Linux con GLIBC anterior. Si el
-precompilado no sirve para la plataforma, compila SQLite desde el código fuente
-local y muestra el diagnóstico completo si falla. Si necesitas repetir la
-comprobación manualmente:
+El comando `npm start` comprueba el módulo nativo `sqlite3` y fija la versión 5.1.7 para
+evitar que una actualización descargue el binario 6.x incompatible con la GLIBC
+de algunos contenedores. Si el precompilado de la plataforma no sirve, compila
+SQLite desde el código fuente local y muestra el diagnóstico completo si falla.
+Si necesitas repetir la comprobación manualmente:
 
 ```bash
 node scripts/ensure-sqlite.js
@@ -271,6 +271,12 @@ pain-bot/
 ```
 
 Los plugins suelen recargarse al guardar. Si no aparece uno nuevo, reinicia con `npm start` o `pm2 restart painbot`.
+
+El modo recomendado de sub-bots es `/pri 1` (dos workers agrupados). Si quedó
+guardado `/pri 2` y `global.processIsolation` está desactivado, el siguiente
+arranque lo restablece a `/pri 1`. El procesamiento de imágenes usa un hilo
+libvips por operación por defecto; puedes ajustar ese límite con
+`PAIN_SHARP_CONCURRENCY`.
 
 ---
 
