@@ -1,5 +1,6 @@
 import fetch from "node-fetch"
 import yts from "yt-search"
+import { probarProveedoresAudio } from "../lib/audio-provider-fallback.js"
 
 function nombreAutor(autor) {
   if (!autor) return '—'
@@ -94,14 +95,47 @@ async function urlEsAudio(url) {
 }
 
 async function pedirAudio(urlVideo) {
-  for (let intento = 0; intento < 2; intento++) {
-    const json = await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
-    const datos = json?.status ? json.data : null
-    const urlAudio = typeof datos?.download === "string" ? datos.download : datos?.download?.url
-    if (!urlAudio || pareceHtml(urlAudio)) continue
-    if (await urlEsAudio(urlAudio)) return { datos, urlAudio }
-  }
-  return null
+  const apiAlex = global.APIs?.alex
+  const urlAlex = (apiAlex?.url || "https://alex-api-scraper2-1.onrender.com").replace(/\/$/, "")
+  const consultaAlex = new URL(`${urlAlex}/api/v1/download/youtube-mp3`)
+  consultaAlex.searchParams.set("q", urlVideo)
+  if (apiAlex?.key) consultaAlex.searchParams.set("apikey", apiAlex.key)
+
+  return probarProveedoresAudio([
+    {
+      nombre: "Delirius",
+      obtener: async () => {
+        const json = await pedirJson(`${baseApi()}/download/ytmp3?url=${encodeURIComponent(urlVideo)}`)
+        const datos = json?.status ? json.data : null
+        const urlAudio = typeof datos?.download === "string" ? datos.download : datos?.download?.url
+        if (!urlAudio || pareceHtml(urlAudio) || !(await urlEsAudio(urlAudio))) return null
+        return { datos, urlAudio }
+      }
+    },
+    {
+      nombre: "Alex",
+      obtener: async () => {
+        const json = await pedirJson(consultaAlex.toString())
+        const resultado = json?.status === true ? json.result : null
+        const urlAudio = resultado?.audio_url
+        if (typeof urlAudio !== "string" || pareceHtml(urlAudio) || !(await urlEsAudio(urlAudio))) {
+          return null
+        }
+        return {
+          urlAudio,
+          datos: {
+            title: resultado.titulo,
+            author: resultado.autor,
+            image: resultado.miniatura,
+            format: resultado.formato,
+            quality: resultado.calidad
+          }
+        }
+      }
+    }
+  ], (proveedor, error) => {
+    console.warn(`[play] Falló proveedor ${proveedor}; probando el siguiente:`, error?.message || error)
+  })
 }
 
 const handler = async (m, { conn, text, usedPrefix }) => {
