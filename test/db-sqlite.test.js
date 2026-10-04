@@ -480,6 +480,41 @@ test('skips unchanged snapshots without waiting for the shared database lock', a
   }
 })
 
+test('recovers an expired lock even when its PID is still alive', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+  const lockPath = `${sqlite}.lock`
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10 } }, chats: {} }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy, { lockTimeoutMs: 1000 })
+    const state = await adapter.read()
+    await fs.mkdir(lockPath)
+    const ownerPath = path.join(lockPath, 'owner.json')
+    await fs.writeFile(ownerPath, JSON.stringify({
+      pid: process.pid,
+      host: os.hostname(),
+      token: 'abandoned-owner-token',
+      createdAt: Date.now() - 180_000,
+    }))
+    const staleTime = new Date(Date.now() - 180_000)
+    await fs.utimes(ownerPath, staleTime, staleTime)
+
+    const claim = await adapter.claimAndUpdate(state, 'daily-user:alice', 60_000, (data) => {
+      data.users.alice.coins += 9000
+      return { coins: data.users.alice.coins }
+    })
+
+    assert.equal(claim.acquired, true)
+    assert.equal(claim.result.coins, 9010)
+    assert.equal((await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice.coins, 9010)
+    assert.equal(await fs.stat(lockPath).then(() => true, () => false), false)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('reports a command-claim lock timeout against its dedicated sidecar lock', async () => {
   const directory = await crearDirectorioTemporal()
   const legacy = path.join(directory, 'database.json')
