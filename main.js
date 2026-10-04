@@ -104,7 +104,8 @@ global.prefix = new RegExp(
 
 global.db = new Low(new ArchivoSqliteCompartido(
   'storage/databases/database.sqlite',
-  'storage/databases/database.json'
+  'storage/databases/database.json',
+  { persistConnections: true, refreshMinIntervalMs: 250 }
 ))
 
 global.DATABASE = global.db
@@ -770,6 +771,9 @@ function cerrarConexionesDelProceso(signal) {
     try { socket.ev?.removeAllListeners?.() } catch {}
     try { socket.ws?.close?.() } catch {}
   }
+  global.db?.adapter?.close?.().catch((error) => {
+    console.error('[db] No se pudieron cerrar las conexiones SQLite:', error?.message || error)
+  })
   setTimeout(() => process.exit(0), 1500).unref?.()
 }
 

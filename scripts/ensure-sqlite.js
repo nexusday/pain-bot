@@ -17,9 +17,9 @@ const db = new sqlite3.Database(':memory:', (error) => {
 })
 `
 
-function ejecutarNode(argumentos) {
+function ejecutarNode(argumentos, cwd = root) {
   return spawnSync(process.execPath, argumentos, {
-    cwd: root,
+    cwd,
     stdio: 'inherit',
   })
 }
@@ -38,12 +38,13 @@ function main() {
   if (probarSqlite()) return
 
   console.warn('[sqlite3] El binario nativo no corresponde a este contenedor; reconstruyéndolo aquí...')
+  const sqlitePackage = join(root, 'node_modules', 'sqlite3')
   const prebuild = join(root, 'node_modules', 'prebuild-install', 'bin.js')
   const nodeGyp = join(root, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js')
-  const prebuilt = ejecutarNode([prebuild, '-r', 'napi'])
+  const prebuilt = ejecutarNode([prebuild, '-r', 'napi'], sqlitePackage)
   if (!resultadoCorrecto(prebuilt)) {
     console.warn('[sqlite3] No se pudo descargar un binario precompilado; compilando desde código fuente...')
-    const compilado = ejecutarNode([nodeGyp, 'rebuild'])
+    const compilado = ejecutarNode([nodeGyp, 'rebuild'], sqlitePackage)
     if (!resultadoCorrecto(compilado)) {
       if (compilado.error) throw compilado.error
       throw new Error(`node-gyp terminó con código ${compilado.status ?? 'desconocido'}.`)

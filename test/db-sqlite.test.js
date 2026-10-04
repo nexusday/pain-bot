@@ -495,6 +495,63 @@ test('queues a burst of daily-style transactions on one worker instead of racing
   }
 })
 
+test('reuses worker SQLite connections and closes them explicitly on shutdown', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10 } }, chats: {} }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy, { persistConnections: true })
+    const state = await adapter.read()
+    await Promise.all(Array.from({ length: 10 }, () => adapter.refresh(state)))
+    const claim = await adapter.claimAndUpdate(state, 'daily-user:alice', 60_000, (data) => {
+      data.users.alice.coins += 5
+      return { coins: data.users.alice.coins }
+    })
+
+    assert.equal(claim.result.coins, 15)
+    await adapter.close()
+    await assert.rejects(adapter.refresh(state), /ya se está cerrando/)
+    await fs.rm(directory, { recursive: true, force: true })
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('coalesces repeated shared-state refreshes within the configured interval', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+  const cooldown = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10 } }, chats: {} }))
+    const reader = new ArchivoSqliteCompartido(sqlite, legacy, {
+      persistConnections: true,
+      refreshMinIntervalMs: 40,
+    })
+    const writer = new ArchivoSqliteCompartido(sqlite, legacy)
+    const readerState = await reader.read()
+    const writerState = await writer.read()
+    writerState.users.alice.coins = 20
+    await writer.write(writerState)
+    await reader.refresh(readerState)
+    assert.equal(readerState.users.alice.coins, 20)
+
+    writerState.users.alice.coins = 30
+    await writer.write(writerState)
+    await reader.refresh(readerState)
+    assert.equal(readerState.users.alice.coins, 20)
+    await cooldown(50)
+    await reader.refresh(readerState)
+    assert.equal(readerState.users.alice.coins, 30)
+    await reader.close()
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('rejects conflicting writes to the same balance instead of overwriting either transaction', async () => {
   const directory = await crearDirectorioTemporal()
   const legacy = path.join(directory, 'database.json')
