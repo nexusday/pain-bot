@@ -175,7 +175,7 @@ if (isSubbotWorker || isManagedPrimary) {
     global.db.adapter.refresh(global.db.data).catch((error) => {
       console.error('[db] No se pudo actualizar la vista de otro proceso:', error?.message || error)
     })
-  }, 500)
+  }, 5000)
   syncDatabase.unref?.()
 }
 global.authFile = 'sessions'
@@ -666,22 +666,51 @@ if (!isSubbotWorker) {
   if (!Array.isArray(assignedSessions)) throw new Error('La asignación de sub-bots no es válida')
   const serbotModule = await import('./plugins/serbot-serbot.js')
   const serbotDir = resolve(__dirname, global.bot || 'Serbot')
-  for (const folder of [...new Set(assignedSessions)]) {
-    if (typeof folder !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(folder)) continue
-    const botPath = join(serbotDir, folder)
-    if (!existsSync(join(botPath, 'creds.json'))) continue
-    await serbotModule.AYBot({
-      pathAYBot: botPath,
-      m: null,
-      conn: global.conn,
-      args: [],
-      usedPrefix: '.',
-      command: 'qr',
-      fromCommand: false,
-      esperarConexion: false
-    })
+  const sessions = [...new Set(assignedSessions)].filter(folder =>
+    typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
+  )
+  const batchSize = 4
+  let started = 0
+  let skipped = 0
+  let failed = 0
+  for (let i = 0; i < sessions.length; i += batchSize) {
+    const batch = sessions.slice(i, i + batchSize)
+    await Promise.all(batch.map(async (folder) => {
+      const botPath = join(serbotDir, folder)
+      if (!existsSync(join(botPath, 'creds.json'))) {
+        skipped++
+        console.warn(`Worker subbot: se omite ${folder}, no tiene creds.json.`)
+        return
+      }
+      try {
+        const iniciado = await serbotModule.AYBot({
+          pathAYBot: botPath,
+          m: null,
+          conn: global.conn,
+          args: [],
+          usedPrefix: '.',
+          command: 'qr',
+          fromCommand: false,
+          esperarConexion: false
+        })
+        if (iniciado) started++
+        else {
+          failed++
+          console.error(`Worker subbot: no se pudo iniciar la sesión ${folder}.`)
+        }
+      } catch (error) {
+        failed++
+        console.error(`Worker subbot: error iniciando ${folder}:`, error?.message || error)
+      }
+    }))
+    if (i + batchSize < sessions.length) {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
   }
-  console.log(`Worker ${process.env.PAIN_WORKER_ID || 'subbot'} administra ${assignedSessions.length} sesión(es).`)
+  console.log(
+    `Worker ${process.env.PAIN_WORKER_ID || 'subbot'} inició ${started}/${sessions.length} sesión(es); ` +
+    `${skipped} omitida(s), ${failed} con error.`
+  )
 }
 
 function cerrarConexionesDelProceso(signal) {

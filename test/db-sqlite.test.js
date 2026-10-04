@@ -152,7 +152,7 @@ test('merges last message timestamp and chat by most recent activity', async () 
   }
 })
 
-test('merges signed exp changes once and persists the refreshed baseline', async () => {
+test('merges signed exp changes on refresh without writing the shared database', async () => {
   const directory = await crearDirectorioTemporal()
   const legacy = path.join(directory, 'database.json')
   const sqlite = path.join(directory, 'database.sqlite')
@@ -182,7 +182,10 @@ test('merges signed exp changes once and persists the refreshed baseline', async
     await concurrentWorker.write(concurrentState)
     await workerB.refresh(stateB)
     assert.equal(stateB.users.alice.exp, 97)
+    assert.equal((await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice.exp, 90)
+    await workerB.write(stateB)
     assert.equal((await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice.exp, 97)
+    assert.equal(await fs.stat(`${sqlite}.lock`).then(() => true, () => false), false)
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
   }
@@ -219,6 +222,38 @@ test('refresh exposes another worker commit while retaining local independent ch
     assert.equal(committed.users.alice.msgCount, 2)
     assert.equal(committed.users.alice.coins, 20)
     assert.equal(committed.users.bob.coins, 8)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('refresh resolves only conflicting fields to committed values and keeps independent local edits', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({
+      users: { alice: { coins: 10, name: 'Alice' } },
+      chats: {},
+    }))
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy)
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+    stateA.users.alice.coins = 3
+    stateB.users.alice.coins = 30
+    stateB.users.alice.name = 'Alice 2'
+
+    await workerA.write(stateA)
+    await workerB.refresh(stateB)
+
+    assert.deepEqual(stateB.users.alice, { coins: 3, name: 'Alice 2' })
+    await workerB.write(stateB)
+    assert.deepEqual(
+      (await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice,
+      { coins: 3, name: 'Alice 2' }
+    )
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
   }
