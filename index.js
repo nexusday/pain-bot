@@ -11,6 +11,7 @@ import {
   readModeState,
   writeModeState
 } from './lib/process-isolation.js'
+import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const mainPath = join(__dirname, 'main.js')
@@ -25,6 +26,12 @@ try {
 }
 
 await import('./config.js')
+console.log('Verificando base compartida antes de iniciar los procesos...')
+await new ArchivoSqliteCompartido(
+  join(__dirname, 'storage', 'databases', 'database.sqlite'),
+  join(__dirname, 'storage', 'databases', 'database.json')
+).read()
+console.log('Base compartida lista.')
 const configuredIsolation = global.processIsolation === true
 let mode = readModeState(modePath, configuredIsolation)
 const subbotRoot = resolve(__dirname, global.bot || 'Serbot')

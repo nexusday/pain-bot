@@ -717,6 +717,7 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
       /^(juegos?|econom[ií]a|rpg)$/i.test(String(tag))
     )) || /^rpg[-_]/i.test(plugin.name)
     const idMensaje = String(m.key?.id || m.id || '')
+    let reclamoJuegoAdquirido = false
     if (esComandoJuego && idMensaje) {
       const claimKey = `game:${m.chat}:${idMensaje}`
       try {
@@ -733,6 +734,7 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
         await m.reply('No pude verificar si este comando ya fue ejecutado. Inténtalo de nuevo en unos segundos.')
         continue
       }
+      reclamoJuegoAdquirido = true
     }
     
     comandoEjecutado = true
@@ -766,7 +768,7 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
         const usuarioDb = global.db.data.users[m.sender]
         const idProgreso = String(m.key?.id || m.id || '')
         let reclamarProgreso = Boolean(usuarioDb)
-        if (reclamarProgreso && idProgreso) {
+        if (reclamarProgreso && idProgreso && !reclamoJuegoAdquirido) {
           try {
             reclamarProgreso = await global.db.adapter.claimCommand(
               global.db.data,
@@ -781,11 +783,7 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
           const esSticker = Array.isArray(plugin.tags) && plugin.tags.includes('stickers')
           m.rpgProgress = awardCommandProgress(usuarioDb, { isSticker: esSticker })
           m.rpgAwarded = true
-          await global.db.write()
         }
-      }
-      if (esComandoJuego) {
-        await global.db.write()
       }
     } catch (e) {
       m.error = e

@@ -104,12 +104,16 @@ test('only one worker can claim a game message and claims survive ordinary DB wr
     const dataA = await workerA.read()
     const dataB = await workerB.read()
     const claimKey = 'game:group@g.us:message-1'
+    const databaseBeforeClaims = await fs.readFile(sqlite)
 
     const results = await Promise.all([
       workerA.claimCommand(dataA, claimKey),
       workerB.claimCommand(dataB, claimKey),
     ])
     assert.deepEqual(results.sort(), [false, true])
+    assert.deepEqual(await fs.readFile(sqlite), databaseBeforeClaims)
+    assert.equal(await fs.stat(`${sqlite}.claims.sqlite`).then(info => info.isFile()), true)
+    assert.equal(await fs.stat(`${sqlite}.lock`).then(() => true, () => false), false)
 
     dataA.users.alice.msgCount++
     await workerA.write(dataA)
@@ -336,6 +340,27 @@ test('serializes simultaneous independent process writes to the shared database'
     for (let index = 0; index < 8; index++) {
       assert.equal(finalState.users[`user-${index}`].coins, index)
     }
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('reports a command-claim lock timeout against its dedicated sidecar lock', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+  const claimsLock = `${sqlite}.claims.sqlite.lock`
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: {}, chats: {} }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy, { lockTimeoutMs: 30 })
+    const state = await adapter.read()
+    await fs.mkdir(claimsLock)
+
+    await assert.rejects(
+      adapter.claimCommand(state, 'rpg-progress:group:message'),
+      error => error.code === 'ERR_SQLITE_LOCK_TIMEOUT' && error.message.includes(claimsLock)
+    )
   } finally {
     await fs.rm(directory, { recursive: true, force: true })
   }
