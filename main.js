@@ -48,6 +48,7 @@ import readline from 'readline'
 import NodeCache from 'node-cache'
 import qrcode from 'qrcode-terminal'
 import { EventEmitter } from 'node:events'
+import { monitorEventLoopDelay } from 'node:perf_hooks'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const {
@@ -172,6 +173,20 @@ await global.loadDatabase()
 const isSubbotWorker = process.env.PAIN_ROLE === 'subbot'
 const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
 global.processRole = isSubbotWorker ? 'subbot' : 'primary'
+const eventLoopDelay = monitorEventLoopDelay({ resolution: 20 })
+eventLoopDelay.enable()
+const eventLoopMonitor = setInterval(() => {
+  const maxDelayMs = eventLoopDelay.max / 1e6
+  const p99DelayMs = eventLoopDelay.percentile(99) / 1e6
+  eventLoopDelay.reset()
+  if (maxDelayMs >= 1500) {
+    console.warn(
+      `[event-loop] ${process.env.PAIN_WORKER_ID || 'primary'} tuvo retraso ` +
+      `máximo ${Math.round(maxDelayMs)}ms (p99 ${Math.round(p99DelayMs)}ms).`
+    )
+  }
+}, 30_000)
+eventLoopMonitor.unref?.()
 if (isSubbotWorker || isManagedPrimary) {
   const syncDatabase = setInterval(() => {
     global.db.adapter.refresh(global.db.data).catch((error) => {
