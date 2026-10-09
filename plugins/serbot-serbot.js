@@ -975,16 +975,24 @@ async function iniciarSubBot(options) {
       const dispersarMs = (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
       const esReemplazo = motivo === DisconnectReason.connectionReplaced
       if (!esReemplazo && fallosConsecutivos >= MAX_FALLOS_RECONEXION) {
-        console.log(chalk.bold.red(
-          `\n┆ Subbot (+${idCarpetaBot}) no logró reconectar tras ${MAX_FALLOS_RECONEXION} intentos ` +
-          `(último código ${motivo ?? 'sin código'}). Se deja de intentar; la sesión se conserva y se retoma al reiniciar.\n`
+        console.log(chalk.bold.yellow(
+          `\n┆ Subbot (+${idCarpetaBot}) sigue sin conectar tras ${MAX_FALLOS_RECONEXION} intentos ` +
+          `(último código ${motivo ?? 'sin código'}). Se reintenta en 5 min con backoff largo; usa /rebot para forzarlo.\n`
         ))
-        reconectando = true
-        sock._ignorarCierre = true
-        try { sock.ws.close() } catch {}
-        try { sock.ev.removeAllListeners() } catch {}
-        quitarSockDeConns(sock)
-        detenerWatchdog()
+        fallosConsecutivos = 0
+        reemplazosConsecutivos = 0
+        const colaLarga = 5 * 60_000 + dispersarMs
+        if (!temporizadorReconexion) {
+          reconectando = true
+          temporizadorReconexion = setTimeout(() => {
+            temporizadorReconexion = null
+            recargarHandler(true).catch((error) => {
+              console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
+              reconectando = false
+            })
+          }, colaLarga)
+          temporizadorReconexion.unref?.()
+        }
         return
       }
       const cola = esReemplazo

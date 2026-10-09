@@ -47,8 +47,8 @@ import {
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
-import { removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
-import { confirmSessionLease } from './lib/process-isolation.js'
+import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
+import { confirmSessionLease, requestReconnectAll, requestReconnectOne } from './lib/process-isolation.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
@@ -789,6 +789,45 @@ if (!isSubbotWorker) {
   }, 10_000)
   workerStatusInterval.unref?.()
   process.on('message', async (message) => {
+    if (message?.type === 'reconnect-sessions' && Array.isArray(message.sessions)) {
+      const wanted = [...new Set(message.sessions)].filter(folder =>
+        typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
+      )
+      if (!wanted.length) return
+      for (const folder of wanted) {
+        sesionesRetiradas.delete(folder)
+        if (!sessions.includes(folder)) sessions.push(folder)
+      }
+      const socketAbiertoAqui = (folder) => {
+        const digits = String(folder).replace(/\D/g, '')
+        return (global.conns || []).some((c) => {
+          const tieneUsuario = Boolean(c?.user?.id || c?.user?.jid)
+          const abierto = c?.ws?.isOpen === true ||
+            (c?.ws?.socket?.readyState ?? c?.ws?.readyState) === ws.OPEN
+          if (!tieneUsuario || !abierto) return false
+          const jidDigits = String(c?.phoneNumber || c?.botNumber || c?.user?.jid || c?.user?.id || '')
+            .split('@')[0].split(':')[0].replace(/\D/g, '')
+          const pathDigits = c?.pathAYBot
+            ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '')
+            : ''
+          return jidDigits === digits || pathDigits === digits
+        })
+      }
+      for (const folder of wanted) {
+        if (socketAbiertoAqui(folder)) continue
+        try {
+          await serbotModule.retirarSesionDeWorker(join(serbotDir, folder), { handoff: false })
+        } catch {}
+        sesionesRetiradas.delete(folder)
+        await iniciarSesion(folder)
+      }
+      try {
+        publishWorkerStatus()
+      } catch (error) {
+        console.error(`Worker ${workerId}: no se pudo actualizar el estado tras reconectar:`, error?.message || error)
+      }
+      return
+    }
     if (message?.type === 'add-sessions' && Array.isArray(message.sessions)) {
       const added = [...new Set(message.sessions)].filter(folder =>
         typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
@@ -826,8 +865,9 @@ if (!isSubbotWorker) {
     }
     for (const folder of removed) confirmSessionLease(folder)
   })
-  const batchSize = 1
+  const batchSize = Number.parseInt(process.env.PAIN_SUBBOT_BATCH, 10) || 4
   const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
+  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1200
   if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
   const initialSessions = [...sessions]
   let started = 0
@@ -842,7 +882,7 @@ if (!isSubbotWorker) {
     skipped += results.filter(result => result === 'skipped').length
     failed += results.filter(result => result === 'failed').length
     if (i + batchSize < initialSessions.length) {
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      await new Promise(resolve => setTimeout(resolve, pausaEntreLotesMs))
     }
   }
   console.log(
@@ -879,9 +919,158 @@ process.on('message', (message) => {
 
 let reconexionSubBotsPromise = null
 
+function contarSesionesEnDisco(serbotDir) {
+  try {
+    if (!existsSync(serbotDir)) return { todas: [], revisables: [], requierenVincular: 0 }
+    const todas = readdirSync(serbotDir).filter((folder) => {
+      try {
+        const folderPath = join(serbotDir, folder)
+        return statSync(folderPath).isDirectory() && existsSync(join(folderPath, 'creds.json'))
+      } catch {
+        return false
+      }
+    })
+    const requierenVincular = todas.filter((folder) =>
+      sesionRequiereVincular(join(serbotDir, folder))
+    ).length
+    const revisables = todas.filter((folder) =>
+      !sesionRequiereVincular(join(serbotDir, folder)) &&
+      !vinculacionEnCurso(join(serbotDir, folder))
+    )
+    return { todas, revisables, requierenVincular }
+  } catch {
+    return { todas: [], revisables: [], requierenVincular: 0 }
+  }
+}
+
+function contarConectadosManaged() {
+  const vistos = new Set()
+  try {
+    for (const worker of readSubbotWorkerStatuses(__dirname)) {
+      for (const s of worker.sessions || []) {
+        if (s?.connected) vistos.add(String(s.folder))
+      }
+    }
+  } catch {}
+  for (const c of global.conns || []) {
+    try {
+      const tieneUsuario = Boolean(c?.user?.id || c?.user?.jid)
+      const abierto = c?.ws?.isOpen === true ||
+        (c?.ws?.socket?.readyState ?? c?.ws?.readyState) === ws.OPEN
+      if (!tieneUsuario || !abierto) continue
+      const folder = c?.pathAYBot ? String(c.pathAYBot).split(/[\\/]/).pop() : ''
+      if (folder) vistos.add(folder)
+    } catch {}
+  }
+  return vistos
+}
+
+global.reconnectSubBotsManaged = async function() {
+  if (reconexionSubBotsPromise) return reconexionSubBotsPromise
+  reconexionSubBotsPromise = (async () => {
+    const serbotDir = global.bot || './Serbot'
+    const { todas, revisables, requierenVincular } = contarSesionesEnDisco(serbotDir)
+    if (!todas.length) {
+      console.log(chalk.yellow('No se encontraron sub-bots para reconectar'))
+      return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0, requierenVincular: 0 }
+    }
+    const antes = contarConectadosManaged()
+    const porReconectar = revisables.filter((f) => !antes.has(String(f)))
+    console.log(chalk.cyan(
+      `\nSesiones registradas: ${todas.length}; ya conectadas: ${antes.size}; ` +
+      `por reconectar: ${porReconectar.length}; requieren vincular: ${requierenVincular}.`
+    ))
+    if (!porReconectar.length) {
+      return {
+        total: todas.length,
+        omitidos: antes.size,
+        conectados: 0,
+        pendientes: 0,
+        fallidos: 0,
+        requierenVincular
+      }
+    }
+    let ack = null
+    try {
+      ack = await requestReconnectAll()
+    } catch (error) {
+      console.error('[rebot all] No se pudo pedir reconexión a los workers:', error?.message || error)
+    }
+    if (!ack?.dispatched) {
+      return {
+        total: todas.length,
+        omitidos: antes.size,
+        conectados: 0,
+        pendientes: porReconectar.length,
+        fallidos: 0,
+        requierenVincular
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 15_000))
+    const despues = contarConectadosManaged()
+    let conectados = 0
+    for (const f of porReconectar) {
+      if (despues.has(String(f)) && !antes.has(String(f))) conectados++
+    }
+    const omitidos = [...despues].filter((f) => antes.has(String(f))).length || antes.size
+    const pendientes = Math.max(0, porReconectar.length - conectados)
+    console.log(chalk.cyan(
+      `\nRevisión terminada: ${conectados} reconectados, ${omitidos} ya activos, ` +
+      `${pendientes} pendientes y ${requierenVincular} requieren vincular.`
+    ))
+    return {
+      total: todas.length,
+      omitidos,
+      conectados,
+      pendientes,
+      fallidos: 0,
+      requierenVincular
+    }
+  })()
+  try {
+    return await reconexionSubBotsPromise
+  } finally {
+    reconexionSubBotsPromise = null
+  }
+}
+
+global.reconnectSubBotOneManaged = async function(folder) {
+  const clean = String(folder || '').replace(/\D/g, '')
+  if (!clean) return { ok: false, reason: 'invalid' }
+  const serbotDir = global.bot || './Serbot'
+  const raiz = join(serbotDir, clean)
+  let realFolder = clean
+  try {
+    if (existsSync(serbotDir)) {
+      for (const name of readdirSync(serbotDir)) {
+        if (String(name).replace(/\D/g, '') === clean) {
+          realFolder = name
+          break
+        }
+      }
+    }
+  } catch {}
+  if (sesionRequiereVincular(join(serbotDir, realFolder))) {
+    return { ok: false, reason: 'needs-relink' }
+  }
+  const antes = contarConectadosManaged()
+  if (antes.has(String(realFolder))) return { ok: true, already: true }
+  const ack = await requestReconnectOne(realFolder)
+  if (!ack?.dispatched) return { ok: false, reason: 'no-worker' }
+  const limite = Date.now() + 50_000
+  while (Date.now() < limite) {
+    await new Promise((r) => setTimeout(r, 1000))
+    if (contarConectadosManaged().has(String(realFolder))) return { ok: true }
+  }
+  return { ok: false, reason: 'timeout' }
+}
+
 global.reconnectSubBots = async function() {
-  if (isSubbotWorker || isManagedPrimary) {
+  if (isSubbotWorker) {
     return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
+  }
+  if (isManagedPrimary) {
+    return global.reconnectSubBotsManaged()
   }
   if (reconexionSubBotsPromise) return reconexionSubBotsPromise
 

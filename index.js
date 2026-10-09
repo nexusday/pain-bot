@@ -163,7 +163,7 @@ function addSessionsToWorker(slot, target) {
 // Los grupos de sub-bots no arrancan a la vez: cada uno espera su turno para no saturar la CPU.
 function startDelayMs(id) {
   const n = Number.parseInt(/^subbot-group-(\d+)$/.exec(id)?.[1], 10)
-  return Number.isInteger(n) ? 8_000 + n * 25_000 : 0
+  return Number.isInteger(n) ? 4_000 + n * 12_000 : 0
 }
 
 function startSlot(id, slot) {
@@ -244,6 +244,56 @@ function startSlot(id, slot) {
       const worker = slots.get(groupId)
       if (target && worker) addSessionsToWorker(worker, target)
       reconcile()
+      return
+    }
+    if (message.type === 'request-reconnect-one' && typeof message.requestId === 'string' &&
+        /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
+      const groupId = groupIdForSession(message.session)
+      const worker = slots.get(groupId)
+      let dispatched = false
+      if (worker?.child?.connected) {
+        dispatched = worker.child.send(
+          { type: 'reconnect-sessions', sessions: [message.session] },
+          () => {}
+        ) !== false
+      }
+      if (child.connected) {
+        child.send({
+          type: 'reconnect-one-ack',
+          requestId: message.requestId,
+          session: message.session,
+          dispatched,
+          worker: groupId
+        }, () => {})
+      }
+      return
+    }
+    if (message.type === 'request-reconnect-all' && typeof message.requestId === 'string') {
+      const desired = makeTargets()
+      let workers = 0
+      let sessions = 0
+      for (const [workerId, target] of desired) {
+        if (workerId === 'primary') continue
+        const worker = slots.get(workerId)
+        if (!worker?.child?.connected) continue
+        const ok = worker.child.send(
+          { type: 'reconnect-sessions', sessions: target.sessions },
+          () => {}
+        ) !== false
+        if (ok) {
+          workers++
+          sessions += target.sessions.length
+        }
+      }
+      if (child.connected) {
+        child.send({
+          type: 'reconnect-all-ack',
+          requestId: message.requestId,
+          dispatched: workers > 0,
+          workers,
+          sessions
+        }, () => {})
+      }
       return
     }
   })

@@ -244,6 +244,52 @@ let handler = async (m, { conn, args, usedPrefix, command, participants, groupMe
 
   reloj()[clave] = Date.now()
 
+  // En modo supervisor (primary gestionado) los sockets viven en los workers.
+  // Crear el socket aquí duplicaría la sesión y provoca 440/405. Se delega al worker dueño.
+  if (process.env.PAIN_ROLE === 'primary' && typeof global.reconnectSubBotOneManaged === 'function') {
+    let resultado = null
+    try {
+      resultado = await global.reconnectSubBotOneManaged(phoneNumber)
+    } catch (e) {
+      console.error('[rebot managed]', e?.message || e)
+    }
+    if (resultado?.already) {
+      return conn.sendMessage(m.chat, {
+        text: tr(conn,
+          `+${phoneNumber} ya está conectado.`,
+          `+${phoneNumber} is already connected.`,
+          `+${phoneNumber} já está conectado.`
+        ),
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+    }
+    if (resultado?.reason === 'needs-relink') {
+      return conn.sendMessage(m.chat, {
+        text: tr(conn,
+          `+${phoneNumber} requiere volver a vincularse con ${usedPrefix}code o ${usedPrefix}qr.`,
+          `+${phoneNumber} needs to be relinked with ${usedPrefix}code or ${usedPrefix}qr.`,
+          `+${phoneNumber} precisa de novo vínculo com ${usedPrefix}code ou ${usedPrefix}qr.`
+        ),
+        contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+      }, { quoted: m })
+    }
+    await conn.sendMessage(m.chat, {
+      text: resultado?.ok
+        ? tr(conn,
+          `+${phoneNumber} SUBBOT RECONECTADO CON EXITO.`,
+          `+${phoneNumber} SUBBOT RECONNECTED.`,
+          `+${phoneNumber} SUBBOT RECONECTADO COM SUCESSO.`
+        )
+        : tr(conn,
+          `+${phoneNumber} NO SE PUDO RECONECTAR EL SUBBOT. Revisa /bots y reintenta en 1 min.`,
+          `+${phoneNumber} THE SUBBOT COULD NOT RECONNECT. Check /bots and retry in 1 min.`,
+          `+${phoneNumber} NÃO FOI POSSÍVEL RECONECTAR O SUBBOT. Veja /bots e tente em 1 min.`
+        ),
+      contextInfo: { ...(global.rcanal?.contextInfo || {}) }
+    }, { quoted: m })
+    return
+  }
+
   let ok = false
   try {
     if (typeof sock?.reconectarPain === 'function') {

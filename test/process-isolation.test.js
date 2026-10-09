@@ -29,11 +29,11 @@ test('splits sub-bots into stable groups without losing or duplicating sessions'
 })
 
 test('group count comes from PAIN_SUBBOT_WORKERS and is clamped', () => {
-  assert.equal(configuredGroupCount({}), 1)
+  assert.equal(configuredGroupCount({}), 5)
   assert.equal(configuredGroupCount({ PAIN_SUBBOT_WORKERS: '1' }), 1)
   assert.equal(configuredGroupCount({ PAIN_SUBBOT_WORKERS: '99' }), 8)
   assert.equal(configuredGroupCount({ PAIN_SUBBOT_WORKERS: '0' }), 1)
-  assert.equal(configuredGroupCount({ PAIN_SUBBOT_WORKERS: 'x' }), 1)
+  assert.equal(configuredGroupCount({ PAIN_SUBBOT_WORKERS: 'x' }), 5)
   assert.deepEqual([...assignSessions(['a', 'b', 'c'], 1).keys()], ['subbot-group-0'])
 })
 test('does not start duplicate workers while another live worker owns a session', () => {
