@@ -204,6 +204,21 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
   const moneda = global.moneda || 'coins'
   const comipPct = Math.min(Math.max(Math.floor(Number(datosUsuario.comisionPareja) || 0), 0), 50)
   const lineaComip = datosUsuario.partner ? `\n┊ comip  ·  \`${comipPct}%\`` : ''
+  const lineaCasados = (() => {
+    if (!datosUsuario.partner) return ''
+    const desde = Number(datosUsuario.marriedAt) || 0
+    if (!desde) return ''
+    const min = Math.floor(Math.max(0, Date.now() - desde) / 60000)
+    const dias = Math.floor(min / 1440)
+    const horas = Math.floor((min % 1440) / 60)
+    const minutos = min % 60
+    const texto = dias > 0
+      ? `${dias} d, ${horas} h, ${minutos} min`
+      : horas > 0
+        ? `${horas} h, ${minutos} min`
+        : `${minutos} min`
+    return `\n┊ juntos  ·  \`${texto}\``
+  })()
 
   const texto = `
 \`*˚   ✩    ✦    ✩   ˚*\`
@@ -217,7 +232,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
 ┊ cumple  ·  \`${cumple}\`
 ┊ ${desc}
 ┊ favorito  ·  \`${favorito}\`
-┊ ${lineaVinculo}${lineaComip}
+┊ ${lineaVinculo}${lineaComip}${lineaCasados}
 
 \`*˚   ✩    ✦    ✩   ˚*\`
 
