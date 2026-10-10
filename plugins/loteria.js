@@ -1,4 +1,4 @@
-import { abrirSorteoActual, anunciarApertura, comprarBoletos, obtenerSorteo, marcarInteresLoteria, establecerTzLoteria, textoTzLoteria, enHorarioNocturno, MAX_BOLETOS_POR_USUARIO, MIN_COMPRADORES, MAX_POZO, horaCierreTexto } from '../lib/loteria.js'
+import { abrirSorteoActual, anunciarApertura, comprarBoletos, obtenerSorteo, marcarInteresLoteria, obtenerTzLoteria, establecerTzLoteria, textoTzLoteria, enHorarioNocturno, MAX_BOLETOS_POR_USUARIO, MIN_COMPRADORES, MAX_POZO, horaCierreTexto } from '../lib/loteria.js'
 
 let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) => {
   try {
@@ -77,7 +77,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
 ┊ boleto  ·  \`${Number(sorteo.precioBoleto).toLocaleString()} ${global.moneda || 'USD'}\`
 ┊ tus boletos  ·  \`${mios}/${MAX_BOLETOS_POR_USUARIO}\`
 ┊ participantes  ·  \`${entradas.length}/${MIN_COMPRADORES}\` mínimo
-┊ cierra  ·  \`${horaCierreTexto(sorteo.terminaEn)}\` (en ~${mins} min)
+┊ cierra  ·  \`${horaCierreTexto(sorteo.terminaEn, obtenerTzLoteria(m.chat))}\` (en ~${mins} min)
 ┊ compra con  ·  \`${usedPrefix + command} <cantidad>\`
 ╰─────────`.trim(),
         contextInfo: { ...rcanal.contextInfo }
