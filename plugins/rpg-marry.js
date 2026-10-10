@@ -99,11 +99,15 @@ function clearPartner(jid, conn, participants) {
       u.partner = ''
       delete u.marriedAt
       delete u.comisionPareja
+      delete u.comisionEnviada
+      delete u.comisionRecibida
     }
     if (key === partnerRaw || isSamePlayer(key, partnerRaw, conn, participants)) {
       u.partner = ''
       delete u.marriedAt
       delete u.comisionPareja
+      delete u.comisionEnviada
+      delete u.comisionRecibida
     }
   }
   return partnerRaw

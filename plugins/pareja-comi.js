@@ -21,8 +21,16 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const arg = String(args[0] || '').toLowerCase().trim()
 
     if (!arg) {
+      const yo = global.db.data.users[m.sender] || {}
+      const comparti = Number(yo.comisionEnviada) || 0
+      const socio = global.db.data.users[pareja] || {}
+      const pctSocio = Math.min(Math.max(Math.floor(Number(socio.comisionPareja) || 0), 0), MAX_COMISION)
+      const meCompartio = Number(socio.comisionEnviada) || 0
+      const socioConmigo = String(socio.partner || '')
+      const digitos = (v = '') => String(v).split('@')[0].split(':')[0].replace(/\D/g, '')
+      const esMutuo = pctSocio > 0 && digitos(socioConmigo) === digitos(m.sender)
       return conn.sendMessage(m.chat, {
-        text: `💞 *Comisión de pareja*\n\n> Estado: *${actual}%*\n> Tu pareja: @${String(pareja).split('@')[0]}\n\n> Uso: *${usedPrefix + command} <0-${MAX_COMISION}>*\n> Ejemplo: *${usedPrefix + command} 10* → el 10% de lo que ganes en juegos va para tu pareja.\n> *${usedPrefix + command} off* → desactivar.`,
+        text: `💞 *Comisión de pareja*\n\n> Tu pareja: @${String(pareja).split('@')[0]}\n> Tú compartes: *${actual}%*\n> Has compartido: *${comparti.toLocaleString()} ${global.moneda || 'USD'}* en total\n> Tu pareja comparte: *${pctSocio}%*${pctSocio > 0 ? (esMutuo ? ' (contigo)' : ' (no contigo)') : ''}\n> Te ha compartido: *${meCompartio.toLocaleString()} ${global.moneda || 'USD'}* en total\n\n> Uso: *${usedPrefix + command} <0-${MAX_COMISION}>*\n> Ejemplo: *${usedPrefix + command} 10* → el 10% de lo que ganes en juegos va para tu pareja.\n> *${usedPrefix + command} off* → desactivar.`,
         contextInfo: {
           ...rcanal.contextInfo,
           mentionedJid: [pareja]
