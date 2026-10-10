@@ -52,8 +52,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
     const { sorteo } = await abrirSorteoActual(m.chat, conn)
     marcarInteresLoteria(m.chat)
     if (!sorteo) {
+      const { finHoraActual: proximoFin, horaCierreTexto: aTexto, faltaParaTexto: enTexto } = await import('../lib/loteria.js')
+      const proximo = proximoFin(new Date())
       return conn.sendMessage(m.chat, {
-        text: '[❌] No se pudo abrir el pozo. Inténtalo de nuevo.',
+        text: `[❗] El pozo de esta ventana ya cerró.\n> Próximo pozo cierra \`${aTexto(proximo)}\` (en ${enTexto(proximo)}).`,
         contextInfo: { ...rcanal.contextInfo }
       }, { quoted: m })
     }
