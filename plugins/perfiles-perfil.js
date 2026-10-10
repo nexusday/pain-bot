@@ -202,6 +202,8 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
   const desc = datosUsuario.desc && datosUsuario.desc !== 'Sin descripción' ? datosUsuario.desc : 'sin descripción aún'
   const favorito = datosUsuario.favourite && datosUsuario.favourite !== 'No establecido' ? datosUsuario.favourite : '—'
   const moneda = global.moneda || 'coins'
+  const comipPct = Math.min(Math.max(Math.floor(Number(datosUsuario.comisionPareja) || 0), 0), 50)
+  const lineaComip = datosUsuario.partner ? `\n┊ comip  ·  \`${comipPct}%\`` : ''
 
   const texto = `
 \`*˚   ✩    ✦    ✩   ˚*\`
@@ -215,7 +217,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
 ┊ cumple  ·  \`${cumple}\`
 ┊ ${desc}
 ┊ favorito  ·  \`${favorito}\`
-┊ ${lineaVinculo}
+┊ ${lineaVinculo}${lineaComip}
 
 \`*˚   ✩    ✦    ✩   ˚*\`
 
@@ -231,7 +233,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
 
 \`${usedPrefix}setname\`  \`${usedPrefix}setage\`  \`${usedPrefix}setgenre\`
 \`${usedPrefix}setbirth\`  \`${usedPrefix}setdesc\`  \`${usedPrefix}setfav\`
-\`${usedPrefix}marry\`  \`${usedPrefix}divorce\``.trim()
+\`${usedPrefix}marry\`  \`${usedPrefix}divorce\`  \`${usedPrefix}comip\``.trim()
 
   const botNumber = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
   const configPath = join('./Serbot', botNumber, 'config.json')

@@ -1,6 +1,7 @@
 import { findGroupParticipant, resolveTargetJids, senderJidCandidates } from '../lib/group-participant.js'
 import { resolveDbUser, isSamePlayer } from '../lib/michi-users.js'
 import { resolveGroupTarget } from '../lib/resolve-group-target.js'
+import { formatearPrefijoVisible } from '../lib/menu-categories.js'
 
 const TTL_MS = 60_000
 
@@ -97,10 +98,12 @@ function clearPartner(jid, conn, participants) {
     if (key === jid || isSamePlayer(key, jid, conn, participants)) {
       u.partner = ''
       delete u.marriedAt
+      delete u.comisionPareja
     }
     if (key === partnerRaw || isSamePlayer(key, partnerRaw, conn, participants)) {
       u.partner = ''
       delete u.marriedAt
+      delete u.comisionPareja
     }
   }
   return partnerRaw
@@ -295,12 +298,14 @@ handler.all = async function (m, { conn, participants }) {
     const bKey = resolveDbUser(quien, conn, partes).jid || quien
     syncPartner(aKey, bKey, conn, partes)
 
+    const prefijoComip = formatearPrefijoVisible(conn?.prefix || global.prefix, '.')
     return conn.sendMessage(m.chat, {
       text: [
         `💒 *¡Matrimonio!*`,
         ``,
         `> @${yo.split('@')[0]} y @${quien.split('@')[0]} ahora son pareja.`,
         `> Se verá en *perfil*.`,
+        `> Compartan ganancias con *${prefijoComip}comip <1-50>* (máx. 50%).`,
       ].join('\n'),
       contextInfo: {
         ...(global.rcanal?.contextInfo || {}),

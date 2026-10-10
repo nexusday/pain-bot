@@ -275,6 +275,7 @@ export async function rejectInvite(m, conn, invite) {
   }
 }
 export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished') {
+  const { aplicarComisionPareja } = await import('../lib/pareja-comision.js')
   try {
     const idChat = cancelledGame.chatId || m.chat
     const game = cancelledGame
@@ -319,6 +320,7 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
       
       if (global.db.data.users[game.winner]) {
         global.db.data.users[game.winner].coins = (global.db.data.users[game.winner].coins || 0) + reward
+        await aplicarComisionPareja(game.winner, reward, conn, idChat, m)
       }
 
       const loser = game.winner === game.player1 ? game.player2 : game.player1
@@ -342,9 +344,11 @@ export async function handleGameEnd(m, conn, cancelledGame, reason = 'finished')
 
       if (global.db.data.users[game.player1]) {
         global.db.data.users[game.player1].coins = (global.db.data.users[game.player1].coins || 0) + drawReward
+        await aplicarComisionPareja(game.player1, drawReward, conn, idChat, m)
       }
       if (global.db.data.users[game.player2]) {
         global.db.data.users[game.player2].coins = (global.db.data.users[game.player2].coins || 0) + drawReward
+        await aplicarComisionPareja(game.player2, drawReward, conn, idChat, m)
       }
 
       message = `╭─╮  𓍯  𝙅𝙐𝙀𝙂𝙊 𝙀𝙈𝙋𝘼𝙏𝘼𝘿𝙊  𓍯

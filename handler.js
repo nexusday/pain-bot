@@ -39,7 +39,8 @@ import { estaEnBlackn } from './lib/blackn.js'
 import { idiomaDe, tr } from './lib/lang.js'
 import { coincideRespuesta } from './lib/banco-adivinanzas.js'
 import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
-import { juegosBloqueadosEn, verificarComandoJuegos } from './lib/Modos/modo-games.js'
+import { juegosBloqueadosEn, verificarComandoJuegos, esPluginJuegos } from './lib/Modos/modo-games.js'
+import { COMANDOS_SIN_COMISION, aplicarComisionPareja } from './lib/pareja-comision.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -585,6 +586,9 @@ for (const plugin of conAll) {
 }
 
 if (textoPuedeSerComando(m, isOwner, isROwner, comandos)) {
+// Saldo antes de ejecutar: si un juego lo aumenta, la comisión de pareja
+// (/comi) mueve el % al partner. Se calcula por delta, sin tocar cada plugin.
+const saldoCoinsAntes = Number(global.db.data?.users?.[m.sender]?.coins) || 0
 for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, pluginsEnCache())) {
   const __filename = join(___dirname, plugin.name)
 
@@ -800,6 +804,23 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
       console.error(`Error ejecutando plugin ${plugin.name}:`, e)
     }
   }
+  // Hook de comisión de pareja: solo juegos que aumentaron el saldo
+  // (banco/préstamos/transferencias están excluidos en COMANDOS_SIN_COMISION).
+  if (comandoEjecutado && !m.error && m.plugin && m.command &&
+      !COMANDOS_SIN_COMISION.has(String(m.command).toLowerCase())) {
+    try {
+      const defEjecutado = global.plugins?.[m.plugin]
+      if (defEjecutado && esPluginJuegos(defEjecutado, m.plugin)) {
+        const saldoAhora = Number(global.db.data?.users?.[m.sender]?.coins) || 0
+        const ganado = saldoAhora - saldoCoinsAntes
+        if (ganado > 0) {
+          await aplicarComisionPareja(m.sender, ganado, this, m.chat, m)
+        }
+      }
+    } catch (e) {
+      console.error('[comi] Hook central:', e?.message || e)
+    }
+  }
 }
 }
 
@@ -878,6 +899,7 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
       
       const premio = Math.floor(Math.random() * (500 - 250 + 1)) + 250
       user.coins = (user.coins || 0) + premio
+      await aplicarComisionPareja(m.sender, premio, this, m.chat, m)
       
       await this.sendMessage(m.chat, {
         text: tr(this,
@@ -1039,7 +1061,12 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
 
     try {
       const modulo = await import(`./lib/logic-miner.js`)
+      const saldoMinerAntes = Number(global.db.data?.users?.[m.sender]?.coins) || 0
       await modulo.handleMove.call(this, m, this, datosJuego)
+      const ganadoMiner = (Number(global.db.data?.users?.[m.sender]?.coins) || 0) - saldoMinerAntes
+      if (ganadoMiner > 0) {
+        await aplicarComisionPareja(m.sender, ganadoMiner, this, m.chat, m)
+      }
     } catch (e) {
       console.error('Error procesando movimiento miner:', e)
       return this.sendMessage(m.chat, { text: '[❌] Error al procesar el movimiento.', contextInfo: { ...rcanal.contextInfo } }, { quoted: m })
