@@ -409,6 +409,23 @@ function vigilarSocketPrincipal() {
 
 if (!isSubbotWorker) setInterval(vigilarSocketPrincipal, 15_000).unref?.()
 
+// Lotería: solo el principal marca el ritmo (aperturas por hora y cierres).
+// Los anuncios los intenta él; si no es miembro del grupo el cierre lo
+// resuelve igual (dinero a salvo) y el anuncio lo hace el bot presente
+// vía maybeCerrarSorteo en el handler.
+if (!isSubbotWorker) {
+  const tickLoteria = () => {
+    import('./lib/loteria.js').then(({ tickLoteria }) => {
+      try {
+        void tickLoteria(global.conn)
+      } catch {}
+    }).catch(() => {})
+  }
+  const primerTickLoteria = setTimeout(tickLoteria, 20_000)
+  primerTickLoteria.unref?.()
+  const cadaTickLoteria = setInterval(tickLoteria, 30_000)
+  cadaTickLoteria.unref?.()
+}
 // Higiene de memoria del principal cada 60s (workers la hacen en su tick).
 if (!isSubbotWorker) {
   const higienePrincipal = setInterval(() => {

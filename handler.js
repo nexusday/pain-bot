@@ -838,6 +838,15 @@ if (comandoEjecutado && global.db.data?.users?.[m.sender]) {
   }
 }
 
+// Cierre perezoso de lotería: si el sorteo del grupo venció, lo cierra el
+// bot presente (con claim anti-duplicado entre procesos). Barato si no venció.
+if (m.isGroup) {
+  try {
+    const { maybeCerrarSorteo } = await import('./lib/loteria.js')
+    await maybeCerrarSorteo(this, m.chat)
+  } catch {}
+}
+
 if (m.rpgProgress?.leveled) {
   const rpg = m.rpgProgress
   await this.sendMessage(m.chat, {
