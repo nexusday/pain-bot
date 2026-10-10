@@ -409,6 +409,18 @@ function vigilarSocketPrincipal() {
 
 if (!isSubbotWorker) setInterval(vigilarSocketPrincipal, 15_000).unref?.()
 
+// Higiene de memoria del principal cada 60s (workers la hacen en su tick).
+if (!isSubbotWorker) {
+  const higienePrincipal = setInterval(() => {
+    import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
+      try {
+        higieneMemoriaProceso()
+      } catch {}
+    }).catch(() => {})
+  }, 60_000)
+  higienePrincipal.unref?.()
+}
+
 async function connectionUpdate(update) {
   const sock = this?.ev ? this : conn
   const { connection, lastDisconnect, isNewLogin } = update
@@ -782,11 +794,20 @@ if (!isSubbotWorker) {
     }))
   }
   publishWorkerStatus()
+  let ticksEstado = 0
   workerStatusInterval = setInterval(() => {
     try {
       publishWorkerStatus()
     } catch (error) {
       console.error(`Worker ${workerId}: no se pudo publicar el estado de sus sesiones:`, error?.message || error)
+    }
+    // Higiene de memoria cada ~60s (no en cada tick para no escanear de más).
+    if (++ticksEstado % 6 === 0) {
+      import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
+        try {
+          higieneMemoriaProceso()
+        } catch {}
+      }).catch(() => {})
     }
   }, 10_000)
   workerStatusInterval.unref?.()
