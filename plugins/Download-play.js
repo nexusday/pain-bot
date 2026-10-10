@@ -150,7 +150,7 @@ async function urlEsAudio(url) {
   }
 }
 
-async function pedirAudio(urlVideo, consultaKronix = null) {
+async function pedirAudio(urlVideo) {
   /*
    * ============================
    * API ALEX
@@ -200,20 +200,20 @@ async function pedirAudio(urlVideo, consultaKronix = null) {
     [
       /*
        * ========================================
-       * PROVEEDOR 1: KRONIX
+       * PROVEEDOR 1: KRONIX (playAudio3 por URL)
        *
        * Respuesta esperada:
        *
        * {
        *   "status": true,
        *   "creador": "Sunkovv",
-       *   "query": "amapolas",
+       *   "query": "https://youtu.be/...",
        *   "resultado": {
        *     "titulo": "...",
        *     "autor": "...",
        *     "miniatura": "...",
-       *     "duracion": "3:31",
-       *     "duracion_segundos": 211,
+       *     "duracion": "3:12",
+       *     "duracion_segundos": 192,
        *     "calidad": "MP3 320kbps",
        *     "tipo": "audio/mpeg",
        *     "url": "https://...mp3"
@@ -235,11 +235,11 @@ async function pedirAudio(urlVideo, consultaKronix = null) {
           ).replace(/\/$/, "")
 
           const consulta =
-            new URL(`${baseKronix}/api/download/ytmp3`)
+            new URL(`${baseKronix}/api/download/playAudio3`)
 
           consulta.searchParams.set(
-            "query",
-            consultaKronix || urlVideo
+            "url",
+            urlVideo
           )
 
           if (apiKronix?.key) {
@@ -643,17 +643,12 @@ const handler = async (
      * ============================
      * DESCARGAR AUDIO
      * ============================
-     * Kronix acepta texto o link en "query": se le pasa el texto
-     * original cuando hay búsqueda, si no el video ya resuelto.
+     * Kronix (playAudio3) trabaja con la URL del video ya resuelta
+     * por yt-search / link directo / selección de lista.
      */
 
-    const consultaKronix =
-      !enlace && !/^\d+$/.test(text.trim())
-        ? text.trim()
-        : urlVideo
-
     const audio =
-      await pedirAudio(urlVideo, consultaKronix)
+      await pedirAudio(urlVideo)
 
     if (!audio?.urlAudio) {
       throw "no se pudo obtener el audio"
