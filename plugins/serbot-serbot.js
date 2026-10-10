@@ -468,6 +468,12 @@ async function iniciarSubBot(options) {
     let temporizadorReconexion = null
     let reemplazosConsecutivos = 0
     let fallosConsecutivos = 0
+    // Racha de cierres 500 (badSession) sin un 'open' entre ellos. WhatsApp
+    // cierra con stream-error 500 cuando la sesión murió en el teléfono
+    // (dispositivo desvinculado), así que una racha confirma sesión muerta.
+    // No se borra al primer 500: un 500 aislado puede ser un error
+    // transitorio del servidor y borrar creds sería irreversible.
+    let fallos500Seguidos = 0
     const telefonoEmparejamiento = phoneNumber
     const idCarpetaBot = path.basename(pathAYBot)
 
@@ -676,11 +682,20 @@ async function iniciarSubBot(options) {
       }
 
       const motivo = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
-      const detalleDesconexion = String(
+      let detalleDesconexion = String(
         lastDisconnect?.error?.message ||
         lastDisconnect?.error?.output?.payload?.message ||
         ''
       ).slice(0, 240)
+      try {
+        const datosFallo = lastDisconnect?.error?.data
+        if (datosFallo && typeof datosFallo === 'object') {
+          const textoDatos = JSON.stringify(datosFallo).slice(0, 120)
+          if (textoDatos && textoDatos !== '{}') {
+            detalleDesconexion = `${detalleDesconexion} ${textoDatos}`.trim().slice(0, 240)
+          }
+        }
+      } catch {}
 
       if (connection === 'close') {
         detenerPrekeys(sock)
@@ -709,6 +724,13 @@ async function iniciarSubBot(options) {
           return
         }
 
+        // Racha 500: WhatsApp cierra con stream-error 500 (badSession) cuando
+        // la sesión murió en el teléfono. 3 seguidos sin 'open' = sesión
+        // muerta confirmada; un 500 aislado se trata como transitorio.
+        if (motivo === DisconnectReason.badSession) fallos500Seguidos++
+        const sesionMuertaConfirmada = esMotivoSesionFatal(motivo) ||
+          (motivo === DisconnectReason.badSession && fallos500Seguidos >= 3)
+
         if (esMotivoSesionFatal(motivo) && !estadoConn.creds.registered) {
           terminarIntento(new Error(`Emparejamiento de sub-bot ${idCarpetaBot} interrumpido`))
           console.log(chalk.bold.yellow(
@@ -721,7 +743,7 @@ async function iniciarSubBot(options) {
           return
         }
 
-        if (esMotivoSesionFatal(motivo)) {
+        if (sesionMuertaConfirmada) {
           terminarIntento(new Error(`Sesión de sub-bot ${idCarpetaBot} cerrada con código ${motivo ?? 'desconocido'}`))
           let marcaCreada = false
           try {
@@ -782,6 +804,7 @@ async function iniciarSubBot(options) {
         reconectando = false
         reemplazosConsecutivos = 0
         fallosConsecutivos = 0
+        fallos500Seguidos = 0
         vistoUsuarioEn = Date.now()
         await borrarMensajeVinculo().catch(() => {})
         if (intento.cancelado) return
@@ -977,11 +1000,11 @@ async function iniciarSubBot(options) {
       if (!esReemplazo && fallosConsecutivos >= MAX_FALLOS_RECONEXION) {
         console.log(chalk.bold.yellow(
           `\n┆ Subbot (+${idCarpetaBot}) sigue sin conectar tras ${MAX_FALLOS_RECONEXION} intentos ` +
-          `(último código ${motivo ?? 'sin código'}). Se reintenta en 5 min con backoff largo; usa /rebot para forzarlo.\n`
+          `(último código ${motivo ?? 'sin código'}). Se reintenta en 2 min con backoff largo; usa /rebot para forzarlo.\n`
         ))
         fallosConsecutivos = 0
         reemplazosConsecutivos = 0
-        const colaLarga = 5 * 60_000 + dispersarMs
+        const colaLarga = 2 * 60_000 + dispersarMs
         if (!temporizadorReconexion) {
           reconectando = true
           temporizadorReconexion = setTimeout(() => {
@@ -995,9 +1018,16 @@ async function iniciarSubBot(options) {
         }
         return
       }
-      const cola = esReemplazo
-        ? Math.min(60_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 15 * 60_000) + dispersarMs
-        : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 6)), 5 * 60_000) + dispersarMs
+      const esReinicio = motivo === DisconnectReason.restartRequired
+      // Tope 90s (antes 5min): con 150 subbots, un tope de 5min + 30s de
+      // dispersión dejaba colas de 327s y parecían muertos. 440 (reemplazo)
+      // conserva backoff largo para no pelear entre duplicados. 515 es un
+      // reinicio pedido por el servidor: reintento casi inmediato.
+      const cola = esReinicio
+        ? 3000 + Math.min(dispersarMs, 5000)
+        : esReemplazo
+          ? Math.min(60_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 15 * 60_000) + dispersarMs
+          : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
       if (esReemplazo) reemplazosConsecutivos++
       else fallosConsecutivos++
       console.log(chalk.bold.magentaBright(
