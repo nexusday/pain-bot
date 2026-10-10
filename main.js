@@ -166,6 +166,7 @@ global.loadDatabase = async function loadDatabase() {
     modoSad: normalizeModeMap(global.db.data?.modoSad),
     modoPsico: normalizeModeMap(global.db.data?.modoPsico),
     modoCustom: normalizeModeMap(global.db.data?.modoCustom),
+    modoGames: normalizeModeMap(global.db.data?.modoGames),
     modoCustomCfg: global.db.data?.modoCustomCfg && typeof global.db.data.modoCustomCfg === 'object' && !Array.isArray(global.db.data.modoCustomCfg)
       ? global.db.data.modoCustomCfg
       : {},

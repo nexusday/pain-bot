@@ -39,6 +39,7 @@ import { estaEnBlackn } from './lib/blackn.js'
 import { idiomaDe, tr } from './lib/lang.js'
 import { coincideRespuesta } from './lib/banco-adivinanzas.js'
 import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
+import { juegosBloqueadosEn, verificarComandoJuegos } from './lib/Modos/modo-games.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -666,6 +667,12 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
       continue
     }
 
+    if (await verificarComandoJuegos(m, this, plugin, plugin.name, coincidenciaPrefijo[0] || usedPrefix, isOwner, isROwner)) {
+      comandoEjecutado = true
+      m.commandExecuted = true
+      continue
+    }
+
     if (plugin.group && !m.isGroup) {
       comandoEjecutado = true
       m.commandExecuted = true
@@ -821,7 +828,8 @@ if (m.rpgProgress?.leveled) {
 
 
 if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.db.data.adivinanzasActivas[m.chat]) {
-  
+  if (juegosBloqueadosEn(m.chat, { isOwner, isROwner })) return
+
   if (m.isGroup && global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
     if (!isAdmin && !isOwner && !isROwner) {
       return 
@@ -897,7 +905,8 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
 
   
   if (m.isGroup && global.pendingInvites && global.pendingInvites[m.chat] && !comandoEjecutado) {
-    
+    if (juegosBloqueadosEn(m.chat, { isOwner, isROwner })) return
+
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) {
         return 
@@ -936,7 +945,8 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
   }
 
   if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'tictactoe' && !comandoEjecutado) {
-    
+    if (juegosBloqueadosEn(m.chat, { isOwner, isROwner })) return
+
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) {
         return 
@@ -1012,6 +1022,7 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
 
   // Miner game moves
   if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'miner' && !comandoEjecutado) {
+    if (juegosBloqueadosEn(m.chat, { isOwner, isROwner })) return
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) {
         return 
@@ -1037,6 +1048,7 @@ if (m.text && !comandoEjecutado && global.db.data.adivinanzasActivas && global.d
 
   // Bomba game moves (botones interactivos o numero 1-10)
   if (m.isGroup && global.games && global.games[m.chat] && global.games[m.chat].type === 'bomba' && !comandoEjecutado) {
+    if (juegosBloqueadosEn(m.chat, { isOwner, isROwner })) return
     if (global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
       if (!isAdmin && !isOwner && !isROwner) return
     }
