@@ -345,10 +345,11 @@ if (!opts['test']) {
       phase ^= character.charCodeAt(0)
       phase = Math.imul(phase, 16777619)
     }
-    // Guardado periódico espaciado: serializar la DB congela el event loop,
-    // así que por defecto es cada 3 min (ajustable con PAIN_DB_SAVE_MS).
+    // Guardado periódico espaciado: serializar la DB congela el event loop.
+    // Con DB de ~38 MB el escaneo completo pesa; 60s es el equilibrio
+    // (ajustable con PAIN_DB_SAVE_MS, mínimo 30s).
     const intervaloGuardado = Math.max(
-      Number.parseInt(process.env.PAIN_DB_SAVE_MS, 10) || 180_000,
+      Number.parseInt(process.env.PAIN_DB_SAVE_MS, 10) || 60_000,
       30_000
     )
     const initialDelay = (phase >>> 0) % intervaloGuardado
@@ -905,10 +906,26 @@ function cerrarConexionesDelProceso(signal) {
     try { socket.ev?.removeAllListeners?.() } catch {}
     try { socket.ws?.close?.() } catch {}
   }
-  global.db?.adapter?.close?.().catch((error) => {
-    console.error('[db] No se pudieron cerrar las conexiones SQLite:', error?.message || error)
-  })
-  setTimeout(() => process.exit(0), 1500).unref?.()
+  // Volcado final: antes se cerraba sin guardar y se perdía hasta 3 min
+  // de cambios en memoria (comisiones, msgs, etc.). El supervisor da 10s.
+  const salir = () => process.exit(0)
+  const volcadoFinal = (async () => {
+    try {
+      await Promise.race([
+        global.db?.write?.() ?? Promise.resolve(),
+        new Promise((resolve) => setTimeout(resolve, 8000)),
+      ])
+    } catch (error) {
+      console.error('[db] No se pudo volcar antes de salir:', error?.message || error)
+    }
+    try {
+      await global.db?.adapter?.close?.()
+    } catch (error) {
+      console.error('[db] No se pudieron cerrar las conexiones SQLite:', error?.message || error)
+    }
+  })()
+  volcadoFinal.then(salir, salir)
+  setTimeout(salir, 9500).unref?.()
 }
 
 process.once('SIGINT', () => cerrarConexionesDelProceso('SIGINT'))
@@ -916,6 +933,38 @@ process.once('SIGTERM', () => cerrarConexionesDelProceso('SIGTERM'))
 process.on('message', (message) => {
   if (message?.type === 'shutdown') cerrarConexionesDelProceso('shutdown')
 })
+
+// Compactación del WAL: con 6 procesos escribiendo sin parar el checkpoint
+// pasivo nunca completa y el WAL crece (lecturas cada vez más lentas).
+// Solo el principal lo hace, cada 10 min (PAIN_DB_CHECKPOINT_MS, 0 = off).
+if (!isSubbotWorker) {
+  const intervaloCheckpoint = Number.parseInt(process.env.PAIN_DB_CHECKPOINT_MS, 10)
+  const cadaCheckpointMs = Number.isInteger(intervaloCheckpoint) ? intervaloCheckpoint : 600_000
+  if (cadaCheckpointMs > 0) {
+    const compactarWal = async () => {
+      try {
+        const adapter = global.db?.adapter
+        if (!adapter?.checkpointWal) return
+        for (const objetivo of [adapter.filename, adapter.claimsFilename].filter(Boolean)) {
+          try {
+            const res = await adapter.checkpointWal(objetivo)
+            if (res && Number(res.busy) !== 0) {
+              console.warn(`[db] Checkpoint ocupado en ${objetivo}: ${res.log ?? '?'} frames pendientes.`)
+            }
+          } catch (error) {
+            console.error(`[db] No se pudo compactar ${objetivo}:`, error?.message || error)
+          }
+        }
+      } catch (error) {
+        console.error('[db] Error compactando WAL:', error?.message || error)
+      }
+    }
+    const primerCheckpoint = setTimeout(() => void compactarWal(), 120_000)
+    primerCheckpoint.unref?.()
+    const cadaCheckpoint = setInterval(() => void compactarWal(), Math.max(cadaCheckpointMs, 60_000))
+    cadaCheckpoint.unref?.()
+  }
+}
 
 
 let reconexionSubBotsPromise = null
