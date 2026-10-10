@@ -69,6 +69,10 @@ qasim: {
   url: "https://api.qasimdev.dpdns.org",
   key: "qasim-dev",
   openRouterKey: process.env.OPENROUTER_API_KEY || null
+},
+kronix: {
+  url: "https://kronix-apis.nexcodea.com",
+  key: "9003f3f5e589987e589073bd9965ac73a00663acb136b73b9b30f601e37c52e4"
 }
 }
 

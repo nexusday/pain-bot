@@ -150,7 +150,7 @@ async function urlEsAudio(url) {
   }
 }
 
-async function pedirAudio(urlVideo) {
+async function pedirAudio(urlVideo, consultaKronix = null) {
   /*
    * ============================
    * API ALEX
@@ -189,9 +189,10 @@ async function pedirAudio(urlVideo) {
    * ============================
    * FALLBACK DE PROVEEDORES
    *
-   * 1. Delirius
-   * 2. Alex
-   * 3. ABZTech
+   * 1. Kronix
+   * 2. Delirius
+   * 3. Alex
+   * 4. ABZTech
    * ============================
    */
 
@@ -199,7 +200,107 @@ async function pedirAudio(urlVideo) {
     [
       /*
        * ========================================
-       * PROVEEDOR 1: DELIRIUS
+       * PROVEEDOR 1: KRONIX
+       *
+       * Respuesta esperada:
+       *
+       * {
+       *   "status": true,
+       *   "creador": "Sunkovv",
+       *   "query": "amapolas",
+       *   "resultado": {
+       *     "titulo": "...",
+       *     "autor": "...",
+       *     "miniatura": "...",
+       *     "duracion": "3:31",
+       *     "duracion_segundos": 211,
+       *     "calidad": "MP3 320kbps",
+       *     "tipo": "audio/mpeg",
+       *     "url": "https://...mp3"
+       *   }
+       * }
+       * ========================================
+       */
+
+      {
+        nombre: "Kronix",
+
+        obtener: async () => {
+          const apiKronix =
+            global.APIs?.kronix
+
+          const baseKronix = (
+            apiKronix?.url ||
+            "https://kronix-apis.nexcodea.com"
+          ).replace(/\/$/, "")
+
+          const consulta =
+            new URL(`${baseKronix}/api/download/ytmp3`)
+
+          consulta.searchParams.set(
+            "query",
+            consultaKronix || urlVideo
+          )
+
+          if (apiKronix?.key) {
+            consulta.searchParams.set(
+              "apikey",
+              apiKronix.key
+            )
+          }
+
+          const json = await pedirJson(
+            consulta.toString(),
+            {
+              timeoutMs: 20_000
+            }
+          )
+
+          const resultado =
+            json?.status === true
+              ? json.resultado
+              : null
+
+          const urlAudio =
+            resultado?.url
+
+          if (
+            typeof urlAudio !== "string" ||
+            pareceHtml(urlAudio) ||
+            !(await urlEsAudio(urlAudio))
+          ) {
+            return null
+          }
+
+          return {
+            urlAudio,
+
+            datos: {
+              title:
+                resultado.titulo,
+
+              author:
+                resultado.autor,
+
+              image:
+                resultado.miniatura,
+
+              duration:
+                resultado.duracion,
+
+              quality:
+                resultado.calidad,
+
+              format:
+                resultado.tipo
+            }
+          }
+        }
+      },
+
+      /*
+       * ========================================
+       * PROVEEDOR 2: DELIRIUS
        * ========================================
        */
 
@@ -244,7 +345,7 @@ async function pedirAudio(urlVideo) {
 
       /*
        * ========================================
-       * PROVEEDOR 2: ALEX
+       * PROVEEDOR 3: ALEX
        * ========================================
        */
 
@@ -291,7 +392,7 @@ async function pedirAudio(urlVideo) {
 
       /*
        * ========================================
-       * PROVEEDOR 3: ABZTECH
+       * PROVEEDOR 4: ABZTECH
        * ========================================
        */
 
@@ -542,10 +643,17 @@ const handler = async (
      * ============================
      * DESCARGAR AUDIO
      * ============================
+     * Kronix acepta texto o link en "query": se le pasa el texto
+     * original cuando hay búsqueda, si no el video ya resuelto.
      */
 
+    const consultaKronix =
+      !enlace && !/^\d+$/.test(text.trim())
+        ? text.trim()
+        : urlVideo
+
     const audio =
-      await pedirAudio(urlVideo)
+      await pedirAudio(urlVideo, consultaKronix)
 
     if (!audio?.urlAudio) {
       throw "no se pudo obtener el audio"
