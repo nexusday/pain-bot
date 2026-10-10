@@ -931,9 +931,22 @@ function contarSesionesEnDisco(serbotDir) {
         return false
       }
     })
-    const requierenVincular = todas.filter((folder) =>
+    const enTodas = new Set(todas)
+    let requierenVincular = todas.filter((folder) =>
       sesionRequiereVincular(join(serbotDir, folder))
     ).length
+    // Marcas limpiadas (sin creds.json): confirmar que también se cuentan.
+    try {
+      for (const folder of readdirSync(serbotDir)) {
+        if (enTodas.has(folder)) continue
+        try {
+          const folderPath = join(serbotDir, folder)
+          if (!statSync(folderPath).isDirectory()) continue
+          if (existsSync(join(folderPath, 'creds.json'))) continue
+          if (sesionRequiereVincular(folderPath)) requierenVincular++
+        } catch {}
+      }
+    } catch {}
     const revisables = todas.filter((folder) =>
       !sesionRequiereVincular(join(serbotDir, folder)) &&
       !vinculacionEnCurso(join(serbotDir, folder))
@@ -1095,9 +1108,21 @@ global.reconnectSubBots = async function() {
       return false
     }
   })
-  const requierenVincular = sesionesSubBot.filter(folder =>
+  const enSesiones = new Set(sesionesSubBot)
+  let requierenVincular = sesionesSubBot.filter(folder =>
     sesionRequiereVincular(join(serbotDir, folder))
   ).length
+  try {
+    for (const folder of readdirSync(serbotDir)) {
+      if (enSesiones.has(folder)) continue
+      try {
+        const folderPath = join(serbotDir, folder)
+        if (!statSync(folderPath).isDirectory()) continue
+        if (existsSync(join(folderPath, 'creds.json'))) continue
+        if (sesionRequiereVincular(folderPath)) requierenVincular++
+      } catch {}
+    }
+  } catch {}
   const sesionesRevisables = sesionesSubBot.filter(folder =>
     !sesionRequiereVincular(join(serbotDir, folder)) &&
     !vinculacionEnCurso(join(serbotDir, folder))

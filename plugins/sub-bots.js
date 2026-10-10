@@ -5,7 +5,7 @@ import fs from 'fs'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 import { formatBotUptime } from '../lib/bot-uptime.js'
 import { tr } from '../lib/lang.js'
-import { sesionRequiereVincular } from '../lib/subbot-recovery.js'
+import { sesionRequiereVincular, listarRequierenVincular, listarSesionesConCreds } from '../lib/subbot-recovery.js'
 import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -69,14 +69,10 @@ let handler = async (m, { conn, usedPrefix }) => {
     const idsGruposUnicos = new Set()
     const estadosWorkers = readSubbotWorkerStatuses(DIR_RAIZ)
     const raizSubs = join(process.cwd(), global.bot || 'Serbot')
-    const carpetasSesion = fs.existsSync(raizSubs)
-      ? fs.readdirSync(raizSubs, { withFileTypes: true })
-        .filter((entrada) => entrada.isDirectory() && fs.existsSync(join(raizSubs, entrada.name, 'creds.json')))
-        .map((entrada) => entrada.name)
-      : []
-    const requierenVincular = carpetasSesion.filter((nombre) =>
-      sesionRequiereVincular(join(raizSubs, nombre))
-    ).length
+    const carpetasSesion = listarSesionesConCreds(raizSubs)
+    // Incluye marcas sin creds (carpeta limpiada): si no, son invisibles.
+    const carpetasRevincular = listarRequierenVincular(raizSubs)
+    const requierenVincular = carpetasRevincular.length
 
     if (connBotPrincipal?.chats) {
       for (const jidUsuario of Object.keys(connBotPrincipal.chats)) {
@@ -125,7 +121,12 @@ let handler = async (m, { conn, usedPrefix }) => {
     const totalSubBots = usuariosUnicos.size
     const totalBots = totalSubBots + 1
     const sesionesActivas = new Set([...usuariosUnicos.values()].map(({ folder }) => folder))
-    const sinSocketActivo = Math.max(0, carpetasSesion.filter(nombre => !sesionesActivas.has(nombre)).length)
+    const setRevincular = new Set(carpetasRevincular)
+    // Los que requieren vincular NO son "sin socket": ya están diagnosticados,
+    // solo esperan /code o /qr. Mezclarlos ocultaba el diagnóstico.
+    const sinSocketActivo = Math.max(0, carpetasSesion.filter(nombre =>
+      !sesionesActivas.has(nombre) && !setRevincular.has(nombre)
+    ).length)
     const totalGrupos = idsGruposUnicos.size
     const memoriaMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
 

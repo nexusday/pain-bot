@@ -5,7 +5,7 @@ import { esOwnerConfig, esDuenoPrincipal, esBotPrincipal, numeroBotDe, obtenerId
 import { cleanBotNum, numerosIdentidadBot, numeroPublicoBot } from './modo-sub.js'
 import { resolvePhoneNumber } from '../lib/resolve-phone.js'
 import { candidatosJidRemitente, jidsSeSolapan } from '../lib/group-participant.js'
-import { sesionRequiereVincular } from '../lib/subbot-recovery.js'
+import { listarRequierenVincular, sesionRequiereVincular } from '../lib/subbot-recovery.js'
 import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
 
 function dirSerbot() {
@@ -85,9 +85,14 @@ function listarSubsEnDisco() {
   const raiz = dirSerbot()
   if (!fs.existsSync(raiz)) return []
   const out = []
-  for (const nombre of fs.readdirSync(raiz)) {
+  const vistos = new Set()
+  const agregar = (nombre) => {
     const n = digitos(nombre)
-    if (n.length < 8) continue
+    if (n.length < 8 || vistos.has(n)) return
+    vistos.add(n)
+    out.push(n)
+  }
+  for (const nombre of fs.readdirSync(raiz)) {
     const ruta = path.join(raiz, nombre)
     try {
       if (!fs.statSync(ruta).isDirectory()) continue
@@ -95,8 +100,12 @@ function listarSubsEnDisco() {
     } catch {
       continue
     }
-    out.push(n)
+    agregar(nombre)
   }
+  // Marcas limpiadas (sin creds): si no se agregan, son invisibles en la lista.
+  try {
+    for (const nombre of listarRequierenVincular(raiz)) agregar(nombre)
+  } catch {}
   return out
 }
 
