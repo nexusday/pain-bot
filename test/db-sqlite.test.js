@@ -724,3 +724,373 @@ test('rejects corrupt JSON and never creates a new database or replaces the sour
     await fs.rm(directory, { recursive: true, force: true })
   }
 })
+
+test('refresh drops an entity deleted by another worker using the incremental cursor', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({
+      users: { alice: { coins: 1 }, bob: { coins: 2 } },
+      chats: { 'g@g.us': { antiLink: true } },
+    }))
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy)
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+
+    delete stateA.users.bob
+    delete stateA.chats['g@g.us']
+    await workerA.write(stateA)
+
+    await workerB.refresh(stateB)
+    assert.equal(stateB.users.bob, undefined)
+    assert.equal(stateB.chats['g@g.us'], undefined)
+    // Un lector totalmente nuevo tampoco debe verlos.
+    const finalState = await new ArchivoSqliteCompartido(sqlite, legacy).read()
+    assert.deepEqual(finalState.users, { alice: { coins: 1 } })
+    assert.deepEqual(finalState.chats, {})
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('recreating an entity after deletion is not resurrected by a stale tombstone', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({
+      users: { alice: { coins: 1 } },
+      chats: {},
+    }))
+    const reader = new ArchivoSqliteCompartido(sqlite, legacy)
+    const readerState = await reader.read()
+
+    // Otro worker borra a alice...
+    const deleter = new ArchivoSqliteCompartido(sqlite, legacy)
+    const deleterState = await deleter.read()
+    delete deleterState.users.alice
+    await deleter.write(deleterState)
+
+    // ...y acto seguido se vuelve a crear.
+    const creator = new ArchivoSqliteCompartido(sqlite, legacy)
+    const creatorState = await creator.read()
+    creatorState.users.alice = { coins: 50 }
+    await creator.write(creatorState)
+
+    // El lector parte del estado inicial (alice coins 1) y debe terminar con
+    // la versión viva, sin que el borrado pendiente la elimine.
+    await reader.refresh(readerState)
+    assert.deepEqual(readerState.users.alice, { coins: 50 })
+
+    const finalState = await new ArchivoSqliteCompartido(sqlite, legacy).read()
+    assert.deepEqual(finalState.users.alice, { coins: 50 })
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('refresh only reads entities changed since its last cursor', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    const users = {}
+    for (let index = 0; index < 400; index++) users[`user-${index}`] = { coins: index }
+    await fs.writeFile(legacy, JSON.stringify({ users, chats: {} }))
+
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy, { persistConnections: true })
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+    const cursorInicial = workerB.cursorSeq
+
+    stateA.users['user-7'].coins = 777
+    await workerA.write(stateA)
+
+    await workerB.refresh(stateB)
+    assert.equal(stateB.users['user-7'].coins, 777)
+    assert.equal(stateB.users['user-200'].coins, 200)
+    assert.ok(workerB.cursorSeq > cursorInicial)
+    await workerB.close()
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('claimAndUpdate reconciles only the entity the callback touches', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({
+      users: { alice: { coins: 10 }, bob: { coins: 20 }, carol: { coins: 30 } },
+      chats: {},
+    }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy)
+    const state = await adapter.read()
+
+    const resultado = await adapter.claimAndUpdate(state, 'daily-user:alice', 60_000, (datos) => {
+      datos.users.alice.coins += 5
+      return { coins: datos.users.alice.coins }
+    })
+
+    assert.deepEqual(resultado.result, { coins: 15 })
+    assert.equal(state.users.alice.coins, 15)
+    assert.equal(state.users.bob.coins, 20)
+    assert.equal(state.users.carol.coins, 30)
+
+    const finalState = await new ArchivoSqliteCompartido(sqlite, legacy).read()
+    assert.deepEqual(finalState.users, {
+      alice: { coins: 15 },
+      bob: { coins: 20 },
+      carol: { coins: 30 },
+    })
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('claimAndUpdate sees a remote write made inside the cursor window', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10 } }, chats: {} }))
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy)
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+
+    stateA.users.alice.coins = 50
+    await workerA.write(stateA)
+
+    let visto
+    const resultado = await workerB.claimAndUpdate(stateB, 'daily-user:alice', 60_000, (datos) => {
+      visto = datos.users.alice.coins
+      datos.users.alice.coins += 1
+      return { antes: visto }
+    })
+
+    assert.equal(visto, 50)
+    assert.deepEqual(resultado.result, { antes: 50 })
+    assert.equal(stateB.users.alice.coins, 51)
+    assert.equal((await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice.coins, 51)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('claimAndUpdate merges a remote update with local edits without losing either', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10, level: 1 } }, chats: {} }))
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy)
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+
+    stateA.users.alice.level = 5
+    await workerA.write(stateA)
+    stateB.users.alice.coins = 99
+
+    await workerB.claimAndUpdate(stateB, 'daily-user:alice', 60_000, (datos) => {
+      datos.users.alice.coins += 1
+      return {}
+    })
+
+    assert.deepEqual(stateB.users.alice, { coins: 100, level: 5 })
+    assert.deepEqual(
+      (await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice,
+      { coins: 100, level: 5 }
+    )
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('claimAndUpdate deletes an entity through the callback and propagates it', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({
+      users: { alice: { coins: 1 }, bob: { coins: 2 } },
+      chats: {},
+    }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy)
+    const state = await adapter.read()
+
+    await adapter.claimAndUpdate(state, 'daily-user:alice', 60_000, (datos) => {
+      delete datos.users.bob
+      return {}
+    })
+
+    assert.equal(state.users.bob, undefined)
+    assert.deepEqual(state.users, { alice: { coins: 1 } })
+    assert.deepEqual(
+      (await new ArchivoSqliteCompartido(sqlite, legacy).read()).users,
+      { alice: { coins: 1 } }
+    )
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('a rejected claim neither persists nor touches the live snapshot', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({ users: { alice: { coins: 10 } }, chats: {} }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy)
+    const state = await adapter.read()
+
+    await adapter.claimAndUpdate(state, 'daily-user:alice', 60_000, (datos, now) => {
+      datos.users.alice.coins += 5
+      datos.users.alice.lastDaily = now
+      return { claim: true }
+    })
+    const revBefore = JSON.stringify(state.users.alice)
+
+    const duplicado = await adapter.claimAndUpdate(state, 'daily-user:alice', 60_000, (datos, now) => {
+      const restante = 60_000 - (now - datos.users.alice.lastDaily)
+      if (restante > 0) return { claim: false, restante }
+      datos.users.alice.coins += 5
+      return { claim: true }
+    })
+
+    assert.equal(duplicado.acquired, true)
+    assert.ok(duplicado.result.restante > 0)
+    assert.equal(JSON.stringify(state.users.alice), revBefore)
+    assert.equal((await new ArchivoSqliteCompartido(sqlite, legacy).read()).users.alice.coins, 15)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('the lazy entity view supports membership and enumeration inside the claim', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({
+      users: { alice: { coins: 1 }, bob: { coins: 2 } },
+      chats: {},
+    }))
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy)
+    const state = await adapter.read()
+
+    let averiguado
+    await adapter.claimAndUpdate(state, 'loteria-buy:x', 60_000, (datos) => {
+      averiguado = {
+        tieneAlice: 'alice' in datos.users,
+        claves: Object.keys(datos.users).sort(),
+      }
+      return {}
+    })
+
+    assert.equal(averiguado.tieneAlice, true)
+    assert.deepEqual(averiguado.claves, ['alice', 'bob'])
+    assert.deepEqual(state.users, { alice: { coins: 1 }, bob: { coins: 2 } })
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('claimAndUpdate reconciles in place without replacing live object identities', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    await fs.writeFile(legacy, JSON.stringify({
+      users: { alice: { coins: 10, level: 1 } },
+      chats: {},
+    }))
+    const workerA = new ArchivoSqliteCompartido(sqlite, legacy)
+    const workerB = new ArchivoSqliteCompartido(sqlite, legacy)
+    const stateA = await workerA.read()
+    const stateB = await workerB.read()
+
+    const mapaRef = stateB.users
+    const usuarioRef = stateB.users.alice
+
+    stateA.users.alice.level = 9
+    await workerA.write(stateA)
+
+    await workerB.claimAndUpdate(stateB, 'daily-user:alice', 60_000, (datos) => {
+      datos.users.alice.coins += 1
+      return {}
+    })
+
+    assert.equal(stateB.users, mapaRef)
+    assert.equal(stateB.users.alice, usuarioRef)
+    assert.deepEqual(usuarioRef, { coins: 11, level: 9 })
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('migrates a per-collection schema without the sequence column and keeps refreshing', async () => {
+  const directory = await crearDirectorioTemporal()
+  const legacy = path.join(directory, 'database.json')
+  const sqlite = path.join(directory, 'database.sqlite')
+
+  try {
+    // Esquema intermedio: colecciones/entidades ya fragmentadas pero sin la
+    // columna `updated` ni las tablas de borrados y cursor.
+    const stats = JSON.stringify({ commands: 3 })
+    const alice = JSON.stringify({ coins: 10 })
+    const grupo = JSON.stringify({ antiLink: true })
+    await new Promise((resolve, reject) => {
+      const db = new sqlite3.Database(sqlite)
+      db.exec(`
+        CREATE TABLE bot_collections (
+          key TEXT PRIMARY KEY, payload TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE bot_entidades (
+          collection TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (collection, id)
+        );
+        CREATE TABLE bot_coleccion_revs (
+          collection TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO bot_collections (key, payload, revision) VALUES ('stats', '${stats}', 4);
+        INSERT INTO bot_entidades (collection, id, data, revision) VALUES ('users', 'alice', '${alice}', 2);
+        INSERT INTO bot_entidades (collection, id, data, revision) VALUES ('chats', 'g1', '${grupo}', 5);
+        INSERT INTO bot_coleccion_revs (collection, revision) VALUES ('users', 2);
+      `, (error) => {
+        if (error) { reject(error); return }
+        db.close((closeError) => closeError ? reject(closeError) : resolve())
+      })
+    })
+
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy)
+    const state = await adapter.read()
+    assert.deepEqual(state.stats, { commands: 3 })
+    assert.deepEqual(state.users, { alice: { coins: 10 } })
+    assert.deepEqual(state.chats, { g1: { antiLink: true } })
+
+    // Tras migrar, el refresco incremental sigue viendo los cambios propios.
+    state.users.alice.coins = 25
+    await adapter.write(state)
+    await adapter.refresh(state)
+    const finalState = await new ArchivoSqliteCompartido(sqlite, legacy).read()
+    assert.equal(finalState.users.alice.coins, 25)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true })
+  }
+})

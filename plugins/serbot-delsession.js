@@ -5,7 +5,13 @@ import { esOwnerConfig, esDuenoPrincipal, esBotPrincipal, numeroBotDe, obtenerId
 import { cleanBotNum, numerosIdentidadBot, numeroPublicoBot } from './modo-sub.js'
 import { resolvePhoneNumber } from '../lib/resolve-phone.js'
 import { candidatosJidRemitente, jidsSeSolapan } from '../lib/group-participant.js'
-import { listarRequierenVincular, sesionRequiereVincular } from '../lib/subbot-recovery.js'
+import {
+  listarRequierenVincular,
+  necesitaRevinculacion,
+  sesionRequiereVincular,
+  olvidarAjustesSesion,
+  tieneAjustesGuardados
+} from '../lib/subbot-recovery.js'
 import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
 
 function dirSerbot() {
@@ -164,6 +170,8 @@ async function eliminarSesionSubBot(num) {
       fs.rmSync(path.join(ruta, 'creds.json'), { force: true })
     }
   }
+  // La sesión se elimina a propósito: también se olvida su registro de ajustes.
+  try { olvidarAjustesSesion(ruta, dirSerbot()) } catch {}
   if (typeof process.send === 'function') {
     process.send({ type: 'remove-session', session: n }, (error) => {
       if (error) console.error('[delsession] No se pudo actualizar la asignación del supervisor:', error.message)
@@ -224,7 +232,8 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
     let i = 1
     for (const n of [...nums].sort()) {
       const on = online.some(o => o.num === n)
-      const requiereVincular = sesionRequiereVincular(rutaSesionSub(n))
+      const requiereVincular = necesitaRevinculacion(dirSerbot(), n) ||
+        sesionRequiereVincular(rutaSesionSub(n))
       texto += `*${i}.* +${n} ${on ? '🟢' : requiereVincular ? '🔗' : '⚪'}\n`
       i++
     }
@@ -279,7 +288,8 @@ let handler = async (m, { conn, args, usedPrefix, command, participants }) => {
 
   const ruta = rutaSesionSub(objetivo)
   const conectado = listarSubsConectados().some(({ num }) => num === objetivo)
-  if (!conectado && !fs.existsSync(ruta)) {
+  const hayAjustes = tieneAjustesGuardados(dirSerbot(), objetivo)
+  if (!conectado && !fs.existsSync(ruta) && !hayAjustes) {
     return conn.reply(m.chat, `[❗] No hay sesión para +${objetivo}.`, m)
   }
 

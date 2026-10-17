@@ -19,7 +19,10 @@ import {
   finalizarVinculacion,
   limpiarMarcaReenlace,
   limpiarCredencialesSubBot,
-  marcarVinculacionEnCurso
+  marcarVinculacionEnCurso,
+  restaurarAjustesSesion,
+  olvidarAjustesSesion,
+  tieneAjustesGuardados
 } from '../lib/subbot-recovery.js'
 import { fileURLToPath } from "url"
 import { tr } from '../lib/lang.js'
@@ -290,7 +293,13 @@ async function iniciarSubBot(options) {
 
   const codigoM = args[0] && /(--code|code)/.test(args[0].trim()) ? true : args[1] && /(--code|code)/.test(args[1].trim()) ? true : false
   const rutaMarcaReenlace = path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE)
-  const reenlaceEnCurso = fromCommand && fs.existsSync(rutaMarcaReenlace)
+  const raizReenlace = path.dirname(pathAYBot)
+  const carpetaReenlace = path.basename(pathAYBot)
+  // Re-vinculación de una sesión conocida: hay marca o quedaron ajustes
+  // conservados en el registro (la carpeta ya fue archivada).
+  const reenlaceEnCurso = fromCommand && (
+    fs.existsSync(rutaMarcaReenlace) || tieneAjustesGuardados(raizReenlace, carpetaReenlace)
+  )
   let txtCodigo, codeBot, txtQR
 
   if (codigoM) {
@@ -309,6 +318,8 @@ async function iniciarSubBot(options) {
       const previa = JSON.parse(fs.readFileSync(rutaCreds, 'utf8'))
       if (previa?.registered && !fs.existsSync(path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE))) {
         if (m && conn) await avisarSesionExistente(conn, m, path.basename(pathAYBot), 'guardada', usedPrefix)
+        // Ya está vinculada: un registro viejo de ajustes es basura, se olvida.
+        try { olvidarAjustesSesion(pathAYBot, raizReenlace) } catch {}
         if (supervisorHandoff) releaseSessionLease(path.basename(pathAYBot))
         return
       }
@@ -316,7 +327,15 @@ async function iniciarSubBot(options) {
   }
 
   if (fromCommand) {
-    limpiarCredencialesSubBot(pathAYBot)
+    limpiarCredencialesSubBot(pathAYBot, raizReenlace)
+    // Si la sesión había quedado archivada, recupera config/staff/soporte.
+    try {
+      if (restaurarAjustesSesion(pathAYBot, raizReenlace)) {
+        console.log(chalk.gray(`┆ Ajustes restaurados para +${carpetaReenlace} (config/staff/soporte).`))
+      }
+    } catch (error) {
+      console.error(`No se pudieron restaurar los ajustes de ${carpetaReenlace}:`, error?.message || error)
+    }
   }
 
   const argCreds = args[0]
@@ -765,7 +784,7 @@ async function iniciarSubBot(options) {
           console.log(chalk.bold.magentaBright(
             `\n┆ Sesión (+${idCarpetaBot}) rechazada por WhatsApp (código ${motivo ?? 'desconocido'}). ` +
             `${detalleDesconexion ? `Motivo: ${detalleDesconexion}. ` : ''}` +
-            `Se conserva su carpeta; vuelve a vincularla con /code o /qr.\n`
+            `Se archivará; sus ajustes quedan guardados y vuelve a vincularla con /code o /qr.\n`
           ))
           try { sock.ws.close() } catch {}
           quitarSockDeConns(sock)
@@ -794,6 +813,8 @@ async function iniciarSubBot(options) {
       if (connection === 'open') {
         try {
           limpiarMarcaReenlace(pathAYBot)
+          // El vínculo ya se recuperó: los ajustes conservados ya no hacen falta.
+          olvidarAjustesSesion(pathAYBot, path.dirname(pathAYBot))
         } catch (error) {
           console.error(`No se pudo limpiar la marca de reconexión de ${idCarpetaBot}:`, error?.message || error)
         }

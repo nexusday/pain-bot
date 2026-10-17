@@ -40,7 +40,10 @@ import { makeWASocket, protoType, serialize } from './lib/simple.js'
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-estable.js'
 import {
   ARCHIVO_REENLACE_PENDIENTE,
-  limpiarCredencialesSubBot,
+  listarRequierenVincular,
+  necesitaRevinculacion,
+  purgarSesionesReenlace,
+  purgarSesionReenlace,
   sesionRequiereVincular,
   vinculacionEnCurso
 } from './lib/subbot-recovery.js'
@@ -756,10 +759,13 @@ if (!isSubbotWorker) {
     const botPath = join(serbotDir, folder)
     if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) {
       try {
-        limpiarCredencialesSubBot(botPath)
-        console.warn(`Worker subbot: se omite ${folder}, requiere volver a vincular.`)
+        purgarSesionReenlace(botPath, serbotDir)
+        console.warn(`Worker subbot: se archivó ${folder} (requiere volver a vincular); ajustes conservados.`)
+        if (typeof process.send === 'function') {
+          try { process.send({ type: 'remove-session', session: folder }, () => {}) } catch {}
+        }
       } catch (error) {
-        console.error(`Worker subbot: no se pudieron limpiar las credenciales de ${folder}:`, error?.message || error)
+        console.error(`Worker subbot: no se pudo archivar ${folder}:`, error?.message || error)
       }
       return Promise.resolve('skipped')
     }
@@ -825,6 +831,8 @@ if (!isSubbotWorker) {
           higieneMemoriaProceso()
         } catch {}
       }).catch(() => {})
+      // Archiva sesiones rechazadas: evita que se acumulen carpetas muertas.
+      try { purgarReenlacesPendientes(serbotDir) } catch {}
     }
   }, 10_000)
   workerStatusInterval.unref?.()
@@ -929,6 +937,7 @@ if (!isSubbotWorker) {
     `Worker ${workerId} inició ${started}/${sessions.length} sesión(es); ` +
     `${skipped} omitida(s), ${failed} con error.`
   )
+  try { purgarReenlacesPendientes(serbotDir) } catch {}
 }
 
 function cerrarConexionesDelProceso(signal) {
@@ -1007,6 +1016,26 @@ if (!isSubbotWorker) {
 
 let reconexionSubBotsPromise = null
 
+// Archiva (conserva ajustes + borra carpeta) las sesiones marcadas para volver
+// a vincular, avisando al supervisor para que las suelte sin reiniciar workers.
+function purgarReenlacesPendientes(serbotDir) {
+  let purgadas = []
+  try {
+    purgadas = purgarSesionesReenlace(serbotDir)
+  } catch (error) {
+    console.error('[reenlace] No se pudieron archivar sesiones para revincular:', error?.message || error)
+    return
+  }
+  for (const folder of purgadas) {
+    console.log(chalk.cyan(
+      `Sesión +${folder} archivada (requiere revincular); ajustes conservados para restaurarlos al volver a vincular.`
+    ))
+    if (typeof process.send === 'function') {
+      try { process.send({ type: 'remove-session', session: folder }, () => {}) } catch {}
+    }
+  }
+}
+
 function contarSesionesEnDisco(serbotDir) {
   try {
     if (!existsSync(serbotDir)) return { todas: [], revisables: [], requierenVincular: 0 }
@@ -1018,21 +1047,10 @@ function contarSesionesEnDisco(serbotDir) {
         return false
       }
     })
-    const enTodas = new Set(todas)
-    let requierenVincular = todas.filter((folder) =>
-      sesionRequiereVincular(join(serbotDir, folder))
-    ).length
-    // Marcas limpiadas (sin creds.json): confirmar que también se cuentan.
+    // Cubre marcas presentes y sesiones ya archivadas (solo registro).
+    let requierenVincular = 0
     try {
-      for (const folder of readdirSync(serbotDir)) {
-        if (enTodas.has(folder)) continue
-        try {
-          const folderPath = join(serbotDir, folder)
-          if (!statSync(folderPath).isDirectory()) continue
-          if (existsSync(join(folderPath, 'creds.json'))) continue
-          if (sesionRequiereVincular(folderPath)) requierenVincular++
-        } catch {}
-      }
+      requierenVincular = listarRequierenVincular(serbotDir).length
     } catch {}
     const revisables = todas.filter((folder) =>
       !sesionRequiereVincular(join(serbotDir, folder)) &&
@@ -1151,7 +1169,7 @@ global.reconnectSubBotOneManaged = async function(folder) {
       }
     }
   } catch {}
-  if (sesionRequiereVincular(join(serbotDir, realFolder))) {
+  if (necesitaRevinculacion(serbotDir, realFolder) || sesionRequiereVincular(join(serbotDir, realFolder))) {
     return { ok: false, reason: 'needs-relink' }
   }
   const antes = contarConectadosManaged()
@@ -1457,6 +1475,21 @@ if (!isSubbotWorker && !isManagedPrimary) setInterval(() => {
     console.error('[supervisor sub-bots] Error revisando sesiones:', error?.message || error)
   })
 }, 60_000).unref?.()
+
+// Archivado periódico de sesiones rechazadas desde el principal, por si alguna
+// quedó sin worker asignado que la procese.
+if (!isSubbotWorker) {
+  const serbotDirSweep = resolve(__dirname, global.bot || 'Serbot')
+  const barrerReenlaces = () => {
+    try {
+      purgarReenlacesPendientes(serbotDirSweep)
+    } catch (error) {
+      console.error('[reenlace] No se pudo archivar sesiones:', error?.message || error)
+    }
+  }
+  setTimeout(barrerReenlaces, 20_000).unref?.()
+  setInterval(barrerReenlaces, 60_000).unref?.()
+}
 
 const publicationTimers = new Map()
 const publicationQueue = new Map()
