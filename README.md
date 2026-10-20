@@ -365,9 +365,10 @@ eso la compuerta ya no interviene: si el principal se desvincula más tarde, los
 sub-bots **siguen conectados y funcionando**.
 
 **`/subme <mensaje>`** no lo manda el principal a los sub-bots: **cada sub-bot
-abre su propio chat privado con quien ejecutó el comando y le escribe ahí**. El
-owner recibe un mensaje por sub-bot en su privado, y el bot le confirma cuántos
-escribieron y cuántos fallaron.
+se escribe a sí mismo** el mensaje (en su propio chat "mensajes para ti
+mismo"). Ni el principal les escribe a los sub-bots, ni los sub-bots se
+escriben entre sí. El owner recibe solo la confirmación de cuántos escribieron
+y cuántos fallaron.
 
 ---
 

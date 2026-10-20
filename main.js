@@ -871,12 +871,11 @@ if (!isSubbotWorker) {
   }, 10_000)
   workerStatusInterval.unref?.()
   process.on('message', async (message) => {
-    if (message?.type === 'send-private' && typeof message.text === 'string' &&
-        typeof message.jid === 'string') {
-      // /subme: cada sub-bot de este worker escribe al owner en su privado.
-      const { enviarPrivadoDesdeSockets } = await import('./lib/subme-broadcast.js')
+    if (message?.type === 'send-private' && typeof message.text === 'string') {
+      // /subme: cada sub-bot de este worker se escribe a sí mismo el mensaje.
+      const { enviarMensajeASuPropioChat } = await import('./lib/subme-broadcast.js')
       const sockets = (global.conns || []).filter(Boolean)
-      const resultado = await enviarPrivadoDesdeSockets(message.jid, message.text, sockets)
+      const resultado = await enviarMensajeASuPropioChat(message.text, sockets)
       try {
         process.send({
           type: 'send-private-result',

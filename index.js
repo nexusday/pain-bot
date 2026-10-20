@@ -322,7 +322,7 @@ function startSlot(id, slot) {
     }
     if (id !== 'primary' || !message || typeof message !== 'object') return
     if (message.type === 'request-send-private' && typeof message.requestId === 'string' &&
-        typeof message.jid === 'string' && typeof message.text === 'string') {
+        typeof message.text === 'string') {
       const workerIds = []
       for (const [workerId, worker] of slots) {
         if (workerId === 'primary' || !worker.child?.connected) continue
@@ -330,7 +330,6 @@ function startSlot(id, slot) {
         worker.child.send({
           type: 'send-private',
           requestId: message.requestId,
-          jid: message.jid,
           text: message.text,
         }, () => {})
       }

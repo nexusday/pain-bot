@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { requestEnviarPrivadoSubBots } from '../lib/process-isolation.js'
 import { crearCoordinadorSubme } from '../lib/subme-coordinator.js'
-import { enviarPrivadoDesdeSockets } from '../lib/subme-broadcast.js'
+import { enviarMensajeASuPropioChat } from '../lib/subme-broadcast.js'
 
 /**
  * Simula la cadena completa de /subme:
@@ -27,7 +27,7 @@ function montar({ workers: definiciones }) {
     }
     worker.on('message', async (mensaje) => {
       if (mensaje?.type !== 'send-private') return
-      const resultado = await enviarPrivadoDesdeSockets(mensaje.jid, mensaje.text, sockets)
+      const resultado = await enviarMensajeASuPropioChat(mensaje.text, sockets)
       supervisor.emit('from-worker', id, {
         type: 'send-private-result',
         requestId: mensaje.requestId,
@@ -53,7 +53,6 @@ function montar({ workers: definiciones }) {
       worker.send({
         type: 'send-private',
         requestId: mensaje.requestId,
-        jid: mensaje.jid,
         text: mensaje.text,
       })
     }
@@ -79,7 +78,7 @@ function socket(numero, { falla = false } = {}) {
   }
 }
 
-test('el owner recibe un mensaje privado de cada sub-bot', async () => {
+test('cada sub-bot se escribe a sí mismo y nadie escribe al owner', async () => {
   const a = socket('5211111111111')
   const b = socket('5212222222222')
   const c = socket('5213333333333')
@@ -92,7 +91,6 @@ test('el owner recibe un mensaje privado de cada sub-bot', async () => {
 
   const ack = await requestEnviarPrivadoSubBots({
     processRef: primary,
-    jid: '5219999999999@s.whatsapp.net',
     text: 'mensaje para el owner',
     timeoutMs: 5000,
   })
@@ -101,12 +99,11 @@ test('el owner recibe un mensaje privado de cada sub-bot', async () => {
   assert.equal(ack.workers, 2)
   assert.deepEqual(ack.fallidos, [])
 
-  // Cada sub-bot escribió al owner (no el principal a cada sub-bot).
-  for (const s of [a, b, c]) {
-    assert.equal(s.enviados.length, 1)
-    assert.equal(s.enviados[0].jid, '5219999999999@s.whatsapp.net')
-    assert.equal(s.enviados[0].text, 'mensaje para el owner')
-  }
+  // Destino = el propio número de cada sub-bot.
+  assert.equal(a.enviados[0].jid, '5211111111111@s.whatsapp.net')
+  assert.equal(b.enviados[0].jid, '5212222222222@s.whatsapp.net')
+  assert.equal(c.enviados[0].jid, '5213333333333@s.whatsapp.net')
+  assert.equal(a.enviados[0].text, 'mensaje para el owner')
 })
 
 test('los sub-bots que fallan se listan sin bloquear al resto', async () => {
@@ -118,7 +115,6 @@ test('los sub-bots que fallan se listan sin bloquear al resto', async () => {
 
   const ack = await requestEnviarPrivadoSubBots({
     processRef: primary,
-    jid: '5219999999999@s.whatsapp.net',
     text: 'hola',
     timeoutMs: 5000,
   })
@@ -131,7 +127,6 @@ test('sin workers la petición responde con cero', async () => {
   const { primary } = montar({ workers: {} })
   const ack = await requestEnviarPrivadoSubBots({
     processRef: primary,
-    jid: '5219999999999@s.whatsapp.net',
     text: 'hola',
     timeoutMs: 5000,
   })
@@ -139,8 +134,7 @@ test('sin workers la petición responde con cero', async () => {
   assert.equal(ack.workers, 0)
 })
 
-test('sin destino o sin texto no se envía nada', async () => {
+test('sin texto no se envía nada', async () => {
   const { primary } = montar({ workers: { 'subbot-group-0': [socket('5211111111111')] } })
-  assert.equal(await requestEnviarPrivadoSubBots({ processRef: primary, jid: '', text: 'hola' }), null)
-  assert.equal(await requestEnviarPrivadoSubBots({ processRef: primary, jid: '1@s.whatsapp.net', text: '' }), null)
+  assert.equal(await requestEnviarPrivadoSubBots({ processRef: primary, text: '' }), null)
 })
