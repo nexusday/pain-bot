@@ -1,6 +1,7 @@
 import sharp from '../lib/sharp.js'
 import fetch from 'node-fetch'
 import { webp2png } from '../lib/webp2mp4.js'
+import { guardarEnCacheLimitado } from '../lib/cache-limitado.js'
 
 
 
@@ -10,6 +11,10 @@ const EMOJI_WA_RESERVA = 'https://emoji-cdn.mqrio.dev'
 
 const cachePngEmoji = new Map()
 const cacheAnchoTexto = new Map()
+// Topes: los PNG de emoji pesan y las medidas de texto dependen del texto
+// enviado, así que sin límite crecían en cada worker.
+const MAX_CACHE_EMOJI = 150
+const MAX_CACHE_TEXTO = 300
 const segmentadorGrafemas =
   typeof Intl !== 'undefined' && Intl.Segmenter
     ? new Intl.Segmenter('und', { granularity: 'grapheme' })
@@ -117,7 +122,7 @@ async function obtenerPngEmoji(emoji) {
     for (const code of emojiACodigos(emoji)) {
       const bufer = await obtenerPng(`${CDN_EMOJI_WA}/${code}.png`)
       if (bufer) {
-        cachePngEmoji.set(emoji, bufer)
+        guardarEnCacheLimitado(cachePngEmoji, emoji, bufer, MAX_CACHE_EMOJI)
         return bufer
       }
     }
@@ -125,13 +130,13 @@ async function obtenerPngEmoji(emoji) {
       `${EMOJI_WA_RESERVA}/${encodeURIComponent(emoji)}?style=whatsapp`
     )
     if (bufer) {
-      cachePngEmoji.set(emoji, bufer)
+      guardarEnCacheLimitado(cachePngEmoji, emoji, bufer, MAX_CACHE_EMOJI)
       return bufer
     }
-    cachePngEmoji.set(emoji, null)
+    guardarEnCacheLimitado(cachePngEmoji, emoji, null, MAX_CACHE_EMOJI)
     return null
   } catch {
-    cachePngEmoji.set(emoji, null)
+    guardarEnCacheLimitado(cachePngEmoji, emoji, null, MAX_CACHE_EMOJI)
     return null
   }
 }
@@ -224,11 +229,11 @@ async function medirAnchoTexto(text, tamanoFuente, anchoTrazo) {
    
     const medido =
       maxX >= minX ? maxX - minX + 1 + 6 : Math.ceil(tamanoFuente * text.length * 0.7 + anchoTrazo * 2)
-    cacheAnchoTexto.set(clave, medido)
+    guardarEnCacheLimitado(cacheAnchoTexto, clave, medido, MAX_CACHE_TEXTO)
     return medido
   } catch {
     const reserva = Math.ceil(tamanoFuente * text.length * 0.72 + anchoTrazo * 2)
-    cacheAnchoTexto.set(clave, reserva)
+    guardarEnCacheLimitado(cacheAnchoTexto, clave, reserva, MAX_CACHE_TEXTO)
     return reserva
   }
 }

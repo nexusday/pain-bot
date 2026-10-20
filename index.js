@@ -44,6 +44,20 @@ const RESTART_MAX_MS = 30_000
 const STABLE_MS = 60_000
 // Generación joven más grande: el GC llegó a ocupar ~20 % del tiempo por la cantidad de objetos pequeños.
 const SEMI_SPACE_MB = Math.min(Math.max(Number.parseInt(process.env.PAIN_SEMI_SPACE_MB, 10) || 16, 16), 128)
+// Tope de heap por proceso: con 150+ subbots un worker descontrolado podía
+// crecer hasta llenar los 8 GB del VPS. Al llegar al tope, Node hace GC fuerte
+// y, si de verdad no alcanza, el supervisor reinicia solo ese worker.
+const HEAP_WORKER_MB = Math.min(
+  Math.max(Number.parseInt(process.env.PAIN_WORKER_HEAP_MB, 10) || 896, 256),
+  4096
+)
+const HEAP_PRIMARY_MB = Math.min(
+  Math.max(Number.parseInt(process.env.PAIN_PRIMARY_HEAP_MB, 10) || 1024, 256),
+  4096
+)
+const EXEC_ARGV_BASE = process.execArgv.filter((arg) =>
+  arg !== '--expose-gc' && !/^--max-old-space-size=/.test(arg) && !/^--max-semi-space-size=/.test(arg)
+)
 
 function listSessions() {
   if (!existsSync(subbotRoot)) return []
@@ -176,7 +190,12 @@ function startSlot(id, slot) {
   slot.startedAt = Date.now()
   const child = fork(mainPath, process.argv.slice(2), {
     cwd: __dirname,
-    execArgv: [...process.execArgv, `--max-semi-space-size=${SEMI_SPACE_MB}`],
+    execArgv: [
+      ...EXEC_ARGV_BASE,
+      '--expose-gc',
+      `--max-semi-space-size=${SEMI_SPACE_MB}`,
+      `--max-old-space-size=${slot.target.role === 'primary' ? HEAP_PRIMARY_MB : HEAP_WORKER_MB}`,
+    ],
     env: {
       ...process.env,
       PAIN_ROLE: slot.target.role,

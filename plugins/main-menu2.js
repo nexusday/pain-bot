@@ -23,6 +23,14 @@ const TTL_MENU_MS = 30 * 60 * 1000
 function recordarMenuActivo(chatId, key) {
   if (!chatId || !key?.id) return
   menusActivos.set(chatId, { key, at: Date.now() })
+  if (menusActivos.size <= 800) return
+  const ahora = Date.now()
+  for (const [id, entry] of menusActivos) {
+    if (!entry?.at || ahora - entry.at > TTL_MENU_MS) menusActivos.delete(id)
+  }
+  while (menusActivos.size > 800) {
+    menusActivos.delete(menusActivos.keys().next().value)
+  }
 }
 
 function obtenerMenuActivo(chatId) {

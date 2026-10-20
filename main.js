@@ -38,6 +38,7 @@ import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-estable.js'
+import { estadoMemoriaProceso } from './lib/mem-hygiene.js'
 import {
   ARCHIVO_REENLACE_PENDIENTE,
   listarRequierenVincular,
@@ -705,31 +706,22 @@ function agendarRecargaCodigo(nombre) {
   agendarRecargaCodigo._espera = setTimeout(async () => {
     try {
       globalThis.__HOT_EPOCH = Date.now()
-      await filesInitEnCaliente()
+      // ESM no descarga módulos: reimportar todos los plugins con ?update=
+      // dejaba una copia viva por cada cambio y el heap crecía sin bajar.
+      // Los plugins se siguen recargando uno a uno con el watcher de plugins;
+      // handler.js se recarga solo; lib/ requiere reinicio.
+      if (nombre !== 'handler.js') {
+        console.log(chalk.yellow(
+          `[hot] ${nombre} cambió: reinicia el bot para aplicarlo (lib/ no se recarga en caliente).`
+        ))
+        return
+      }
       await global.reloadHandler(false)
       console.log(chalk.cyan(`Updated code - '${nombre}'`))
     } catch (e) {
       console.error('No se pudo recargar el código:', e?.message || e)
     }
   }, 400)
-}
-
-async function filesInitEnCaliente() {
-  for (const filename of readdirSync(pluginFolder).filter(pluginFilter)) {
-    const dir = global.__filename(join(pluginFolder, filename), true)
-    if (!existsSync(dir)) {
-      delete global.plugins[filename]
-      continue
-    }
-    try {
-      const module = await import(`${global.__filename(dir)}?update=${Date.now()}`)
-      global.plugins[filename] = normalizePlugin(module.default || module)
-    } catch (e) {
-      conn.logger?.error?.(`Error recargando plugin ${filename}:`, e)
-    }
-  }
-  global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)))
-  global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
 }
 
 watch(join(__dirname, 'handler.js'), () => agendarRecargaCodigo('handler.js'))
@@ -800,6 +792,7 @@ if (!isSubbotWorker) {
     for (const socket of global.conns) {
       if (socket?.pathAYBot) socketsBySessionPath.set(resolve(socket.pathAYBot), socket)
     }
+    const estado = estadoMemoriaProceso()
     writeSubbotWorkerStatus(__dirname, workerId, sessions.map((folder) => {
       const socket = socketsBySessionPath.get(join(serbotDir, folder))
       const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
@@ -814,7 +807,18 @@ if (!isSubbotWorker) {
         ),
         requiresRelink: existsSync(join(serbotDir, folder, '.needs-relink')),
       }
-    }))
+    }), {
+      memoria: estado.memoria,
+      recursos: {
+        sockets: estado.sockets,
+        chats: estado.chats,
+        mensajes: estado.mensajes,
+        metadata: estado.metadata,
+        participantes: estado.participantes,
+        cacheMensajes: estado.cacheMensajes,
+        modoAhorro: estado.modoAhorro,
+      },
+    })
   }
   publishWorkerStatus()
   let ticksEstado = 0
@@ -824,8 +828,9 @@ if (!isSubbotWorker) {
     } catch (error) {
       console.error(`Worker ${workerId}: no se pudo publicar el estado de sus sesiones:`, error?.message || error)
     }
-    // Higiene de memoria cada ~60s (no en cada tick para no escanear de más).
-    if (++ticksEstado % 6 === 0) {
+    // Higiene de memoria cada ~30s. Antes eran 60s y el heap alcanzaba
+    // ~1 GB por worker antes de que la poda hiciera efecto.
+    if (++ticksEstado % 3 === 0) {
       import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
         try {
           higieneMemoriaProceso()

@@ -352,6 +352,39 @@ Uso personal o educativo. Respeta las [políticas de WhatsApp](https://www.whats
 *Pain Bot — By Sunkovv*
 # Sub-bot process layout
 
-The main bot runs in its own process. All sub-bots share one supervised worker.
+The main bot runs in its own process. Sub-bots are split across several
+supervised workers (5 by default, `PAIN_SUBBOT_WORKERS`).
 `/pri 2` and per-sub-bot worker mode have been removed to keep process count and
 CPU overhead predictable.
+
+---
+
+# Memoria con muchos sub-bots
+
+Con 150+ sub-bots la RAM la consuma el proceso, no el bot. Por eso ahora:
+
+- Se podan por proceso los chats inactivos (150 por socket), la metadata de
+  grupos (60 por socket) y el caché de mensajes (4 000 por proceso, 50 por chat).
+- Se quitan las miniaturas (jpeg/png) de los mensajes cacheados: eran el bloque
+  más pesado y ningún comando las usaba.
+- Se libera el modelo de voz (Whisper) tras 5 min sin audio y se ejecuta GC
+  cuando el heap supera 350 MB.
+- Se limita el heap de cada proceso: 896 MB por worker y 1 GB para el principal.
+  Si un worker se pasa, el supervisor lo reinicia solo.
+
+Diagnóstico: `/mem` y `/mem limpiar` (fuerza poda y GC en el proceso actual).
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `PAIN_SUBBOT_WORKERS` | `5` | Cuántos workers reparten los sub-bots |
+| `PAIN_WORKER_HEAP_MB` | `896` | Tope de heap por worker |
+| `PAIN_PRIMARY_HEAP_MB` | `1024` | Tope de heap del proceso principal |
+| `PAIN_MAX_CHATS_SOCKET` | `150` | Chats guardados por socket |
+| `PAIN_MAX_GROUP_META` | `400` | Metadata de grupos en caché por proceso |
+| `PAIN_MAX_MSG_CACHE` | `4000` | Mensajes cacheados por proceso |
+| `PAIN_MAX_MSG_CHAT` | `50` | Mensajes cacheados por chat |
+| `PAIN_GROUP_META_TTL_MS` | `1800000` | Antigüedad máxima de la metadata de un grupo |
+| `PAIN_GC_MIN_MB` | `350` | Heap a partir del cual se fuerza GC |
+| `PAIN_RSS_ALERT_MB` | `1200` | RSS del proceso que activa la poda agresiva |
+| `PAIN_STT_IDLE_MS` | `300000` | Tiempo sin audio para descargar el modelo de voz |
+| `PAIN_MAX_IA_CHATS` | `300` | Chats con memoria de IA por proceso |
