@@ -1,5 +1,6 @@
 import ws from 'ws'
 import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
+import { enviarMensajeATodosLosSubBots, resumirFallidos } from '../lib/subme-broadcast.js'
 
 const RAIZ = process.cwd()
 
@@ -8,17 +9,6 @@ function soloDigitos(valor) {
     .split('@')[0]
     .split(':')[0]
     .replace(/\D/g, '')
-}
-
-/** JID del sub-bot: respeta @lid / @hosted.lid si el estado lo trae. */
-function jidDesdeNumero(valor) {
-  const crudo = String(valor || '').trim()
-  if (!crudo) return ''
-  const [base, dominio] = crudo.split('@')
-  const numero = soloDigitos(base)
-  if (numero.length < 6) return ''
-  if (dominio) return `${numero}@${dominio}`
-  return `${numero}@s.whatsapp.net`
 }
 
 function estaConectado(connSub) {
@@ -34,16 +24,15 @@ export function listarSubBotsConectados(conn) {
   const numeroPrincipal = soloDigitos(conn?.user?.jid || conn?.user?.id)
 
   const agregar = (valor, connSub = null) => {
-    const jid = jidDesdeNumero(valor)
     const numero = soloDigitos(valor)
-    if (!jid || numero.length < 6) return
+    if (numero.length < 6) return
     if (numeroPrincipal && numero === numeroPrincipal) return
     const previo = porNumero.get(numero)
     if (previo) {
       if (!previo.connSub && connSub) previo.connSub = connSub
       return
     }
-    porNumero.set(numero, { numero, jid, connSub })
+    porNumero.set(numero, { numero, connSub })
   }
 
   for (const connSub of global.conns || []) {
@@ -67,50 +56,68 @@ export function listarSubBotsConectados(conn) {
   return [...porNumero.values()]
 }
 
+/**
+ * JID del owner: el de quien ejecutó el comando. Se prefiere el número real
+ * (PN) para que cada sub-bot pueda escribirle en su privado sin adivinar el LID.
+ */
+async function resolverDestinoOwner(m, conn) {
+  const candidatos = [m?.sender, m?.key?.participantAlt, m?.key?.remoteJidAlt]
+  for (const candidato of candidatos) {
+    const valor = String(candidato || '').trim()
+    if (!valor) continue
+    if (valor.endsWith('@s.whatsapp.net') || valor.endsWith('@c.us')) return valor
+  }
+
+  const jid = String(m?.sender || '').trim()
+  if (!jid) return ''
+  try {
+    const { resolverNumeroTelefono } = await import('../lib/resolve-phone.js')
+    const telefono = await Promise.race([
+      resolverNumeroTelefono(jid, conn, null, m),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+    ])
+    if (telefono) return `${soloDigitos(telefono)}@s.whatsapp.net`
+  } catch (error) {
+    console.error('[subme] No se pudo resolver el número del owner:', error?.message || error)
+  }
+  return jid
+}
+
 let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
   if (!isOwner) {
     return m.reply('*[❗] Solo los dueños pueden usar este comando.*')
   }
 
   try {
-    
     if (conn !== global.conn) {
       return m.reply('*[❗] Este comando solo puede ser usado desde el bot principal.*')
     }
 
-    
     if (!text) {
-      return m.reply(`*[❗] Debes proporcionar un mensaje para enviar a los sub-bots.*\n\n> Ejemplo: ${usedPrefix + command} Se acaba de actualizar nuevos comandos a los sub bots, usalo yaaa.`)
+      return m.reply(`*[❗] Debes proporcionar un mensaje para enviar a los sub-bots.\n\n> Ejemplo: ${usedPrefix + command} Se acaba de actualizar nuevos comandos a los sub bots, usalo yaaa.`)
     }
 
-    
-    const subBotsConectados = listarSubBotsConectados(conn)
+    const destino = await resolverDestinoOwner(m, conn)
+    if (!destino) {
+      return m.reply('*[❗] No se pudo detectar tu chat para escribirte.*')
+    }
 
-    if (subBotsConectados.length === 0) {
+    if (!listarSubBotsConectados(conn).length) {
       return m.reply('*[❗] No hay sub-bots conectados en este momento.*')
     }
 
-    
-    let conteoEnviados = 0
-    const fallidos = []
+    // Cada sub-bot abre su propio chat privado con el owner y le escribe ahí.
+    const resultado = await enviarMensajeATodosLosSubBots({ jid: destino, text })
+    const total = resultado.enviados + resultado.fallidos.length
 
-    
-    for (const subBot of subBotsConectados) {
-      try {
-        // A los sub-bots les llega únicamente el mensaje del owner.
-        await conn.sendMessage(subBot.jid, { text })
-        conteoEnviados++
-        console.log(`✅ Mensaje enviado a sub-bot: ${subBot.jid}`)
-      } catch (error) {
-        fallidos.push(subBot.numero)
-        console.error(`❌ Error enviando mensaje a sub-bot ${subBot.jid}:`, error.message)
-      }
+    if (!total) {
+      return m.reply('*[❗] No hay sub-bots conectados en este momento.*')
     }
 
-    const lineasFallidos = fallidos.length
-      ? fallidos.map(numero => `┊ sin enviar  ·  \`+${numero}\``).join('\n')
+    const fallidos = Array.isArray(resultado.fallidos) ? resultado.fallidos : []
+    const detalleFallidos = fallidos.length
+      ? `\n┊ sin enviar  ·  \`${resumirFallidos(fallidos)}\``
       : ''
-    const bloqueFallidos = lineasFallidos ? `\n${lineasFallidos}` : ''
 
     const mensajeConfirmacion = `
 \`*˚   ✩    ✦    ✩   ˚*\`
@@ -118,9 +125,9 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
 ╭─ ✧
 ┊ *subme*
 ╰─ ✧  ✩
-┊ sub-bots  ·  \`${subBotsConectados.length}\`
-┊ enviados  ·  \`${conteoEnviados}\`
-┊ fallidos  ·  \`${fallidos.length}\`${bloqueFallidos}
+┊ sub-bots  ·  \`${total}\`
+┊ enviaron  ·  \`${resultado.enviados}\`
+┊ fallaron  ·  \`${fallidos.length}\`${detalleFallidos}
 ╰─────────`.trim()
 
     await conn.sendMessage(m.chat, {
@@ -130,13 +137,13 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
 
   } catch (e) {
     console.error('Error en comando subme:', e)
-    conn.reply(m.chat, '❌ Hubo un error al enviar mensajes a los sub-bots.', m, rcanal)
+    conn.reply(m.chat, '❌ Hubo un error al enviar el mensaje a los sub-bots.', m, rcanal)
   }
 }
 
 handler.command = ['subme', 'submessage', 'submsg']
 handler.tags = ['owner']
-handler.help = ['subme <mensaje> - Enviar mensaje a todos los sub-bots']
+handler.help = ['subme <mensaje> - Cada sub-bot te escribe el mensaje en tu privado']
 handler.rowner = true
 
 export default handler

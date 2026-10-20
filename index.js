@@ -15,6 +15,7 @@ import {
 } from './lib/process-isolation.js'
 import { ARCHIVO_REENLACE_PENDIENTE } from './lib/subbot-recovery.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
+import { crearCoordinadorSubme } from './lib/subme-coordinator.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const mainPath = join(__dirname, 'main.js')
@@ -39,6 +40,20 @@ const slots = new Map()
 const leasedSessions = new Set()
 const pendingLeaseRequests = new Map()
 const pendingSessionRemovals = new Set()
+// /subme: el principal reparte la orden y cada worker responde con su conteo.
+const coordinadorSubme = crearCoordinadorSubme({
+  alTerminar: (resumen) => {
+    const primary = slots.get('primary')?.child
+    if (!primary?.connected) return
+    primary.send({
+      type: 'subme-ack',
+      requestId: resumen.requestId,
+      workers: resumen.workers,
+      enviados: resumen.enviados,
+      fallidos: resumen.fallidos,
+    }, () => {})
+  },
+})
 let stopping = false
 let scanTimer
 // Sesión del bot principal: mientras no exista, el principal está en modo
@@ -271,6 +286,13 @@ function startSlot(id, slot) {
       reconcile()
       return
     }
+    if (message?.type === 'send-private-result' && typeof message.requestId === 'string') {
+      coordinadorSubme.resultado(message.requestId, id, {
+        enviados: message.enviados,
+        fallidos: message.fallidos,
+      })
+      return
+    }
     if (message?.type === 'reconcile-sessions') {
       reconcile()
       return
@@ -299,6 +321,22 @@ function startSlot(id, slot) {
       return
     }
     if (id !== 'primary' || !message || typeof message !== 'object') return
+    if (message.type === 'request-send-private' && typeof message.requestId === 'string' &&
+        typeof message.jid === 'string' && typeof message.text === 'string') {
+      const workerIds = []
+      for (const [workerId, worker] of slots) {
+        if (workerId === 'primary' || !worker.child?.connected) continue
+        workerIds.push(workerId)
+        worker.child.send({
+          type: 'send-private',
+          requestId: message.requestId,
+          jid: message.jid,
+          text: message.text,
+        }, () => {})
+      }
+      coordinadorSubme.registrar(message.requestId, workerIds)
+      return
+    }
     if (message.type === 'lease-session' && /^[a-zA-Z0-9_-]+$/.test(message.session || '') &&
         typeof message.requestId === 'string') {
       leasedSessions.add(message.session)

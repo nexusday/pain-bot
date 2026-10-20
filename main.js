@@ -871,6 +871,22 @@ if (!isSubbotWorker) {
   }, 10_000)
   workerStatusInterval.unref?.()
   process.on('message', async (message) => {
+    if (message?.type === 'send-private' && typeof message.text === 'string' &&
+        typeof message.jid === 'string') {
+      // /subme: cada sub-bot de este worker escribe al owner en su privado.
+      const { enviarPrivadoDesdeSockets } = await import('./lib/subme-broadcast.js')
+      const sockets = (global.conns || []).filter(Boolean)
+      const resultado = await enviarPrivadoDesdeSockets(message.jid, message.text, sockets)
+      try {
+        process.send({
+          type: 'send-private-result',
+          requestId: message.requestId,
+          enviados: resultado.enviados,
+          fallidos: resultado.fallidos,
+        }, () => {})
+      } catch {}
+      return
+    }
     if (message?.type === 'reconnect-sessions' && Array.isArray(message.sessions)) {
       const wanted = [...new Set(message.sessions)].filter(folder =>
         typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)

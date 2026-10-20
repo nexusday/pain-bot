@@ -364,6 +364,11 @@ En cuanto el principal queda vinculado, los sub-bots arrancan solos. Después de
 eso la compuerta ya no interviene: si el principal se desvincula más tarde, los
 sub-bots **siguen conectados y funcionando**.
 
+**`/subme <mensaje>`** no lo manda el principal a los sub-bots: **cada sub-bot
+abre su propio chat privado con quien ejecutó el comando y le escribe ahí**. El
+owner recibe un mensaje por sub-bot en su privado, y el bot le confirma cuántos
+escribieron y cuántos fallaron.
+
 ---
 
 # Memoria con muchos sub-bots
