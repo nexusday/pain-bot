@@ -1,6 +1,6 @@
 import ws from 'ws'
 import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
-import { enviarMensajeATodosLosSubBots, resumirFallidos } from '../lib/subme-broadcast.js'
+import { enviarMensajeATodosLosSubBots } from '../lib/subme-broadcast.js'
 
 const RAIZ = process.cwd()
 
@@ -58,7 +58,8 @@ export function listarSubBotsConectados(conn) {
 
 /**
  * Cada sub-bot se escribe a SÍ MISMO el texto (su chat "mensajes para ti
- * mismo"). El principal no escribe a los sub-bots ni los sub-bots entre sí.
+ * mismo"). El principal NO le escribe a nadie: ni a los sub-bots, ni al
+ * owner (ni siquiera una confirmación). Solo reparte la orden.
  */
 let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
   if (!isOwner) {
@@ -78,37 +79,15 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner }) => {
       return m.reply('*[❗] No hay sub-bots conectados en este momento.*')
     }
 
+    // Reparte la orden y no contesta nada: cada sub-bot se escribe a sí mismo.
     const resultado = await enviarMensajeATodosLosSubBots({ text })
-    const total = resultado.enviados + resultado.fallidos.length
-
-    if (!total) {
-      return m.reply('*[❗] No hay sub-bots conectados en este momento.*')
-    }
-
-    const fallidos = Array.isArray(resultado.fallidos) ? resultado.fallidos : []
-    const detalleFallidos = fallidos.length
-      ? `\n┊ sin enviar  ·  \`${resumirFallidos(fallidos)}\``
-      : ''
-
-    const mensajeConfirmacion = `
-\`*˚   ✩    ✦    ✩   ˚*\`
-
-╭─ ✧
-┊ *subme*
-╰─ ✧  ✩
-┊ sub-bots  ·  \`${total}\`
-┊ enviaron  ·  \`${resultado.enviados}\`
-┊ fallaron  ·  \`${fallidos.length}\`${detalleFallidos}
-╰─────────`.trim()
-
-    await conn.sendMessage(m.chat, {
-      text: mensajeConfirmacion,
-      contextInfo: { ...rcanal.contextInfo }
-    }, { quoted: m })
+    console.log(
+      `[subme] Mensaje repartido: ${resultado.enviados} sub-bot(s) se lo escribieron ` +
+      `en su propio chat${resultado.fallidos?.length ? `, ${resultado.fallidos.length} fallaron` : ''}.`
+    )
 
   } catch (e) {
     console.error('Error en comando subme:', e)
-    conn.reply(m.chat, '❌ Hubo un error al enviar el mensaje a los sub-bots.', m, rcanal)
   }
 }
 

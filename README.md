@@ -367,8 +367,8 @@ sub-bots **siguen conectados y funcionando**.
 **`/subme <mensaje>`** no lo manda el principal a los sub-bots: **cada sub-bot
 se escribe a sí mismo** el mensaje (en su propio chat "mensajes para ti
 mismo"). Ni el principal les escribe a los sub-bots, ni los sub-bots se
-escriben entre sí. El owner recibe solo la confirmación de cuántos escribieron
-y cuántos fallaron.
+escriben entre sí, y **el principal no contesta nada** (tampoco una
+confirmación): solo reparte la orden.
 
 ---
 
