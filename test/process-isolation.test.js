@@ -7,9 +7,14 @@ import {
   addedSessions,
   canStartSessions,
   requestSessionLease,
-  removedSessions
+  removedSessions,
+  sesionPrincipalRegistrada,
+  subBotsPermitidos
 } from '../lib/process-isolation.js'
 import { EventEmitter } from 'events'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 test('splits sub-bots into stable groups without losing or duplicating sessions', () => {
   const sessions = Array.from({ length: 80 }, (_, index) => `521${String(index).padStart(10, '0')}`)
@@ -55,6 +60,29 @@ test('removes sessions from a running worker without treating additions as remov
   assert.equal(removedSessions(['one'], ['one']), null)
   assert.deepEqual(addedSessions(['one'], ['one', 'two']), ['two'])
   assert.equal(addedSessions(['one', 'two'], ['one']), null)
+})
+
+test('solo cuenta como principal vinculado la sesión ya registrada', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pain-creds-'))
+  const ruta = join(dir, 'creds.json')
+  try {
+    assert.equal(sesionPrincipalRegistrada(ruta), false)
+    writeFileSync(ruta, JSON.stringify({ registered: false, me: null }))
+    assert.equal(sesionPrincipalRegistrada(ruta), false)
+    writeFileSync(ruta, JSON.stringify({ registered: true, me: { id: '1@s.whatsapp.net' } }))
+    assert.equal(sesionPrincipalRegistrada(ruta), true)
+    writeFileSync(ruta, '{roto')
+    assert.equal(sesionPrincipalRegistrada(ruta), false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('los sub-bots solo arrancan con el principal vinculado', () => {
+  assert.equal(subBotsPermitidos(), false)
+  assert.equal(subBotsPermitidos({ principalVinculado: false, sesionRegistrada: false }), false)
+  assert.equal(subBotsPermitidos({ principalVinculado: true, sesionRegistrada: false }), true)
+  assert.equal(subBotsPermitidos({ principalVinculado: false, sesionRegistrada: true }), true)
 })
 
 test('session lease request waits for supervisor acknowledgement', async () => {

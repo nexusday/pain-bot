@@ -442,11 +442,39 @@ if (!isSubbotWorker) {
   higienePrincipal.unref?.()
 }
 
+// Avisa al supervisor cuando el bot principal queda vinculado: hasta ese
+// momento los workers de sub-bots se quedan en espera y no reconectan nada.
+let principalVinculadoAvisado = false
+function avisarPrincipalVinculado() {
+  if (isSubbotWorker || principalVinculadoAvisado) return
+  const socket = global.conn
+  if (!socket?.authState?.creds?.registered) return
+  principalVinculadoAvisado = true
+  try {
+    if (typeof process.send === 'function') process.send({ type: 'primary-linked' })
+  } catch {}
+}
+
+function avisarPrincipalDesvinculado() {
+  if (isSubbotWorker) return
+  principalVinculadoAvisado = false
+  try {
+    if (typeof process.send === 'function') process.send({ type: 'primary-unlinked' })
+  } catch {}
+}
+
+if (!isSubbotWorker) {
+  const revisarVinculacion = setInterval(avisarPrincipalVinculado, 2000)
+  revisarVinculacion.unref?.()
+}
+
 async function connectionUpdate(update) {
   const sock = this?.ev ? this : conn
   const { connection, lastDisconnect, isNewLogin } = update
   global.stopped = connection
   if (isNewLogin) sock.isInit = true
+
+  avisarPrincipalVinculado()
 
   if (global.db.data == null) await loadDatabase()
 
@@ -511,6 +539,7 @@ async function connectionUpdate(update) {
 
   if (noReconectar.has(reason)) {
     sock.logger?.error?.(`Sesión del principal cerrada (${reason}). No se reconecta sola.`)
+    if (reason === DisconnectReason.loggedOut) avisarPrincipalDesvinculado()
     return
   }
 
@@ -1455,9 +1484,12 @@ connectionUpdate = async function(update) {
   await originalConnectionUpdate.call(this, update)
   
  
-  if (!isManagedPrimary && update.connection === 'open' && !global.subBotsReconnected) {
+  // Los sub-bots solo se reconectan con el principal YA vinculado: durante el
+  // emparejamiento (cuando pides el código de 8 dígitos) no deben arrancar.
+  const principalVinculado = Boolean(global.conn?.authState?.creds?.registered)
+  if (!isManagedPrimary && update.connection === 'open' && principalVinculado && !global.subBotsReconnected) {
     global.subBotsReconnected = true
-    console.log(chalk.cyan('\nBot principal conectado, iniciando reconexión de sub-bots...'))
+    console.log(chalk.cyan('\nBot principal vinculado, iniciando reconexión de sub-bots...'))
     setTimeout(() => {
       global.reconnectSubBots().catch(console.error)
     }, 5000)
@@ -1467,7 +1499,7 @@ connectionUpdate = async function(update) {
 
 if (!isSubbotWorker && !isManagedPrimary) setTimeout(() => {
   if (global.subBotsReconnected) return
-  if (global.conn && global.conn.user) {
+  if (global.conn?.authState?.creds?.registered) {
     global.subBotsReconnected = true
     console.log(chalk.cyan('\nIniciando reconexión automática de sub-bots..'))
     global.reconnectSubBots().catch(console.error)
@@ -1475,7 +1507,7 @@ if (!isSubbotWorker && !isManagedPrimary) setTimeout(() => {
 }, 10000)
 
 if (!isSubbotWorker && !isManagedPrimary) setInterval(() => {
-  if (!global.conn?.user) return
+  if (!global.conn?.authState?.creds?.registered) return
   global.reconnectSubBots().catch((error) => {
     console.error('[supervisor sub-bots] Error revisando sesiones:', error?.message || error)
   })

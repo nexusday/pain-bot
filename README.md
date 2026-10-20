@@ -357,6 +357,13 @@ supervised workers (5 by default, `PAIN_SUBBOT_WORKERS`).
 `/pri 2` and per-sub-bot worker mode have been removed to keep process count and
 CPU overhead predictable.
 
+**Los sub-bots esperan al principal.** Si el bot principal no tiene sesión
+registrada (estás emparejando con un código de 8 dígitos), los workers de
+sub-bots no arrancan: no se conecta nada hasta que termines el emparejamiento.
+En cuanto el principal queda vinculado, los sub-bots arrancan solos. Después de
+eso la compuerta ya no interviene: si el principal se desvincula más tarde, los
+sub-bots **siguen conectados y funcionando**.
+
 ---
 
 # Memoria con muchos sub-bots

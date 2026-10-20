@@ -9,7 +9,9 @@ import {
   groupIdForSession,
   addedSessions,
   canStartSessions,
-  removedSessions
+  removedSessions,
+  sesionPrincipalRegistrada as leerSesionPrincipalRegistrada,
+  subBotsPermitidos
 } from './lib/process-isolation.js'
 import { ARCHIVO_REENLACE_PENDIENTE } from './lib/subbot-recovery.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
@@ -39,6 +41,32 @@ const pendingLeaseRequests = new Map()
 const pendingSessionRemovals = new Set()
 let stopping = false
 let scanTimer
+// Sesión del bot principal: mientras no exista, el principal está en modo
+// emparejamiento y los sub-bots deben esperar (no tiene sentido conectar
+// 150 sub-bots mientras el usuario sigue escribiendo el código).
+const MAIN_SESSION_FILE = join(__dirname, 'sessions', 'creds.json')
+let principalVinculado = false
+let sesionRegistradaEnDisco = false
+let ultimaLecturaSesion = 0
+
+function existeSesionPrincipal() {
+  try {
+    if (Date.now() - ultimaLecturaSesion < 3000) return sesionRegistradaEnDisco
+    ultimaLecturaSesion = Date.now()
+    sesionRegistradaEnDisco = leerSesionPrincipalRegistrada(MAIN_SESSION_FILE)
+    return sesionRegistradaEnDisco
+  } catch {
+    sesionRegistradaEnDisco = false
+    return false
+  }
+}
+
+function subBotsPermitidosAhora() {
+  return subBotsPermitidos({
+    principalVinculado,
+    sesionRegistrada: existeSesionPrincipal(),
+  })
+}
 const STOP_TIMEOUT_MS = 10_000
 const RESTART_MAX_MS = 30_000
 const STABLE_MS = 60_000
@@ -182,6 +210,19 @@ function startDelayMs(id) {
 
 function startSlot(id, slot) {
   if (stopping || slot.child || Date.now() < slot.restartAt) return
+  // El principal manda la señal cuando termina de vincularse; hasta entonces
+  // los workers de sub-bots se quedan en espera (no se lanzan ni se conectan).
+  if (slot.target.role === 'subbot' && !subBotsPermitidosAhora()) {
+    if (!slot.esperandoVinculacion) {
+      slot.esperandoVinculacion = true
+      console.log(
+        '[supervisor] El bot principal todavía no está vinculado: ' +
+        'los sub-bots esperan a que termines el emparejamiento.'
+      )
+    }
+    return
+  }
+  slot.esperandoVinculacion = false
   const liveAssignments = [...slots]
     .filter(([ownerId, owner]) => owner.child && owner.child.exitCode === null && owner.child.signalCode === null)
     .map(([ownerId, owner]) => [ownerId, owner.target.sessions])
@@ -232,6 +273,25 @@ function startSlot(id, slot) {
     }
     if (message?.type === 'reconcile-sessions') {
       reconcile()
+      return
+    }
+    if (message?.type === 'primary-linked') {
+      if (id !== 'primary') return
+      // El principal terminó de vincularse: ahora sí arrancan los sub-bots.
+      // Este testigo se queda en true durante toda la ejecución del supervisor:
+      // si más adelante el principal se desvincula, los sub-bots que ya están
+      // conectados siguen funcionando (y se reinician solos si hace falta).
+      principalVinculado = true
+      console.log('[supervisor] Bot principal vinculado: arrancan los sub-bots.')
+      reconcile()
+      return
+    }
+    if (message?.type === 'primary-unlinked') {
+      if (id !== 'primary') return
+      console.log(
+        '[supervisor] El bot principal se desvinculó: ' +
+        'los sub-bots que ya estaban conectados siguen funcionando.'
+      )
       return
     }
     if ((message === 'reset' || message === 'restart') && id === 'primary') {
