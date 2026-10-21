@@ -44,7 +44,9 @@ const rcanal = global.rcanal || {
   }
 }
 
-const CODIGO_EMPAREJAMIENTO = 'PAINBOTM'
+// No se usa un código fijo: Baileys genera uno aleatorio por intento. Un
+// código idéntico para todos los usuarios es una señal clarísima de
+// automatización/granja para WhatsApp y facilitaba que tumbaran las cuentas.
 const SOCKET_CONEXION_MAX_MS = 60_000
 const SOCKET_INACTIVO_MAX_MS = 90_000
 const MAX_FALLOS_RECONEXION = 8
@@ -622,7 +624,9 @@ async function iniciarSubBot(options) {
         }
 
         await new Promise((resolver) => setImmediate(resolver))
-        let secreto = await sock.requestPairingCode(telefonoEmparejamiento, CODIGO_EMPAREJAMIENTO)
+        // Sin segundo argumento: Baileys crea un código aleatorio distinto
+        // para cada vinculación (bytesToCrockford(randomBytes(5))).
+        let secreto = await sock.requestPairingCode(telefonoEmparejamiento)
 
         secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
         codigoEmparejamientoEnviado = true
