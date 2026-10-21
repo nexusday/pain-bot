@@ -3,6 +3,7 @@
 
 
 
+import './lib/load-env.js'
 import { watchFile, unwatchFile } from 'fs' 
 import chalk from 'chalk'
 import { fileURLToPath } from 'url'
@@ -76,8 +77,10 @@ global.webPanel = {
   // proxy (recomendado) se omite y queda https://subdominio.dominio.
   includePort: process.env.PAIN_WEB_INCLUDE_PORT === '1',
   brandName: process.env.PAIN_WEB_BRAND || 'Pain Bot',
-  // Cuenta administradora inicial. Si dejas adminPass vacío, se genera una
-  // contraseña aleatoria y se guarda en storage/webpanel-admin.txt.
+  // Cuenta administradora inicial. La contraseña NO se escribe aquí: se lee
+  // de PAIN_WEB_ADMIN_PASS (.env local o Startup → Environment en Pterodactyl).
+  // Si queda vacía, se genera una aleatoria y se guarda en
+  // storage/webpanel-admin.txt.
   adminUser: process.env.PAIN_WEB_ADMIN_USER || 'admin',
   adminPass: process.env.PAIN_WEB_ADMIN_PASS || '',
   adminReset: process.env.PAIN_WEB_ADMIN_RESET === '1',

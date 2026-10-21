@@ -452,6 +452,50 @@ contraseña aleatoria y se escribe en `storage/webpanel-admin.txt`. Para
 recuperar el acceso, define `PAIN_WEB_ADMIN_PASS` y `PAIN_WEB_ADMIN_RESET=1`
 una vez, y luego quita `PAIN_WEB_ADMIN_RESET`.
 
+### Dónde van las credenciales
+
+**No escribas contraseñas dentro de `config.js`.** Ese archivo se versiona y
+terminaría compartido con el repositorio. El panel lee la contraseña de
+`PAIN_WEB_ADMIN_PASS`; si no la defines, genera una y la guarda aparte.
+
+La prioridad es:
+
+1. Variables reales del proceso (Pterodactyl → **Startup → Environment**).
+2. Archivo `.env` local (opcional).
+3. Valores por defecto de `config.js`.
+
+En producción con Pterodactyl configura las credenciales en las variables de
+arranque del servidor. En local puedes copiar el ejemplo:
+
+```bash
+cp .env.example .env
+chmod 600 .env
+# Edita .env y define PAIN_WEB_ADMIN_PASS
+```
+
+`.env` ya está en `.gitignore`; `.env.example` solo contiene valores de
+ejemplo y sí se puede subir. Nunca subas el `.env` real ni
+`storage/webpanel-admin.txt`.
+
+### Seguridad
+
+- La contraseña del panel se guarda con **scrypt + salt** en
+  `storage/webpanel.sqlite`; no se guarda en texto plano.
+- `storage/webpanel-admin.txt` contiene la contraseña generada en texto plano.
+  Cópiala a tu gestor de contraseñas y bórrala; el archivo se crea con permisos
+  `0600`.
+- Usa HTTPS en producción. La cookie de sesión es `HttpOnly`, `SameSite=Lax` y
+  `Secure` cuando la URL pública es `https://`.
+- Las mutaciones exigen token CSRF y validan el origen. El login y la
+  vinculación tienen límites por usuario/IP.
+- No publiques el puerto `10022` directamente a Internet: expón solo el
+  reverse proxy HTTPS.
+- El panel sirve únicamente archivos de `webpanel/public`. Las credenciales de
+  WhatsApp viven en `Serbot/<número>/` y no se sirven por HTTP.
+- Si un atacante obtiene acceso al sistema de archivos o al panel de
+  Pterodactyl, puede leer `.env`, `storage/` y `Serbot/`. Por eso importan los
+  permisos del servidor, las copias de seguridad y no reutilizar contraseñas.
+
 ### DNS y reverse proxy
 
 Configura el subdominio para que apunte al nodo y publica el puerto del panel
