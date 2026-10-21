@@ -80,6 +80,10 @@ function subBotsPermitidosAhora() {
   return subBotsPermitidos({
     principalVinculado,
     sesionRegistrada: existeSesionPrincipal(),
+    // Si ya hay sub-bots vinculados (p. ej. creados desde el panel web) los
+    // workers arrancan aunque el principal no esté: los sub-bots no dependen
+    // de él.
+    haySubBots: listSessions().length > 0,
   })
 }
 const STOP_TIMEOUT_MS = 10_000

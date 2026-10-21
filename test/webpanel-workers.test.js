@@ -3,8 +3,20 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { hayWorkersConSesiones } from '../lib/webpanel/pairing.js'
+import { subBotsPermitidos } from '../lib/process-isolation.js'
 
 const CARPETA = path.resolve('storage', 'process-status')
+
+test('supervisor: los workers arrancan si hay sub-bots aunque no haya principal', () => {
+  // Sin principal y sin sub-bots: los workers esperan (no tiene sentido
+  // levantar 150 sub-bots mientras se empareja el principal).
+  assert.equal(subBotsPermitidos({ principalVinculado: false, sesionRegistrada: false }), false)
+  // Con al menos un sub-bot vinculado, los workers arrancan igual.
+  assert.equal(subBotsPermitidos({ principalVinculado: false, sesionRegistrada: false, haySubBots: true }), true)
+  // Con el principal vinculado, también.
+  assert.equal(subBotsPermitidos({ principalVinculado: true }), true)
+  assert.equal(subBotsPermitidos({ sesionRegistrada: true }), true)
+})
 
 test('pairing: los sub-bots no dependen del principal si los workers viven', () => {
   fs.mkdirSync(CARPETA, { recursive: true })

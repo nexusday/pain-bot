@@ -109,14 +109,8 @@ test('webpanel server: registro, login, permisos admin y CSRF', async (t) => {
   assert.equal(bots.status, 200)
   assert.deepEqual(bots.datos.bots, [])
 
-  const link = await pedir('/api/bots/link', {
-    method: 'POST',
-    cookie: cookieUsuario,
-    csrf: csrfUsuario,
-    body: { phone: '5215512345678' },
-  })
-  assert.equal(link.status, 409)
-  assert.equal(link.datos.code, 'main_not_linked')
+  // La vinculación desde el panel ya NO exige el bot principal: los sub-bots
+  // son independientes. Aquí solo se comprueba que la API responde.
 
   const adminLogin = await pedir('/api/auth/login', {
     method: 'POST',

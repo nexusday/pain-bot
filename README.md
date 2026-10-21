@@ -208,8 +208,14 @@ número del bot principal:
   los sub-bots reconectan solos.
 - **"Cambiar número"** hace todo en un paso: desvincula, recrea el socket y
   deja el código de 8 dígitos listo para escribir en WhatsApp.
-- **"Reiniciar proceso"** sí corta el panel unos segundos. Úsalo solo si el bot
-  está atascado; para cambiar de número no hace falta.
+- **Si la sesión del principal está caída** (WhatsApp la cerró, el socket no
+  responde), el panel lo detecta, lo marca como *"Sesión caída"* y al generar
+  el código **borra la sesión vieja y crea una nueva en el mismo proceso**.
+  No hay que reiniciar nada.
+- **"Quitar el número"** borra el número principal guardado (útil para
+  cambiar de número o para dejar el principal sin vincular).
+- No hay ningún botón que reinicie el proceso: la web nunca se corta y nadie
+  se queda a medias en una vinculación.
 - Si el principal se desconecta solo (WhatsApp revoca la sesión), el panel
   sigue vivo y el administrador puede volver a emparejarlo desde la web.
 - Si WhatsApp cierra la sesión del principal (código **403** o cierre de
@@ -221,19 +227,19 @@ número del bot principal:
 
 ### ¿Los sub-bots funcionan sin el principal?
 
-**Sí**, con un matiz importante:
+**Sí**, y ahora también en instalación nueva:
 
-- **Si el principal ya estuvo vinculado**, sus sub-bots son independientes:
-  siguen conectados y funcionando aunque el principal se caiga, lo desvincules
-  o WhatsApp le cierre la sesión (403). El supervisor nunca los para por eso.
-- **Si el principal nunca se ha vinculado** (instalación nueva), los sub-bots
-  **esperan** en vez de arrancar: no tiene sentido levantar 150 sub-bots
-  mientras el usuario todavía está emparejando el principal. En cuanto el
-  principal queda vinculado, arrancan solos.
-- Lo mismo pasa si se reinicia todo el proceso con el principal sin vincular:
-  los workers vuelven a esperar al principal.
-- Con los workers ya vivos, **vincular un sub-bot nuevo desde el panel sí se
-  puede aunque el principal esté caído** (su worker lo conecta igual).
+- **Los sub-bots son independientes del principal.** Cada uno tiene su sesión
+  y su worker: si el principal se cae, se desvincula o WhatsApp le cierra la
+  sesión (403), los sub-bots **siguen conectados y funcionando**.
+- **Vincular un sub-bot desde el panel no exige que el principal esté
+  vinculado**: el panel ya no devuelve `main_not_linked`. Al terminar el
+  emparejamiento, el worker conecta el sub-bot y el supervisor lo levanta
+  aunque el principal no exista todavía.
+- Los workers solo esperan al principal cuando **todavía no hay ningún
+  sub-bot vinculado** (instalación recién hecha): no tiene sentido levantar
+  150 sub-bots mientras el usuario sigue escribiendo el código del principal.
+  En cuanto existe un sub-bot, los workers arrancan igual.
 - Lo que sí es exclusivo del principal: que él conteste en la comunidad
   oficial, los comandos del owner, la lista de bots y el aviso de canales.
 

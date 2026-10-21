@@ -1359,19 +1359,23 @@ function adminOverviewHTML(data) {
 function adminMainHTML(main) {
   const code = state.mainCode || ''
   const linked = Boolean(main.linked)
+  const vivo = linked && main.connected
   const estado = !main.available
     ? { label: 'No disponible', cls: 'neutral' }
-    : linked
+    : vivo
       ? { label: 'Vinculado', cls: 'success' }
-      : main.connected
-        ? { label: 'Esperando vinculación', cls: 'warn' }
-        : { label: 'Socket cerrado', cls: 'danger' }
+      : main.stale
+        ? { label: 'Sesión caída', cls: 'danger' }
+        : main.connected
+          ? { label: 'Esperando vinculación', cls: 'warn' }
+          : { label: 'Conectando', cls: 'warn' }
 
-  const acciones = linked
+  const acciones = vivo
     ? `<button class="btn btn-secondary" data-action="main-relink">${icon('rotate')} Cambiar número</button>
-       <button class="btn btn-danger" data-action="main-unlink">${icon('power')} Desvincular</button>
-       <button class="btn btn-ghost" data-action="main-restart">${icon('refresh')} Reiniciar proceso</button>`
-    : `<button class="btn btn-secondary" data-action="main-restart">${icon('refresh')} Reiniciar proceso</button>`
+       <button class="btn btn-danger" data-action="main-unlink">${icon('power')} Desvincular</button>`
+    : main.stale || main.phone
+      ? `<button class="btn btn-danger" data-action="main-unlink">${icon('power')} Quitar el número</button>`
+      : ''
 
   return `
     <div class="grid-2">
@@ -1393,13 +1397,14 @@ function adminMainHTML(main) {
 
             ${!main.available ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El panel no tiene acceso al socket del bot principal. En un servidor normal esto no debería ocurrir: revisa que el panel se esté ejecutando en el proceso principal.</div></div>` : ''}
             ${main.caido ? `<div class="notice danger" style="margin-top:14px">${icon('alert')}<div><b>El bot principal se desconectó</b> (WhatsApp cerró la sesión${main.caido.motivo ? `, código ${h(main.caido.motivo)}` : ''}). El panel web y los sub-bots <b>siguen funcionando</b>: vuelve a vincular el número aquí abajo y el bot principal reconecta solo.</div></div>` : ''}
+            ${main.stale ? `<div class="notice danger" style="margin-top:14px">${icon('alert')}<div><b>La sesión del principal está caída</b> (${h(main.phone || 'el número')}). Al generar el código se borra la sesión vieja y se crea una nueva <b>dentro del mismo proceso</b>: no hace falta reiniciar el bot ni se corta el panel.</div></div>` : ''}
             ${!linked && main.connected && !main.caido ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Mientras el principal no esté vinculado, los sub-bots no pueden conectarse. Genera un código abajo y escríbelo en WhatsApp → <b>Dispositivos vinculados → Vincular con número</b>.</div></div>` : ''}
-            ${!linked && !main.connected ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>El bot principal se está conectando con WhatsApp. En cuanto abra, el botón de abajo genera el código: <b>no hace falta reiniciar nada</b>.</div></div>` : ''}
+            ${!linked && !main.connected && !main.stale ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>El bot principal se está conectando con WhatsApp. En cuanto abra, el botón de abajo genera el código: <b>no hace falta reiniciar nada</b>.</div></div>` : ''}
             ${linked ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Al desvincular se borran las credenciales locales, pero <b>el panel web sigue en marcha</b>: los usuarios no se cortan y los sub-bots reconectan solos.</div></div>` : ''}
           </div>
         </div>
 
-        ${!linked ? `<div class="card">
+        ${!vivo ? `<div class="card">
           <div class="card-head"><div><h3>Vincular el principal</h3><p>Código de 8 dígitos, sin QR</p></div></div>
           <div class="card-body">
             <form id="main-link-form">
@@ -1437,7 +1442,7 @@ function adminMainHTML(main) {
               <li><span class="step-num">1</span><div><b>Vincular</b><span>El panel pide un código al socket del principal y lo muestra durante 90 segundos.</span></div></li>
               <li><span class="step-num">2</span><div><b>Confirmar en WhatsApp</b><span>Al aceptar, las credenciales se guardan y el principal queda en línea.</span></div></li>
               <li><span class="step-num">3</span><div><b>Desvincular</b><span>Se cierra la sesión en WhatsApp y se borran las credenciales del servidor.</span></div></li>
-              <li><span class="step-num">4</span><div><b>Reiniciar</b><span>El proceso se relanza y ya acepta un número nuevo.</span></div></li>
+              <li><span class="step-num">4</span><div><b>Recuperar</b><span>Si la sesión se cae, el panel crea un socket nuevo dentro del mismo proceso: la web nunca se reinicia.</span></div></li>
             </ol>
           </div>
         </div>
@@ -2218,18 +2223,18 @@ async function handleMainLink(form) {
 async function handleMainUnlink() {
   const main = state.main || {}
   const numero = main.phone ? fmtPhone(main.phone) : 'el bot principal'
+  const caido = main.stale || !main.connected
   confirmModal({
-    title: 'Desvincular el bot principal',
-    message: `Se cerrará la sesión de <b>${h(numero)}</b> en WhatsApp y se borrarán sus credenciales del servidor. El <b>panel web sigue funcionando</b> y los sub-bots reconectan solos. Podrás emparejar otro número desde aquí mismo.`,
-    confirmLabel: 'Desvincular',
+    title: caido ? 'Quitar el número del principal' : 'Desvincular el bot principal',
+    message: caido
+      ? `Se borrará la sesión guardada de <b>${h(numero)}</b> y se levantará un principal limpio, listo para que vincules otro número. <b>No se reinicia el proceso</b> y los sub-bots no se tocan.`
+      : `Se cerrará la sesión de <b>${h(numero)}</b> en WhatsApp y se borrarán sus credenciales del servidor. <b>El panel web sigue funcionando</b> y los sub-bots reconectan solos.`,
+    confirmLabel: caido ? 'Quitar el número' : 'Desvincular',
     onConfirm: async () => {
-      const resultado = await api.post('/api/main/unlink', {})
+      await api.post('/api/main/unlink', {})
       state.mainCode = null
-      showToast('Bot principal desvinculado. El panel sigue en marcha.', 'success')
+      showToast('Listo. Ya puedes vincular otro número.', 'success')
       await renderAdmin('principal')
-      if (resultado?.restartRequired) {
-        showToast('No se pudo recrear el socket: reinicia el proceso para vincular otro número.', 'warn')
-      }
     },
   })
 }
