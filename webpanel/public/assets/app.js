@@ -993,7 +993,8 @@ function pairingCardHTML() {
   }
 
   const createdAt = Number(pairing.created_at || Date.now())
-  const total = status === 'code_ready' ? 90_000 : 180_000
+  const ttlCodigo = Number(state.config?.pairCodeTtlMs || 90_000)
+  const total = status === 'code_ready' ? ttlCodigo : 180_000
   const expires = Number(pairing.expires_at || createdAt + total)
   const remaining = Math.max(0, expires - Date.now())
   const width = Math.max(0, Math.min(100, (remaining / total) * 100))
@@ -1090,7 +1091,8 @@ function startCountdown() {
     const text = document.getElementById('pairing-countdown')
     const bar = document.getElementById('pairing-progress')
     if (!text && !bar) return
-    const total = pairing.status === 'code_ready' ? 90_000 : 180_000
+    const ttlCodigo = Number(state.config?.pairCodeTtlMs || 90_000)
+    const total = pairing.status === 'code_ready' ? ttlCodigo : 180_000
     const createdAt = Number(pairing.created_at || Date.now())
     const expires = Number(pairing.expires_at || createdAt + total)
     const remaining = Math.max(0, expires - Date.now())
@@ -1809,29 +1811,72 @@ function adminSettingsHTML(data) {
   const maxSubs = Number(data.maxSubs || 0)
   const maxPorUsuario = Number(data.maxSubsPerUser || 0)
   const maxPorIp = Number(data.maxBotsPerIp || 0)
+  const intentosHora = Number(data.maxPairAttemptsPerHour || 0)
+  const intentosDia = Number(data.maxPairAttemptsPerDay || 0)
+  const intentosIp = Number(data.maxPairAttemptsPerIpPerHour || 0)
+  const esperaSegundos = Number(data.pairCooldownSeconds || 0)
+  const duracionCodigo = Number(data.pairCodeSeconds || 90)
   return `<div class="grid-2">
-    <div class="card">
-      <div class="card-head"><div><h3>Límites de sub-bots</h3><p>Se aplican a todo el servidor</p></div></div>
-      <div class="card-body">
-        <form id="settings-form">
-          <div class="form-error">${icon('alert')}<span></span></div>
-          <div class="field">
-            <label class="label" for="settings-max">Máximo de sub-bots del servidor</label>
-            <input id="settings-max" name="maxSubs" type="number" min="0" class="input" value="${maxSubs}" />
-            <div class="hint">Usa <b>0</b> para ilimitado. El valor se guarda en <span class="mono">storage/maxsubs.json</span>.</div>
-          </div>
-          <div class="field">
-            <label class="label" for="settings-max-user">Máximo de sub-bots por cuenta</label>
-            <input id="settings-max-user" name="maxSubsPerUser" type="number" min="0" class="input" value="${maxPorUsuario}" />
-            <div class="hint">Cuántas cuentas puede vincular cada usuario del panel. <b>0</b> = sin límite.</div>
-          </div>
-          <div class="field">
-            <label class="label" for="settings-max-ip">Máximo de cuentas por IP</label>
-            <input id="settings-max-ip" name="maxBotsPerIp" type="number" min="0" class="input" value="${maxPorIp}" />
-            <div class="hint">Cuentas distintas que se pueden vincular desde la misma conexión. <b>0</b> = sin límite.</div>
-          </div>
-          <button class="btn btn-primary" type="submit">${icon('check')} Guardar límites</button>
-        </form>
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><div><h3>Límites de sub-bots</h3><p>Se aplican a todo el servidor</p></div></div>
+        <div class="card-body">
+          <form id="settings-form">
+            <div class="form-error">${icon('alert')}<span></span></div>
+            <div class="field">
+              <label class="label" for="settings-max">Máximo de sub-bots del servidor</label>
+              <input id="settings-max" name="maxSubs" type="number" min="0" class="input" value="${maxSubs}" />
+              <div class="hint">Usa <b>0</b> para ilimitado. El valor se guarda en <span class="mono">storage/maxsubs.json</span>.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-max-user">Máximo de sub-bots por cuenta</label>
+              <input id="settings-max-user" name="maxSubsPerUser" type="number" min="0" class="input" value="${maxPorUsuario}" />
+              <div class="hint">Cuántas cuentas puede vincular cada usuario del panel. <b>0</b> = sin límite.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-max-ip">Máximo de cuentas por IP</label>
+              <input id="settings-max-ip" name="maxBotsPerIp" type="number" min="0" class="input" value="${maxPorIp}" />
+              <div class="hint">Cuentas distintas que se pueden vincular desde la misma conexión. <b>0</b> = sin límite.</div>
+            </div>
+            <button class="btn btn-primary" type="submit">${icon('check')} Guardar límites</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Intentos de vinculación</h3><p>Para que nadie abuse del panel</p></div>
+        </div>
+        <div class="card-body">
+          <form id="settings-limits-form">
+            <div class="form-error">${icon('alert')}<span></span></div>
+            <div class="field">
+              <label class="label" for="settings-attempts-hour">Intentos por hora y usuario</label>
+              <input id="settings-attempts-hour" name="maxPairAttemptsPerHour" type="number" min="0" class="input" value="${intentosHora}" />
+              <div class="hint">Códigos que puede pedir un usuario en una hora. <b>0</b> = sin límite.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-attempts-day">Intentos por día y usuario</label>
+              <input id="settings-attempts-day" name="maxPairAttemptsPerDay" type="number" min="0" class="input" value="${intentosDia}" />
+              <div class="hint">Códigos por día. <b>0</b> = sin límite.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-attempts-ip">Intentos por hora y IP</label>
+              <input id="settings-attempts-ip" name="maxPairAttemptsPerIpPerHour" type="number" min="0" class="input" value="${intentosIp}" />
+              <div class="hint">Códigos por hora desde la misma conexión. <b>0</b> = sin límite.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-cooldown">Espera entre códigos del mismo número (segundos)</label>
+              <input id="settings-cooldown" name="pairCooldownSeconds" type="number" min="0" class="input" value="${esperaSegundos}" />
+              <div class="hint">Espera antes de volver a pedir un código para el mismo número. <b>0</b> = sin espera.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-code-ttl">Duración del código (segundos)</label>
+              <input id="settings-code-ttl" name="pairCodeSeconds" type="number" min="15" class="input" value="${duracionCodigo}" />
+              <div class="hint">Cuánto vive el código de 8 dígitos antes de caducar (es la cuenta atrás que ve el usuario).</div>
+            </div>
+            <button class="btn btn-primary" type="submit">${icon('check')} Guardar intentos</button>
+          </form>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -2421,6 +2466,43 @@ async function handleSettingsSave(form) {
   }
 }
 
+async function handleSettingsLimitsSave(form) {
+  const numero = (selector) => {
+    const valor = Number(form.querySelector(selector)?.value || 0)
+    return Number.isFinite(valor) && valor >= 0 ? valor : NaN
+  }
+  const porHora = numero('[name="maxPairAttemptsPerHour"]')
+  const porDia = numero('[name="maxPairAttemptsPerDay"]')
+  const porIp = numero('[name="maxPairAttemptsPerIpPerHour"]')
+  const espera = numero('[name="pairCooldownSeconds"]')
+  const duracion = numero('[name="pairCodeSeconds"]')
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  if ([porHora, porDia, porIp, espera, duracion].some((valor) => Number.isNaN(valor))) {
+    showFormError(form, 'Todos los valores deben ser 0 o un número mayor.')
+    return
+  }
+  if (duracion < 15) {
+    showFormError(form, 'La duración del código debe ser de 15 segundos o más.')
+    return
+  }
+  setLoading(submit, true, 'Guardando…')
+  try {
+    await api.patch('/api/admin/settings', {
+      maxPairAttemptsPerHour: porHora,
+      maxPairAttemptsPerDay: porDia,
+      maxPairAttemptsPerIpPerHour: porIp,
+      pairCooldownSeconds: espera,
+      pairCodeSeconds: duracion,
+    })
+    showToast('Límites de intentos actualizados.', 'success')
+    await renderAdmin('settings')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudieron guardar los límites.')
+    setLoading(submit, false)
+  }
+}
+
 /* ── Delegación de eventos ──────────────────────────────────────────────── */
 async function onClick(event) {
   const actionEl = event.target.closest('[data-action]')
@@ -2607,6 +2689,11 @@ async function onSubmit(event) {
   if (id === 'settings-form') {
     event.preventDefault()
     await handleSettingsSave(form)
+    return
+  }
+  if (id === 'settings-limits-form') {
+    event.preventDefault()
+    await handleSettingsLimitsSave(form)
     return
   }
   if (id === 'main-link-form') {

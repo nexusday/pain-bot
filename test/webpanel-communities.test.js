@@ -140,6 +140,54 @@ test('webpanel: comunidades (crear, listar, editar y borrar)', async (t) => {
   assert.ok(handle)
 })
 
+test('webpanel: los límites de intentos son configurables', async (t) => {
+  const { pedir } = await panelDePrueba(t)
+
+  const login = await pedir('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'admin12345' },
+  })
+  const cookieAdmin = login.cookie
+  const csrfAdmin = login.datos.csrf
+
+  const guardado = await pedir('/api/admin/settings', {
+    method: 'PATCH',
+    cookie: cookieAdmin,
+    csrf: csrfAdmin,
+    body: {
+      maxPairAttemptsPerHour: 3,
+      maxPairAttemptsPerDay: 5,
+      maxPairAttemptsPerIpPerHour: 2,
+      pairCooldownSeconds: 10,
+      pairCodeSeconds: 120,
+    },
+  })
+  assert.equal(guardado.status, 200)
+  assert.equal(guardado.datos.maxPairAttemptsPerHour, 3)
+  assert.equal(guardado.datos.maxPairAttemptsPerDay, 5)
+  assert.equal(guardado.datos.maxPairAttemptsPerIpPerHour, 2)
+  assert.equal(guardado.datos.pairCooldownSeconds, 10)
+  assert.equal(guardado.datos.pairCodeSeconds, 120)
+
+  const leidos = await pedir('/api/admin/settings', { cookie: cookieAdmin })
+  assert.equal(leidos.status, 200)
+  assert.equal(leidos.datos.maxPairAttemptsPerHour, 3)
+  assert.equal(leidos.datos.pairCooldownSeconds, 10)
+  assert.equal(leidos.datos.pairCodeSeconds, 120)
+
+  // La duración del código también viaja a la config pública (cuenta atrás).
+  const config = await pedir('/api/config')
+  assert.equal(config.datos.pairCodeTtlMs, 120_000)
+
+  const duracionCorta = await pedir('/api/admin/settings', {
+    method: 'PATCH',
+    cookie: cookieAdmin,
+    csrf: csrfAdmin,
+    body: { pairCodeSeconds: 5 },
+  })
+  assert.equal(duracionCorta.status, 400)
+})
+
 test('webpanel: máximo de sub-bots por cuenta y por IP', async (t) => {
   const { handle, pedir } = await panelDePrueba(t, { trustProxy: true })
   const ipFalsa = { headers: { 'x-forwarded-for': '10.0.0.1' } }

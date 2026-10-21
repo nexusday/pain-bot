@@ -461,39 +461,6 @@ Con 150+ sub-bots la RAM la consuma el proceso, no el bot. Por eso ahora:
 
 Diagnóstico: `/mem` y `/mem limpiar` (fuerza poda y GC en el proceso actual).
 
-# CPU alto con muchos sub-bots
-
-Si el panel de Pterodactyl marca un CPU alto (300 % y pico) justo después de
-reiniciar, la causa casi siempre es la **tormenta de reconexiones**:
-
-1. Al arrancar, los workers levantan sus sub-bots a la vez (150+ conexiones de
-   WhatsApp desde la misma IP en pocos segundos).
-2. WhatsApp cierra algunas: `Subbot (+X) desconectado (428). Motivo:
-   Connection Terminated by Server`.
-3. Antes, cada sub-bot reconectaba a los 5-20 s **para siempre**: el contador
-   de fallos se reiniciaba en cada conexión (aunque muriera a los 10 s), así
-   que el bucle no paraba y el CPU se quedaba arriba.
-
-Ahora:
-
-- El 428 tiene su propio backoff (20 s → 40 s → 80 s … hasta 5 min).
-- El contador de fallos solo se reinicia si la conexión anterior aguantó más
-  de 2 minutos: si WhatsApp la corta enseguida, el sub-bot espera cada vez
-  más en vez de martillear el servidor.
-
-Si aun así el CPU se queda alto:
-
-| Ajuste | Valor | Para qué |
-|---|---|---|
-| `PAIN_LOG_MENSAJES` | `0` | Deja de imprimir cada mensaje (con 150 bots en grupos activos es mucho stdout) |
-| `PAIN_SUBBOT_BATCH` | `2` | Menos sub-bots conectando a la vez por worker |
-| `PAIN_SUBBOT_BATCH_DELAY_MS` | `2500` | Más pausa entre lotes al arrancar |
-| `PAIN_START_DELAY_MS` | `30000` | Espera antes de levantar los workers |
-
-Comprobación rápida: si en la consola salen muchos
-`desconectado (428)` seguidos, es la tormenta de reconexiones. Cuando paran,
-el CPU baja solo.
-
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `PAIN_SUBBOT_WORKERS` | `5` | Cuántos workers reparten los sub-bots |
@@ -508,10 +475,6 @@ el CPU baja solo.
 | `PAIN_RSS_ALERT_MB` | `1200` | RSS del proceso que activa la poda agresiva |
 | `PAIN_STT_IDLE_MS` | `300000` | Tiempo sin audio para descargar el modelo de voz |
 | `PAIN_MAX_IA_CHATS` | `300` | Chats con memoria de IA por proceso |
-| `PAIN_LOG_MENSAJES` | `1` | `0` deja de imprimir cada mensaje en la consola (ahorra I/O con 150+ bots) |
-| `PAIN_SUBBOT_BATCH` | `4` | Sub-bots que conectan a la vez por worker |
-| `PAIN_SUBBOT_BATCH_DELAY_MS` | `1200` | Pausa entre lotes de conexión |
-| `PAIN_START_DELAY_MS` | `0` | Espera antes de levantar los workers |
 
 ---
 
@@ -528,8 +491,8 @@ el puerto: solo escucha el proceso principal.
 - Las sesiones de WhatsApp siguen en `Serbot/<número>/`; mientras se vinculan
   llevan un archivo `.pairing` para que el supervisor no las conecte, archive
   ni purge a mitad del proceso.
-- El bot principal **no** es obligatorio para vincular sub-bots desde la web: los
-  sub-bots son independientes y su worker los conecta igual.
+- El bot principal debe estar vinculado antes de generar códigos desde la web.
+  Si no lo está, el panel responde `main_not_linked`.
 - La interfaz es una SPA sin dependencias: tema oscuro, logo del bot, barra
   lateral plegable (botón de menú también en escritorio) y diseño adaptable a
   móvil y escritorio.
@@ -586,17 +549,23 @@ mostrarla un tiempo.
 
 ### Límites por cuenta y por IP
 
-En **Administración → Ajustes** se configuran tres topes:
+En **Administración → Ajustes** se configuran todos los topes del panel:
 
 | Límite | Dónde se guarda | Para qué |
 |---|---|---|
 | Máximo de sub-bots del servidor | `storage/maxsubs.json` | Tope global de sesiones |
 | Máximo de sub-bots por cuenta | `panel_meta` (`max_subs_per_user`) | Cuántas cuentas puede vincular cada usuario |
 | Máximo de cuentas por IP | `panel_meta` (`max_bots_per_ip`) | Cuántas cuentas distintas se pueden vincular desde la misma conexión |
+| Intentos por hora y usuario | `panel_meta` (`pair_attempts_hour`) | Cuántos códigos pide un usuario en una hora |
+| Intentos por día y usuario | `panel_meta` (`pair_attempts_day`) | Cuántos códigos pide un usuario en un día |
+| Intentos por hora y IP | `panel_meta` (`pair_attempts_ip_hour`) | Cuántos códigos se piden desde una conexión |
+| Espera entre códigos del mismo número | `panel_meta` (`pair_cooldown_ms`) | Segundos antes de poder pedir otro código para el mismo número |
+| Duración del código | `panel_meta` (`pair_code_ttl_ms`) | Segundos que vive el código de 8 dígitos (la cuenta atrás del panel) |
 
-`0` significa "sin límite". Cuando una cuenta o una IP llega al tope, el
-panel responde `user_limit` (403) o `ip_limit` (429) y el usuario ve un aviso
-en "Mis bots".
+`0` significa "sin límite". Cuando un usuario llega al tope, el panel responde
+`user_limit` (403), `ip_limit` (429), `rate_limit`, `rate_limit_day`,
+`rate_limit_ip` o `cooldown`, y el mensaje dice **exactamente cuánto falta**
+("Espera 12 min", "Se libera en 3 h") en vez de un "espera un poco".
 
 ### Sesiones: filtros y borrado por oleadas
 
@@ -633,6 +602,7 @@ Endpoint: `POST /api/admin/sessions/bulk` con `{ phones: [...], batchSize: 5 }`.
 | `PAIN_WEB_MAX_LINKS_HOUR` | `8` | Intentos por usuario/hora |
 | `PAIN_WEB_MAX_LINKS_DAY` | `30` | Intentos por usuario/día |
 | `PAIN_WEB_MAX_LINKS_IP_HOUR` | `20` | Intentos por IP/hora |
+| `PAIN_WEB_PAIR_COOLDOWN_MS` | `30000` | Espera entre códigos del mismo número (ms) |
 
 Si `PAIN_WEB_ADMIN_PASS` queda vacío, al primer arranque se genera una
 contraseña aleatoria y se escribe en `storage/webpanel-admin.txt`. Para
