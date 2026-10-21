@@ -1394,7 +1394,7 @@ function adminMainHTML(main) {
             ${!main.available ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El panel no tiene acceso al socket del bot principal. En un servidor normal esto no debería ocurrir: revisa que el panel se esté ejecutando en el proceso principal.</div></div>` : ''}
             ${main.caido ? `<div class="notice danger" style="margin-top:14px">${icon('alert')}<div><b>El bot principal se desconectó</b> (WhatsApp cerró la sesión${main.caido.motivo ? `, código ${h(main.caido.motivo)}` : ''}). El panel web y los sub-bots <b>siguen funcionando</b>: vuelve a vincular el número aquí abajo y el bot principal reconecta solo.</div></div>` : ''}
             ${!linked && main.connected && !main.caido ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Mientras el principal no esté vinculado, los sub-bots no pueden conectarse. Genera un código abajo y escríbelo en WhatsApp → <b>Dispositivos vinculados → Vincular con número</b>.</div></div>` : ''}
-            ${!linked && !main.connected ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El socket del principal está cerrado. Reinicia el proceso para volver a pedir un código de vinculación.</div></div>` : ''}
+            ${!linked && !main.connected ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>El bot principal se está conectando con WhatsApp. En cuanto abra, el botón de abajo genera el código: <b>no hace falta reiniciar nada</b>.</div></div>` : ''}
             ${linked ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Al desvincular se borran las credenciales locales, pero <b>el panel web sigue en marcha</b>: los usuarios no se cortan y los sub-bots reconectan solos.</div></div>` : ''}
           </div>
         </div>
@@ -1409,8 +1409,12 @@ function adminMainHTML(main) {
                 <div class="input-icon">${icon('phone')}<input id="main-phone" name="phone" class="input" inputmode="numeric" autocomplete="tel" placeholder="5215512345678" required /></div>
                 <div class="hint">Código de país, sin <b>+</b>, espacios ni guiones.</div>
               </div>
-              <button class="btn btn-primary" type="submit" ${main.canRequestCode ? '' : 'disabled'}>${icon('key')} Generar código</button>
-              ${!main.canRequestCode ? '<div class="hint" style="margin-top:10px">El socket no está listo para emparejar. Reinicia el bot e inténtalo de nuevo.</div>' : ''}
+              <button class="btn btn-primary" type="submit" ${main.available === false ? 'disabled' : ''}>${icon('key')} Generar código</button>
+              ${main.available === false
+                ? '<div class="hint" style="margin-top:10px">El panel no tiene acceso al socket del principal.</div>'
+                : main.starting
+                  ? '<div class="hint" style="margin-top:10px">El bot principal está conectando con WhatsApp. El botón espera a que esté listo: no hace falta reiniciar nada.</div>'
+                  : ''}
             </form>
             ${code ? `<div class="code-box" style="margin-top:18px">
               <div class="code-kicker">Código de vinculación</div>

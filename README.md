@@ -583,6 +583,7 @@ Endpoint: `POST /api/admin/sessions/bulk` con `{ phones: [...], batchSize: 5 }`.
 | `PAIN_WEB_REQUIRE_INVITE` | `0` | `1` exige código de invitación |
 | `PAIN_WEB_INVITE` | vacío | Código de invitación |
 | `PAIN_WEB_TRUST_PROXY` | `1` | `0` ignora `X-Forwarded-For` |
+| `PAIN_WEB_MAIN_WAIT` | `25000` | Espera (ms) a que el socket del principal abra antes de pedir el código |
 | `PAIN_WEB_SESSION_TTL` | `604800000` | Duración de la sesión web (ms) |
 | `PAIN_WEB_PAIR_TTL` | `180000` | Vida del intento de vinculación (ms) |
 | `PAIN_WEB_CODE_TTL` | `90000` | Vida del código de 8 dígitos (ms) |

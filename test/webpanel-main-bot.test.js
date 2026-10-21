@@ -130,8 +130,38 @@ test('main-bot: relink desvincula, recrea el socket y devuelve el código', asyn
   }
 })
 
+test('main-bot: espera a que el socket del principal abra (sin reiniciar)', async () => {
+  const anteriorAuth = global.authFile
+  global.authFile = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-main-espera-'))
+  try {
+    let abierto = false
+    global.conn = {
+      get ws() {
+        return { get isOpen() { return abierto } }
+      },
+      authState: { creds: { registered: false } },
+      user: {},
+      requestPairingCode: async (phone) => `AB${String(phone).slice(-6)}`,
+    }
+    // El socket tarda un momento en abrir (arranque o recreación).
+    setTimeout(() => { abierto = true }, 700)
+
+    const resultado = await solicitarCodigoPrincipal('5215512345678')
+    assert.equal(resultado.phone, '5215512345678')
+    assert.equal(resultado.code.length, 8)
+  } finally {
+    delete global.conn
+    if (anteriorAuth === undefined) delete global.authFile
+    else global.authFile = anteriorAuth
+    fs.rmSync(global.authFile || '', { recursive: true, force: true })
+  }
+})
+
 test('main-bot: pide un código de emparejamiento al socket principal', async () => {
   const anteriorAuth = global.authFile
+  const anteriorEspera = process.env.PAIN_WEB_MAIN_WAIT
+  // La espera del socket se acorta para que el test no tarde 25 s.
+  process.env.PAIN_WEB_MAIN_WAIT = '1200'
   global.authFile = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-main-code-'))
   try {
     global.conn = crearPrincipalFalso({
@@ -179,6 +209,8 @@ test('main-bot: pide un código de emparejamiento al socket principal', async ()
     delete global.conn
     if (anteriorAuth === undefined) delete global.authFile
     else global.authFile = anteriorAuth
+    if (anteriorEspera === undefined) delete process.env.PAIN_WEB_MAIN_WAIT
+    else process.env.PAIN_WEB_MAIN_WAIT = anteriorEspera
     fs.rmSync(global.authFile || '', { recursive: true, force: true })
   }
 })
