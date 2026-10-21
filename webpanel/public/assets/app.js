@@ -804,7 +804,7 @@ async function renderDashboard() {
           <div class="card-body">
             <ol class="steps">
               <li><span class="step-num">1</span><div><b>Abre WhatsApp</b><span>Entra en <span class="kbd">Dispositivos vinculados</span> y elige vincular con número de teléfono.</span></div></li>
-              <li><span class="step-num">2</span><div><b>Genera el código</b><span>Escribe tu número en el panel y copia el código de 8 dígitos.</span></div></li>
+              <li><span class="step-num">2</span><div><b>Genera el código</b><span>Escribe tu número en el panel y copia el código de 8 caracteres.</span></div></li>
               <li><span class="step-num">3</span><div><b>Confirma</b><span>Ingresa el código en WhatsApp. La sesión aparecerá conectada automáticamente.</span></div></li>
             </ol>
             <a class="btn btn-primary btn-block" href="#/link" style="margin-top:16px">${icon('link')} Empezar vinculación</a>
@@ -854,7 +854,7 @@ function stepsCardHTML() {
       <ol class="steps">
         <li><span class="step-num">1</span><div><b>Abre WhatsApp</b><span>Ve a <span class="kbd">Ajustes</span> → <span class="kbd">Dispositivos vinculados</span> → <span class="kbd">Vincular un dispositivo</span>.</span></div></li>
         <li><span class="step-num">2</span><div><b>Elige "Vincular con número"</b><span>Ingresa el número tal como lo escribiste en el panel.</span></div></li>
-        <li><span class="step-num">3</span><div><b>Escribe el código</b><span>Copia el código de 8 dígitos y confírmalo. La sesión aparecerá conectada.</span></div></li>
+        <li><span class="step-num">3</span><div><b>Escribe el código</b><span>Copia el código de 8 caracteres y confírmalo. La sesión aparecerá conectada.</span></div></li>
       </ol>
       <div class="pairing-alert" style="margin-top:18px">${icon('shield')}<div><b>Seguridad:</b> nunca compartas el código. Caduca rápido y permite vincular tu WhatsApp.</div></div>
     </div>

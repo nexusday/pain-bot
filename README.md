@@ -501,7 +501,7 @@ reverse proxy, que es el caso normal en producción.
 3. Revisa **Ajustes** para el límite de plazas y **Usuarios** para crear o
    moderar cuentas.
 4. Cada usuario entra a **Vincular bot**, escribe su número con código de país
-   y recibe un código de 8 dígitos. Lo confirma en WhatsApp → Dispositivos
+   y recibe un código de 8 caracteres. Lo confirma en WhatsApp → Dispositivos
    vinculados → Vincular con número.
 5. El panel muestra el estado en **Mis bots**; la vinculación aparece en el
    panel de administración con su auditoría.
