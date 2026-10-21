@@ -50,6 +50,9 @@ const rcanal = global.rcanal || {
 const SOCKET_CONEXION_MAX_MS = 60_000
 const SOCKET_INACTIVO_MAX_MS = 90_000
 const MAX_FALLOS_RECONEXION = 8
+// Una conexión que aguanta menos de esto se considera inestable: el backoff
+// no se reinicia, así el sub-bot deja de martillear a WhatsApp.
+const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
 let versionBaileysCache = null
 const iniciosSubBot = new Map()
 
@@ -523,6 +526,9 @@ async function iniciarSubBot(options) {
     let temporizadorReconexion = null
     let reemplazosConsecutivos = 0
     let fallosConsecutivos = 0
+    // Momento en el que se abrió la conexión actual: sirve para saber si la
+    // sesión anterior fue estable (si no, el backoff sigue creciendo).
+    let conectadoEstableEn = 0
     // Racha de cierres 500 (badSession) sin un 'open' entre ellos. WhatsApp
     // cierra con stream-error 500 cuando la sesión murió en el teléfono
     // (dispositivo desvinculado), así que una racha confirma sesión muerta.
@@ -876,8 +882,16 @@ async function iniciarSubBot(options) {
           temporizadorReconexion = null
         }
         reconectando = false
-        reemplazosConsecutivos = 0
-        fallosConsecutivos = 0
+        // Solo se limpian los contadores si la conexión anterior aguantó lo
+        // suficiente. Si WhatsApp corta la sesión a los pocos segundos, el
+        // backoff debe seguir creciendo: si no, el sub-bot reintenta cada
+        // 5-20 s para siempre y el CPU se queda por las nubes.
+        const duracionPrevia = conectadoEstableEn ? Date.now() - conectadoEstableEn : Infinity
+        conectadoEstableEn = Date.now()
+        if (duracionPrevia > CONEXION_ESTABLE_MIN_MS) {
+          reemplazosConsecutivos = 0
+          fallosConsecutivos = 0
+        }
         fallos500Seguidos = 0
         vistoUsuarioEn = Date.now()
         await borrarMensajeVinculo().catch(() => {})
@@ -1105,6 +1119,11 @@ async function iniciarSubBot(options) {
         return
       }
       const esReinicio = motivo === DisconnectReason.restartRequired
+      // 428 (WhatsApp cerró la conexión): con 150+ sub-bots en el mismo servidor
+      // es normal que rechace alguna. Con backoff corto se formaba un bucle
+      // (cada sub-bot reconectaba a los 5-20 s y el CPU se disparaba), así que
+      // aquí se espera bastante más entre reintentos.
+      const esCerradoPorServidor = motivo === DisconnectReason.connectionClosed
       // Tope 90s (antes 5min): con 150 subbots, un tope de 5min + 30s de
       // dispersión dejaba colas de 327s y parecían muertos. 440 (reemplazo)
       // conserva backoff largo para no pelear entre duplicados. 515 es un
@@ -1113,7 +1132,9 @@ async function iniciarSubBot(options) {
         ? 3000 + Math.min(dispersarMs, 5000)
         : esReemplazo
           ? Math.min(60_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 15 * 60_000) + dispersarMs
-          : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
+          : esCerradoPorServidor
+            ? Math.min(20_000 * (2 ** Math.min(fallosConsecutivos, 4)), 5 * 60_000) + dispersarMs
+            : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
       if (esReemplazo) reemplazosConsecutivos++
       else fallosConsecutivos++
       console.log(chalk.bold.magentaBright(
