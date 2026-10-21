@@ -516,11 +516,17 @@ if (!isSubbotWorker) {
 // Avisa al supervisor cuando el bot principal queda vinculado: hasta ese
 // momento los workers de sub-bots se quedan en espera y no reconectan nada.
 let principalVinculadoAvisado = false
+/** Motivo por el que el principal se quedó sin sesión (lo ve el panel). */
+function marcarPrincipalCaido(motivo) {
+  global.__painPrincipalCaido = { motivo: String(motivo || ''), en: Date.now() }
+}
+
 function avisarPrincipalVinculado() {
   if (isSubbotWorker || principalVinculadoAvisado) return
   const socket = global.conn
   if (!socket?.authState?.creds?.registered) return
   principalVinculadoAvisado = true
+  global.__painPrincipalCaido = null
   try {
     if (typeof process.send === 'function') process.send({ type: 'primary-linked' })
   } catch {}
@@ -611,6 +617,23 @@ async function connectionUpdate(update) {
   if (noReconectar.has(reason)) {
     sock.logger?.error?.(`Sesión del principal cerrada (${reason}). No se reconecta sola.`)
     if (reason === DisconnectReason.loggedOut) avisarPrincipalDesvinculado()
+    // 403 (WhatsApp cerró la sesión) o cierre de sesión: ese dispositivo ya
+    // no vale en el teléfono. Se borran las credenciales y se levanta un
+    // socket limpio para que el panel pueda volver a vincular el número SIN
+    // reiniciar el proceso: la web y los sub-bots siguen funcionando.
+    if (reason === DisconnectReason.forbidden || reason === DisconnectReason.loggedOut) {
+      marcarPrincipalCaido(reason)
+      try {
+        await global.reiniciarPrincipalLimpio?.({ timeoutMs: 30_000 })
+        console.log(
+          chalk.yellow(
+            'El bot principal quedó desvinculado. Vínculalo de nuevo desde el panel web.'
+          )
+        )
+      } catch (error) {
+        console.error('No se pudo recrear el socket del principal:', error?.message || error)
+      }
+    }
     return
   }
 

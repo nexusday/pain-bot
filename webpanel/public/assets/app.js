@@ -1392,7 +1392,8 @@ function adminMainHTML(main) {
             </div>
 
             ${!main.available ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El panel no tiene acceso al socket del bot principal. En un servidor normal esto no debería ocurrir: revisa que el panel se esté ejecutando en el proceso principal.</div></div>` : ''}
-            ${!linked && main.connected ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Mientras el principal no esté vinculado, los sub-bots no pueden conectarse. Genera un código abajo y escríbelo en WhatsApp → <b>Dispositivos vinculados → Vincular con número</b>.</div></div>` : ''}
+            ${main.caido ? `<div class="notice danger" style="margin-top:14px">${icon('alert')}<div><b>El bot principal se desconectó</b> (WhatsApp cerró la sesión${main.caido.motivo ? `, código ${h(main.caido.motivo)}` : ''}). El panel web y los sub-bots <b>siguen funcionando</b>: vuelve a vincular el número aquí abajo y el bot principal reconecta solo.</div></div>` : ''}
+            ${!linked && main.connected && !main.caido ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Mientras el principal no esté vinculado, los sub-bots no pueden conectarse. Genera un código abajo y escríbelo en WhatsApp → <b>Dispositivos vinculados → Vincular con número</b>.</div></div>` : ''}
             ${!linked && !main.connected ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El socket del principal está cerrado. Reinicia el proceso para volver a pedir un código de vinculación.</div></div>` : ''}
             ${linked ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Al desvincular se borran las credenciales locales, pero <b>el panel web sigue en marcha</b>: los usuarios no se cortan y los sub-bots reconectan solos.</div></div>` : ''}
           </div>

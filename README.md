@@ -212,6 +212,11 @@ número del bot principal:
   está atascado; para cambiar de número no hace falta.
 - Si el principal se desconecta solo (WhatsApp revoca la sesión), el panel
   sigue vivo y el administrador puede volver a emparejarlo desde la web.
+- Si WhatsApp cierra la sesión del principal (código **403** o cierre de
+  sesión), el bot **no se queda parado**: se borran las credenciales del
+  principal, se levanta un socket limpio y el panel muestra *"El bot principal
+  se desconectó"* con el formulario para volver a vincularlo. Los sub-bots
+  siguen conectados y la web nunca se corta.
 - Los sub-bots no se tocan: siguen con sus propias sesiones y reconectan solos.
 
 ---

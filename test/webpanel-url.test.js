@@ -95,7 +95,8 @@ test('menú: el encabezado incluye el link global del panel', async () => {
       rentalLine: '',
     })
     assert.match(texto, /serbot-pain\.nexcodea\.com/)
-    assert.match(texto, /panel web/i)
+    assert.match(texto, /¿Quieres ser subbot de Pain Bot\?/i)
+    assert.match(texto, /vincula en/i)
   } finally {
     global.webPanelHandle = anteriorHandle
     if (anteriorPublicUrl === undefined) delete process.env.PAIN_WEB_PUBLIC_URL
