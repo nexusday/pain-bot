@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import test from 'node:test'
+import { hayWorkersConSesiones } from '../lib/webpanel/pairing.js'
+
+const CARPETA = path.resolve('storage', 'process-status')
+
+test('pairing: los sub-bots no dependen del principal si los workers viven', () => {
+  fs.mkdirSync(CARPETA, { recursive: true })
+  const archivo = path.join(CARPETA, 'test-worker-1.json')
+  try {
+    assert.equal(hayWorkersConSesiones(), false)
+
+    fs.writeFileSync(archivo, JSON.stringify({
+      workerId: 'test-worker-1',
+      pid: process.pid,
+      updatedAt: Date.now(),
+      sessions: [{ folder: '5215500000099', number: '5215500000099', connected: true }],
+    }))
+
+    // Con workers vivos se puede vincular aunque el principal no esté.
+    assert.equal(hayWorkersConSesiones(), true)
+
+    // Un worker sin sesiones no cuenta.
+    fs.writeFileSync(archivo, JSON.stringify({
+      workerId: 'test-worker-1',
+      pid: process.pid,
+      updatedAt: Date.now(),
+      sessions: [],
+    }))
+    assert.equal(hayWorkersConSesiones(), false)
+  } finally {
+    fs.rmSync(archivo, { force: true })
+  }
+})

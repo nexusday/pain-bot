@@ -219,6 +219,24 @@ número del bot principal:
   siguen conectados y la web nunca se corta.
 - Los sub-bots no se tocan: siguen con sus propias sesiones y reconectan solos.
 
+### ¿Los sub-bots funcionan sin el principal?
+
+**Sí**, con un matiz importante:
+
+- **Si el principal ya estuvo vinculado**, sus sub-bots son independientes:
+  siguen conectados y funcionando aunque el principal se caiga, lo desvincules
+  o WhatsApp le cierre la sesión (403). El supervisor nunca los para por eso.
+- **Si el principal nunca se ha vinculado** (instalación nueva), los sub-bots
+  **esperan** en vez de arrancar: no tiene sentido levantar 150 sub-bots
+  mientras el usuario todavía está emparejando el principal. En cuanto el
+  principal queda vinculado, arrancan solos.
+- Lo mismo pasa si se reinicia todo el proceso con el principal sin vincular:
+  los workers vuelven a esperar al principal.
+- Con los workers ya vivos, **vincular un sub-bot nuevo desde el panel sí se
+  puede aunque el principal esté caído** (su worker lo conecta igual).
+- Lo que sí es exclusivo del principal: que él conteste en la comunidad
+  oficial, los comandos del owner, la lista de bots y el aviso de canales.
+
 ---
 
 ## PM2 en Termux
