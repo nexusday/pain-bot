@@ -53,6 +53,50 @@ global.logssubbots = '120363430965244922@newsletter'
 // true = botones/listas con @itsliaaa/baileys | false = solo @whiskeysockets/baileys
 global.baileysInteractive = true
 
+// ── Panel web de vinculación ────────────────────────────────────────────────
+// El proceso principal levanta un servidor HTTP en `port` (la allocation de
+// Pterodactyl). El dominio NO está fijo en el código: se arma con
+// `subdomain` + `domain`, y puedes sobreescribir todo con variables PAIN_WEB_*.
+//
+//   subdomain: 'pain'          -> https://pain.nexcodea.com
+//   domain:    'nexcodea.com'  -> el dominio base
+//   publicUrl: ''              -> si lo defines, manda sobre subdomain+domain
+//
+// En Pterodactyl: asigna el puerto 10022 y apunta el subdominio al nodo.
+// Si usas Cloudflare/proxy, activa "trustProxy" para leer X-Forwarded-*.
+global.webPanel = {
+  enabled: true,
+  host: '0.0.0.0',
+  port: 10022,
+  subdomain: process.env.PAIN_WEB_SUBDOMAIN || 'pain',
+  domain: process.env.PAIN_WEB_DOMAIN || 'nexcodea.com',
+  publicUrl: process.env.PAIN_WEB_PUBLIC_URL || '',
+  // Si sirves el panel directamente por el puerto (sin proxy), pon
+  // includePort: true para que la URL pública incluya :10022. Con reverse
+  // proxy (recomendado) se omite y queda https://subdominio.dominio.
+  includePort: process.env.PAIN_WEB_INCLUDE_PORT === '1',
+  brandName: process.env.PAIN_WEB_BRAND || 'Pain Bot',
+  // Cuenta administradora inicial. Si dejas adminPass vacío, se genera una
+  // contraseña aleatoria y se guarda en storage/webpanel-admin.txt.
+  adminUser: process.env.PAIN_WEB_ADMIN_USER || 'admin',
+  adminPass: process.env.PAIN_WEB_ADMIN_PASS || '',
+  adminReset: process.env.PAIN_WEB_ADMIN_RESET === '1',
+  sessionSecret: process.env.PAIN_WEB_SECRET || '',
+  trustProxy: process.env.PAIN_WEB_TRUST_PROXY !== '0',
+  cookieName: process.env.PAIN_WEB_COOKIE || 'pain_panel',
+  // Registro: puedes cerrarlo o exigir un código de invitación.
+  allowRegistration: process.env.PAIN_WEB_ALLOW_REGISTER !== '0',
+  requireInvite: process.env.PAIN_WEB_REQUIRE_INVITE === '1',
+  inviteCode: process.env.PAIN_WEB_INVITE || '',
+  // Límites anti-abuso del emparejamiento.
+  sessionTtlMs: 7 * 24 * 60 * 60 * 1000,
+  pairTtlMs: 180_000,
+  codeTtlMs: 90_000,
+  maxPairAttemptsPerHour: Number.parseInt(process.env.PAIN_WEB_MAX_LINKS_HOUR, 10) || 8,
+  maxPairAttemptsPerDay: Number.parseInt(process.env.PAIN_WEB_MAX_LINKS_DAY, 10) || 30,
+  maxPairAttemptsPerIpPerHour: Number.parseInt(process.env.PAIN_WEB_MAX_LINKS_IP_HOUR, 10) || 20,
+}
+
 global.mods =   []
 global.prems = []
 

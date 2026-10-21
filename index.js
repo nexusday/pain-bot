@@ -13,7 +13,7 @@ import {
   sesionPrincipalRegistrada as leerSesionPrincipalRegistrada,
   subBotsPermitidos
 } from './lib/process-isolation.js'
-import { ARCHIVO_REENLACE_PENDIENTE } from './lib/subbot-recovery.js'
+import { ARCHIVO_REENLACE_PENDIENTE, sesionEnEmparejamiento } from './lib/subbot-recovery.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { crearCoordinadorSubme } from './lib/subme-coordinator.js'
 
@@ -111,7 +111,7 @@ function listSessions() {
       return statSync(sessionPath).isDirectory() && (
         existsSync(join(sessionPath, 'creds.json')) ||
         existsSync(join(sessionPath, ARCHIVO_REENLACE_PENDIENTE))
-      )
+      ) && !sesionEnEmparejamiento(sessionPath)
     } catch {
       return false
     }

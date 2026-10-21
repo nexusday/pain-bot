@@ -41,10 +41,12 @@ import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-
 import { estadoMemoriaProceso } from './lib/mem-hygiene.js'
 import {
   ARCHIVO_REENLACE_PENDIENTE,
+  limpiarEmparejamientos,
   listarRequierenVincular,
   necesitaRevinculacion,
   purgarSesionesReenlace,
   purgarSesionReenlace,
+  sesionEnEmparejamiento,
   sesionRequiereVincular,
   vinculacionEnCurso
 } from './lib/subbot-recovery.js'
@@ -201,6 +203,32 @@ if (isSubbotWorker || isManagedPrimary) {
     })
   }, 5000)
   syncDatabase.unref?.()
+}
+
+// Un reinicio del proceso principal no puede tener vinculaciones web vivas:
+// limpia marcas .pairing huérfanas para que el supervisor no ignore esas
+// sesiones para siempre.
+if (!isSubbotWorker) {
+  try {
+    const obsoletas = limpiarEmparejamientos(resolve(__dirname, global.bot || 'Serbot'))
+    if (obsoletas > 0) {
+      console.log(`[webpanel] Marcas .pairing obsoletas eliminadas: ${obsoletas}`)
+    }
+  } catch (error) {
+    console.error('[webpanel] No se pudieron limpiar marcas .pairing:', error?.message || error)
+  }
+}
+
+// Panel web: solo el proceso principal abre el puerto. Los workers de
+// sub-bots nunca escuchan en red. Si el puerto está ocupado, el bot sigue
+// funcionando igual (el error se registra y no se propaga).
+if (!isSubbotWorker && global.webPanel?.enabled !== false) {
+  try {
+    const { startWebPanel } = await import('./lib/webpanel/server.js')
+    global.webPanelHandle = await startWebPanel()
+  } catch (error) {
+    console.error('[webpanel] No se pudo iniciar el panel:', error?.message || error)
+  }
 }
 global.authFile = 'sessions'
 let state = null
@@ -778,6 +806,10 @@ if (!isSubbotWorker) {
     const existing = sesionesIniciando.get(folder)
     if (existing) return existing
     const botPath = join(serbotDir, folder)
+    if (sesionEnEmparejamiento(botPath)) {
+      console.warn(`Worker subbot: se omite ${folder}, se está vinculando desde el panel web.`)
+      return Promise.resolve('skipped')
+    }
     if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) {
       try {
         purgarSesionReenlace(botPath, serbotDir)
@@ -1019,6 +1051,14 @@ function cerrarConexionesDelProceso(signal) {
     } catch (error) {
       console.error('[db] No se pudieron cerrar las conexiones SQLite:', error?.message || error)
     }
+    try {
+      await Promise.race([
+        global.webPanelHandle?.close?.() ?? Promise.resolve(),
+        new Promise((resolve) => setTimeout(resolve, 2500)),
+      ])
+    } catch (error) {
+      console.error('[webpanel] No se pudo cerrar el panel:', error?.message || error)
+    }
   })()
   volcadoFinal.then(salir, salir)
   setTimeout(salir, 9500).unref?.()
@@ -1091,7 +1131,9 @@ function contarSesionesEnDisco(serbotDir) {
     const todas = readdirSync(serbotDir).filter((folder) => {
       try {
         const folderPath = join(serbotDir, folder)
-        return statSync(folderPath).isDirectory() && existsSync(join(folderPath, 'creds.json'))
+        return statSync(folderPath).isDirectory() &&
+          existsSync(join(folderPath, 'creds.json')) &&
+          !sesionEnEmparejamiento(folderPath)
       } catch {
         return false
       }
@@ -1218,6 +1260,9 @@ global.reconnectSubBotOneManaged = async function(folder) {
       }
     }
   } catch {}
+  if (sesionEnEmparejamiento(join(serbotDir, realFolder))) {
+    return { ok: false, reason: 'pairing' }
+  }
   if (necesitaRevinculacion(serbotDir, realFolder) || sesionRequiereVincular(join(serbotDir, realFolder))) {
     return { ok: false, reason: 'needs-relink' }
   }

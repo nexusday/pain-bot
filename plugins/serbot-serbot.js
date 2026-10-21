@@ -272,7 +272,12 @@ async function iniciarSubBot(options) {
     replyJid = null,
     supervisorHandoff = false,
     esperarConexion = false,
-    timeoutConexionMs = 60_000
+    timeoutConexionMs = 60_000,
+    // Vinculación desde el panel web: no hay mensaje/conn de WhatsApp que
+    // responder; el código se entrega por callback y el panel lo muestra.
+    pairingOnly = false,
+    onPairingCode = null,
+    forzarRevinculacion = false
   } = options
 
   const claveInicio = path.resolve(pathAYBot)
@@ -315,7 +320,7 @@ async function iniciarSubBot(options) {
     fs.mkdirSync(pathAYBot, { recursive: true })
   }
 
-  if (fromCommand && fs.existsSync(rutaCreds)) {
+  if (fromCommand && fs.existsSync(rutaCreds) && !forzarRevinculacion) {
     try {
       const previa = JSON.parse(fs.readFileSync(rutaCreds, 'utf8'))
       if (previa?.registered && !fs.existsSync(path.join(pathAYBot, ARCHIVO_REENLACE_PENDIENTE))) {
@@ -499,6 +504,7 @@ async function iniciarSubBot(options) {
     const idCarpetaBot = path.basename(pathAYBot)
 
     const replyUser = async (text) => {
+      if (!m || !conn) return null
       return sendPrivateReply(m, conn, text, { contextInfo: { ...rcanal.contextInfo } })
     }
 
@@ -607,7 +613,8 @@ async function iniciarSubBot(options) {
     }
 
     async function enviarCodigoEmparejamiento() {
-      if (codigoEmparejamientoEnviado || emparejamientoEnCurso || !codigoM || !m || !conn) return false
+      if (codigoEmparejamientoEnviado || emparejamientoEnCurso || !codigoM) return false
+      if (!pairingOnly && (!m || !conn)) return false
       emparejamientoEnCurso = true
 
       if (!telefonoEmparejamiento) {
@@ -630,6 +637,19 @@ async function iniciarSubBot(options) {
 
         secreto = secreto?.match(/.{1,4}/g)?.join('-') || secreto
         codigoEmparejamientoEnviado = true
+
+        // Panel web: entregar el código al llamador y no enviar nada por
+        // WhatsApp. El socket sigue vivo esperando a que el usuario lo meta
+        // en su teléfono.
+        if (pairingOnly) {
+          emparejamientoEnCurso = false
+          try {
+            await onPairingCode?.(secreto)
+          } catch (error) {
+            console.error('[pairing] No se pudo entregar el código al panel:', error?.message || error)
+          }
+          return true
+        }
 
         const textoCodigo = construirMensajeCodigoEmparejamiento(secreto, telefonoEmparejamiento)
         const jid = getPrivateReplyJid(m, conn)
@@ -668,7 +688,7 @@ async function iniciarSubBot(options) {
       if (isNewLogin) tuvoNuevoLogin = true
       if (isNewLogin) sock.isInit = false
 
-      if (qr && codigoM && m && conn) {
+      if (qr && codigoM && (pairingOnly || (m && conn))) {
         await enviarCodigoEmparejamiento()
         return
       }

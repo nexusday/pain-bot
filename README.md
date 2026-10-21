@@ -49,8 +49,9 @@ npm start
 7. [Uso](#uso)
 8. [Estructura](#estructura)
 9. [Actualizar](#actualizar)
-10. [Problemas frecuentes](#problemas-frecuentes)
-11. [Aviso y créditos](#aviso-y-créditos)
+10. [Panel web](#panel-web)
+11. [Problemas frecuentes](#problemas-frecuentes)
+12. [Aviso y créditos](#aviso-y-créditos)
 
 ---
 
@@ -401,3 +402,109 @@ Diagnóstico: `/mem` y `/mem limpiar` (fuerza poda y GC en el proceso actual).
 | `PAIN_RSS_ALERT_MB` | `1200` | RSS del proceso que activa la poda agresiva |
 | `PAIN_STT_IDLE_MS` | `300000` | Tiempo sin audio para descargar el modelo de voz |
 | `PAIN_MAX_IA_CHATS` | `300` | Chats con memoria de IA por proceso |
+
+---
+
+## Panel web
+
+El proceso principal del bot levanta un panel HTTP para registrar cuentas y
+vincular sub-bots desde el navegador. Los workers de sub-bots **nunca** abren
+el puerto: solo escucha el proceso principal.
+
+- Puerto por defecto: **`10022`** (`global.webPanel.port` o `PAIN_WEB_PORT`).
+- Host: `0.0.0.0`, para que Pterodactyl pueda enrutar la allocation.
+- Base de datos propia: `storage/webpanel.sqlite`. No se mezcla con la base
+  caliente del bot (`storage/databases/database.sqlite`).
+- Las sesiones de WhatsApp siguen en `Serbot/<número>/`; mientras se vinculan
+  llevan un archivo `.pairing` para que el supervisor no las conecte, archive
+  ni purge a mitad del proceso.
+- El bot principal debe estar vinculado antes de generar códigos desde la web.
+  Si no lo está, el panel responde `main_not_linked`.
+
+### Variables de entorno
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `PAIN_WEB_ENABLED` | `1` | `0` apaga el panel sin tocar el bot |
+| `PAIN_WEB_PORT` | `10022` | Puerto de la allocation |
+| `PAIN_WEB_HOST` | `0.0.0.0` | Interfaz de escucha |
+| `PAIN_WEB_SUBDOMAIN` | `pain` | Subdominio público |
+| `PAIN_WEB_DOMAIN` | `nexcodea.com` | Dominio base |
+| `PAIN_WEB_PUBLIC_URL` | derivada | URL pública completa; manda sobre subdominio+dominio |
+| `PAIN_WEB_INCLUDE_PORT` | `0` | `1` agrega `:10022` a la URL derivada |
+| `PAIN_WEB_BRAND` | `Pain Bot` | Nombre visible en el panel |
+| `PAIN_WEB_ADMIN_USER` | `admin` | Usuario administrador inicial |
+| `PAIN_WEB_ADMIN_PASS` | vacío | Contraseña del administrador inicial |
+| `PAIN_WEB_ADMIN_RESET` | `0` | `1` restablece la contraseña del admin al arrancar |
+| `PAIN_WEB_ALLOW_REGISTER` | `1` | `0` cierra el registro público |
+| `PAIN_WEB_REQUIRE_INVITE` | `0` | `1` exige código de invitación |
+| `PAIN_WEB_INVITE` | vacío | Código de invitación |
+| `PAIN_WEB_TRUST_PROXY` | `1` | `0` ignora `X-Forwarded-For` |
+| `PAIN_WEB_SESSION_TTL` | `604800000` | Duración de la sesión web (ms) |
+| `PAIN_WEB_PAIR_TTL` | `180000` | Vida del intento de vinculación (ms) |
+| `PAIN_WEB_CODE_TTL` | `90000` | Vida del código de 8 dígitos (ms) |
+| `PAIN_WEB_MAX_LINKS_HOUR` | `8` | Intentos por usuario/hora |
+| `PAIN_WEB_MAX_LINKS_DAY` | `30` | Intentos por usuario/día |
+| `PAIN_WEB_MAX_LINKS_IP_HOUR` | `20` | Intentos por IP/hora |
+
+Si `PAIN_WEB_ADMIN_PASS` queda vacío, al primer arranque se genera una
+contraseña aleatoria y se escribe en `storage/webpanel-admin.txt`. Para
+recuperar el acceso, define `PAIN_WEB_ADMIN_PASS` y `PAIN_WEB_ADMIN_RESET=1`
+una vez, y luego quita `PAIN_WEB_ADMIN_RESET`.
+
+### DNS y reverse proxy
+
+Configura el subdominio para que apunte al nodo y publica el puerto del panel
+detrás de HTTPS:
+
+1. En Pterodactyl, habilita la allocation **10022** para el servidor.
+2. Crea un registro DNS `A` para `pain.nexcodea.com` apuntando a
+   `node.nexcodea.com` (o al mismo balanceador/proxy que usan los demás
+   servicios del nodo).
+3. Publica `pain.nexcodea.com` por HTTPS y envía el tráfico a
+   `http://IP_DEL_NODO:10022` con `Host` y `X-Forwarded-*`.
+
+Ejemplo de Nginx:
+
+```nginx
+server {
+  listen 443 ssl http2;
+  server_name pain.nexcodea.com;
+
+  # ssl_certificate ... / ssl_certificate_key ...
+
+  location / {
+    proxy_pass http://127.0.0.1:10022;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+Con HTTPS, la cookie de sesión se marca `Secure` automáticamente. Si accedes
+directamente sin proxy, define la URL exacta para evitar confusiones:
+
+```env
+PAIN_WEB_PUBLIC_URL=http://pain.nexcodea.com:10022
+```
+
+`https://pain.nexcodea.com` (sin puerto) es el valor recomendado cuando hay
+reverse proxy, que es el caso normal en producción.
+
+### Primer acceso
+
+1. Arranca el bot principal y abre la URL pública del panel.
+2. Entra con el usuario/contraseña administrador.
+3. Revisa **Ajustes** para el límite de plazas y **Usuarios** para crear o
+   moderar cuentas.
+4. Cada usuario entra a **Vincular bot**, escribe su número con código de país
+   y recibe un código de 8 dígitos. Lo confirma en WhatsApp → Dispositivos
+   vinculados → Vincular con número.
+5. El panel muestra el estado en **Mis bots**; la vinculación aparece en el
+   panel de administración con su auditoría.
+
+El emparejamiento usa el mismo motor de Baileys que `/code`, pero el código se
+genera aleatorio para cada intento y nunca se comparte entre sesiones.

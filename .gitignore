@@ -17,6 +17,10 @@ storage/staff.json
 storage/maxsubs.json
 storage/soporte.json
 storage/main-groups.json
+storage/webpanel.sqlite
+storage/webpanel.sqlite-*
+storage/webpanel-admin.txt
+storage/webpanel.secret
 storage/sticker-ban/
 storage/msgdels/
 package-lock.json
