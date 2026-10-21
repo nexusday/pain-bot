@@ -139,6 +139,28 @@ function avisarSesionExistente(conn, m, numero, tipo, usedPrefix = '.') {
 let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants, groupMetadata: metadatosGrupo }) => {
   if (!global.db.data.users[m.sender]) global.db.data.users[m.sender] = {}
 
+  // Con el panel web activo los sub-bots se crean desde la web: aquí solo se
+  // indica dónde hacerlo (la consola/chat deja de ser el punto de vinculación).
+  const { panelWebActivo, urlPublicaPanel } = await import('../lib/webpanel-url.js')
+  if (panelWebActivo()) {
+    const url = urlPublicaPanel()
+    const pref = usedPrefix || '.'
+    return conn.sendMessage(m.chat, {
+      text: `
+\`*˚   ✩    ✦    ✩   ˚*\`
+
+╭─ ✧
+┊ *los sub-bots ahora se crean desde la web*
+╰─ ✧  ✩
+┊ entra al panel y vincula tu número en segundos
+┊ \`${url}\`
+┊ \`${pref}code\`  ·  \`${pref}qr\`
+┊ ya no hace falta pasar el código por aquí
+╰─────────`.trim(),
+      contextInfo: { ...rcanal.contextInfo }
+    }, { quoted: m })
+  }
+
   let tiempo = global.db.data.users[m.sender].Subs + 120000
 
   let quien = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
@@ -240,7 +262,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
 handler.help = ['#qr', '#code']
 handler.tags = ['subbots']
 handler.command = ['qr', 'qrr', 'code']
-export { iniciarSubBot as AYBot }
+export {
+  iniciarSubBot as AYBot,
+  construirMensajesBienvenidaSubBot as buildWelcomeMessages,
+  enviarSaludoPropioSubBot as sendOwnWelcomeMessage
+}
 export default handler
 
 export async function retirarSesionDeWorker(pathAYBot, { handoff = false } = {}) {
@@ -277,7 +303,10 @@ async function iniciarSubBot(options) {
     // responder; el código se entrega por callback y el panel lo muestra.
     pairingOnly = false,
     onPairingCode = null,
-    forzarRevinculacion = false
+    forzarRevinculacion = false,
+    // Nombre del usuario del panel que pidió la vinculación (para el
+    // mensaje de bienvenida que el sub-bot se envía a sí mismo).
+    usuarioPanel = ''
   } = options
 
   const claveInicio = path.resolve(pathAYBot)
@@ -898,7 +927,9 @@ async function iniciarSubBot(options) {
             fs.writeFileSync(rutaConfig, JSON.stringify(configSub, null, 2))
           }
 
-          const esSubBotFresco = fromCommand && m && tuvoNuevoLogin
+          const nuevoLogin = tuvoNuevoLogin
+          const esSubBotFresco = fromCommand && m && nuevoLogin
+          const esVinculacionDesdePanel = pairingOnly && nuevoLogin
           tuvoNuevoLogin = false
 
           if (esSubBotFresco) {
@@ -912,6 +943,16 @@ async function iniciarSubBot(options) {
               usedPrefix,
               configPath: rutaConfig,
               subConfig: configSub
+            })
+          } else if (esVinculacionDesdePanel) {
+            // Vinculado desde el panel web: el sub-bot se escribe a SÍ MISMO
+            // (como /subme) con las instrucciones de uso.
+            await enviarSaludoPropioSubBot({
+              sock,
+              nombreBot,
+              botNumber: numeroBot,
+              userName: opcionesSubBot.usuarioPanel || '',
+              usedPrefix
             })
           }
 
@@ -1262,6 +1303,30 @@ function construirMensajesBienvenidaSubBot({ conn, nombreBot, botNumber: numeroB
 ╰─────────`.trim()
 
   return { privateMessage: mensajePrivado, channelMessage: mensajeCanal }
+}
+
+/**
+ * El sub-bot se escribe a SÍ MISMO el mensaje de bienvenida (su chat
+ * "mensajes para ti mismo"), igual que hace /subme. Se usa cuando la
+ * vinculación viene del panel web.
+ */
+async function enviarSaludoPropioSubBot({ sock, nombreBot, botNumber: numeroBot, userName, usedPrefix = '.' }) {
+  try {
+    const { jidPropioSubBot } = await import('../lib/subme-broadcast.js')
+    const { privateMessage } = construirMensajesBienvenidaSubBot({
+      conn: sock,
+      nombreBot,
+      botNumber: numeroBot,
+      userName: userName || 'Usuario',
+      usedPrefix
+    })
+    const destino = jidPropioSubBot(sock)
+    if (!destino) return
+    await sock.sendMessage(destino, { text: privateMessage })
+    console.log(`[subbot] Mensaje de vinculación enviado a (+${numeroBot}) por su propio chat.`)
+  } catch (error) {
+    console.error('[subbot] Error enviando el mensaje de vinculación:', error?.message || error)
+  }
 }
 
 async function enviarBienvenidaSubBot({ sock, m, conn, replyJid, nombreBot, botNumber: numeroBot, usedPrefix, configPath: rutaConfig, subConfig: configSub }) {

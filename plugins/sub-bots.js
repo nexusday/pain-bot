@@ -157,9 +157,11 @@ let handler = async (m, { conn, usedPrefix }) => {
       }
       bloqueSubs = lineas.join('\n\n')
     } else {
-      bloqueSubs =
-        `┊ \`sin sub-bots\`\n` +
-        `┊ \`${pref}code\`  ·  \`${pref}qr\``
+      const { panelWebActivo, urlPublicaPanel } = await import('../lib/webpanel-url.js')
+      const urlPanel = panelWebActivo() ? urlPublicaPanel() : ''
+      bloqueSubs = urlPanel
+        ? `┊ \`sin sub-bots\`\n┊ crea el tuyo desde el panel\n┊ ${urlPanel}`
+        : `┊ \`sin sub-bots\`\n┊ \`${pref}code\`  ·  \`${pref}qr\``
     }
 
     const texto = `

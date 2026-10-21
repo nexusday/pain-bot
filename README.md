@@ -494,6 +494,22 @@ Endpoints (solo administradores, con CSRF y validación de origen):
 El estado del principal también viaja en `/api/config` como `mainLinked` para
 que los usuarios vean el aviso cuando el bot principal aún no está vinculado.
 
+### Todo se hace desde el panel
+
+Con el panel activo, la vinculación de sub-bots **no se hace en el chat**:
+
+- `/code` y `/qr` responden con la **URL global del panel** para que el
+  usuario cree su sub-bot desde la web.
+- El **menú del bot** muestra ese mismo link global.
+- Al vincularse desde el panel, el sub-bot **se escribe a sí mismo** (su chat
+  "mensajes para ti mismo", igual que `/subme`) con el resumen de la
+  vinculación: nombre, número, usuario y los comandos que puede usar
+  (`.setbotname`, `.setbotimg`, `.setautoread`, `.antipv`, `.setlen`,
+  `.setmenu`, `.menu`).
+
+La URL global sale de `PAIN_WEB_PUBLIC_URL` o, si no está, de
+`PAIN_WEB_SUBDOMAIN` + `PAIN_WEB_DOMAIN`.
+
 ### Comunidades de WhatsApp
 
 En **Administración → Comunidades** el administrador publica los grupos de la
