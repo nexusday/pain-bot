@@ -222,7 +222,7 @@ if (!isSubbotWorker) {
 // Panel web: solo el proceso principal abre el puerto. Los workers de
 // sub-bots nunca escuchan en red. Si el puerto está ocupado, el bot sigue
 // funcionando igual (el error se registra y no se propaga).
-if (!isSubbotWorker && global.webPanel?.enabled !== false) {
+if (!isSubbotWorker && global.webPanel?.enabled !== false && process.env.PAIN_WEB_ENABLED !== '0') {
   try {
     const { startWebPanel } = await import('./lib/webpanel/server.js')
     global.webPanelHandle = await startWebPanel()
@@ -235,6 +235,19 @@ let state = null
 let saveCreds = async () => {}
 let connectionOptions = null
 let conn
+
+// Guardado de credenciales del principal. Si el panel desvinculó el número,
+// las credenciales viejas no deben volver a escribirse a disco.
+async function guardarCredencialesPrincipales(...args) {
+  if (global.__painBloquearCreds) {
+    try {
+      const { borrarCredencialesPrincipales } = await import('./lib/main-session.js')
+      borrarCredencialesPrincipales()
+    } catch {}
+    return
+  }
+  return saveCreds(...args)
+}
 
 let workerStatusInterval = null
 if (!isSubbotWorker) {
@@ -279,13 +292,25 @@ if (!isSubbotWorker) {
       return
     }
 
-    let loginMethod = await question(
-      chalk.green(
-        '¿Cómo deseas iniciar sesión?\nEscribe "qr" para escanear el código QR o "code" para usar un código de 8 dígitos:\n'
+    let loginMethod = ''
+    try {
+      loginMethod = await question(
+        chalk.green(
+          '¿Cómo deseas iniciar sesión?\nEscribe "qr" para escanear el código QR o "code" para usar un código de 8 dígitos:\n'
+        )
       )
-    )
+    } catch {
+      return
+    }
 
     loginMethod = loginMethod.toLowerCase().trim()
+
+    // El panel pudo vincular el principal mientras se esperaba en consola.
+    if (conn.authState.creds.registered) {
+      console.log(chalk.green('Sesión ya está registrada.'))
+      rl.close()
+      return
+    }
 
     if (loginMethod === 'code') {
       let phoneNumber = await question(chalk.blue('Ingresa el número de WhatsApp donde estará el bot (incluye código país, ej: 521XXXXXXXXXX):\n'))
@@ -320,7 +345,17 @@ if (!isSubbotWorker) {
     rl.close()
   }
 
-  await handleLogin()
+  const loginFlow = handleLogin()
+  const panelActivo = global.webPanel?.enabled !== false && process.env.PAIN_WEB_ENABLED !== '0'
+  if (!panelActivo) {
+    await loginFlow
+  } else {
+    // Con el panel activo el principal también se puede vincular desde la web
+    // (Administración → Bot principal), así que el arranque no se queda
+    // esperando una respuesta en la consola.
+    loginFlow.catch(() => {})
+    console.log(chalk.cyan('El bot principal se puede vincular desde el panel web.'))
+  }
 } else {
   const eventBus = new EventEmitter()
   const facade = {
@@ -655,7 +690,7 @@ global.reloadHandler = async function (restartConn) {
 
   global.conn.handler = handler.handler.bind(global.conn)
   global.conn.connectionUpdate = connectionUpdate.bind(global.conn)
-  global.conn.credsUpdate = saveCreds.bind(global.conn, true)
+  global.conn.credsUpdate = guardarCredencialesPrincipales
 
   initViewOnceAntiListener(global.conn)
   global.conn.ev.on('messages.upsert', global.conn.handler)

@@ -420,6 +420,34 @@ el puerto: solo escucha el proceso principal.
   ni purge a mitad del proceso.
 - El bot principal debe estar vinculado antes de generar códigos desde la web.
   Si no lo está, el panel responde `main_not_linked`.
+- La interfaz es una SPA sin dependencias: tema oscuro, logo del bot, barra
+  lateral plegable (botón de menú también en escritorio) y diseño adaptable a
+  móvil y escritorio.
+
+### Gestionar el bot principal
+
+En **Administración → Bot principal** el administrador puede:
+
+- **Vincular** un número: el panel pide un código de 8 dígitos al socket del
+  principal y lo muestra en pantalla para escribirlo en WhatsApp → Dispositivos
+  vinculados → Vincular con número.
+- **Desvincular** el número actual: se cierra la sesión en WhatsApp y se
+  borran las credenciales locales (`sessions/`).
+- **Cambiar de número**: desvincula y reinicia el proceso en un solo paso.
+- **Reiniciar el bot**: relanza el proceso principal (el supervisor lo vuelve a
+  levantar). El panel espera a que vuelva y se recarga solo.
+
+Endpoints (solo administradores, con CSRF y validación de origen):
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/api/main` | Estado de la sesión principal |
+| `POST` | `/api/main/code` | Genera un código de vinculación |
+| `POST` | `/api/main/unlink` | Desvincula y borra credenciales |
+| `POST` | `/api/main/restart` | Reinicia el proceso principal |
+
+El estado del principal también viaja en `/api/config` como `mainLinked` para
+que los usuarios vean el aviso cuando el bot principal aún no está vinculado.
 
 ### Variables de entorno
 

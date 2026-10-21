@@ -27,6 +27,9 @@ const state = {
   adminPairings: [],
   adminAudit: [],
   adminSettings: null,
+  main: null,
+  mainCode: null,
+  mainPoll: null,
 }
 
 /* ── Iconos (stroke, sin dependencias) ──────────────────────────────────── */
@@ -363,6 +366,10 @@ function stopCountdown() {
 function stopTimers() {
   stopPairingPolling()
   stopCountdown()
+  if (state.mainPoll) {
+    clearInterval(state.mainPoll)
+    state.mainPoll = null
+  }
 }
 
 /* ── Toasts / modales ───────────────────────────────────────────────────── */
@@ -441,20 +448,20 @@ function renderAuth() {
     <div class="auth-shell">
       <section class="auth-brand">
         <div class="brand">
-          <div class="brand-mark">${icon('zap')}</div>
-          <div>
+          <div class="brand-mark"><img src="/assets/logo.webp" alt="" /></div>
+          <div class="brand-text">
             <div class="brand-name">${h(brand)}</div>
-            <div class="brand-sub">Control panel</div>
+            <div class="brand-sub">Panel de control</div>
           </div>
         </div>
         <div class="auth-hero">
-          <div class="auth-kicker"><span class="dot"></span> Panel de sub-bots</div>
-          <h1 class="auth-title">Tus sub-bots,<br><span class="grad">bajo control.</span></h1>
-          <p class="auth-lead">Vincula números de WhatsApp, revisa el estado de cada sesión y administra todo desde un solo lugar. Sin comandos, sin complicaciones.</p>
+          <img class="auth-logo" src="/assets/logo-wide.webp" alt="${h(brand)}" />
+          <h1 class="auth-title">Vincula y administra tus números de WhatsApp</h1>
+          <p class="auth-lead">Cada sub-bot vive en su propia sesión y se conecta al servidor por separado. Desde aquí generas el código, ves el estado real de cada número y lo dejas en marcha o lo retiras.</p>
           <ul class="auth-features">
-            <li><span class="fi">${icon('link')}</span><div><b>Vinculación desde la web</b><span>Genera el código y conéctalo desde WhatsApp en segundos.</span></div></li>
-            <li><span class="fi">${icon('activity')}</span><div><b>Estado en tiempo real</b><span>Conectado, vinculado o necesita re-vincularse: siempre visible.</span></div></li>
-            <li><span class="fi">${icon('shieldCheck')}</span><div><b>Panel administrador</b><span>Usuarios, sesiones, límites y auditoría con permisos separados.</span></div></li>
+            <li><span class="fi">${icon('link')}</span><div><b>Código de 8 dígitos</b><span>Sin escanear QR: WhatsApp → Dispositivos vinculados → Vincular con número.</span></div></li>
+            <li><span class="fi">${icon('activity')}</span><div><b>Estado en vivo</b><span>Conectado, vinculado o pendiente de re-vincular, siempre a la vista.</span></div></li>
+            <li><span class="fi">${icon('shieldCheck')}</span><div><b>Acceso por cuenta</b><span>Cada usuario ve solo sus números; el panel de administración va aparte.</span></div></li>
           </ul>
           <div class="auth-meta">
             <span>${h(publicUrl.replace(/^https?:\/\//, '') || 'Panel privado')}</span>
@@ -466,8 +473,8 @@ function renderAuth() {
       <section class="auth-pane">
         <div class="auth-card">
           <div class="auth-card-head">
-            <h2>${tab === 'login' ? 'Bienvenido de vuelta' : 'Crea tu cuenta'}</h2>
-            <p>${tab === 'login' ? 'Ingresa para administrar tus sub-bots.' : 'Regístrate para vincular tu primer número.'}</p>
+            <h2>${tab === 'login' ? 'Inicia sesión' : 'Crea tu cuenta'}</h2>
+            <p>${tab === 'login' ? 'Accede al panel para gestionar tus sub-bots.' : 'Regístrate para vincular tu primer número.'}</p>
           </div>
           ${allowRegistration ? `<div class="auth-tabs">
             <button class="auth-tab ${tab === 'login' ? 'active' : ''}" data-action="auth-tab" data-tab="login">Iniciar sesión</button>
@@ -510,9 +517,37 @@ function renderAuth() {
 /* ── Shell principal ────────────────────────────────────────────────────── */
 function navLink(path, iconName, label, options = {}) {
   const nav = options.nav || path
-  return `<a class="nav-link" href="#${path}" data-nav="${nav}">
-    ${icon(iconName)}<span>${h(label)}</span>${options.badge ? `<span class="nav-badge" id="${options.badgeId || ''}">${h(options.badge)}</span>` : ''}
+  return `<a class="nav-link" href="#${path}" data-nav="${nav}" title="${h(label)}">
+    ${icon(iconName)}<span class="nav-label">${h(label)}</span>${options.badge ? `<span class="nav-badge" id="${options.badgeId || ''}">${h(options.badge)}</span>` : ''}
   </a>`
+}
+
+const CLAVE_MENU = 'pain.sidebar'
+
+function menuColapsado() {
+  try {
+    return localStorage.getItem(CLAVE_MENU) === 'collapsed'
+  } catch {
+    return false
+  }
+}
+
+function guardarMenu(colapsado) {
+  try {
+    localStorage.setItem(CLAVE_MENU, colapsado ? 'collapsed' : 'open')
+  } catch {}
+}
+
+function toggleSidebar() {
+  const shell = document.getElementById('app-shell')
+  if (!shell) return
+  if (window.innerWidth <= 900) {
+    shell.classList.toggle('sidebar-open')
+    return
+  }
+  const colapsado = !shell.classList.contains('sidebar-collapsed')
+  shell.classList.toggle('sidebar-collapsed', colapsado)
+  guardarMenu(colapsado)
 }
 
 function renderShell() {
@@ -524,12 +559,15 @@ function renderShell() {
 
   document.title = `${cfg.brandName || 'Pain Panel'} · Panel`
   app.innerHTML = `
-    <div class="app-shell" id="app-shell">
+    <div class="app-shell${menuColapsado() ? ' sidebar-collapsed' : ''}" id="app-shell">
       <aside class="sidebar">
         <div class="sidebar-brand">
           <div class="brand">
-            <div class="brand-mark">${icon('zap')}</div>
-            <div><div class="brand-name">${h(cfg.brandName || 'Pain Bot')}</div><div class="brand-sub">Panel de control</div></div>
+            <div class="brand-mark"><img src="/assets/logo.webp" alt="" /></div>
+            <div class="brand-text">
+              <div class="brand-name">${h(cfg.brandName || 'Pain Bot')}</div>
+              <div class="brand-sub">Panel de control</div>
+            </div>
           </div>
         </div>
         <nav class="nav">
@@ -548,7 +586,7 @@ function renderShell() {
       <div class="sidebar-overlay" data-action="close-sidebar"></div>
       <main class="main">
         <header class="topbar">
-          <button class="icon-btn mobile-only" data-action="toggle-sidebar" aria-label="Abrir menú">${icon('menu')}</button>
+          <button class="topbar-toggle" data-action="toggle-sidebar" aria-label="Mostrar u ocultar el menú" title="Mostrar u ocultar el menú">${icon('menu')}</button>
           <div class="topbar-title">
             <h1 id="page-title">Dashboard</h1>
             <p id="page-sub">Resumen de tu cuenta</p>
@@ -608,7 +646,7 @@ async function route() {
       return
     }
     const section = parts[1] || 'overview'
-    const valid = ['overview', 'users', 'sessions', 'pairings', 'audit', 'settings']
+    const valid = ['overview', 'principal', 'users', 'sessions', 'pairings', 'audit', 'settings']
     return renderAdmin(valid.includes(section) ? section : 'overview')
   }
 
@@ -627,16 +665,8 @@ async function route() {
 }
 
 /* ── Widgets compartidos ────────────────────────────────────────────────── */
-function statCard(label, value, iconName, tone = 'violet', foot = '') {
-  const tones = {
-    violet: ['#c4b5fd', 'rgba(139,92,246,.13)', 'rgba(139,92,246,.22)', 'rgba(139,92,246,.16)'],
-    green: ['#86efac', 'rgba(34,197,94,.12)', 'rgba(34,197,94,.22)', 'rgba(34,197,94,.15)'],
-    cyan: ['#a5f3fc', 'rgba(6,182,212,.12)', 'rgba(6,182,212,.22)', 'rgba(6,182,212,.15)'],
-    amber: ['#fde68a', 'rgba(245,158,11,.12)', 'rgba(245,158,11,.22)', 'rgba(245,158,11,.14)'],
-    red: ['#fecaca', 'rgba(239,68,68,.12)', 'rgba(239,68,68,.22)', 'rgba(239,68,68,.14)'],
-  }
-  const [color, bg, line, glow] = tones[tone] || tones.violet
-  return `<div class="stat" style="--stat-color:${color};--stat-bg:${bg};--stat-line:${line};--stat-glow:${glow}">
+function statCard(label, value, iconName, tone = 'accent', foot = '') {
+  return `<div class="stat stat-${tone}">
     <div class="stat-top"><div class="stat-icon">${icon(iconName)}</div></div>
     <div class="stat-value">${h(value)}</div>
     <div class="stat-label">${h(label)}</div>
@@ -738,6 +768,13 @@ async function renderDashboard() {
     content(errorPage(error.message))
     return
   }
+  const isAdmin = state.user?.role === 'admin'
+  if (isAdmin) {
+    try {
+      const data = await api.get('/api/main')
+      state.main = data.main || null
+    } catch {}
+  }
   const bots = state.bots
   const total = bots.length
   const connected = bots.filter((bot) => bot.status === 'connected').length
@@ -746,6 +783,10 @@ async function renderDashboard() {
   const maxSubs = Number(state.config?.maxSubs || 0)
   const slots = maxSubs > 0 ? `${total}/${maxSubs}` : 'Ilimitado'
   const publicUrl = state.config?.publicUrl || ''
+  const mainLinked = isAdmin
+    ? Boolean(state.main?.linked)
+    : state.config?.mainLinked !== false
+  const mainPhone = state.main?.phone || ''
 
   content(`
     <div class="page-head">
@@ -755,8 +796,9 @@ async function renderDashboard() {
         <a class="btn btn-primary" href="#/link">${icon('plus')} Vincular bot</a>
       </div>
     </div>
+    ${mainLinked ? '' : `<div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div>El <b>bot principal</b> todavía no está vinculado, así que los sub-bots no pueden conectarse.${isAdmin ? ' Vincúlalo desde <a href="#/admin/principal"><b>Administración → Bot principal</b></a>.' : ' Avisa al administrador del servidor.'}</div></div>`}
     <div class="stats">
-      ${statCard('Sub-bots', total, 'bot', 'violet')}
+      ${statCard('Sub-bots', total, 'bot', 'accent')}
       ${statCard('Conectados', connected, 'wifi', 'green')}
       ${statCard('Requieren atención', relink, 'alert', 'amber')}
       ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? 'Límite del servidor' : 'Sin límite configurado'}</span>`)}
@@ -779,6 +821,22 @@ async function renderDashboard() {
         </div></div>` : ''}
       </div>
       <div class="stack">
+        ${isAdmin ? `<div class="card">
+          <div class="card-head">
+            <div><h3>Bot principal</h3><p>La sesión principal del servidor</p></div>
+            <span class="badge ${mainLinked ? 'success' : 'warn'}"><span class="dot"></span>${mainLinked ? 'Vinculado' : 'Sin vincular'}</span>
+          </div>
+          <div class="card-body">
+            <div class="main-hero">
+              <div class="main-hero-logo"><img src="/assets/logo.webp" alt="" /></div>
+              <div class="main-hero-info">
+                <h3>${mainPhone ? h(fmtPhone(mainPhone)) : 'Sin número'}</h3>
+                <p>${state.main?.connected ? 'Conectado a WhatsApp' : 'Socket cerrado'}</p>
+              </div>
+            </div>
+            <a class="btn btn-secondary btn-block" style="margin-top:14px" href="#/admin/principal">${icon('bot')} Gestionar el bot principal</a>
+          </div>
+        </div>` : ''}
         <div class="card">
           <div class="card-head"><div><h3>Acceso rápido</h3><p>Tu panel público</p></div><span class="badge success"><span class="dot"></span>En línea</span></div>
           <div class="card-body">
@@ -788,7 +846,7 @@ async function renderDashboard() {
                 <input class="input mono" readonly value="${h(publicUrl)}" />
                 <button class="btn btn-secondary" data-action="copy" data-copy="${h(publicUrl)}" title="Copiar">${icon('copy')}</button>
               </div>
-              <div class="hint">Comparte esta dirección con tus usuarios. El subdominio se configura en <span class="mono">config.js</span>.</div>
+              <div class="hint">Esta es la dirección con la que entra tu equipo. El subdominio se configura en <span class="mono">config.js</span> o en las variables <span class="mono">PAIN_WEB_*</span>.</div>
             </div>
             <div class="field">
               <label class="label">Cuenta</label>
@@ -1100,6 +1158,7 @@ function renderAccount() {
 function adminTabs(active) {
   const tabs = [
     ['overview', 'Resumen', 'grid'],
+    ['principal', 'Bot principal', 'bot'],
     ['users', 'Usuarios', 'users'],
     ['sessions', 'Sesiones', 'server'],
     ['pairings', 'Vinculaciones', 'link'],
@@ -1112,6 +1171,7 @@ function adminTabs(active) {
 
 const ADMIN_META = {
   overview: ['Resumen', 'Estado general del panel y del sistema'],
+  principal: ['Bot principal', 'Vincula, cambia o retira el número del bot principal'],
   users: ['Usuarios', 'Cuentas registradas en el panel'],
   sessions: ['Sesiones', 'Sub-bots detectados en el servidor'],
   pairings: ['Vinculaciones', 'Historial de intentos de vinculación'],
@@ -1129,6 +1189,15 @@ async function renderAdmin(section) {
       const data = await api.get('/api/admin/overview')
       if (!isAdminRoute('overview')) return
       content(adminTabs('overview') + adminOverviewHTML(data))
+      return
+    }
+
+    if (section === 'principal') {
+      const data = await api.get('/api/main')
+      if (!isAdminRoute('principal')) return
+      state.main = data.main || null
+      content(adminTabs('principal') + adminMainHTML(data.main || {}))
+      vigilarVinculacionPrincipal()
       return
     }
 
@@ -1237,6 +1306,102 @@ function adminOverviewHTML(data) {
     </div>`
 }
 
+function adminMainHTML(main) {
+  const code = state.mainCode || ''
+  const linked = Boolean(main.linked)
+  const estado = !main.available
+    ? { label: 'No disponible', cls: 'neutral' }
+    : linked
+      ? { label: 'Vinculado', cls: 'success' }
+      : main.connected
+        ? { label: 'Esperando vinculación', cls: 'warn' }
+        : { label: 'Socket cerrado', cls: 'danger' }
+
+  const acciones = linked
+    ? `<button class="btn btn-secondary" data-action="main-relink">${icon('rotate')} Cambiar número</button>
+       <button class="btn btn-danger" data-action="main-unlink">${icon('power')} Desvincular</button>
+       <button class="btn btn-ghost" data-action="main-restart">${icon('refresh')} Reiniciar bot</button>`
+    : `<button class="btn btn-secondary" data-action="main-restart">${icon('refresh')} Reiniciar bot</button>`
+
+  return `
+    <div class="grid-2">
+      <div class="stack">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Sesión del bot principal</h3><p>El número que responde los comandos del owner</p></div>
+            <span class="badge ${estado.cls}"><span class="dot"></span>${estado.label}</span>
+          </div>
+          <div class="card-body">
+            <div class="main-hero">
+              <div class="main-hero-logo"><img src="/assets/logo.webp" alt="" /></div>
+              <div class="main-hero-info">
+                <h3>${main.phone ? h(fmtPhone(main.phone)) : 'Sin número vinculado'}</h3>
+                <p>${main.name ? h(main.name) + ' · ' : ''}${main.connected ? 'Conectado a WhatsApp' : 'Socket cerrado'}</p>
+              </div>
+              <div class="main-hero-actions">${acciones}</div>
+            </div>
+
+            ${!main.available ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El panel no tiene acceso al socket del bot principal. En un servidor normal esto no debería ocurrir: revisa que el panel se esté ejecutando en el proceso principal.</div></div>` : ''}
+            ${!linked && main.connected ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Mientras el principal no esté vinculado, los sub-bots no pueden conectarse. Genera un código abajo y escríbelo en WhatsApp → <b>Dispositivos vinculados → Vincular con número</b>.</div></div>` : ''}
+            ${!linked && !main.connected ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El socket del principal está cerrado. Reinicia el bot para volver a pedir un código de vinculación.</div></div>` : ''}
+            ${linked ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Al desvincular se borran las credenciales locales y hay que reiniciar el proceso para poder emparejar otro número.</div></div>` : ''}
+          </div>
+        </div>
+
+        ${!linked ? `<div class="card">
+          <div class="card-head"><div><h3>Vincular el principal</h3><p>Código de 8 dígitos, sin QR</p></div></div>
+          <div class="card-body">
+            <form id="main-link-form">
+              <div class="form-error">${icon('alert')}<span></span></div>
+              <div class="field">
+                <label class="label" for="main-phone">Número de WhatsApp</label>
+                <div class="input-icon">${icon('phone')}<input id="main-phone" name="phone" class="input" inputmode="numeric" autocomplete="tel" placeholder="5215512345678" required /></div>
+                <div class="hint">Código de país, sin <b>+</b>, espacios ni guiones.</div>
+              </div>
+              <button class="btn btn-primary" type="submit" ${main.canRequestCode ? '' : 'disabled'}>${icon('key')} Generar código</button>
+              ${!main.canRequestCode ? '<div class="hint" style="margin-top:10px">El socket no está listo para emparejar. Reinicia el bot e inténtalo de nuevo.</div>' : ''}
+            </form>
+            ${code ? `<div class="code-box" style="margin-top:18px">
+              <div class="code-kicker">Código de vinculación</div>
+              <div class="code-value">${h(code)}</div>
+              <div class="code-sub">Escríbelo en WhatsApp → Dispositivos vinculados.</div>
+              <div class="code-actions">
+                <button class="btn btn-secondary btn-sm" data-action="copy" data-copy="${h(code)}">${icon('copy')} Copiar código</button>
+                <button class="btn btn-ghost btn-sm" data-action="main-clear-code">${icon('x')} Ocultar</button>
+              </div>
+            </div>` : ''}
+          </div>
+        </div>` : ''}
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="card-head"><div><h3>Cómo funciona</h3><p>Lo que pasa en cada acción</p></div></div>
+          <div class="card-body">
+            <ol class="steps">
+              <li><span class="step-num">1</span><div><b>Vincular</b><span>El panel pide un código al socket del principal y lo muestra durante 90 segundos.</span></div></li>
+              <li><span class="step-num">2</span><div><b>Confirmar en WhatsApp</b><span>Al aceptar, las credenciales se guardan y el principal queda en línea.</span></div></li>
+              <li><span class="step-num">3</span><div><b>Desvincular</b><span>Se cierra la sesión en WhatsApp y se borran las credenciales del servidor.</span></div></li>
+              <li><span class="step-num">4</span><div><b>Reiniciar</b><span>El proceso se relanza y ya acepta un número nuevo.</span></div></li>
+            </ol>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h3>Sesión principal</h3><p>Datos técnicos</p></div></div>
+          <div class="card-body">
+            <div class="system-grid">
+              <div class="system-item"><div class="si-label">Estado</div><div class="si-value" style="font-size:13px">${h(estado.label)}</div></div>
+              <div class="system-item"><div class="si-label">Credenciales</div><div class="si-value" style="font-size:13px">${main.hasLocalCreds ? 'En el servidor' : 'Sin credenciales'}</div></div>
+              <div class="system-item"><div class="si-label">Socket</div><div class="si-value" style="font-size:13px">${main.connected ? 'Abierto' : 'Cerrado'}</div></div>
+              <div class="system-item"><div class="si-label">Sub-bots</div><div class="si-value" style="font-size:13px">${linked ? 'Pueden conectarse' : 'En espera'}</div></div>
+            </div>
+            <div class="hint" style="margin-top:12px">Carpeta de credenciales: <span class="mono">${h(String(main.authDir || 'sessions'))}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>`
+}
+
 function workersList(workers) {
   if (!workers?.length) {
     return '<div class="hint">No hay workers de sub-bots reportando. El proceso principal puede atender sesiones en modo standalone.</div>'
@@ -1268,6 +1433,9 @@ const ACTION_LABELS = {
   'admin.session_reconnect': 'Sesión reconectada',
   'admin.session_delete': 'Sesión eliminada',
   'admin.settings': 'Ajustes actualizados',
+  'main.code': 'Código del principal',
+  'main.unlink': 'Principal desvinculado',
+  'main.restart': 'Bot reiniciado',
 }
 
 function actionLabel(action) {
@@ -1277,8 +1445,8 @@ function actionLabel(action) {
 function actionTone(action) {
   const value = String(action || '')
   if (['auth.login', 'auth.register', 'bot.linked'].includes(value)) return 'ok'
-  if (['bot.link_expired', 'bot.link_cancelled', 'bot.reconnect', 'admin.user_update', 'admin.settings'].includes(value)) return 'warn'
-  if (value.includes('delete') || value.includes('error')) return 'bad'
+  if (['bot.link_expired', 'bot.link_cancelled', 'bot.reconnect', 'admin.user_update', 'admin.settings', 'main.code', 'main.restart'].includes(value)) return 'warn'
+  if (value.includes('delete') || value.includes('error') || value.includes('unlink')) return 'bad'
   return ''
 }
 
@@ -1567,6 +1735,8 @@ async function handleLogout() {
   state.adminPairings = []
   state.adminAudit = []
   state.adminSettings = null
+  state.main = null
+  state.mainCode = null
   closeModal()
   renderAuth()
   showToast('Sesión cerrada.', 'info')
@@ -1737,6 +1907,109 @@ async function handlePasswordChange(form) {
   }
 }
 
+/* ── Handlers del bot principal ─────────────────────────────────────────── */
+/** Mientras hay un código pendiente, comprueba si el principal se vinculó. */
+function vigilarVinculacionPrincipal() {
+  if (state.mainPoll) {
+    clearInterval(state.mainPoll)
+    state.mainPoll = null
+  }
+  if (!state.mainCode || state.main?.linked) return
+  state.mainPoll = setInterval(async () => {
+    try {
+      const data = await api.get('/api/main')
+      if (!data.main) return
+      state.main = data.main
+      if (data.main.linked) {
+        stopTimers()
+        state.mainCode = null
+        showToast('¡Bot principal vinculado!', 'success')
+        if (isAdminRoute('principal')) renderAdmin('principal')
+      }
+    } catch {}
+  }, 3000)
+}
+
+async function handleMainLink(form) {
+  const input = form.querySelector('[name="phone"]')
+  const submit = form.querySelector('button[type="submit"]')
+  const phone = String(input?.value || '').replace(/\D/g, '')
+
+  hideFormError(form)
+  if (phone.length < 8 || phone.length > 15) {
+    showFormError(form, 'Escribe el número con código de país (entre 8 y 15 dígitos).')
+    return
+  }
+
+  setLoading(submit, true, 'Generando código…')
+  try {
+    const data = await api.post('/api/main/code', { phone })
+    state.mainCode = data.code || null
+    showToast('Código generado. Ingrésalo en WhatsApp.', 'success')
+    await renderAdmin('principal')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo generar el código.')
+    setLoading(submit, false)
+  }
+}
+
+async function handleMainUnlink({ relink = false } = {}) {
+  const main = state.main || {}
+  const numero = main.phone ? fmtPhone(main.phone) : 'el bot principal'
+  confirmModal({
+    title: relink ? 'Cambiar el número del principal' : 'Desvincular el bot principal',
+    message: relink
+      ? `Se cerrará la sesión de <b>${h(numero)}</b> en WhatsApp, se borrarán sus credenciales y el proceso se reiniciará para poder emparejar otro número. Los sub-bots quedan en pausa hasta que el principal vuelva.`
+      : `Se cerrará la sesión de <b>${h(numero)}</b> en WhatsApp y se borrarán sus credenciales del servidor. Después tendrás que reiniciar el bot para vincular otro número.`,
+    confirmLabel: relink ? 'Cambiar número' : 'Desvincular',
+    onConfirm: async () => {
+      await api.post('/api/main/unlink', {})
+      state.mainCode = null
+      if (relink) {
+        await api.post('/api/main/restart', {})
+        showToast('Principal desvinculado. El bot se está reiniciando…', 'success')
+        esperarReinicio()
+        return
+      }
+      showToast('Bot principal desvinculado. Reinicia el bot para vincular otro número.', 'success')
+      await renderAdmin('principal')
+    },
+  })
+}
+
+async function handleMainRestart() {
+  confirmModal({
+    title: 'Reiniciar el bot',
+    message: 'El proceso principal se va a cerrar y a volver a arrancar. Las sesiones de los sub-bots se reconectan solas, pero el panel se quedará unos segundos sin responder.',
+    confirmLabel: 'Reiniciar',
+    danger: false,
+    onConfirm: async () => {
+      await api.post('/api/main/restart', {})
+      showToast('Reiniciando el bot…', 'info')
+      esperarReinicio()
+    },
+  })
+}
+
+/** Espera a que el proceso vuelva y recarga la página. */
+function esperarReinicio() {
+  let intentos = 0
+  const revisar = async () => {
+    intentos += 1
+    try {
+      await api.get('/healthz')
+      window.location.reload()
+      return
+    } catch {}
+    if (intentos < 45) {
+      setTimeout(revisar, 2000)
+      return
+    }
+    showToast('El servidor todavía no responde. Recarga la página en unos segundos.', 'warn')
+  }
+  setTimeout(revisar, 2500)
+}
+
 /* ── Handlers de administración ─────────────────────────────────────────── */
 async function handleUserSave(form) {
   const id = form.dataset.id
@@ -1843,7 +2116,7 @@ async function onClick(event) {
     const id = actionEl.dataset.id
 
     if (action === 'toggle-sidebar') {
-      document.getElementById('app-shell')?.classList.toggle('sidebar-open')
+      toggleSidebar()
       return
     }
     if (action === 'close-sidebar') {
@@ -1927,6 +2200,23 @@ async function onClick(event) {
       confirmAdminDeleteSession(phone)
       return
     }
+    if (action === 'main-unlink') {
+      await handleMainUnlink()
+      return
+    }
+    if (action === 'main-relink') {
+      await handleMainUnlink({ relink: true })
+      return
+    }
+    if (action === 'main-restart') {
+      await handleMainRestart()
+      return
+    }
+    if (action === 'main-clear-code') {
+      state.mainCode = null
+      if (isAdminRoute('principal')) renderAdmin('principal')
+      return
+    }
   }
 
   const nav = event.target.closest('.nav-link')
@@ -1968,6 +2258,11 @@ async function onSubmit(event) {
   if (id === 'settings-form') {
     event.preventDefault()
     await handleSettingsSave(form)
+    return
+  }
+  if (id === 'main-link-form') {
+    event.preventDefault()
+    await handleMainLink(form)
   }
 }
 
