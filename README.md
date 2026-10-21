@@ -371,6 +371,19 @@ mismo"). Ni el principal les escribe a los sub-bots, ni los sub-bots se
 escriben entre sí, y **el principal no contesta nada** (tampoco una
 confirmación): solo reparte la orden.
 
+**`/modosub <n>`** (también `/modobot`, `/botactivo`, `/onlybot`) elige qué bot
+responde en ese grupo. Como cada sub-bot vive en su propio proceso, el comando
+se resuelve con una **lista global** (principal + sub-bots de todos los
+workers) para que el número que elijas sea el mismo en todos lados:
+
+- La lista que muestra el comando y la que se guarda como "bot activo" son
+  idénticas en cada proceso.
+- **Solo contesta un bot**: el dueño del que elegiste. Los demás se callan
+  (antes todos mandaban la confirmación y cada worker elegía un bot distinto).
+- Si el bot elegido no está en el grupo, no aparece en la lista; si además
+  está desconectado, contesta uno solo (el responsable) avisando de ello.
+- `/modosub all` vuelve a dejar que respondan todos.
+
 ---
 
 # Memoria con muchos sub-bots
@@ -448,6 +461,37 @@ Endpoints (solo administradores, con CSRF y validación de origen):
 
 El estado del principal también viaja en `/api/config` como `mainLinked` para
 que los usuarios vean el aviso cuando el bot principal aún no está vinculado.
+
+### Comunidades de WhatsApp
+
+En **Administración → Comunidades** el administrador publica los grupos de la
+comunidad: nombre, enlace de invitación y descripción. Los usuarios las ven en
+la sección **Comunidades** del panel y entran con un clic ("Unirme a la
+comunidad"). Una comunidad se puede ocultar sin borrarla, para dejar de
+mostrarla un tiempo.
+
+### Límites por cuenta y por IP
+
+En **Administración → Ajustes** se configuran tres topes:
+
+| Límite | Dónde se guarda | Para qué |
+|---|---|---|
+| Máximo de sub-bots del servidor | `storage/maxsubs.json` | Tope global de sesiones |
+| Máximo de sub-bots por cuenta | `panel_meta` (`max_subs_per_user`) | Cuántas cuentas puede vincular cada usuario |
+| Máximo de cuentas por IP | `panel_meta` (`max_bots_per_ip`) | Cuántas cuentas distintas se pueden vincular desde la misma conexión |
+
+`0` significa "sin límite". Cuando una cuenta o una IP llega al tope, el
+panel responde `user_limit` (403) o `ip_limit` (429) y el usuario ve un aviso
+en "Mis bots".
+
+### Sesiones: filtros y borrado por oleadas
+
+En **Administración → Sesiones** se puede filtrar por estado (todas,
+conectadas, vinculadas, re-vincular, vinculando, pendientes, sin archivos),
+seleccionar varias sesiones con las casillas y borrarlas de una vez. El
+borrado se hace **por oleadas de 5** para no saturar el proceso del bot.
+
+Endpoint: `POST /api/admin/sessions/bulk` con `{ phones: [...], batchSize: 5 }`.
 
 ### Variables de entorno
 

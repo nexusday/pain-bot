@@ -897,6 +897,10 @@ if (!isSubbotWorker) {
         number: socket?.phoneNumber || socket?.botNumber ||
           socket?.user?.jid || socket?.user?.id || folder,
         name: socket?.user?.name || socket?.authState?.creds?.me?.name || '',
+        // Identidad completa (PN + LID) para que otros procesos puedan saber
+        // si este sub-bot está en un grupo concreto.
+        jid: socket?.user?.jid || socket?.user?.id || '',
+        lid: socket?.user?.lid || '',
         connected: Boolean(
           (socket?.user?.jid || socket?.user?.id) &&
           (socket?.ws?.isOpen === true || readyState === ws.OPEN)

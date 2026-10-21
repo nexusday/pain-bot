@@ -200,6 +200,140 @@ export function listarBotsEnGrupo(participants = []) {
   return bots
 }
 
+/**
+ * Lista bots (principal + subbots) presentes en el grupo.
+ *
+ * En modo supervisor cada sub-bot vive en su propio proceso, así que la
+ * lista local no sirve: el índice 2 sería un bot distinto en cada proceso.
+ * Esta versión arma la misma lista en todos los procesos (principal +
+ * subbots locales + subbots publicados por los workers) y marca cuál de
+ * ellos es "local" (el único que puede responder por ese bot).
+ */
+export function listarBotsEnGrupoGlobal(participants = []) {
+  const mapa = new Map()
+
+  const agregar = (numero, datos) => {
+    const num = limpiarNumBot(numero)
+    if (!num || num.length < 6) return
+    if (mapa.has(num)) return
+    mapa.set(num, { number: num, ...datos })
+  }
+
+  const principalConn = obtenerConnPrincipal()
+  if (principalConn?.user) {
+    agregar(numeroPublicoBot(principalConn, participants), {
+      type: 'principal',
+      name: obtenerNombreVisibleBot(principalConn, true),
+      conn: principalConn,
+      ids: numerosIdentidadBot(principalConn),
+      connected: true,
+    })
+  }
+
+  for (const sub of (global.conns || [])) {
+    if (!sub?.user) continue
+    if (sub.ws?.socket?.readyState !== ws.OPEN) continue
+    agregar(numeroPublicoBot(sub, participants), {
+      type: 'subbot',
+      name: obtenerNombreVisibleBot(sub, false),
+      conn: sub,
+      ids: numerosIdentidadBot(sub),
+      connected: true,
+    })
+  }
+
+  // Sub-bots que viven en otros procesos (grupos de workers).
+  try {
+    for (const worker of readSubbotWorkerStatuses(process.cwd())) {
+      for (const sesion of worker.sessions || []) {
+        const ids = new Set()
+        if (sesion.number) ids.add(String(sesion.number))
+        if (sesion.jid) ids.add(String(sesion.jid))
+        if (sesion.lid) ids.add(String(sesion.lid))
+        agregar(sesion.number || sesion.folder, {
+          type: 'subbot',
+          name: sesion.name || 'Sub-Bot',
+          conn: null,
+          ids,
+          connected: sesion.connected !== false,
+        })
+      }
+    }
+  } catch {}
+
+  const bots = []
+  for (const bot of mapa.values()) {
+    if (!botEstaEnGrupo(bot, participants)) continue
+    bots.push(bot)
+  }
+
+  bots.sort((a, b) => {
+    if (a.type === 'principal') return -1
+    if (b.type === 'principal') return 1
+    return String(a.number).localeCompare(String(b.number), 'en', { numeric: true })
+  })
+  bots.forEach((bot, indice) => { bot.index = indice + 1 })
+  return bots
+}
+
+function botEstaEnGrupo(bot, participants) {
+  if (!Array.isArray(participants) || !participants.length) return false
+  if (bot.conn && !bot.conn._principalRemoto) return botEnParticipantes(bot.conn, participants)
+  const ids = bot.ids instanceof Set ? [...bot.ids] : []
+  if (!ids.length) return false
+  return algunParticipanteCoincideConIds(ids, participants, null)
+}
+
+/** ¿Este socket es el dueño local de ese bot? */
+function esDueñoLocal(bot) {
+  const conn = bot?.conn
+  if (!conn) return false
+  if (conn._principalRemoto) return false
+  return typeof conn.sendMessage === 'function'
+}
+
+/** ¿Este socket ES ese bot? (tolera 52/521 y 54/549) */
+function esEsteBot(conn, numero) {
+  if (!conn || !numero) return false
+  for (const id of numerosIdentidadBot(conn)) {
+    if (numerosCoinciden(id, numero)) return true
+  }
+  return false
+}
+
+/** Dos números son el mismo aunque difieran en el prefijo 52/521 o 54/549. */
+function numerosCoinciden(a, b) {
+  const variantes = (valor) => {
+    const s = String(valor || '').replace(/\D/g, '')
+    const set = new Set([s])
+    if (s.startsWith('521') && s.length >= 12) set.add(`52${s.slice(3)}`)
+    if (s.startsWith('52') && !s.startsWith('521') && s.length === 12) set.add(`521${s.slice(2)}`)
+    if (s.startsWith('549') && s.length >= 12) set.add(`54${s.slice(3)}`)
+    if (s.startsWith('54') && !s.startsWith('549') && s.length === 11) set.add(`549${s.slice(2)}`)
+    return set
+  }
+  const A = variantes(a)
+  for (const v of variantes(b)) if (A.has(v)) return true
+  return false
+}
+
+/**
+ * Único bot que debe contestar: el seleccionado si su proceso está vivo y,
+ * si no, el responsable (principal o el de menor número) para que la
+ * respuesta nunca se duplique.
+ */
+export function elegirQuienResponde(bots, conn, seleccionado = null) {
+  if (!bots.length) return null
+  if (seleccionado) {
+    if (esDueñoLocal(seleccionado) && esEsteBot(conn, seleccionado.number)) return seleccionado
+    if (seleccionado.connected !== false) return null
+  }
+  for (const bot of bots) {
+    if (esDueñoLocal(bot) && esEsteBot(conn, bot.number)) return bot
+  }
+  return null
+}
+
 export function obtenerBotActivoDelGrupo(idChat) {
   const datos = global.db?.data
   if (!datos) return null
@@ -492,14 +626,21 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
     if (fresco?.participants?.length) participantesGrupo = fresco.participants
   } catch {}
 
-  const bots = listarBotsEnGrupo(participantesGrupo)
-  if (!bots.length) {
-    return m.reply('[❗] No detecté bots (principal/sub) en este grupo.')
-  }
+  // La lista debe ser la MISMA en todos los procesos: si no, cada worker
+  // elegiría un bot distinto con el mismo índice.
+  const listaGlobal = listarBotsEnGrupoGlobal(participantesGrupo)
+  const bots = listaGlobal.length ? listaGlobal : listarBotsEnGrupo(participantesGrupo)
 
   const accion = (args[0] || '').toLowerCase().trim()
 
+  if (!bots.length) {
+    // Nadie detectó bots: contesta solo el principal local, nunca todos.
+    if (!esConnBotPrincipal(conn)) return
+    return m.reply('[❗] No detecté bots (principal/sub) en este grupo.')
+  }
+
   if (!accion) {
+    if (!elegirQuienResponde(bots, conn)) return
     const activo = obtenerBotActivoDelGrupo(m.chat)
     let textoMsg = `*Modo Sub / Bot activo*\n\n`
     textoMsg += `Elige qué bot responde en este grupo.\n`
@@ -527,6 +668,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
   }
 
   if (['all', 'off', 'todos', 'reset'].includes(accion)) {
+    if (!elegirQuienResponde(bots, conn)) return
     establecerBotActivoDelGrupo(m.chat, 'all')
     await global.db.write?.()
     return m.reply('✅ Modo Sub desactivado.\n> Todos los bots del grupo pueden responder otra vez.')
@@ -534,15 +676,21 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
 
   const indice = parseInt(accion, 10)
   if (!Number.isFinite(indice) || indice < 1 || indice > bots.length) {
+    if (!elegirQuienResponde(bots, conn)) return
     return m.reply(`[❗] Número inválido.\n\nUsa *${usedPrefix}modosub* para ver la lista\no *${usedPrefix}modosub 1* / *${usedPrefix}modosub all*`)
   }
 
   const seleccionado = bots[indice - 1]
+  // Solo contesta el proceso dueño del bot elegido (o, si no está conectado,
+  // uno solo en su lugar). Así la confirmación nunca sale duplicada.
+  if (!elegirQuienResponde(bots, conn, seleccionado)) return
+
   establecerBotActivoDelGrupo(m.chat, seleccionado.number)
   await global.db.write?.()
 
   const etiqueta = seleccionado.type === 'principal' ? 'Bot Principal' : 'Sub-Bot'
-  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${indice}.* ${etiqueta} — ${seleccionado.name}\n> +${seleccionado.number}\n\n> Los demás bots ignoran comandos aquí (también si escriben desde su propio número).\n> Para volver a todos: *${usedPrefix}modosub all*`)
+  const aviso = seleccionado.connected === false ? '\n> ⚠️ Ese bot no está conectado ahora mismo.' : ''
+  return m.reply(`✅ Ahora solo responde en este grupo:\n\n*${indice}.* ${etiqueta} — ${seleccionado.name}\n> +${seleccionado.number}${aviso}\n\n> Los demás bots ignoran comandos aquí (también si escriben desde su propio número).\n> Para volver a todos: *${usedPrefix}modosub all*`)
 }
 
 handler.command = ['modosub', 'modobot', 'botactivo', 'onlybot']
@@ -563,6 +711,8 @@ export {
   esConnBotPrincipal as isMainBotConn,
   obtenerConnPrincipal as getMainBotConn,
   listarBotsEnGrupo as listBotsInGroup,
+  listarBotsEnGrupoGlobal as listBotsInGroupGlobal,
+  elegirQuienResponde as pickWhoAnswers,
   obtenerBotActivoDelGrupo as getActiveBotForGroup,
   establecerBotActivoDelGrupo as setActiveBotForGroup,
   listarNumerosBotsConocidos as listKnownBotNumbers,

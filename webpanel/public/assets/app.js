@@ -27,6 +27,10 @@ const state = {
   adminPairings: [],
   adminAudit: [],
   adminSettings: null,
+  adminCommunities: [],
+  sessionFilter: 'all',
+  selectedSessions: new Set(),
+  botLimit: null,
   main: null,
   mainCode: null,
   mainPoll: null,
@@ -507,7 +511,7 @@ function renderAuth() {
               <div class="input-icon">${icon('key')}<input class="input" id="auth-invite" name="invite" placeholder="Código de acceso" required /></div>
             </div>` : ''}
             <button class="btn btn-primary btn-block auth-submit" type="submit">${tab === 'login' ? 'Entrar al panel' : 'Crear cuenta'} ${icon('arrowRight')}</button>
-            <div class="auth-legal">Conexión cifrada · Sesiones protegidas con cookies HttpOnly</div>
+            <div class="auth-legal">By Sunkovv</div>
           </form>
         </div>
       </section>
@@ -574,6 +578,7 @@ function renderShell() {
           ${navLink('/dashboard', 'grid', 'Dashboard')}
           ${navLink('/bots', 'bot', 'Mis bots', { badge: state.bots.length || '', badgeId: 'nav-bots-count' })}
           ${navLink('/link', 'link', 'Vincular bot')}
+          ${navLink('/communities', 'globe', 'Comunidades')}
           <div class="nav-section">Cuenta</div>
           ${navLink('/account', 'user', 'Mi cuenta')}
           ${isAdmin ? `<div class="nav-section">Administración</div>${navLink('/admin/overview', 'shield', 'Administración', { nav: '/admin' })}` : ''}
@@ -646,7 +651,7 @@ async function route() {
       return
     }
     const section = parts[1] || 'overview'
-    const valid = ['overview', 'principal', 'users', 'sessions', 'pairings', 'audit', 'settings']
+    const valid = ['overview', 'principal', 'users', 'sessions', 'pairings', 'communities', 'audit', 'settings']
     return renderAdmin(valid.includes(section) ? section : 'overview')
   }
 
@@ -657,6 +662,8 @@ async function route() {
       return renderBots()
     case 'link':
       return renderLinkPage()
+    case 'communities':
+      return renderCommunities()
     case 'account':
       return renderAccount()
     default:
@@ -715,6 +722,7 @@ function errorPage(message) {
 async function loadBots() {
   const data = await api.get('/api/bots')
   state.bots = Array.isArray(data.bots) ? data.bots : []
+  state.botLimit = data.limit || null
   updateNavBadges()
   return state.bots
 }
@@ -883,14 +891,17 @@ async function renderBots() {
     return
   }
   const bots = state.bots
+  const limite = state.botLimit || null
+  const limiteAlcanzado = Boolean(limite && !limite.unlimited && limite.used >= limite.max)
   content(`
     <div class="page-head">
-      <div><h2>Mis bots</h2><p>${bots.length} sesión(es) vinculada(s) a tu cuenta.</p></div>
+      <div><h2>Mis bots</h2><p>${bots.length} sesión(es) vinculada(s) a tu cuenta.${limite && !limite.unlimited ? ` Límite: ${limite.used}/${limite.max}.` : ''}</p></div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="refresh">${icon('refresh')} Actualizar</button>
-        <a class="btn btn-primary" href="#/link">${icon('plus')} Vincular bot</a>
+        <a class="btn btn-primary" href="#/link" ${limiteAlcanzado ? 'aria-disabled="true"' : ''}>${icon('plus')} Vincular bot</a>
       </div>
     </div>
+    ${limiteAlcanzado ? `<div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div>Tu cuenta ya llegó al límite de <b>${limite.max}</b> sub-bot(s). Pide al administrador del servidor que lo amplíe si necesitas más.</div></div>` : ''}
     <div class="card">
       <div class="card-head">
         <div><h3>Sesiones</h3><p>Estado actual de cada sub-bot</p></div>
@@ -1092,6 +1103,34 @@ function startCountdown() {
   state.countdownTimer = setInterval(tick, 1000)
 }
 
+/* ── Comunidades de WhatsApp ────────────────────────────────────────────── */
+async function renderCommunities() {
+  setPage('Comunidades', 'Entra a los grupos de la comunidad de WhatsApp')
+  content(loadingPage('Cargando comunidades…'))
+  try {
+    const data = await api.get('/api/communities')
+    const comunidades = Array.isArray(data.communities) ? data.communities : []
+    content(`
+      <div class="page-head">
+        <div><h2>Comunidades</h2><p>${comunidades.length ? 'Entra con un clic a la comunidad que quieras.' : 'Todavía no hay comunidades publicadas.'}</p></div>
+      </div>
+      ${comunidades.length ? `<div class="community-grid">${comunidades.map((comunidad) => `
+        <div class="community-card">
+          <div class="community-head">
+            <div class="community-icon">${icon('users')}</div>
+            <div class="grow">
+              <div class="cell-title">${h(comunidad.name)}</div>
+              ${comunidad.description ? `<div class="cell-sub">${h(comunidad.description)}</div>` : ''}
+            </div>
+          </div>
+          <a class="btn btn-primary btn-block" href="${h(comunidad.link)}" target="_blank" rel="noopener noreferrer">${icon('external')} Unirme a la comunidad</a>
+          <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" data-action="copy" data-copy="${h(comunidad.link)}">${icon('copy')} Copiar enlace</button>
+        </div>`).join('')}</div>` : `<div class="card">${emptyState('globe', 'Sin comunidades todavía', 'El administrador todavía no ha publicado ninguna comunidad. Vuelve más tarde.')}</div>`}`)
+  } catch (error) {
+    content(errorPage(error.message))
+  }
+}
+
 /* ── Mi cuenta ──────────────────────────────────────────────────────────── */
 function renderAccount() {
   setPage('Mi cuenta', 'Datos de acceso y seguridad del panel')
@@ -1162,6 +1201,7 @@ function adminTabs(active) {
     ['users', 'Usuarios', 'users'],
     ['sessions', 'Sesiones', 'server'],
     ['pairings', 'Vinculaciones', 'link'],
+    ['communities', 'Comunidades', 'globe'],
     ['audit', 'Auditoría', 'activity'],
     ['settings', 'Ajustes', 'settings'],
   ]
@@ -1175,6 +1215,7 @@ const ADMIN_META = {
   users: ['Usuarios', 'Cuentas registradas en el panel'],
   sessions: ['Sesiones', 'Sub-bots detectados en el servidor'],
   pairings: ['Vinculaciones', 'Historial de intentos de vinculación'],
+  communities: ['Comunidades', 'Comunidades de WhatsApp para los usuarios del panel'],
   audit: ['Auditoría', 'Actividad reciente del panel'],
   settings: ['Ajustes', 'Configuración global del panel'],
 }
@@ -1215,7 +1256,8 @@ async function renderAdmin(section) {
       if (!isAdminRoute('sessions')) return
       state.adminSessions = Array.isArray(data.sessions) ? data.sessions : []
       content(adminTabs('sessions') + adminSessionsHTML(data))
-      attachRowFilter('#admin-sessions-search', '[data-session-row]')
+      document.getElementById('admin-sessions-search')?.addEventListener('input', aplicarFiltrosSesiones)
+      aplicarFiltrosSesiones()
       return
     }
 
@@ -1224,6 +1266,14 @@ async function renderAdmin(section) {
       if (!isAdminRoute('pairings')) return
       state.adminPairings = Array.isArray(data.pairings) ? data.pairings : []
       content(adminTabs('pairings') + adminPairingsHTML(data))
+      return
+    }
+
+    if (section === 'communities') {
+      const data = await api.get('/api/admin/communities')
+      if (!isAdminRoute('communities')) return
+      state.adminCommunities = Array.isArray(data.communities) ? data.communities : []
+      content(adminTabs('communities') + adminCommunitiesHTML(data))
       return
     }
 
@@ -1514,7 +1564,9 @@ function sessionsTable(sessions) {
     return emptyState('server', 'Sin sesiones', 'No hay carpetas de sub-bots en el servidor todavía.')
   }
   return `<div class="table-wrap"><table class="table">
-    <thead><tr><th>Sesión</th><th>Dueño</th><th>Estado</th><th>Worker</th><th class="right">Acciones</th></tr></thead>
+    <thead><tr>
+      <th class="check-col"><input type="checkbox" class="row-check" data-session-check-all aria-label="Seleccionar todas las sesiones visibles" /></th>
+      <th>Sesión</th><th>Dueño</th><th>Estado</th><th>Worker</th><th class="right">Acciones</th></tr></thead>
     <tbody>${sessions.map((session) => {
       const phone = session.folder || session.phone
       const search = [phone, session.owner || '', session.label || '', session.status].join(' ').toLowerCase()
@@ -1524,7 +1576,9 @@ function sessionsTable(sessions) {
       else details.push('sin credenciales')
       if (session.label) details.push(session.label)
       const canReconnect = ['linked', 'connected'].includes(session.status)
-      return `<tr data-session-row data-search="${h(search)}">
+      const marcado = state.selectedSessions.has(phone)
+      return `<tr data-session-row data-session-phone="${h(phone)}" data-status="${h(session.status)}" data-search="${h(search)}">
+        <td class="check-col"><input type="checkbox" class="row-check" data-session-check="${h(phone)}" ${marcado ? 'checked' : ''} aria-label="Seleccionar ${h(phone)}" /></td>
         <td><div class="cell-main">
           <div class="row-icon ${statusIconTone(session.status)}">${icon('bot')}</div>
           <div class="grow"><div class="cell-title mono">${fmtPhone(phone)}</div><div class="cell-sub">${h(details.join(' · '))}</div></div>
@@ -1541,6 +1595,16 @@ function sessionsTable(sessions) {
   </table></div>`
 }
 
+const FILTROS_SESION = [
+  ['all', 'Todas'],
+  ['connected', 'Conectadas'],
+  ['linked', 'Vinculadas'],
+  ['relink', 'Re-vincular'],
+  ['pairing', 'Vinculando'],
+  ['pending', 'Pendientes'],
+  ['missing', 'Sin archivos'],
+]
+
 function adminSessionsHTML(data) {
   const sessions = data.sessions || []
   const counts = {
@@ -1549,8 +1613,9 @@ function adminSessionsHTML(data) {
     relink: sessions.filter((session) => session.status === 'relink').length,
     pairing: sessions.filter((session) => session.status === 'pairing').length,
   }
+  const activos = FILTROS_SESION.filter(([id]) => id !== 'all' && id !== 'linked')
   return `<div class="stats">
-    ${statCard('Sesiones', counts.total, 'server', 'violet')}
+    ${statCard('Sesiones', counts.total, 'server', 'accent')}
     ${statCard('Conectadas', counts.connected, 'wifi', 'green')}
     ${statCard('Re-vincular', counts.relink, 'alert', 'amber')}
     ${statCard('Vinculando', counts.pairing, 'link', 'cyan')}
@@ -1560,8 +1625,90 @@ function adminSessionsHTML(data) {
       <div><h3>Todas las sesiones</h3><p>Detectadas por el supervisor y los workers</p></div>
       <div class="input-icon" style="max-width:290px;width:100%">${icon('search')}<input id="admin-sessions-search" class="input" placeholder="Buscar número o dueño…" /></div>
     </div>
+    <div class="filter-bar">
+      <div class="filter-chips">
+        ${FILTROS_SESION.map(([id, label]) => {
+          const total = id === 'all'
+            ? sessions.length
+            : sessions.filter((session) => session.status === id).length
+          return `<button class="chip ${state.sessionFilter === id ? 'active' : ''}" data-action="session-filter" data-filter="${id}">${h(label)} <span class="chip-count">${total}</span></button>`
+        }).join('')}
+      </div>
+      <div class="selection-bar">
+        <span id="selection-count" class="hint">0 seleccionadas</span>
+        <button class="btn btn-ghost btn-sm" data-action="session-select-all">${icon('check')} Seleccionar visibles</button>
+        <button class="btn btn-ghost btn-sm" data-action="session-clear">${icon('x')} Limpiar</button>
+        <button class="btn btn-danger btn-sm" data-action="session-delete-selected" id="session-delete-selected" disabled>${icon('trash')} Eliminar seleccionadas</button>
+      </div>
+    </div>
     <div class="card-body tight">${sessionsTable(sessions)}</div>
   </div>`
+}
+
+/* ── Selección y filtros de sesiones ────────────────────────────────────── */
+function filasSesionVisibles() {
+  return [...document.querySelectorAll('[data-session-row]')].filter((fila) => fila.style.display !== 'none')
+}
+
+function aplicarFiltroSesiones(filtro) {
+  state.sessionFilter = filtro || 'all'
+  document.querySelectorAll('[data-action="session-filter"]').forEach((chip) => {
+    chip.classList.toggle('active', chip.dataset.filter === state.sessionFilter)
+  })
+  aplicarFiltrosSesiones()
+}
+
+function aplicarFiltrosSesiones() {
+  const input = document.getElementById('admin-sessions-search')
+  const q = String(input?.value || '').trim().toLowerCase()
+  document.querySelectorAll('[data-session-row]').forEach((fila) => {
+    const estado = fila.dataset.status || ''
+    const coincideEstado = state.sessionFilter === 'all' || estado === state.sessionFilter
+    const coincideTexto = !q || String(fila.dataset.search || '').includes(q)
+    fila.style.display = coincideEstado && coincideTexto ? '' : 'none'
+  })
+  actualizarSeleccion()
+}
+
+function actualizarSeleccion() {
+  const contador = document.getElementById('selection-count')
+  const total = state.selectedSessions.size
+  if (contador) contador.textContent = `${total} seleccionada${total === 1 ? '' : 's'}`
+  const boton = document.getElementById('session-delete-selected')
+  if (boton) boton.disabled = total === 0
+  const marcadas = document.querySelectorAll('[data-session-check]:checked').length
+  const selectAll = document.querySelector('[data-session-check-all]')
+  if (selectAll) {
+    const visibles = filasSesionVisibles().length
+    selectAll.checked = visibles > 0 && marcadas === visibles
+    selectAll.indeterminate = marcadas > 0 && marcadas < visibles
+  }
+}
+
+function alternarSeleccionSesion(phone, marcado) {
+  if (!phone) return
+  if (marcado) state.selectedSessions.add(phone)
+  else state.selectedSessions.delete(phone)
+  actualizarSeleccion()
+}
+
+async function eliminarSesionesSeleccionadas() {
+  const phones = [...state.selectedSessions]
+  if (!phones.length) {
+    showToast('No hay sesiones seleccionadas.', 'warn')
+    return
+  }
+  confirmModal({
+    title: 'Eliminar sesiones',
+    message: `Se eliminarán <b>${phones.length}</b> sesión(es) del servidor, con sus credenciales y ajustes. Se borran por oleadas de 5 para no saturar el proceso. Esta acción no se puede deshacer.`,
+    confirmLabel: `Eliminar ${phones.length} sesión(es)`,
+    onConfirm: async () => {
+      const data = await api.post('/api/admin/sessions/bulk', { phones, batchSize: 5 })
+      state.selectedSessions.clear()
+      showToast(`${data.eliminados} sesión(es) eliminadas.`, 'success')
+      await renderAdmin('sessions')
+    },
+  })
 }
 
 function pairingsTable(pairings, { compact = false } = {}) {
@@ -1593,6 +1740,54 @@ function adminPairingsHTML(data) {
   </div>`
 }
 
+function adminCommunitiesHTML(data) {
+  const comunidades = data.communities || []
+  return `<div class="grid-2">
+    <div class="card">
+      <div class="card-head"><div><h3>Nueva comunidad</h3><p>Nombre y enlace de invitación</p></div></div>
+      <div class="card-body">
+        <form id="community-form">
+          <div class="form-error">${icon('alert')}<span></span></div>
+          <div class="field">
+            <label class="label" for="community-name">Nombre</label>
+            <input id="community-name" name="name" class="input" maxlength="80" placeholder="Pain Community" required />
+          </div>
+          <div class="field">
+            <label class="label" for="community-link">Enlace de invitación</label>
+            <input id="community-link" name="link" class="input" type="url" placeholder="https://chat.whatsapp.com/..." required />
+            <div class="hint">El enlace que compartes para que la gente entre al grupo de la comunidad.</div>
+          </div>
+          <div class="field">
+            <label class="label" for="community-description">Descripción <span class="muted">(opcional)</span></label>
+            <input id="community-description" name="description" class="input" maxlength="300" placeholder="Avisos, soporte y novedades" />
+          </div>
+          <button class="btn btn-primary" type="submit">${icon('plus')} Crear comunidad</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Comunidades</h3><p>${comunidades.length} en total</p></div>
+      </div>
+      <div class="card-body tight">
+        ${comunidades.length ? `<div class="community-list">${comunidades.map((comunidad) => `
+          <div class="community-row${comunidad.active ? '' : ' off'}">
+            <div class="grow">
+              <div class="cell-title">${h(comunidad.name)}</div>
+              <div class="cell-sub mono truncate">${h(comunidad.link)}</div>
+              ${comunidad.description ? `<div class="hint" style="margin-top:4px">${h(comunidad.description)}</div>` : ''}
+            </div>
+            <div class="actions">
+              <button class="icon-btn sm" data-action="copy" data-copy="${h(comunidad.link)}" title="Copiar enlace">${icon('copy')}</button>
+              <button class="icon-btn sm" data-action="community-toggle" data-id="${comunidad.id}" data-active="${comunidad.active ? 1 : 0}" title="${comunidad.active ? 'Ocultar' : 'Mostrar'}">${icon(comunidad.active ? 'eyeOff' : 'eye')}</button>
+              <button class="icon-btn sm danger" data-action="community-delete" data-id="${comunidad.id}" data-name="${h(comunidad.name)}" title="Eliminar">${icon('trash')}</button>
+            </div>
+          </div>`).join('')}</div>` : emptyState('globe', 'Sin comunidades', 'Crea la primera comunidad para que tus usuarios puedan unirse desde el panel.')}
+      </div>
+    </div>
+  </div>`
+}
+
 function adminAuditHTML(data) {
   return `<div class="card">
     <div class="card-head"><div><h3>Auditoría</h3><p>Eventos más recientes del panel</p></div><span class="badge neutral"><span class="dot"></span>${(data.audit || []).length} evento(s)</span></div>
@@ -1602,18 +1797,30 @@ function adminAuditHTML(data) {
 
 function adminSettingsHTML(data) {
   const maxSubs = Number(data.maxSubs || 0)
+  const maxPorUsuario = Number(data.maxSubsPerUser || 0)
+  const maxPorIp = Number(data.maxBotsPerIp || 0)
   return `<div class="grid-2">
     <div class="card">
-      <div class="card-head"><div><h3>Límites de sub-bots</h3><p>Se aplica a todo el servidor</p></div></div>
+      <div class="card-head"><div><h3>Límites de sub-bots</h3><p>Se aplican a todo el servidor</p></div></div>
       <div class="card-body">
         <form id="settings-form">
           <div class="form-error">${icon('alert')}<span></span></div>
           <div class="field">
-            <label class="label" for="settings-max">Máximo de sub-bots</label>
+            <label class="label" for="settings-max">Máximo de sub-bots del servidor</label>
             <input id="settings-max" name="maxSubs" type="number" min="0" class="input" value="${maxSubs}" />
             <div class="hint">Usa <b>0</b> para ilimitado. El valor se guarda en <span class="mono">storage/maxsubs.json</span>.</div>
           </div>
-          <button class="btn btn-primary" type="submit">${icon('check')} Guardar límite</button>
+          <div class="field">
+            <label class="label" for="settings-max-user">Máximo de sub-bots por cuenta</label>
+            <input id="settings-max-user" name="maxSubsPerUser" type="number" min="0" class="input" value="${maxPorUsuario}" />
+            <div class="hint">Cuántas cuentas puede vincular cada usuario del panel. <b>0</b> = sin límite.</div>
+          </div>
+          <div class="field">
+            <label class="label" for="settings-max-ip">Máximo de cuentas por IP</label>
+            <input id="settings-max-ip" name="maxBotsPerIp" type="number" min="0" class="input" value="${maxPorIp}" />
+            <div class="hint">Cuentas distintas que se pueden vincular desde la misma conexión. <b>0</b> = sin límite.</div>
+          </div>
+          <button class="btn btn-primary" type="submit">${icon('check')} Guardar límites</button>
         </form>
       </div>
     </div>
@@ -1907,6 +2114,56 @@ async function handlePasswordChange(form) {
   }
 }
 
+/* ── Handlers de las comunidades ────────────────────────────────────────── */
+async function handleCommunitySave(form) {
+  const name = String(form.querySelector('[name="name"]')?.value || '').trim()
+  const link = String(form.querySelector('[name="link"]')?.value || '').trim()
+  const description = String(form.querySelector('[name="description"]')?.value || '').trim()
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  if (name.length < 2) {
+    showFormError(form, 'Escribe el nombre de la comunidad.')
+    return
+  }
+  if (!/^https?:\/\/.+/i.test(link)) {
+    showFormError(form, 'El enlace debe empezar con http:// o https://')
+    return
+  }
+  setLoading(submit, true, 'Guardando…')
+  try {
+    await api.post('/api/admin/communities', { name, link, description: description || null })
+    form.reset()
+    showToast('Comunidad creada.', 'success')
+    await renderAdmin('communities')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo crear la comunidad.')
+    setLoading(submit, false)
+  }
+}
+
+async function toggleCommunity(id, active) {
+  try {
+    await api.patch(`/api/admin/communities/${encodeURIComponent(id)}`, { active: !active })
+    showToast(active ? 'Comunidad ocultada.' : 'Comunidad visible.', 'success')
+    await renderAdmin('communities')
+  } catch (error) {
+    showToast(error.message || 'No se pudo actualizar la comunidad.', 'error')
+  }
+}
+
+function confirmDeleteCommunity(id, name) {
+  confirmModal({
+    title: 'Eliminar comunidad',
+    message: `Se eliminará <b>${h(name)}</b> de la lista del panel. Los usuarios ya unidos al grupo de WhatsApp seguirán dentro.`,
+    confirmLabel: 'Eliminar comunidad',
+    onConfirm: async () => {
+      await api.del(`/api/admin/communities/${encodeURIComponent(id)}`)
+      showToast('Comunidad eliminada.', 'success')
+      await renderAdmin('communities')
+    },
+  })
+}
+
 /* ── Handlers del bot principal ─────────────────────────────────────────── */
 /** Mientras hay un código pendiente, comprueba si el principal se vinculó. */
 function vigilarVinculacionPrincipal() {
@@ -2088,18 +2345,30 @@ async function adminReconnect(phone) {
 
 async function handleSettingsSave(form) {
   const input = form.querySelector('[name="maxSubs"]')
+  const inputUsuario = form.querySelector('[name="maxSubsPerUser"]')
+  const inputIp = form.querySelector('[name="maxBotsPerIp"]')
   const submit = form.querySelector('button[type="submit"]')
   const maxSubs = Number(input?.value || 0)
+  const maxSubsPerUser = Number(inputUsuario?.value || 0)
+  const maxBotsPerIp = Number(inputIp?.value || 0)
   hideFormError(form)
   if (!Number.isFinite(maxSubs) || maxSubs < 0) {
     showFormError(form, 'El límite debe ser 0 (ilimitado) o un número mayor.')
     return
   }
+  if (!Number.isFinite(maxSubsPerUser) || maxSubsPerUser < 0) {
+    showFormError(form, 'El límite por cuenta debe ser 0 (ilimitado) o un número mayor.')
+    return
+  }
+  if (!Number.isFinite(maxBotsPerIp) || maxBotsPerIp < 0) {
+    showFormError(form, 'El límite por IP debe ser 0 (ilimitado) o un número mayor.')
+    return
+  }
   setLoading(submit, true, 'Guardando…')
   try {
-    const data = await api.patch('/api/admin/settings', { maxSubs })
+    const data = await api.patch('/api/admin/settings', { maxSubs, maxSubsPerUser, maxBotsPerIp })
     state.config = { ...(state.config || {}), maxSubs: data.maxSubs }
-    showToast('Límite actualizado.', 'success')
+    showToast('Límites actualizados.', 'success')
     await renderAdmin('settings')
   } catch (error) {
     showFormError(form, error.message || 'No se pudo guardar el límite.')
@@ -2217,6 +2486,41 @@ async function onClick(event) {
       if (isAdminRoute('principal')) renderAdmin('principal')
       return
     }
+    if (action === 'community-toggle') {
+      await toggleCommunity(id, actionEl.dataset.active === '1')
+      return
+    }
+    if (action === 'community-delete') {
+      confirmDeleteCommunity(id, actionEl.dataset.name || 'comunidad')
+      return
+    }
+    if (action === 'session-filter') {
+      aplicarFiltroSesiones(actionEl.dataset.filter || 'all')
+      return
+    }
+    if (action === 'session-select-all') {
+      const marcar = state.selectedSessions.size < filasSesionVisibles().length
+      filasSesionVisibles().forEach((fila) => {
+        const phone = fila.dataset.sessionPhone
+        if (!phone) return
+        if (marcar) state.selectedSessions.add(phone)
+        else state.selectedSessions.delete(phone)
+        const box = fila.querySelector('[data-session-check]')
+        if (box) box.checked = marcar
+      })
+      actualizarSeleccion()
+      return
+    }
+    if (action === 'session-clear') {
+      state.selectedSessions.clear()
+      document.querySelectorAll('[data-session-check]').forEach((box) => { box.checked = false })
+      actualizarSeleccion()
+      return
+    }
+    if (action === 'session-delete-selected') {
+      await eliminarSesionesSeleccionadas()
+      return
+    }
   }
 
   const nav = event.target.closest('.nav-link')
@@ -2263,6 +2567,11 @@ async function onSubmit(event) {
   if (id === 'main-link-form') {
     event.preventDefault()
     await handleMainLink(form)
+    return
+  }
+  if (id === 'community-form') {
+    event.preventDefault()
+    await handleCommunitySave(form)
   }
 }
 
@@ -2270,6 +2579,29 @@ function onKeydown(event) {
   if (event.key === 'Escape') {
     closeModal()
     document.getElementById('app-shell')?.classList.remove('sidebar-open')
+  }
+}
+
+/** Casillas de selección de sesiones (admin). */
+function onChange(event) {
+  const target = event.target
+  if (!(target instanceof HTMLInputElement)) return
+
+  if (target.matches('[data-session-check-all]')) {
+    filasSesionVisibles().forEach((fila) => {
+      const phone = fila.dataset.sessionPhone
+      if (!phone) return
+      if (target.checked) state.selectedSessions.add(phone)
+      else state.selectedSessions.delete(phone)
+      const box = fila.querySelector('[data-session-check]')
+      if (box) box.checked = target.checked
+    })
+    actualizarSeleccion()
+    return
+  }
+
+  if (target.matches('[data-session-check]')) {
+    alternarSeleccionSesion(target.dataset.sessionCheck, target.checked)
   }
 }
 
@@ -2301,6 +2633,7 @@ async function boot() {
 
 document.addEventListener('click', onClick)
 document.addEventListener('submit', onSubmit)
+document.addEventListener('change', onChange)
 document.addEventListener('keydown', onKeydown)
 window.addEventListener('hashchange', () => { route() })
 
