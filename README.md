@@ -147,6 +147,12 @@ npm install --no-bin-links
 
 El método principal de vinculación es por **código de 8 dígitos** (pairing code). No hace falta escanear QR.
 
+> **Desde el panel web (recomendado):** el panel arranca **antes que nada** del
+> bot, así que está disponible aunque el principal todavía no esté vinculado.
+> Entra en **Administración → Bot principal**, escribe el número y genera el
+> código. No hace falta tocar la consola. Si prefieres la terminal, sigue
+> leyendo.
+
 ### Arranque
 
 ```bash
@@ -155,6 +161,9 @@ npm start
 ```
 
 ### Pasos en la terminal
+
+Esto solo se usa si el panel está apagado (`PAIN_WEB_ENABLED=0`); con el panel
+activo la consola ya no pregunta nada.
 
 1. Cuando pregunte el método de sesión, escribe:
 
@@ -182,6 +191,28 @@ La sesión se guarda en `Sessions/`. Conserva esa carpeta si no quieres volver a
 > Tip: la primera vinculación hazla con `npm start` en primer plano para copiar el código con calma. Después puedes pasar a PM2.
 
 Detener el proceso: `Ctrl + C`.
+
+---
+
+## El panel web nunca se corta
+
+Los usuarios del panel no deben notar nada cuando el administrador cambia el
+número del bot principal:
+
+- **El panel arranca primero**: antes de cargar la base de datos, de crear el
+  socket de WhatsApp y de conectar los sub-bots. La web está disponible
+  aunque el principal todavía no esté vinculado.
+- **Desvincular o re-vincular NO reinicia el proceso**: se cierra la sesión de
+  WhatsApp, se borran las credenciales y se crea un socket principal nuevo
+  (sin credenciales) dentro del mismo proceso. El panel sigue escuchando y
+  los sub-bots reconectan solos.
+- **"Cambiar número"** hace todo en un paso: desvincula, recrea el socket y
+  deja el código de 8 dígitos listo para escribir en WhatsApp.
+- **"Reiniciar proceso"** sí corta el panel unos segundos. Úsalo solo si el bot
+  está atascado; para cambiar de número no hace falta.
+- Si el principal se desconecta solo (WhatsApp revoca la sesión), el panel
+  sigue vivo y el administrador puede volver a emparejarlo desde la web.
+- Los sub-bots no se tocan: siguen con sus propias sesiones y reconectan solos.
 
 ---
 
@@ -456,8 +487,9 @@ Endpoints (solo administradores, con CSRF y validación de origen):
 |---|---|---|
 | `GET` | `/api/main` | Estado de la sesión principal |
 | `POST` | `/api/main/code` | Genera un código de vinculación |
-| `POST` | `/api/main/unlink` | Desvincula y borra credenciales |
-| `POST` | `/api/main/restart` | Reinicia el proceso principal |
+| `POST` | `/api/main/relink` | Cambia el número: desvincula, recrea el socket y devuelve el código |
+| `POST` | `/api/main/unlink` | Desvincula (el panel sigue en marcha) |
+| `POST` | `/api/main/restart` | Reinicia el proceso principal (corta el panel unos segundos) |
 
 El estado del principal también viaja en `/api/config` como `mainLinked` para
 que los usuarios vean el aviso cuando el bot principal aún no está vinculado.

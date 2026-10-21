@@ -186,8 +186,6 @@ global.loadDatabase = async function loadDatabase() {
   global.db.chain = lodash.chain(global.db.data) 
 }
 
-await global.loadDatabase()
-
 const isSubbotWorker = process.env.PAIN_ROLE === 'subbot'
 const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
 global.processRole = isSubbotWorker ? 'subbot' : 'primary'
@@ -195,6 +193,22 @@ global.processRole = isSubbotWorker ? 'subbot' : 'primary'
 if (isSubbotWorker) {
   try { os.setPriority(10) } catch {}
 }
+
+// El panel web arranca PRIMERO: la web tiene que estar disponible aunque el
+// bot todavía esté emparejando (o sin principal vinculado). Solo el proceso
+// principal abre el puerto; los workers de sub-bots nunca escuchan en red.
+// Si el puerto está ocupado, el bot sigue funcionando igual (el error se
+// registra y no se propaga).
+if (!isSubbotWorker && global.webPanel?.enabled !== false && process.env.PAIN_WEB_ENABLED !== '0') {
+  try {
+    const { startWebPanel } = await import('./lib/webpanel/server.js')
+    global.webPanelHandle = await startWebPanel()
+  } catch (error) {
+    console.error('[webpanel] No se pudo iniciar el panel:', error?.message || error)
+  }
+}
+
+await global.loadDatabase()
 
 if (isSubbotWorker || isManagedPrimary) {
   const syncDatabase = setInterval(() => {
@@ -219,22 +233,13 @@ if (!isSubbotWorker) {
   }
 }
 
-// Panel web: solo el proceso principal abre el puerto. Los workers de
-// sub-bots nunca escuchan en red. Si el puerto está ocupado, el bot sigue
-// funcionando igual (el error se registra y no se propaga).
-if (!isSubbotWorker && global.webPanel?.enabled !== false && process.env.PAIN_WEB_ENABLED !== '0') {
-  try {
-    const { startWebPanel } = await import('./lib/webpanel/server.js')
-    global.webPanelHandle = await startWebPanel()
-  } catch (error) {
-    console.error('[webpanel] No se pudo iniciar el panel:', error?.message || error)
-  }
-}
 global.authFile = 'sessions'
 let state = null
 let saveCreds = async () => {}
 let connectionOptions = null
 let conn
+// Caché de reintentos del socket principal (se comparte al recrearlo).
+let cacheReintentoPrincipal = null
 
 // Guardado de credenciales del principal. Si el panel desvinculó el número,
 // las credenciales viejas no deben volver a escribirse a disco.
@@ -265,7 +270,7 @@ if (!isSubbotWorker) {
   const { version } = await fetchLatestBaileysVersion()
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const question = (texto) => new Promise((resolver) => rl.question(texto, resolver))
-  const cacheReintentoPrincipal = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
+  cacheReintentoPrincipal = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
 
   connectionOptions = conSocketEstable({
     version,
@@ -345,16 +350,19 @@ if (!isSubbotWorker) {
     rl.close()
   }
 
-  const loginFlow = handleLogin()
   const panelActivo = global.webPanel?.enabled !== false && process.env.PAIN_WEB_ENABLED !== '0'
-  if (!panelActivo) {
-    await loginFlow
+  if (panelActivo) {
+    // Con el panel activo ya no hace falta vincular desde la consola: el
+    // principal se empareja desde la web y el panel nunca se corta. La
+    // consola se queda libre para el resto de comandos.
+    rl.close()
+    const urlPanel = global.webPanelHandle?.config?.publicUrl || 'la URL del panel'
+    console.log(chalk.cyan(`El bot principal se vincula desde el panel web: ${urlPanel}`))
+    if (!conn.authState.creds.registered) {
+      console.log(chalk.yellow('Todavía no hay número vinculado: entra al panel y genera el código de 8 dígitos.'))
+    }
   } else {
-    // Con el panel activo el principal también se puede vincular desde la web
-    // (Administración → Bot principal), así que el arranque no se queda
-    // esperando una respuesta en la consola.
-    loginFlow.catch(() => {})
-    console.log(chalk.cyan('El bot principal se puede vincular desde el panel web.'))
+    await handleLogin()
   }
 } else {
   const eventBus = new EventEmitter()
@@ -717,6 +725,70 @@ global.reloadHandler = async function (restartConn) {
 
   isInit = false
   return true
+}
+
+/**
+ * Crea un socket principal NUEVO y sin credenciales, para re-vincular el
+ * número desde el panel sin reiniciar el proceso. Así el panel web (y los
+ * usuarios que están dentro) no se cortan ni un segundo: solo se cambia la
+ * sesión de WhatsApp del principal.
+ */
+global.reiniciarPrincipalLimpio = async function reiniciarPrincipalLimpio({ timeoutMs = 45_000 } = {}) {
+  if (isSubbotWorker) throw new Error('El bot principal no vive en este proceso.')
+
+  // 1. El socket viejo se aparta (sin listeners: no debe reconectarse solo).
+  try { global.conn?.ev?.removeAllListeners?.() } catch {}
+  try { global.conn?.ws?.close?.() } catch {}
+  try { global.conn?.end?.(undefined) } catch {}
+  global.mainBotJid = null
+
+  // 2. Credenciales nuevas (se borran las viejas).
+  const { borrarCredencialesPrincipales } = await import('./lib/main-session.js')
+  borrarCredencialesPrincipales()
+  global.__painBloquearCreds = false
+
+  const authState = await useMultiFileAuthState(global.authFile)
+  state = authState.state
+  saveCreds = authState.saveCreds
+
+  const { version } = await fetchLatestBaileysVersion()
+  connectionOptions = conSocketEstable({
+    version,
+    logger,
+    printQRInTerminal: false,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    browser: Browsers.ubuntu('Chrome'),
+    markOnlineOnConnect: true,
+    appStateMacVerification: { patch: false, snapshot: false },
+    msgRetryCache: cacheReintentoPrincipal,
+  })
+
+  global.conn = makeWASocket(connectionOptions)
+  conn = global.conn
+  global.conn.isInit = false
+  global.conn.well = false
+
+  global.conn.handler = handler.handler.bind(global.conn)
+  global.conn.connectionUpdate = connectionUpdate.bind(global.conn)
+  global.conn.credsUpdate = guardarCredencialesPrincipales
+  initViewOnceAntiListener(global.conn)
+  global.conn.ev.on('messages.upsert', global.conn.handler)
+  global.conn.ev.on('connection.update', global.conn.connectionUpdate)
+  global.conn.ev.on('creds.update', global.conn.credsUpdate)
+
+  isInit = true
+  principalVinculadoAvisado = false
+
+  // 3. Se espera a que el socket quede listo para pedir el código.
+  const limite = Date.now() + Math.max(5_000, Number(timeoutMs) || 0)
+  while (Date.now() < limite) {
+    if (socketPrincipalAbierto(global.conn)) return global.conn
+    await new Promise((resolver) => setTimeout(resolver, 250))
+  }
+  return global.conn
 }
 
 const pluginFolder = join(__dirname, 'plugins')

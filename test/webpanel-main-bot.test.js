@@ -5,7 +5,9 @@ import path from 'node:path'
 import test from 'node:test'
 import {
   MainBotError,
+  desvincularPrincipal,
   estadoPrincipal,
+  relinkPrincipal,
   solicitarCodigoPrincipal,
 } from '../lib/webpanel/main-bot.js'
 
@@ -48,6 +50,80 @@ test('main-bot: el estado refleja si el principal está vinculado', () => {
     assert.equal(pendiente.canRequestCode, true)
   } finally {
     delete global.conn
+    if (anteriorAuth === undefined) delete global.authFile
+    else global.authFile = anteriorAuth
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('main-bot: desvincular recrea el socket sin reiniciar el proceso', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-main-unlink-'))
+  const anteriorAuth = global.authFile
+  const anteriorReinicio = global.reiniciarPrincipalLimpio
+  global.authFile = dir
+  try {
+    fs.writeFileSync(path.join(dir, 'creds.json'), JSON.stringify({ registered: true }))
+    let logout = false
+    let recreado = false
+    global.conn = {
+      ws: { isOpen: true },
+      authState: { creds: { registered: true, me: { id: '5215512345678:12@s.whatsapp.net' } } },
+      user: { id: '5215512345678:12@s.whatsapp.net' },
+      logout: async () => { logout = true },
+    }
+    global.reiniciarPrincipalLimpio = async () => { recreado = true; return true }
+
+    const resultado = await desvincularPrincipal()
+    assert.equal(logout, true)
+    assert.equal(recreado, true)
+    assert.equal(resultado.ok, true)
+    assert.equal(resultado.restartRequired, false)
+    assert.equal(resultado.panelOnline, true)
+    assert.equal(fs.existsSync(path.join(dir, 'creds.json')), false)
+  } finally {
+    delete global.conn
+    if (anteriorReinicio === undefined) delete global.reiniciarPrincipalLimpio
+    else global.reiniciarPrincipalLimpio = anteriorReinicio
+    if (anteriorAuth === undefined) delete global.authFile
+    else global.authFile = anteriorAuth
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('main-bot: relink desvincula, recrea el socket y devuelve el código', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-main-relink-'))
+  const anteriorAuth = global.authFile
+  const anteriorReinicio = global.reiniciarPrincipalLimpio
+  global.authFile = dir
+  try {
+    fs.writeFileSync(path.join(dir, 'creds.json'), JSON.stringify({ registered: true }))
+    let recreado = false
+    global.conn = {
+      ws: { isOpen: true },
+      authState: { creds: { registered: true, me: { id: '5215512345678:12@s.whatsapp.net' } } },
+      user: { id: '5215512345678:12@s.whatsapp.net' },
+      logout: async () => {},
+    }
+    global.reiniciarPrincipalLimpio = async () => {
+      recreado = true
+      // El socket nuevo ya está limpio y listo para emparejar.
+      global.conn = {
+        ws: { isOpen: true },
+        authState: { creds: { registered: false } },
+        user: {},
+        requestPairingCode: async (phone) => `AB${String(phone).slice(-6)}`,
+      }
+      return true
+    }
+
+    const resultado = await relinkPrincipal('5215512345678')
+    assert.equal(recreado, true)
+    assert.equal(resultado.phone, '5215512345678')
+    assert.equal(resultado.code.length, 8)
+  } finally {
+    delete global.conn
+    if (anteriorReinicio === undefined) delete global.reiniciarPrincipalLimpio
+    else global.reiniciarPrincipalLimpio = anteriorReinicio
     if (anteriorAuth === undefined) delete global.authFile
     else global.authFile = anteriorAuth
     fs.rmSync(dir, { recursive: true, force: true })

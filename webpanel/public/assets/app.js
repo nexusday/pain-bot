@@ -1370,8 +1370,8 @@ function adminMainHTML(main) {
   const acciones = linked
     ? `<button class="btn btn-secondary" data-action="main-relink">${icon('rotate')} Cambiar número</button>
        <button class="btn btn-danger" data-action="main-unlink">${icon('power')} Desvincular</button>
-       <button class="btn btn-ghost" data-action="main-restart">${icon('refresh')} Reiniciar bot</button>`
-    : `<button class="btn btn-secondary" data-action="main-restart">${icon('refresh')} Reiniciar bot</button>`
+       <button class="btn btn-ghost" data-action="main-restart">${icon('refresh')} Reiniciar proceso</button>`
+    : `<button class="btn btn-secondary" data-action="main-restart">${icon('refresh')} Reiniciar proceso</button>`
 
   return `
     <div class="grid-2">
@@ -1393,8 +1393,8 @@ function adminMainHTML(main) {
 
             ${!main.available ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El panel no tiene acceso al socket del bot principal. En un servidor normal esto no debería ocurrir: revisa que el panel se esté ejecutando en el proceso principal.</div></div>` : ''}
             ${!linked && main.connected ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Mientras el principal no esté vinculado, los sub-bots no pueden conectarse. Genera un código abajo y escríbelo en WhatsApp → <b>Dispositivos vinculados → Vincular con número</b>.</div></div>` : ''}
-            ${!linked && !main.connected ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El socket del principal está cerrado. Reinicia el bot para volver a pedir un código de vinculación.</div></div>` : ''}
-            ${linked ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Al desvincular se borran las credenciales locales y hay que reiniciar el proceso para poder emparejar otro número.</div></div>` : ''}
+            ${!linked && !main.connected ? `<div class="notice warn" style="margin-top:14px">${icon('alert')}<div>El socket del principal está cerrado. Reinicia el proceso para volver a pedir un código de vinculación.</div></div>` : ''}
+            ${linked ? `<div class="notice" style="margin-top:14px">${icon('info')}<div>Al desvincular se borran las credenciales locales, pero <b>el panel web sigue en marcha</b>: los usuarios no se cortan y los sub-bots reconectan solos.</div></div>` : ''}
           </div>
         </div>
 
@@ -2210,39 +2210,74 @@ async function handleMainLink(form) {
   }
 }
 
-async function handleMainUnlink({ relink = false } = {}) {
+async function handleMainUnlink() {
   const main = state.main || {}
   const numero = main.phone ? fmtPhone(main.phone) : 'el bot principal'
   confirmModal({
-    title: relink ? 'Cambiar el número del principal' : 'Desvincular el bot principal',
-    message: relink
-      ? `Se cerrará la sesión de <b>${h(numero)}</b> en WhatsApp, se borrarán sus credenciales y el proceso se reiniciará para poder emparejar otro número. Los sub-bots quedan en pausa hasta que el principal vuelva.`
-      : `Se cerrará la sesión de <b>${h(numero)}</b> en WhatsApp y se borrarán sus credenciales del servidor. Después tendrás que reiniciar el bot para vincular otro número.`,
-    confirmLabel: relink ? 'Cambiar número' : 'Desvincular',
+    title: 'Desvincular el bot principal',
+    message: `Se cerrará la sesión de <b>${h(numero)}</b> en WhatsApp y se borrarán sus credenciales del servidor. El <b>panel web sigue funcionando</b> y los sub-bots reconectan solos. Podrás emparejar otro número desde aquí mismo.`,
+    confirmLabel: 'Desvincular',
     onConfirm: async () => {
-      await api.post('/api/main/unlink', {})
+      const resultado = await api.post('/api/main/unlink', {})
       state.mainCode = null
-      if (relink) {
-        await api.post('/api/main/restart', {})
-        showToast('Principal desvinculado. El bot se está reiniciando…', 'success')
-        esperarReinicio()
-        return
-      }
-      showToast('Bot principal desvinculado. Reinicia el bot para vincular otro número.', 'success')
+      showToast('Bot principal desvinculado. El panel sigue en marcha.', 'success')
       await renderAdmin('principal')
+      if (resultado?.restartRequired) {
+        showToast('No se pudo recrear el socket: reinicia el proceso para vincular otro número.', 'warn')
+      }
     },
   })
 }
 
+function openRelinkModal() {
+  openModal({
+    title: 'Cambiar el número del principal',
+    subtitle: 'Sin reiniciar el panel',
+    body: `<form id="relink-form">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="notice" style="margin-bottom:14px">${icon('info')}<div>Se cierra la sesión actual de WhatsApp y se genera un código para el número nuevo. <b>El panel web no se reinicia</b>: los usuarios que están dentro no se cortan.</div></div>
+      <div class="field">
+        <label class="label" for="relink-phone">Número de WhatsApp</label>
+        <div class="input-icon">${icon('phone')}<input id="relink-phone" name="phone" class="input" inputmode="numeric" autocomplete="tel" placeholder="5215512345678" required /></div>
+        <div class="hint">Código de país, sin <b>+</b>, espacios ni guiones.</div>
+      </div>
+    </form>`,
+    footer: `<button class="btn btn-ghost" data-action="modal-close">Cancelar</button>
+      <button class="btn btn-primary" id="relink-submit" type="submit" form="relink-form">${icon('key')} Generar código</button>`,
+  })
+}
+
+async function handleMainRelink(form) {
+  const input = form.querySelector('[name="phone"]')
+  const submit = document.getElementById('relink-submit')
+  const phone = String(input?.value || '').replace(/\D/g, '')
+  hideFormError(form)
+  if (phone.length < 8 || phone.length > 15) {
+    showFormError(form, 'Escribe el número con código de país (entre 8 y 15 dígitos).')
+    return
+  }
+  setLoading(submit, true, 'Preparando…')
+  try {
+    const data = await api.post('/api/main/relink', { phone })
+    state.mainCode = data.code || null
+    closeModal()
+    showToast('Código generado. Ingrésalo en WhatsApp.', 'success')
+    await renderAdmin('principal')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo generar el código.')
+    setLoading(submit, false)
+  }
+}
+
 async function handleMainRestart() {
   confirmModal({
-    title: 'Reiniciar el bot',
-    message: 'El proceso principal se va a cerrar y a volver a arrancar. Las sesiones de los sub-bots se reconectan solas, pero el panel se quedará unos segundos sin responder.',
-    confirmLabel: 'Reiniciar',
+    title: 'Reiniciar el proceso del bot',
+    message: 'El proceso principal se cierra y vuelve a arrancar. <b>El panel web se corta unos segundos</b> y las sesiones de los sub-bots se reconectan solas. Úsalo solo si el bot está atascado: para cambiar de número usa "Cambiar número", que no corta nada.',
+    confirmLabel: 'Reiniciar proceso',
     danger: false,
     onConfirm: async () => {
       await api.post('/api/main/restart', {})
-      showToast('Reiniciando el bot…', 'info')
+      showToast('Reiniciando el proceso…', 'info')
       esperarReinicio()
     },
   })
@@ -2474,7 +2509,7 @@ async function onClick(event) {
       return
     }
     if (action === 'main-relink') {
-      await handleMainUnlink({ relink: true })
+      openRelinkModal()
       return
     }
     if (action === 'main-restart') {
@@ -2572,6 +2607,11 @@ async function onSubmit(event) {
   if (id === 'community-form') {
     event.preventDefault()
     await handleCommunitySave(form)
+    return
+  }
+  if (id === 'relink-form') {
+    event.preventDefault()
+    await handleMainRelink(form)
   }
 }
 
