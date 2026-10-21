@@ -78,6 +78,16 @@ test('webpanel server: registro, login, permisos admin y CSRF', async (t) => {
   assert.match(index.texto, /Pain Panel|Pain Bot/)
   assert.match(index.res.headers.get('content-security-policy') || '', /default-src 'self'/)
 
+  // Los assets se revalidan siempre: tras un git pull el navegador recibe la
+  // versión nueva sin recargar a la fuerza.
+  const asset = await pedir('/assets/app.js')
+  assert.equal(asset.status, 200)
+  assert.match(asset.res.headers.get('cache-control') || '', /no-cache/)
+  const etag = asset.res.headers.get('etag')
+  assert.ok(etag)
+  const revalidado = await fetch(`${base}/assets/app.js`, { headers: { 'if-none-match': etag } })
+  assert.equal(revalidado.status, 304)
+
   const registro = await pedir('/api/auth/register', {
     method: 'POST',
     body: {
