@@ -814,6 +814,56 @@ global.reiniciarPrincipalLimpio = async function reiniciarPrincipalLimpio({ time
   return global.conn
 }
 
+/**
+ * Recarga el panel web con el código actual SIN reiniciar el proceso:
+ * cierra el servidor HTTP y lo vuelve a levantar con el código nuevo.
+ * Las sesiones de WhatsApp de los sub-bots no se tocan.
+ */
+global.reiniciarPanelWeb = async function reiniciarPanelWeb() {
+  try {
+    await global.webPanelHandle?.close?.()
+  } catch (error) {
+    console.error('[webpanel] No se pudo cerrar el panel anterior:', error?.message || error)
+  }
+  global.webPanelHandle = null
+  try {
+    const { startWebPanel } = await import('./lib/webpanel/server.js')
+    global.webPanelHandle = await startWebPanel()
+  } catch (error) {
+    console.error('[webpanel] No se pudo reiniciar el panel:', error?.message || error)
+    return false
+  }
+  return Boolean(global.webPanelHandle)
+}
+
+/**
+ * Recarga en caliente el handler, los módulos de lib/ y los plugins
+ * indicados, sin reiniciar el proceso.
+ */
+global.recargarEnCaliente = async function recargarEnCaliente({ plugins = [] } = {}) {
+  const resumen = { handler: false, plugins: [] }
+
+  // Epoch nuevo: handler.js y lib/*.js se reimportan frescos.
+  globalThis.__HOT_EPOCH = Date.now()
+  try {
+    await global.reloadHandler?.(false)
+    resumen.handler = true
+  } catch (error) {
+    console.error('[hot] No se pudo recargar el handler:', error?.message || error)
+  }
+
+  for (const archivo of plugins) {
+    try {
+      await global.reload?.(null, archivo)
+      resumen.plugins.push(archivo)
+    } catch (error) {
+      console.error(`[hot] No se pudo recargar el plugin ${archivo}:`, error?.message || error)
+    }
+  }
+
+  return resumen
+}
+
 const pluginFolder = join(__dirname, 'plugins')
 const pluginFilter = (filename) => /\.js$/.test(filename)
 

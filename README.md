@@ -574,6 +574,40 @@ Endpoints (solo el dueño del sub-bot o un administrador):
 ### Comunidades de WhatsApp
 
 En **Administración → Comunidades** el administrador publica los grupos de la
+comunidad: nombre, enlace de invitación y descripción. Cada comunidad se puede
+**editar** (nombre, enlace y descripción), **ocultar** sin borrarla, copiar su
+enlace o **eliminarla**. Los usuarios las ven en la sección **Comunidades** del
+panel y entran con un clic ("Unirme a la comunidad").
+
+### Actualizar sin reiniciar (tipo /fix)
+
+En **Administración → Ajustes → Mantenimiento** hay dos botones:
+
+- **Actualizar en caliente**: hace lo mismo que el comando `/fix` (trae el
+  código del remoto con `git fetch` + `git reset --hard`) y además:
+  - **guarda tus cambios locales** y los reaplica después del `reset` (el
+    comando `/fix` los pisaba),
+  - **recarga el handler y los módulos de `lib/`** con el código nuevo,
+  - **recarga los plugins** que cambiaron,
+  - **reinicia solo el servidor HTTP del panel** con el código nuevo.
+- **Recargar código**: solo la recarga en caliente, sin tocar git (sirve si
+  editaste archivos a mano).
+
+**No se reinicia el proceso**: los sub-bots no se desconectan y el panel solo
+pierde la conexión un instante mientras se recarga (la web espera a que
+vuelva y se recarga sola). Lo único que sigue necesitando un reinicio del
+proceso es un cambio en `main.js`; el panel te avisa cuando pasa.
+
+Endpoints (solo administradores):
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `POST` | `/api/admin/update` | Actualiza desde el remoto y recarga en caliente |
+| `POST` | `/api/admin/reload` | Recarga el código en caliente sin tocar git |
+
+### Comunidades de WhatsApp (API)
+
+En **Administración → Comunidades** el administrador publica los grupos de la
 comunidad: nombre, enlace de invitación y descripción. Los usuarios las ven en
 la sección **Comunidades** del panel y entran con un clic ("Unirme a la
 comunidad"). Una comunidad se puede ocultar sin borrarla, para dejar de

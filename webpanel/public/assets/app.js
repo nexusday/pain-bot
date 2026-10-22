@@ -1791,6 +1791,7 @@ function adminCommunitiesHTML(data) {
               ${comunidad.description ? `<div class="hint" style="margin-top:4px">${h(comunidad.description)}</div>` : ''}
             </div>
             <div class="actions">
+              <button class="icon-btn sm" data-action="community-edit" data-id="${comunidad.id}" title="Editar">${icon('pencil')}</button>
               <button class="icon-btn sm" data-action="copy" data-copy="${h(comunidad.link)}" title="Copiar enlace">${icon('copy')}</button>
               <button class="icon-btn sm" data-action="community-toggle" data-id="${comunidad.id}" data-active="${comunidad.active ? 1 : 0}" title="${comunidad.active ? 'Ocultar' : 'Mostrar'}">${icon(comunidad.active ? 'eyeOff' : 'eye')}</button>
               <button class="icon-btn sm danger" data-action="community-delete" data-id="${comunidad.id}" data-name="${h(comunidad.name)}" title="Eliminar">${icon('trash')}</button>
@@ -1817,6 +1818,7 @@ function adminSettingsHTML(data) {
   const intentosIp = Number(data.maxPairAttemptsPerIpPerHour || 0)
   const esperaSegundos = Number(data.pairCooldownSeconds || 0)
   const duracionCodigo = Number(data.pairCodeSeconds || 90)
+  const repo = data.repo || {}
   return `<div class="grid-2">
     <div class="stack">
       <div class="card">
@@ -1880,23 +1882,40 @@ function adminSettingsHTML(data) {
         </div>
       </div>
     </div>
-    <div class="card">
-      <div class="card-head"><div><h3>Identidad del panel</h3><p>Dominio, subdominio y URL pública</p></div></div>
-      <div class="card-body">
-        <div class="field">
-          <label class="label">URL pública</label>
-          <div class="input-group">
-            <input class="input mono" readonly value="${h(data.publicUrl || '')}" />
-            <button class="btn btn-secondary" data-action="copy" data-copy="${h(data.publicUrl || '')}">${icon('copy')}</button>
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><div><h3>Identidad del panel</h3><p>Dominio, subdominio y URL pública</p></div></div>
+        <div class="card-body">
+          <div class="field">
+            <label class="label">URL pública</label>
+            <div class="input-group">
+              <input class="input mono" readonly value="${h(data.publicUrl || '')}" />
+              <button class="btn btn-secondary" data-action="copy" data-copy="${h(data.publicUrl || '')}">${icon('copy')}</button>
+            </div>
           </div>
+          <div class="system-grid">
+            <div class="system-item"><div class="si-label">Subdominio</div><div class="si-value" style="font-size:13px">${h(data.subdomain || '—')}</div></div>
+            <div class="system-item"><div class="si-label">Dominio</div><div class="si-value" style="font-size:13px">${h(data.domain || '—')}</div></div>
+            <div class="system-item"><div class="si-label">Marca</div><div class="si-value" style="font-size:13px">${h(data.brandName || '—')}</div></div>
+            <div class="system-item"><div class="si-label">Plazas</div><div class="si-value" style="font-size:13px">${maxSubs > 0 ? h(maxSubs) : 'Ilimitado'}</div></div>
+          </div>
+          <div class="pairing-alert" style="margin-top:14px">${icon('info')}<div>Para cambiar el subdominio, dominio o puerto, edita <span class="mono">config.js</span> (o las variables <span class="mono">PAIN_WEB_*</span>) y reinicia el bot. Nada está fijo en el código.</div></div>
         </div>
-        <div class="system-grid">
-          <div class="system-item"><div class="si-label">Subdominio</div><div class="si-value" style="font-size:13px">${h(data.subdomain || '—')}</div></div>
-          <div class="system-item"><div class="si-label">Dominio</div><div class="si-value" style="font-size:13px">${h(data.domain || '—')}</div></div>
-          <div class="system-item"><div class="si-label">Marca</div><div class="si-value" style="font-size:13px">${h(data.brandName || '—')}</div></div>
-          <div class="system-item"><div class="si-label">Plazas</div><div class="si-value" style="font-size:13px">${maxSubs > 0 ? h(maxSubs) : 'Ilimitado'}</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Mantenimiento</h3><p>Actualizar sin reiniciar el servidor</p></div></div>
+        <div class="card-body">
+          <div class="system-grid">
+            <div class="system-item"><div class="si-label">Rama</div><div class="si-value mono" style="font-size:13px">${h(repo.rama || '—')}</div></div>
+            <div class="system-item"><div class="si-label">Commit</div><div class="si-value mono" style="font-size:13px">${h(repo.corto || '—')}</div></div>
+          </div>
+          <div class="notice" style="margin-top:14px">${icon('info')}<div>Trae el código del remoto y lo aplica <b>sin reiniciar el proceso</b>: los sub-bots no se desconectan, el bot recarga sus plugins y el panel se recarga con el código nuevo. Tus cambios locales se guardan antes de actualizar.</div></div>
+          <div class="flex gap-8" style="margin-top:14px;flex-wrap:wrap">
+            <button class="btn btn-primary" data-action="admin-update">${icon('refresh')} Actualizar en caliente</button>
+            <button class="btn btn-secondary" data-action="admin-reload">${icon('rotate')} Recargar código</button>
+          </div>
+          <div id="update-result" class="hint" style="margin-top:12px"></div>
         </div>
-        <div class="pairing-alert" style="margin-top:14px">${icon('info')}<div>Para cambiar el subdominio, dominio o puerto, edita <span class="mono">config.js</span> (o las variables <span class="mono">PAIN_WEB_*</span>) y reinicia el bot. Nada está fijo en el código.</div></div>
       </div>
     </div>
   </div>`
@@ -2171,6 +2190,116 @@ async function handlePasswordChange(form) {
 }
 
 /* ── Handlers de las comunidades ────────────────────────────────────────── */
+/* ── Mantenimiento: actualizar sin reiniciar ─────────────────────────────── */
+function esperaPanelYRecarga() {
+  let intentos = 0
+  const revisar = async () => {
+    intentos += 1
+    try {
+      await api.get('/healthz')
+      window.location.reload()
+      return
+    } catch {}
+    if (intentos < 60) setTimeout(revisar, 1000)
+    else showToast('El panel no volvió a responder. Recarga la página.', 'warn')
+  }
+  setTimeout(revisar, 1200)
+}
+
+async function handleAdminUpdate() {
+  const box = document.getElementById('update-result')
+  const set = (texto) => { if (box) box.textContent = texto }
+  set('Actualizando desde el remoto…')
+  try {
+    const data = await api.post('/api/admin/update', {})
+    const commits = data.commits || []
+    const lineas = []
+    lineas.push(commits.length ? `${commits.length} commit(s) aplicados.` : 'Ya estaba al día.')
+    if (data.cambiosLocalesConservados) {
+      lineas.push('Tus cambios locales se guardaron y se reaplicaron.')
+    } else if (data.habiaCambiosLocales) {
+      lineas.push('Tus cambios locales no se pudieron reaplicar: revísalos.')
+    }
+    if (data.resumen?.handler) lineas.push('El bot recargó su código.')
+    if (data.resumen?.plugins?.length) lineas.push(`${data.resumen.plugins.length} plugin(s) recargados.`)
+    lineas.push('El panel se recarga solo en un momento.')
+    if (data.reinicioPendiente) {
+      lineas.push('main.js cambió: eso sí necesita un reinicio del proceso.')
+    }
+    set(lineas.join(' '))
+    showToast('Actualización aplicada.', 'success')
+    esperaPanelYRecarga()
+  } catch (error) {
+    set(`Error: ${error.message || 'no se pudo actualizar'}`)
+    showToast(error.message || 'No se pudo actualizar.', 'error')
+  }
+}
+
+async function handleAdminReload() {
+  const box = document.getElementById('update-result')
+  const set = (texto) => { if (box) box.textContent = texto }
+  set('Recargando el código en caliente…')
+  try {
+    await api.post('/api/admin/reload', {})
+    set('Código recargado. El panel se recarga solo en un momento.')
+    showToast('Código recargado.', 'success')
+    esperaPanelYRecarga()
+  } catch (error) {
+    set(`Error: ${error.message || 'no se pudo recargar'}`)
+    showToast(error.message || 'No se pudo recargar.', 'error')
+  }
+}
+
+/* ── Handlers de las comunidades ────────────────────────────────────────── */
+function openCommunityModal(comunidad) {
+  openModal({
+    title: 'Editar comunidad',
+    subtitle: comunidad.name,
+    body: `<form id="community-edit-form" data-id="${comunidad.id}">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="field">
+        <label class="label" for="ced-name">Nombre</label>
+        <input id="ced-name" name="name" class="input" maxlength="80" value="${h(comunidad.name || '')}" required />
+      </div>
+      <div class="field">
+        <label class="label" for="ced-link">Enlace de invitación</label>
+        <input id="ced-link" name="link" class="input" type="url" value="${h(comunidad.link || '')}" required />
+        <div class="hint">El enlace al que entra la gente para unirse al grupo.</div>
+      </div>
+      <div class="field">
+        <label class="label" for="ced-desc">Descripción</label>
+        <textarea id="ced-desc" name="description" class="textarea" maxlength="300" placeholder="Avisos, soporte y novedades">${h(comunidad.description || '')}</textarea>
+      </div>
+    </form>`,
+    footer: `<button class="btn btn-ghost" data-action="modal-close">Cancelar</button>
+      <button class="btn btn-primary" type="submit" form="community-edit-form">${icon('check')} Guardar cambios</button>`,
+  })
+}
+
+async function handleCommunityEdit(form) {
+  const id = form.dataset.id
+  const name = String(form.querySelector('[name="name"]')?.value || '').trim()
+  const link = String(form.querySelector('[name="link"]')?.value || '').trim()
+  const description = String(form.querySelector('[name="description"]')?.value || '').trim()
+  hideFormError(form)
+  if (name.length < 2) {
+    showFormError(form, 'El nombre debe tener al menos 2 caracteres.')
+    return
+  }
+  if (!/^https?:\/\/.+/i.test(link)) {
+    showFormError(form, 'El enlace debe empezar con http:// o https://')
+    return
+  }
+  try {
+    await api.patch(`/api/admin/communities/${encodeURIComponent(id)}`, { name, link, description: description || null })
+    closeModal()
+    showToast('Comunidad actualizada.', 'success')
+    await renderAdmin('communities')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo actualizar la comunidad.')
+  }
+}
+
 async function handleCommunitySave(form) {
   const name = String(form.querySelector('[name="name"]')?.value || '').trim()
   const link = String(form.querySelector('[name="link"]')?.value || '').trim()
@@ -2782,8 +2911,25 @@ async function onClick(event) {
       if (isAdminRoute('principal')) renderAdmin('principal')
       return
     }
+    if (action === 'admin-update') {
+      await handleAdminUpdate()
+      return
+    }
+    if (action === 'admin-reload') {
+      await handleAdminReload()
+      return
+    }
     if (action === 'community-toggle') {
       await toggleCommunity(id, actionEl.dataset.active === '1')
+      return
+    }
+    if (action === 'community-edit') {
+      const comunidad = (state.adminCommunities || []).find((item) => String(item.id) === String(id))
+      if (!comunidad) {
+        showToast('No se encontró la comunidad. Actualiza la lista.', 'error')
+        return
+      }
+      openCommunityModal(comunidad)
       return
     }
     if (action === 'community-delete') {
@@ -2878,6 +3024,11 @@ async function onSubmit(event) {
   if (id === 'community-form') {
     event.preventDefault()
     await handleCommunitySave(form)
+    return
+  }
+  if (id === 'community-edit-form') {
+    event.preventDefault()
+    await handleCommunityEdit(form)
     return
   }
   if (id === 'relink-form') {

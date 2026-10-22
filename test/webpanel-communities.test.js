@@ -118,10 +118,12 @@ test('webpanel: comunidades (crear, listar, editar y borrar)', async (t) => {
     method: 'PATCH',
     cookie: cookieAdmin,
     csrf: csrfAdmin,
-    body: { name: 'Pain Community Oficial', active: false },
+    body: { name: 'Pain Community Oficial', link: 'https://chat.whatsapp.com/NUEVO1', description: 'Nueva descripción', active: false },
   })
   assert.equal(editada.status, 200)
   assert.equal(editada.datos.community.name, 'Pain Community Oficial')
+  assert.equal(editada.datos.community.link, 'https://chat.whatsapp.com/NUEVO1')
+  assert.equal(editada.datos.community.description, 'Nueva descripción')
   assert.equal(editada.datos.community.active, 0)
 
   // Oculta: el usuario ya no la ve.
