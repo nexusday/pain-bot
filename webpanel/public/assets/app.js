@@ -10,7 +10,7 @@ const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-const PANEL_VERSION = '1.6.2'
+const PANEL_VERSION = '1.6.3'
 
 const state = {
   user: null,
@@ -2926,6 +2926,20 @@ async function onClick(event) {
       impersonarUsuario(id, actionEl.dataset.username || '')
       return
     }
+    if (action === 'restart-bot') {
+      confirmModal({
+        title: 'Reiniciar el bot',
+        message: 'El proceso se cierra y vuelve a arrancar (Pterodactyl lo levanta solo). El panel se corta un par de segundos y los sub-bots reconectan. ¿Seguimos?',
+        confirmLabel: 'Reiniciar el bot',
+        danger: false,
+        onConfirm: async () => {
+          await api.post('/api/main/restart', {})
+          showToast('Reiniciando el bot…', 'info')
+          esperarReinicio()
+        },
+      })
+      return
+    }
     if (action === 'stop-impersonating') {
       await stopImpersonating()
       return
@@ -3151,7 +3165,11 @@ function avisarVersionDesactualizada() {
   aviso.id = 'version-banner'
   aviso.className = 'version-banner'
   aviso.innerHTML = servidorViejo
-    ? `${icon('alert')}<span>El <b>servidor del panel tiene el código viejo</b> (v${h(delServidor)}). Reinicia el bot una vez para que se apliquen los cambios; después ya podrás usar "Actualizar en caliente" sin reiniciar.</span>`
+    ? `${icon('alert')}<span>El <b>servidor del panel tiene el código viejo</b> (v${h(delServidor)}). Reinicia el bot una vez para que se apliquen los cambios; después ya podrás usar "Actualizar en caliente" sin reiniciar.</span>${
+        state.user?.role === 'admin'
+          ? `<button class="btn btn-sm btn-secondary" data-action="restart-bot">${icon('refresh')} Reiniciar el bot ahora</button>`
+          : ''
+      }`
     : `${icon('alert')}<span>Hay una versión nueva del panel (v${h(delServidor)}). Recarga la página para verla: <b>Ctrl + Shift + R</b></span>`
   document.body.appendChild(aviso)
 }
