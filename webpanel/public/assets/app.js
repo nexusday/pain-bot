@@ -68,6 +68,8 @@ const ICONS = {
   alert: '<path d="M10.3 4.3 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/>',
+  login: '<path d="M15 3h6v6M15 3l-6 6M9 21H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="M21 15H9"/>',
+  userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   key: '<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10 13 8-8"/><path d="m15 4 5 5"/><path d="m17 6 2-2"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/>',
@@ -527,61 +529,64 @@ function renderAuth() {
             <li><span class="fi">${icon('activity')}</span><div><b>Estado en vivo</b><span>Conectado, vinculado o pendiente de re-vincular, siempre a la vista.</span></div></li>
             <li><span class="fi">${icon('shieldCheck')}</span><div><b>Acceso por cuenta</b><span>Cada usuario ve solo sus números; el panel de administración va aparte.</span></div></li>
           </ul>
-          <div class="auth-meta">
-            <span>${h(publicUrl.replace(/^https?:\/\//, '') || 'Panel privado')}</span>
-            <span class="sep"></span>
-            <span>v${h(cfg.version || '1.0.0')}</span>
-          </div>
-          <div class="auth-stats" id="auth-stats">
-            <div class="stat-badge stat-skeleton">${icon('users')} <span class="skeleton"></span> usuarios</div>
-            <div class="stat-badge stat-skeleton">${icon('bot')} <span class="skeleton"></span> sub-bots</div>
-            <div class="stat-badge stat-skeleton stat-online">${icon('wifi')} <span class="skeleton"></span> conectados</div>
-            <div class="stat-badge stat-skeleton">${icon('globe')} <span class="skeleton"></span> comunidades</div>
-          </div>
+          <div class="auth-stats" id="auth-stats"></div>
         </div>
       </section>
-      <section class="auth-pane">
-        <div class="auth-card">
-          <div class="auth-card-head">
-            <h2>${tab === 'login' ? 'Inicia sesión' : 'Crea tu cuenta'}</h2>
-            <p>${tab === 'login' ? 'Accede al panel para gestionar tus sub-bots.' : 'Regístrate para vincular tu primer número.'}</p>
-          </div>
-          ${allowRegistration ? `<div class="auth-tabs">
-            <button class="auth-tab ${tab === 'login' ? 'active' : ''}" data-action="auth-tab" data-tab="login">Iniciar sesión</button>
-            <button class="auth-tab ${tab === 'register' ? 'active' : ''}" data-action="auth-tab" data-tab="register">Registrarse</button>
-          </div>` : ''}
-          <form id="auth-form" data-mode="${tab}">
-            <div class="form-error">${icon('alert')}<span></span></div>
-            <div class="field">
-              <label class="label" for="auth-username">Usuario</label>
-              <div class="input-icon">${icon('user')}<input class="input" id="auth-username" name="username" autocomplete="username" placeholder="tu_usuario" required minlength="3" maxlength="32" /></div>
-            </div>
-            ${tab === 'register' ? `<div class="field">
-              <label class="label" for="auth-email">Correo <span class="muted">(opcional)</span></label>
-              <div class="input-icon">${icon('mail')}<input class="input" id="auth-email" name="email" type="email" autocomplete="email" placeholder="tu@correo.com" /></div>
-            </div>` : ''}
-            <div class="field">
-              <label class="label" for="auth-password">Contraseña</label>
-              <div class="input-icon">
-                ${icon('lock')}
-                <input class="input" id="auth-password" name="password" type="password" autocomplete="${tab === 'login' ? 'current-password' : 'new-password'}" placeholder="••••••••" required ${tab === 'register' ? 'minlength="8"' : ''} />
-                <button type="button" class="icon-btn sm" data-action="toggle-password" data-input="auth-password" style="position:absolute;right:5px;top:5px;border:0;background:transparent" aria-label="Mostrar contraseña">${icon('eye')}</button>
-              </div>
-            </div>
-            ${tab === 'register' ? `<div class="field">
-              <label class="label" for="auth-confirm">Confirmar contraseña</label>
-              <div class="input-icon">${icon('lock')}<input class="input" id="auth-confirm" name="confirm" type="password" autocomplete="new-password" placeholder="••••••••" required minlength="8" /></div>
-            </div>` : ''}
-            ${tab === 'register' && cfg.requireInvite ? `<div class="field">
-              <label class="label" for="auth-invite">Código de invitación</label>
-              <div class="input-icon">${icon('key')}<input class="input" id="auth-invite" name="invite" placeholder="Código de acceso" required /></div>
-            </div>` : ''}
-            <button class="btn btn-primary btn-block auth-submit" type="submit">${tab === 'login' ? 'Entrar al panel' : 'Crear cuenta'} ${icon('arrowRight')}</button>
-            <div class="auth-legal">By Sunkovv</div>
-          </form>
+        <div class="auth-actions">
+          <button class="btn btn-primary btn-block" data-action="auth-open-login">${icon('login')} Iniciar sesión</button>
+          ${allowRegistration ? `<button class="btn btn-secondary btn-block" data-action="auth-open-register">${icon('userPlus')} Registrarse</button>` : ''}
+          <div class="auth-gratis" data-action="auth-open-login">${icon('zap')} Totalmente gratis</div>
         </div>
-      </section>
+      </div>
     </div>`
+}
+
+/* ── Modal flotante de acceso (login / registro) ────────────────────────── */
+function openAuthModal() {
+  const cfg = state.config || {}
+  const brand = cfg.brandName || 'Pain Bot'
+  const allowRegistration = cfg.allowRegistration !== false
+  const tab = state.authTab
+
+  openModal({
+    title: tab === 'login' ? 'Inicia sesión' : 'Crea tu cuenta',
+    subtitle: tab === 'login' ? 'Accede al panel para gestionar tus sub-bots.' : 'Regístrate para vincular tu primer número.',
+    body: `
+      ${allowRegistration ? `<div class="auth-tabs">
+        <button class="auth-tab ${tab === 'login' ? 'active' : ''}" data-action="auth-tab" data-tab="login">Iniciar sesión</button>
+        <button class="auth-tab ${tab === 'register' ? 'active' : ''}" data-action="auth-tab" data-tab="register">Registrarse</button>
+      </div>` : ''}
+      <form id="auth-form" data-mode="${tab}">
+        <div class="form-error">${icon('alert')}<span></span></div>
+        <div class="field">
+          <label class="label" for="auth-username">Usuario</label>
+          <div class="input-icon">${icon('user')}<input class="input" id="auth-username" name="username" autocomplete="username" placeholder="tu_usuario" required minlength="3" maxlength="32" /></div>
+        </div>
+        ${tab === 'register' ? `<div class="field">
+          <label class="label" for="auth-email">Correo <span class="muted">(opcional)</span></label>
+          <div class="input-icon">${icon('mail')}<input class="input" id="auth-email" name="email" type="email" autocomplete="email" placeholder="tu@correo.com" /></div>
+        </div>` : ''}
+        <div class="field">
+          <label class="label" for="auth-password">Contraseña</label>
+          <div class="input-icon">
+            ${icon('lock')}
+            <input class="input" id="auth-password" name="password" type="password" autocomplete="${tab === 'login' ? 'current-password' : 'new-password'}" placeholder="••••••••" required ${tab === 'register' ? 'minlength="8"' : ''} />
+            <button type="button" class="icon-btn sm" data-action="toggle-password" data-input="auth-password" style="position:absolute;right:5px;top:5px;border:0;background:transparent" aria-label="Mostrar contraseña">${icon('eye')}</button>
+          </div>
+        </div>
+        ${tab === 'register' ? `<div class="field">
+          <label class="label" for="auth-confirm">Confirmar contraseña</label>
+          <div class="input-icon">${icon('lock')}<input class="input" id="auth-confirm" name="confirm" type="password" autocomplete="new-password" placeholder="••••••••" required minlength="8" /></div>
+        </div>` : ''}
+        ${tab === 'register' && cfg.requireInvite ? `<div class="field">
+          <label class="label" for="auth-invite">Código de invitación</label>
+          <div class="input-icon">${icon('key')}<input class="input" id="auth-invite" name="invite" placeholder="Código de acceso" required /></div>
+        </div>` : ''}
+        <button class="btn btn-primary btn-block auth-submit" type="submit">${tab === 'login' ? 'Entrar al panel' : 'Crear cuenta'} ${icon('arrowRight')}</button>
+        <div class="auth-legal">By Sunkovv</div>
+      </form>
+    `,
+  })
 }
 
 /* ── Shell principal ────────────────────────────────────────────────────── */
@@ -2989,6 +2994,16 @@ async function onClick(event) {
     if (action === 'auth-tab') {
       state.authTab = actionEl.dataset.tab === 'register' ? 'register' : 'login'
       renderAuth()
+      return
+    }
+    if (action === 'auth-open-login') {
+      state.authTab = 'login'
+      openAuthModal()
+      return
+    }
+    if (action === 'auth-open-register') {
+      state.authTab = 'register'
+      openAuthModal()
       return
     }
     if (action === 'toggle-password') {

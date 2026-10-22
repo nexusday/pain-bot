@@ -1353,6 +1353,43 @@ svg {
   color: var(--success);
 }
 
+/* ── Acceso: botones y aviso gratuito ───────────────────────────────────── */
+.auth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.auth-gratis {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.auth-gratis:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.auth-gratis svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-2);
+}
+
+.auth-gratis:hover svg {
+  color: var(--accent);
+}
+
 /* ── Dashboard: más métricas ─────────────────────────────────────────────── */
 .stats-row {
   display: grid;
