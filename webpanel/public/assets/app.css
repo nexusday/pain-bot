@@ -604,33 +604,40 @@ svg {
 /* ── Acceso ─────────────────────────────────────────────────────────────── */
 .auth-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background:
+    radial-gradient(900px 420px at 15% 0%, rgba(232, 69, 60, 0.12), transparent 62%),
+    radial-gradient(700px 380px at 85% 100%, rgba(52, 196, 139, 0.08), transparent 62%),
+    var(--bg-soft);
 }
 
 .auth-brand {
   position: relative;
-  padding: 40px 48px;
-  background:
-    radial-gradient(900px 420px at 12% 0%, rgba(232, 69, 60, 0.14), transparent 62%),
-    var(--bg-soft);
-  border-right: 1px solid var(--line);
+  width: 100%;
+  max-width: 640px;
+  padding: 34px 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
   overflow: hidden;
 }
 
 .auth-hero {
-  max-width: 520px;
-  margin-top: auto;
-  margin-bottom: auto;
-  padding: 24px 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 .auth-logo {
   display: block;
-  width: min(420px, 100%);
+  width: min(260px, 100%);
   height: auto;
   border-radius: 14px;
   border: 1px solid var(--line);
@@ -1316,6 +1323,10 @@ svg {
   border-top: 1px solid var(--line);
 }
 
+.auth-stats:empty {
+  display: none;
+}
+
 .stat-badge {
   display: inline-flex;
   align-items: center;
@@ -1355,13 +1366,19 @@ svg {
 
 /* ── Acceso: botones y aviso gratuito ───────────────────────────────────── */
 .auth-actions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 22px;
+}
+
+.auth-actions .btn {
+  min-height: 42px;
 }
 
 .auth-gratis {
+  grid-column: 1 / -1;
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2692,13 +2709,12 @@ svg {
 
 @media (max-width: 980px) {
   .auth-shell {
-    grid-template-columns: minmax(0, 1fr);
+    align-items: flex-start;
+    padding: 24px 16px;
   }
 
   .auth-brand {
     padding: 24px 20px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
     gap: 20px;
   }
 
@@ -2868,12 +2884,28 @@ svg {
     font-size: 19px;
   }
 
-  .auth-pane {
-    padding: 24px 16px 40px;
+  .auth-shell {
+    padding: 14px 12px 24px;
   }
 
-  .auth-card {
-    padding: 22px 18px;
+  .auth-brand {
+    padding: 22px 16px;
+    border-radius: 14px;
+    gap: 18px;
+  }
+
+  .auth-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auth-gratis {
+    grid-column: auto;
+    justify-self: stretch;
+    justify-content: center;
+  }
+
+  .auth-meta {
+    flex-wrap: wrap;
   }
 
   .code-value {

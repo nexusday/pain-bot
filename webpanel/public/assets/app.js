@@ -10,7 +10,7 @@ const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-const PANEL_VERSION = '1.6.5'
+const PANEL_VERSION = '1.6.6'
 
 const state = {
   user: null,
@@ -530,14 +530,18 @@ function renderAuth() {
             <li><span class="fi">${icon('shieldCheck')}</span><div><b>Acceso por cuenta</b><span>Cada usuario ve solo sus números; el panel de administración va aparte.</span></div></li>
           </ul>
           <div class="auth-stats" id="auth-stats"></div>
+          <div class="auth-actions">
+            <button class="btn btn-primary btn-block" data-action="auth-open-login">${icon('login')} Iniciar sesión</button>
+            ${allowRegistration ? `<button class="btn btn-secondary btn-block" data-action="auth-open-register">${icon('userPlus')} Registrarse</button>` : ''}
+            <div class="auth-gratis" data-action="auth-open-login">${icon('zap')} Totalmente gratis</div>
+          </div>
+          <div class="auth-meta">
+            <span>${h(publicUrl.replace(/^https?:\/\//, '') || 'Panel privado')}</span>
+            <span class="sep"></span>
+            <span>v${h(cfg.version || '1.0.0')}</span>
+          </div>
         </div>
       </section>
-        <div class="auth-actions">
-          <button class="btn btn-primary btn-block" data-action="auth-open-login">${icon('login')} Iniciar sesión</button>
-          ${allowRegistration ? `<button class="btn btn-secondary btn-block" data-action="auth-open-register">${icon('userPlus')} Registrarse</button>` : ''}
-          <div class="auth-gratis" data-action="auth-open-login">${icon('zap')} Totalmente gratis</div>
-        </div>
-      </div>
     </div>`
 }
 
@@ -2993,7 +2997,10 @@ async function onClick(event) {
     }
     if (action === 'auth-tab') {
       state.authTab = actionEl.dataset.tab === 'register' ? 'register' : 'login'
-      renderAuth()
+      // Si las pestañas están dentro del modal, hay que repintar el modal,
+      // no la landing (renderAuth cerraría el modal).
+      if (modalRoot && modalRoot.classList.contains('open')) openAuthModal()
+      else renderAuth()
       return
     }
     if (action === 'auth-open-login') {
