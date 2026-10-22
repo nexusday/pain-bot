@@ -2662,60 +2662,82 @@ svg {
     padding: 24px 20px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
-    gap: 18px;
+    gap: 20px;
   }
 
   .auth-hero {
     margin: 0;
-    padding: 0;
+    padding: 16px 0 0;
   }
 
   .auth-logo {
-    width: min(260px, 100%);
+    width: min(280px, 100%);
     margin-bottom: 18px;
   }
 
+  .auth-kicker {
+    margin-bottom: 12px;
+  }
+
+  .auth-title {
+    font-size: clamp(24px, 8vw, 32px);
+    margin-bottom: 10px;
+  }
+
+  .auth-lead {
+    max-width: none;
+    font-size: 13.5px;
+    margin-bottom: 16px;
+  }
+
   .auth-features {
-    display: none;
+    margin: 14px 0 0;
+    gap: 1px;
+    max-width: none;
+  }
+
+  .auth-features li {
+    padding: 8px 0;
+  }
+
+  .auth-features b {
+    font-size: 12.5px;
+  }
+
+  .auth-features span {
+    font-size: 11.5px;
   }
 
   .auth-meta {
     margin-top: 16px;
-    font-size: 10.5px;
-  }
-
-  /* En móvil las stats empujan el formulario muy abajo: se ocultan aquí y se
-     pueden ver desde el dashboard tras iniciar sesión. */
-  .auth-stats {
-    display: none;
   }
 
   .auth-pane {
-    padding: 20px 16px;
+    display: grid;
+    place-items: start;
+    padding: 24px 20px 32px;
+    background: var(--bg);
   }
 
   .auth-card {
+    width: 100%;
+    max-width: 100%;
     padding: 24px 20px;
-    border-radius: var(--radius);
   }
 
-  .auth-card-head {
-    margin-bottom: 16px;
+  .auth-stats {
+    margin-top: 10px;
+    gap: 8px;
   }
 
-  .auth-card-head h2 {
-    font-size: 18px;
+  .auth-stats .stat-badge {
+    font-size: 12px;
+    padding: 6px 10px;
   }
 
-  .auth-tabs {
-    margin-bottom: 16px;
-    gap: 2px;
-    padding: 2px;
-  }
-
-  .auth-tab {
-    height: 32px;
-    font-size: 12.5px;
+  .auth-stats .stat-badge svg {
+    width: 12px;
+    height: 12px;
   }
 }
 
