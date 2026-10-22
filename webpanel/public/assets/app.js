@@ -10,7 +10,7 @@ const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-const PANEL_VERSION = '1.6.0'
+const PANEL_VERSION = '1.6.1'
 
 const state = {
   user: null,
@@ -3121,16 +3121,38 @@ function onChange(event) {
 
 /* ── Arranque ───────────────────────────────────────────────────────────── */
 /* ── Aviso de versión desactualizada ──────────────────────────────────────── */
-/** Si el navegador tiene un JS viejo, el servidor avisa con otra versión. */
+/** Compara versiones "1.2.3" → 1 si a > b, -1 si a < b, 0 si iguales. */
+function compararVersiones(a, b) {
+  const pa = String(a || '').split('.').map((n) => Number.parseInt(n, 10) || 0)
+  const pb = String(b || '').split('.').map((n) => Number.parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0
+    const y = pb[i] || 0
+    if (x > y) return 1
+    if (x < y) return -1
+  }
+  return 0
+}
+
+/**
+ * Si el navegador tiene un JS viejo, el servidor avisa con otra versión.
+ * También avisa al revés: si el servidor quedó con el código viejo (no se
+ * reinició el proceso tras una actualización), avisa de que hay que reiniciarlo.
+ */
 function avisarVersionDesactualizada() {
   const delServidor = String(state.config?.version || '').trim()
-  if (!delServidor || delServidor === PANEL_VERSION) return
-  const banner = document.getElementById('version-banner')
-  if (banner) return
+  if (!delServidor) return
+  const comparacion = compararVersiones(PANEL_VERSION, delServidor)
+  if (comparacion === 0) return
+  if (document.getElementById('version-banner')) return
+
+  const servidorViejo = comparacion > 0
   const aviso = document.createElement('div')
   aviso.id = 'version-banner'
   aviso.className = 'version-banner'
-  aviso.innerHTML = `${icon('alert')}<span>Hay una versión nueva del panel (v${h(delServidor)}). Recarga la página para verla: <b>Ctrl + Shift + R</b></span>`
+  aviso.innerHTML = servidorViejo
+    ? `${icon('alert')}<span>El <b>servidor del panel tiene el código viejo</b> (v${h(delServidor)}). Reinicia el bot una vez para que se apliquen los cambios; después ya podrás usar "Actualizar en caliente" sin reiniciar.</span>`
+    : `${icon('alert')}<span>Hay una versión nueva del panel (v${h(delServidor)}). Recarga la página para verla: <b>Ctrl + Shift + R</b></span>`
   document.body.appendChild(aviso)
 }
 
