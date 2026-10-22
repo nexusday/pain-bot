@@ -1617,6 +1617,34 @@ svg {
   flex: none;
 }
 
+/* ── Acting as ──────────────────────────────────────────────────────────── */
+.impersonating-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  background: #2b2412;
+  border-bottom: 1px solid rgba(227, 174, 60, 0.35);
+  color: #f0cd7d;
+  font-size: 12.5px;
+}
+
+.impersonating-bar svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.impersonating-bar span {
+  flex: 1;
+  min-width: 180px;
+}
+
+.impersonating-bar b {
+  color: #ffe3a8;
+}
+
 /* ── Aviso de versión desactualizada ─────────────────────────────────────── */
 .version-banner {
   position: fixed;

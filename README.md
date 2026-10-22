@@ -571,6 +571,29 @@ Endpoints (solo el dueño del sub-bot o un administrador):
 | `POST` | `/api/bots/:numero/config/image` | Sube la imagen del menú (data URL) |
 | `GET` | `/api/bots/:numero/image` | Devuelve la imagen configurada |
 
+### Entrar como usuario (acting as)
+
+En **Administración → Usuarios** cada cuenta tiene un botón de persona: el
+admin **entra en su panel sin necesitar su contraseña**. Es útil para ver
+exactamente lo que ve el usuario (sus sub-bots, su menú, sus límites) o para
+ayudarlo a configurar su bot.
+
+- Mientras está acting as, arriba del panel hay una banda amarilla:
+  *"Estás acting as @usuario"* con el botón **Volver a @admin**.
+- Al volver, se crea una sesión nueva de administrador: la del admin nunca se
+  pierde (queda el registro original de auditoría).
+- Todo queda en la **auditoría**: `admin.impersonate` y
+  `admin.stop_impersonating`.
+- Solo los administradores pueden hacerlo, y nunca sobre una cuenta
+  bloqueada.
+
+Endpoints:
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `POST` | `/api/admin/impersonate/:id` | Entra como ese usuario |
+| `POST` | `/api/auth/stop-impersonating` | Vuelve a la cuenta de administrador |
+
 ### Comunidades de WhatsApp
 
 En **Administración → Comunidades** el administrador publica los grupos de la
@@ -604,14 +627,6 @@ Endpoints (solo administradores):
 |---|---|---|
 | `POST` | `/api/admin/update` | Actualiza desde el remoto y recarga en caliente |
 | `POST` | `/api/admin/reload` | Recarga el código en caliente sin tocar git |
-
-### Comunidades de WhatsApp (API)
-
-En **Administración → Comunidades** el administrador publica los grupos de la
-comunidad: nombre, enlace de invitación y descripción. Los usuarios las ven en
-la sección **Comunidades** del panel y entran con un clic ("Unirme a la
-comunidad"). Una comunidad se puede ocultar sin borrarla, para dejar de
-mostrarla un tiempo.
 
 ### Límites por cuenta y por IP
 

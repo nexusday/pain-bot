@@ -10,7 +10,7 @@ const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-const PANEL_VERSION = '1.5.1'
+const PANEL_VERSION = '1.6.0'
 
 const state = {
   user: null,
@@ -38,6 +38,7 @@ const state = {
   main: null,
   mainCode: null,
   mainPoll: null,
+  impersonatedBy: null,
 }
 
 /* ── Iconos (stroke, sin dependencias) ──────────────────────────────────── */
@@ -609,6 +610,11 @@ function renderShell() {
             <button class="icon-btn danger" data-action="logout" title="Cerrar sesión">${icon('logout')}</button>
           </div>
         </header>
+        ${state.impersonatedBy ? `<div class="impersonating-bar">
+          ${icon('user')}
+          <span>Estás <b>acting como @${h(state.user.username)}</b>. Todo lo que cambies afecta a esa cuenta.</span>
+          <button class="btn btn-sm btn-secondary" data-action="stop-impersonating">${icon('logout')} Volver a @${h(state.impersonatedBy.username)}</button>
+        </div>` : ''}
         <div class="content" id="content"></div>
       </main>
     </div>`
@@ -1503,6 +1509,8 @@ const ACTION_LABELS = {
   'main.code': 'Código del principal',
   'main.unlink': 'Principal desvinculado',
   'main.restart': 'Bot reiniciado',
+  'admin.impersonate': 'Entró como usuario',
+  'admin.stop_impersonating': 'Volvió a su cuenta',
 }
 
 function actionLabel(action) {
@@ -1558,6 +1566,7 @@ function usersTable(users) {
         <td><span class="tiny muted">${fmtDate(user.created_at, false)}</span></td>
         <td><span class="tiny muted">${user.last_login_at ? fmtRelative(user.last_login_at) : 'Nunca'}</span></td>
         <td><div class="actions">
+          <button class="icon-btn sm" data-action="admin-impersonate" data-id="${user.id}" data-username="${h(user.username)}" title="Entrar como este usuario" ${self ? 'disabled' : ''}>${icon('user')}</button>
           <button class="icon-btn sm" data-action="admin-user-edit" data-id="${user.id}" title="Editar">${icon('pencil')}</button>
           <button class="icon-btn sm danger" data-action="admin-user-delete" data-id="${user.id}" data-username="${h(user.username)}" title="Eliminar" ${self ? 'disabled' : ''}>${icon('trash')}</button>
         </div></td>
@@ -2655,6 +2664,37 @@ async function handleBotConfigSave(form) {
   }
 }
 
+/* ── Acting as (entrar como usuario) ─────────────────────────────────────── */
+async function impersonarUsuario(id, username) {
+  confirmModal({
+    title: 'Entrar como usuario',
+    message: `Vas a entrar en la cuenta de <b>@${h(username || '')}</b> sin necesidad de su contraseña. Verás el panel tal cual lo ve esa persona y todo lo que cambies afecta a su cuenta. Puedes volver a la tuya con el botón "Volver".`,
+    confirmLabel: 'Entrar como usuario',
+    danger: false,
+    onConfirm: async () => {
+      const data = await api.post(`/api/admin/impersonate/${encodeURIComponent(id)}`, {})
+      state.user = data.user
+      state.csrf = data.csrf
+      state.impersonatedBy = data.impersonatedBy || null
+      showToast(`Ahora estás dentro de @${data.user.username}.`, 'success')
+      window.location.reload()
+    },
+  })
+}
+
+async function stopImpersonating() {
+  try {
+    const data = await api.post('/api/auth/stop-impersonating', {})
+    state.user = data.user
+    state.csrf = data.csrf
+    state.impersonatedBy = null
+    showToast('Volviste a tu cuenta de administrador.', 'success')
+    window.location.reload()
+  } catch (error) {
+    showToast(error.message || 'No se pudo volver a tu cuenta.', 'error')
+  }
+}
+
 /* ── Handlers de administración ─────────────────────────────────────────── */
 async function handleUserSave(form) {
   const id = form.dataset.id
@@ -2882,6 +2922,14 @@ async function onClick(event) {
       await handleLinkRegenerate()
       return
     }
+    if (action === 'admin-impersonate') {
+      impersonarUsuario(id, actionEl.dataset.username || '')
+      return
+    }
+    if (action === 'stop-impersonating') {
+      await stopImpersonating()
+      return
+    }
     if (action === 'admin-user-edit') {
       openUserModal(id)
       return
@@ -3096,6 +3144,7 @@ async function boot() {
       publicConfig = await api.get('/api/config')
     } catch {}
     state.config = { ...(state.config || {}), ...(me.config || {}), ...publicConfig }
+    state.impersonatedBy = me.impersonatedBy || null
     renderShell()
     if (!location.hash) history.replaceState(null, '', '#/dashboard')
     await route()

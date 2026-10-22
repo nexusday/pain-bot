@@ -218,6 +218,63 @@ test('webpanel: el usuario configura su sub-bot y ve el menú', async (t) => {
   assert.equal(prohibido.status, 403)
 })
 
+test('webpanel: el admin puede entrar como usuario y volver a su cuenta', async (t) => {
+  const { handle, pedir } = await panelDePrueba(t)
+
+  const registro = await pedir('/api/auth/register', {
+    method: 'POST',
+    body: { username: 'cliente', password: 'cliente12345' },
+  })
+  assert.equal(registro.status, 201)
+  const usuario = await handle.store.buscarUsuarioPorNombre('cliente')
+
+  const login = await pedir('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'admin12345' },
+  })
+  const cookieAdmin = login.cookie
+  const csrfAdmin = login.datos.csrf
+
+  // Un usuario normal no puede impersonar.
+  const noAutorizado = await pedir(`/api/admin/impersonate/${usuario.id}`, {
+    method: 'POST',
+    cookie: registro.cookie,
+    csrf: registro.datos.csrf,
+  })
+  assert.equal(noAutorizado.status, 403)
+
+  // El admin entra como el usuario.
+  const impersonado = await pedir(`/api/admin/impersonate/${usuario.id}`, {
+    method: 'POST',
+    cookie: cookieAdmin,
+    csrf: csrfAdmin,
+  })
+  assert.equal(impersonado.status, 200)
+  assert.equal(impersonado.datos.user.username, 'cliente')
+  assert.equal(impersonado.datos.user.role, 'user')
+  assert.equal(impersonado.datos.impersonatedBy.username, 'admin')
+  assert.ok(impersonado.cookie.startsWith('pain_panel='))
+
+  // Con esa cookie el panel ve la cuenta del usuario y la marca de acting as.
+  const me = await pedir('/api/auth/me', { cookie: impersonado.cookie })
+  assert.equal(me.status, 200)
+  assert.equal(me.datos.user.username, 'cliente')
+  assert.equal(me.datos.impersonatedBy.username, 'admin')
+
+  // Volver a la cuenta del admin.
+  const volver = await pedir('/api/auth/stop-impersonating', {
+    method: 'POST',
+    cookie: impersonado.cookie,
+    csrf: impersonado.datos.csrf,
+  })
+  assert.equal(volver.status, 200)
+  assert.equal(volver.datos.user.username, 'admin')
+  assert.equal(volver.datos.user.role, 'admin')
+
+  const meAdmin = await pedir('/api/auth/me', { cookie: volver.cookie })
+  assert.equal(meAdmin.datos.impersonatedBy, null)
+})
+
 test('webpanel: los límites de intentos son configurables', async (t) => {
   const { pedir } = await panelDePrueba(t)
 
