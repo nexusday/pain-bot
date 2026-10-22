@@ -1306,7 +1306,67 @@ svg {
   font-size: 11px;
 }
 
-/* ── Tablas ─────────────────────────────────────────────────────────────── */
+/* ── Badges de stats en tiempo real (landing + shell) ────────────────────── */
+.auth-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.stat-badge svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-2);
+}
+
+.stat-badge b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.stat-online {
+  color: var(--success);
+  border-color: var(--success-soft);
+  background: var(--success-soft);
+}
+
+.stat-online svg {
+  color: var(--success);
+}
+
+.stat-online b {
+  color: var(--success);
+}
+
+/* ── Dashboard: más métricas ─────────────────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+/* Contenedor de badges en el topbar (solo se muestra cuando hay datos) */
+.stat-badge-skeleton-box {
+  display: none;
+  gap: 10px;
+  align-items: center;
+}
 .table-wrap {
   width: 100%;
   overflow-x: auto;

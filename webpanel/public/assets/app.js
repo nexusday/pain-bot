@@ -39,6 +39,9 @@ const state = {
   mainCode: null,
   mainPoll: null,
   impersonatedBy: null,
+  stats: null,
+  statsPoll: null,
+  dashboardPoll: null,
 }
 
 /* ── Iconos (stroke, sin dependencias) ──────────────────────────────────── */
@@ -360,6 +363,50 @@ const api = {
   del: (path) => request('DELETE', path),
 }
 
+/* ── Stats en tiempo real ────────────────────────────────────────────────── */
+async function cargarStats() {
+  try {
+    const data = await api.get('/api/stats')
+    state.stats = data
+    renderStatsBadges()
+  } catch {
+    // Fallo silencioso: las stats son opcionales
+  }
+}
+
+function iniciarPollingStats() {
+  if (state.statsPoll) clearInterval(state.statsPoll)
+  state.statsPoll = setInterval(cargarStats, 30_000)
+  state.statsPoll.unref?.()
+}
+
+function renderStatsBadges() {
+  const s = state.stats
+  if (!s) return
+  // Landing (sin login)
+  const elAuth = document.getElementById('auth-stats')
+  if (elAuth && !state.user) {
+    elAuth.innerHTML = `
+      <div class="stat-badge">${icon('users')} <b>${s.users}</b> usuarios</div>
+      <div class="stat-badge">${icon('bot')} <b>${s.bots}</b> sub-bots</div>
+      <div class="stat-badge ${s.sessionsConnected ? 'stat-online' : ''}">${icon('wifi')} <b>${s.sessionsConnected}</b> conectados</div>
+      <div class="stat-badge">${icon('globe')} <b>${s.communities}</b> comunidades</div>
+    `
+    return
+  }
+  // Shell (después del login): badges en el topbar
+  const elTop = document.getElementById('stats-badges')
+  if (elTop) {
+    elTop.style.display = ''
+    elTop.innerHTML = `
+      <span class="stat-badge">${icon('users')} <b>${s.users}</b> usuarios</span>
+      <span class="stat-badge">${icon('bot')} <b>${s.bots}</b> sub-bots</span>
+      <span class="stat-badge ${s.sessionsConnected ? 'stat-online' : ''}">${icon('wifi')} <b>${s.sessionsConnected}</b> conectados</span>
+      <span class="stat-badge">${icon('globe')} <b>${s.communities}</b> comunidades</span>
+    `
+  }
+}
+
 /* ── Timer helpers ──────────────────────────────────────────────────────── */
 function stopPairingPolling() {
   if (state.pollTimer) clearInterval(state.pollTimer)
@@ -375,6 +422,14 @@ function stopCountdown() {
 function stopTimers() {
   stopPairingPolling()
   stopCountdown()
+  if (state.statsPoll) {
+    clearInterval(state.statsPoll)
+    state.statsPoll = null
+  }
+  if (state.dashboardPoll) {
+    clearInterval(state.dashboardPoll)
+    state.dashboardPoll = null
+  }
   if (state.mainPoll) {
     clearInterval(state.mainPoll)
     state.mainPoll = null
@@ -476,6 +531,12 @@ function renderAuth() {
             <span>${h(publicUrl.replace(/^https?:\/\//, '') || 'Panel privado')}</span>
             <span class="sep"></span>
             <span>v${h(cfg.version || '1.0.0')}</span>
+          </div>
+          <div class="auth-stats" id="auth-stats">
+            <div class="stat-badge stat-skeleton">${icon('users')} <span class="skeleton"></span> usuarios</div>
+            <div class="stat-badge stat-skeleton">${icon('bot')} <span class="skeleton"></span> sub-bots</div>
+            <div class="stat-badge stat-skeleton stat-online">${icon('wifi')} <span class="skeleton"></span> conectados</div>
+            <div class="stat-badge stat-skeleton">${icon('globe')} <span class="skeleton"></span> comunidades</div>
           </div>
         </div>
       </section>
@@ -602,6 +663,7 @@ function renderShell() {
             <p id="page-sub">Resumen de tu cuenta</p>
           </div>
           <div class="topbar-actions">
+            <div id="stats-badges" class="stat-badge-skeleton-box" style="display:none;"></div>
             <button class="icon-btn" data-action="refresh" title="Actualizar">${icon('refresh')}</button>
             <div class="user-chip">
               <div class="avatar">${initials(user.username)}</div>
@@ -809,16 +871,16 @@ async function renderDashboard() {
 
   content(`
     <div class="page-head">
-      <div><h2>Hola, ${h(state.user.username)}</h2><p>Este es el estado de tus sub-bots y tu cuenta.</p></div>
+      <div><h2>Hola, ${h(state.user.username)}</h2><p>Estado en vivo de tu cuenta y tus sub-bots.</p></div>
       <div class="page-actions">
         <a class="btn btn-secondary" href="#/bots">${icon('bot')} Ver todos</a>
         <a class="btn btn-primary" href="#/link">${icon('plus')} Vincular bot</a>
       </div>
     </div>
     ${mainLinked ? '' : `<div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div>El <b>bot principal</b> todavía no está vinculado, así que los sub-bots no pueden conectarse.${isAdmin ? ' Vincúlalo desde <a href="#/admin/principal"><b>Administración → Bot principal</b></a>.' : ' Avisa al administrador del servidor.'}</div></div>`}
-    <div class="stats">
+    <div class="stats-row">
       ${statCard('Sub-bots', total, 'bot', 'accent')}
-      ${statCard('Conectados', connected, 'wifi', 'green')}
+      ${statCard('Conectados', connected, 'wifi', connected > 0 ? 'green' : 'muted')}
       ${statCard('Requieren atención', relink, 'alert', 'amber')}
       ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? 'Límite del servidor' : 'Sin límite configurado'}</span>`)}
     </div>
@@ -889,6 +951,18 @@ async function renderDashboard() {
         </div>
       </div>
     </div>`)
+
+  // Auto-actualizar datos del dashboard cada 30s (solo mientras se esté en esta ruta)
+  if (state.dashboardPoll) clearInterval(state.dashboardPoll)
+  state.dashboardPoll = setInterval(async () => {
+    if (location.hash.replace(/^#/, '') !== '/dashboard' && location.hash.replace(/^#/, '') !== '') return
+    try {
+      await loadBots()
+      updateNavBadges()
+      renderDashboard()
+    } catch {}
+  }, 30_000)
+  state.dashboardPoll.unref?.()
 }
 
 /* ── Mis bots ───────────────────────────────────────────────────────────── */
@@ -3218,11 +3292,17 @@ async function boot() {
     if (!location.hash) history.replaceState(null, '', '#/dashboard')
     await route()
     avisarVersionDesactualizada()
+    // Stats en tiempo real: cargar una vez y mantener actualizado
+    await cargarStats()
+    iniciarPollingStats()
   } catch (error) {
     state.user = null
     try {
       state.config = { ...(state.config || {}), ...(await api.get('/api/config')) }
     } catch {}
+    // También cargar stats públicas en la landing
+    await cargarStats()
+    iniciarPollingStats()
     renderAuth()
     if (error.status && error.status !== 401) {
       showToast(error.message || 'No se pudo cargar el panel.', 'error')
