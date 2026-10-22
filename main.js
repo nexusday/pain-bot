@@ -54,7 +54,7 @@ import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
-import { confirmSessionLease, requestReconnectAll, requestReconnectOne } from './lib/process-isolation.js'
+import { confirmSessionLease, requestReconnectAll, requestReconnectOne, requestReloadAll } from './lib/process-isolation.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
@@ -864,6 +864,24 @@ global.recargarEnCaliente = async function recargarEnCaliente({ plugins = [] } =
   return resumen
 }
 
+/**
+ * Pide a los workers de sub-bots que recarguen su codigo en caliente.
+ * Sin esto, una actualizacion solo llegaba al proceso principal y los
+ * sub-bots seguian con el codigo viejo hasta reiniciar.
+ */
+global.pedirRecargaWorkers = async function pedirRecargaWorkers(plugins = []) {
+  if (isSubbotWorker) return { dispatched: 0, workers: 0, motivo: 'worker' }
+  if (typeof requestReloadAll !== 'function') return { dispatched: 0, workers: 0, motivo: 'sin-ipc' }
+  try {
+    const ack = await requestReloadAll({ plugins })
+    if (!ack) return { dispatched: 0, workers: 0, motivo: 'sin-respuesta' }
+    return { dispatched: ack.dispatched ? 1 : 0, workers: ack.workers || 0, motivo: null }
+  } catch (error) {
+    console.error('[hot] No se pudo pedir la recarga a los workers:', error?.message || error)
+    return { dispatched: 0, workers: 0, motivo: error?.message || 'error' }
+  }
+}
+
 const pluginFolder = join(__dirname, 'plugins')
 const pluginFilter = (filename) => /\.js$/.test(filename)
 
@@ -906,27 +924,29 @@ global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
 global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {
     const dir = global.__filename(join(pluginFolder, filename), true)
+    // En los workers de sub-bots no hay socket principal: conn es undefined.
+    const log = conn?.logger || global.conn?.logger || console
     if (filename in global.plugins) {
-      if (existsSync(dir)) conn.logger.info(`Updated plugin - '${filename}'`)
+      if (existsSync(dir)) log.info?.(`Updated plugin - '${filename}'`)
       else {
-        conn.logger.warn(`Deleted plugin - '${filename}'`)
+        log.warn?.(`Deleted plugin - '${filename}'`)
         delete global.plugins[filename]
         global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
         return
       }
-    } else conn.logger.info(`New plugin - '${filename}'`)
+    } else log.info?.(`New plugin - '${filename}'`)
 
     const err = syntaxerror(readFileSync(dir), filename, {
       sourceType: 'module',
       allowAwaitOutsideFunction: true,
     })
-    if (err) conn.logger.error(`Syntax error while loading '${filename}':\n${format(err)}`)
+    if (err) log.error?.(`Syntax error while loading '${filename}':\n${format(err)}`)
     else {
       try {
         const module = await import(`${global.__filename(dir)}?update=${Date.now()}`)
         global.plugins[filename] = normalizePlugin(module.default || module)
       } catch (e) {
-        conn.logger.error(`Error requiring plugin '${filename}':\n${format(e)}`)
+        log.error?.(`Error requiring plugin '${filename}':\n${format(e)}`)
       } finally {
         global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)))
         global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
@@ -1087,6 +1107,29 @@ if (!isSubbotWorker) {
   }, 10_000)
   workerStatusInterval.unref?.()
   process.on('message', async (message) => {
+    if (message?.type === 'reload-worker') {
+      // Actualización en caliente del worker: se reimportan handler + plugins
+      // sin reiniciar el proceso (las sesiones siguen conectadas).
+      const plugins = Array.isArray(message.plugins)
+        ? message.plugins.filter((p) => typeof p === 'string')
+        : []
+      let resumen = { handler: false, plugins: [] }
+      let error = null
+      try {
+        resumen = (await global.recargarEnCaliente?.({ plugins })) || resumen
+      } catch (e) {
+        error = e?.message || String(e)
+      }
+      try {
+        process.send({
+          type: 'reload-worker-result',
+          requestId: message.requestId,
+          resumen,
+          error
+        }, () => {})
+      } catch {}
+      return
+    }
     if (message?.type === 'send-private' && typeof message.text === 'string') {
       // /subme: cada sub-bot de este worker se escribe a sí mismo el mensaje.
       const { enviarMensajeASuPropioChat } = await import('./lib/subme-broadcast.js')

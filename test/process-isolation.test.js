@@ -6,6 +6,7 @@ import {
   groupIdForSession,
   addedSessions,
   canStartSessions,
+  requestReloadAll,
   requestSessionLease,
   removedSessions,
   sesionPrincipalRegistrada,
@@ -99,4 +100,34 @@ test('session lease request waits for supervisor acknowledgement', async () => {
     }
   }
   assert.equal(await requestSessionLease('5211111111111', { processRef: ipc, timeoutMs: 100 }), true)
+})
+
+test('la recarga en caliente pide a todos los workers recargar código', async () => {
+  const ipc = new EventEmitter()
+  ipc.env = { PAIN_ROLE: 'primary' }
+  let enviado = null
+  ipc.send = (message, callback) => {
+    enviado = message
+    callback?.()
+    queueMicrotask(() => ipc.emit('message', {
+      type: 'reload-all-ack',
+      requestId: message.requestId,
+      dispatched: true,
+      workers: 4
+    }))
+    return true
+  }
+
+  const ack = await requestReloadAll({ processRef: ipc, plugins: ['modo-custom.js', 'nope.txt'] })
+  assert.equal(enviado.type, 'request-reload-all')
+  assert.deepEqual(enviado.plugins, ['modo-custom.js'])
+  assert.equal(ack.workers, 4)
+  assert.equal(ack.dispatched, true)
+})
+
+test('la recarga en caliente no hace nada en un worker', async () => {
+  const ipc = new EventEmitter()
+  ipc.env = { PAIN_ROLE: 'subbot' }
+  ipc.send = () => { throw new Error('no debería enviar') }
+  assert.equal(await requestReloadAll({ processRef: ipc }), null)
 })

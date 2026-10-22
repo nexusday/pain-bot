@@ -388,6 +388,31 @@ function startSlot(id, slot) {
       }
       return
     }
+    if (message.type === 'request-reload-all' && typeof message.requestId === 'string') {
+      // Actualización en caliente: cada worker recarga handler + plugins
+      // sin reiniciar el proceso (las sesiones de WhatsApp no se cortan).
+      const plugins = Array.isArray(message.plugins)
+        ? message.plugins.filter((p) => typeof p === 'string')
+        : []
+      let dispatched = 0
+      for (const [workerId, worker] of slots) {
+        if (workerId === 'primary' || !worker.child?.connected) continue
+        const ok = worker.child.send(
+          { type: 'reload-worker', requestId: message.requestId, plugins },
+          () => {}
+        ) !== false
+        if (ok) dispatched++
+      }
+      if (child.connected) {
+        child.send({
+          type: 'reload-all-ack',
+          requestId: message.requestId,
+          dispatched,
+          workers: dispatched
+        }, () => {})
+      }
+      return
+    }
     if (message.type === 'request-reconnect-all' && typeof message.requestId === 'string') {
       const desired = makeTargets()
       let workers = 0

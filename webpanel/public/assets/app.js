@@ -10,7 +10,7 @@ const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-const PANEL_VERSION = '1.6.4'
+const PANEL_VERSION = '1.6.5'
 
 const state = {
   user: null,
@@ -1922,7 +1922,7 @@ function adminSettingsHTML(data) {
             <div class="system-item"><div class="si-label">Rama</div><div class="si-value mono" style="font-size:13px">${h(repo.rama || '—')}</div></div>
             <div class="system-item"><div class="si-label">Commit</div><div class="si-value mono" style="font-size:13px">${h(repo.corto || '—')}</div></div>
           </div>
-          <div class="notice" style="margin-top:14px">${icon('info')}<div>Trae el código del remoto y lo aplica <b>sin reiniciar el proceso</b>: los sub-bots no se desconectan, el bot recarga sus plugins y el panel se recarga con el código nuevo. Tus cambios locales se guardan antes de actualizar.</div></div>
+          <div class="notice" style="margin-top:14px">${icon('info')}<div>Trae el código del remoto y lo aplica <b>sin reiniciar el proceso</b>: los sub-bots no se desconectan, el bot y sus workers recargan sus plugins y el panel se recarga con el código nuevo. Tus cambios locales se guardan antes de actualizar.</div></div>
           <div class="flex gap-8" style="margin-top:14px;flex-wrap:wrap">
             <button class="btn btn-primary" data-action="admin-update">${icon('refresh')} Actualizar en caliente</button>
             <button class="btn btn-secondary" data-action="admin-reload">${icon('rotate')} Recargar código</button>
@@ -2252,6 +2252,7 @@ async function aplicarCambiosEnCaliente() {
     if (data.cambiosLocalesConservados) lineas.push('Tus cambios locales se guardaron y se reaplicaron.')
     if (data.resumen?.handler) lineas.push('El bot recargó su código.')
     if (data.resumen?.plugins?.length) lineas.push(`${data.resumen.plugins.length} plugin(s) recargados.`)
+    if (data.workers?.workers) lineas.push(`${data.workers.workers} worker(s) de sub-bots recargados.`)
     if (data.reinicioPendiente) {
       lineas.push('main.js cambió: hace falta reiniciar el proceso.')
       set(lineas.join(' '))
@@ -2284,8 +2285,11 @@ async function handleAdminReload() {
   const set = (texto) => { if (box) box.textContent = texto }
   set('Recargando el código en caliente…')
   try {
-    await api.post('/api/admin/reload', {})
-    set('Código recargado. El panel se recarga solo en un momento.')
+    const data = await api.post('/api/admin/reload', {})
+    const workers = data?.workers?.workers
+    set(workers
+      ? `Código recargado (${workers} worker(s) de sub-bots también). El panel se recarga solo en un momento.`
+      : 'Código recargado. El panel se recarga solo en un momento.')
     showToast('Código recargado.', 'success')
     esperaPanelYRecarga()
   } catch (error) {
