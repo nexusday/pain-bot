@@ -10,7 +10,7 @@ const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-const PANEL_VERSION = '1.6.3'
+const PANEL_VERSION = '1.6.4'
 
 const state = {
   user: null,
@@ -2219,7 +2219,28 @@ function esperaPanelYRecarga() {
   setTimeout(revisar, 1200)
 }
 
-async function handleAdminUpdate() {
+/** Reinicio del proceso completo: corta el panel unos segundos. */
+function confirmarReinicioDelProceso() {
+  confirmModal({
+    title: 'Reiniciar el bot',
+    message: 'El proceso se cierra y vuelve a arrancar (Pterodactyl lo levanta solo). <b>El panel se corta un par de segundos</b> y los sub-bots reconectan. ¿Seguimos?',
+    confirmLabel: 'Reiniciar el bot',
+    danger: false,
+    onConfirm: async () => {
+      await api.post('/api/main/restart', {})
+      showToast('Reiniciando el bot…', 'info')
+      esperarReinicio()
+    },
+  })
+}
+
+/**
+ * Aplica los cambios del remoto SIN reiniciar el proceso: el bot recarga su
+ * código y el panel se recarga a sí mismo (unos cientos de ms). Solo si cambió
+ * `main.js` (que no se puede recargar en caliente) hay que reiniciar el
+ * proceso, y eso sí corta el panel unos segundos.
+ */
+async function aplicarCambiosEnCaliente() {
   const box = document.getElementById('update-result')
   const set = (texto) => { if (box) box.textContent = texto }
   set('Actualizando desde el remoto…')
@@ -2228,24 +2249,34 @@ async function handleAdminUpdate() {
     const commits = data.commits || []
     const lineas = []
     lineas.push(commits.length ? `${commits.length} commit(s) aplicados.` : 'Ya estaba al día.')
-    if (data.cambiosLocalesConservados) {
-      lineas.push('Tus cambios locales se guardaron y se reaplicaron.')
-    } else if (data.habiaCambiosLocales) {
-      lineas.push('Tus cambios locales no se pudieron reaplicar: revísalos.')
-    }
+    if (data.cambiosLocalesConservados) lineas.push('Tus cambios locales se guardaron y se reaplicaron.')
     if (data.resumen?.handler) lineas.push('El bot recargó su código.')
     if (data.resumen?.plugins?.length) lineas.push(`${data.resumen.plugins.length} plugin(s) recargados.`)
-    lineas.push('El panel se recarga solo en un momento.')
     if (data.reinicioPendiente) {
-      lineas.push('main.js cambió: eso sí necesita un reinicio del proceso.')
+      lineas.push('main.js cambió: hace falta reiniciar el proceso.')
+      set(lineas.join(' '))
+      showToast('Hay que reiniciar el proceso (main.js cambió).', 'warn')
+      confirmarReinicioDelProceso()
+      return
     }
+    lineas.push('El panel se recarga solo en un momento (sin cortar la web).')
     set(lineas.join(' '))
-    showToast('Actualización aplicada.', 'success')
+    showToast('Actualización aplicada sin reiniciar.', 'success')
     esperaPanelYRecarga()
   } catch (error) {
+    if (error.code === 'unsupported') {
+      set('El proceso del bot tiene el código viejo: hay que reiniciarlo una vez.')
+      showToast('El proceso tiene el código viejo: hay que reiniciar el bot una vez.', 'warn')
+      confirmarReinicioDelProceso()
+      return
+    }
     set(`Error: ${error.message || 'no se pudo actualizar'}`)
     showToast(error.message || 'No se pudo actualizar.', 'error')
   }
+}
+
+async function handleAdminUpdate() {
+  await aplicarCambiosEnCaliente()
 }
 
 async function handleAdminReload() {
@@ -2926,18 +2957,12 @@ async function onClick(event) {
       impersonarUsuario(id, actionEl.dataset.username || '')
       return
     }
+    if (action === 'apply-updates') {
+      await aplicarCambiosEnCaliente()
+      return
+    }
     if (action === 'restart-bot') {
-      confirmModal({
-        title: 'Reiniciar el bot',
-        message: 'El proceso se cierra y vuelve a arrancar (Pterodactyl lo levanta solo). El panel se corta un par de segundos y los sub-bots reconectan. ¿Seguimos?',
-        confirmLabel: 'Reiniciar el bot',
-        danger: false,
-        onConfirm: async () => {
-          await api.post('/api/main/restart', {})
-          showToast('Reiniciando el bot…', 'info')
-          esperarReinicio()
-        },
-      })
+      await confirmarReinicioDelProceso()
       return
     }
     if (action === 'stop-impersonating') {
@@ -3165,9 +3190,9 @@ function avisarVersionDesactualizada() {
   aviso.id = 'version-banner'
   aviso.className = 'version-banner'
   aviso.innerHTML = servidorViejo
-    ? `${icon('alert')}<span>El <b>servidor del panel tiene el código viejo</b> (v${h(delServidor)}). Reinicia el bot una vez para que se apliquen los cambios; después ya podrás usar "Actualizar en caliente" sin reiniciar.</span>${
+    ? `${icon('alert')}<span>El <b>servidor del panel tiene el código viejo</b> (v${h(delServidor)}). Pulsa <b>Aplicar cambios</b>: si el proceso no necesita reiniciarse, el panel se recarga solo <b>sin cortar la web</b>.</span>${
         state.user?.role === 'admin'
-          ? `<button class="btn btn-sm btn-secondary" data-action="restart-bot">${icon('refresh')} Reiniciar el bot ahora</button>`
+          ? `<button class="btn btn-sm btn-secondary" data-action="apply-updates">${icon('refresh')} Aplicar cambios</button>`
           : ''
       }`
     : `${icon('alert')}<span>Hay una versión nueva del panel (v${h(delServidor)}). Recarga la página para verla: <b>Ctrl + Shift + R</b></span>`
