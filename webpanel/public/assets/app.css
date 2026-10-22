@@ -2659,9 +2659,10 @@ svg {
   }
 
   .auth-brand {
-    padding: 28px 24px;
+    padding: 24px 20px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    gap: 18px;
   }
 
   .auth-hero {
@@ -2670,11 +2671,51 @@ svg {
   }
 
   .auth-logo {
-    width: min(300px, 100%);
+    width: min(260px, 100%);
+    margin-bottom: 18px;
   }
 
   .auth-features {
     display: none;
+  }
+
+  .auth-meta {
+    margin-top: 16px;
+    font-size: 10.5px;
+  }
+
+  /* En móvil las stats empujan el formulario muy abajo: se ocultan aquí y se
+     pueden ver desde el dashboard tras iniciar sesión. */
+  .auth-stats {
+    display: none;
+  }
+
+  .auth-pane {
+    padding: 20px 16px;
+  }
+
+  .auth-card {
+    padding: 24px 20px;
+    border-radius: var(--radius);
+  }
+
+  .auth-card-head {
+    margin-bottom: 16px;
+  }
+
+  .auth-card-head h2 {
+    font-size: 18px;
+  }
+
+  .auth-tabs {
+    margin-bottom: 16px;
+    gap: 2px;
+    padding: 2px;
+  }
+
+  .auth-tab {
+    height: 32px;
+    font-size: 12.5px;
   }
 }
 
