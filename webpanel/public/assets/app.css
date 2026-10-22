@@ -1617,6 +1617,29 @@ svg {
   flex: none;
 }
 
+/* ── Aviso de versión desactualizada ─────────────────────────────────────── */
+.version-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  background: #3a2a12;
+  border-top: 1px solid rgba(227, 174, 60, 0.4);
+  color: #f0cd7d;
+  font-size: 12.5px;
+}
+
+.version-banner svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
 /* ── Configuración del sub-bot ──────────────────────────────────────────── */
 .bot-config {
   display: grid;

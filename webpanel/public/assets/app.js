@@ -8,6 +8,10 @@ const app = document.getElementById('app')
 const modalRoot = document.getElementById('modal-root')
 const toastRoot = document.getElementById('toast-root')
 
+// Versión de los recursos del panel. Si el servidor tiene otra, el navegador
+// está con la copia vieja: se avisa para que recarguen.
+const PANEL_VERSION = '1.5.1'
+
 const state = {
   user: null,
   csrf: null,
@@ -584,7 +588,7 @@ function renderShell() {
           ${isAdmin ? `<div class="nav-section">Administración</div>${navLink('/admin/overview', 'shield', 'Administración', { nav: '/admin' })}` : ''}
         </nav>
         <div class="sidebar-foot">
-          <div class="hint">Panel público</div>
+          <div class="hint">Panel público · v${h(PANEL_VERSION)}</div>
           <div class="public-url">${icon('globe')}<span>${h(publicUrl.replace(/^https?:\/\//, '') || '—')}</span></div>
         </div>
       </aside>
@@ -3068,6 +3072,20 @@ function onChange(event) {
 }
 
 /* ── Arranque ───────────────────────────────────────────────────────────── */
+/* ── Aviso de versión desactualizada ──────────────────────────────────────── */
+/** Si el navegador tiene un JS viejo, el servidor avisa con otra versión. */
+function avisarVersionDesactualizada() {
+  const delServidor = String(state.config?.version || '').trim()
+  if (!delServidor || delServidor === PANEL_VERSION) return
+  const banner = document.getElementById('version-banner')
+  if (banner) return
+  const aviso = document.createElement('div')
+  aviso.id = 'version-banner'
+  aviso.className = 'version-banner'
+  aviso.innerHTML = `${icon('alert')}<span>Hay una versión nueva del panel (v${h(delServidor)}). Recarga la página para verla: <b>Ctrl + Shift + R</b></span>`
+  document.body.appendChild(aviso)
+}
+
 async function boot() {
   try {
     const me = await api.get('/api/auth/me')
@@ -3081,6 +3099,7 @@ async function boot() {
     renderShell()
     if (!location.hash) history.replaceState(null, '', '#/dashboard')
     await route()
+    avisarVersionDesactualizada()
   } catch (error) {
     state.user = null
     try {
