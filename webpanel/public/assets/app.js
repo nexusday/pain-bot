@@ -10,7 +10,7 @@ const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-const PANEL_VERSION = '1.6.1'
+const PANEL_VERSION = '1.6.2'
 
 const state = {
   user: null,

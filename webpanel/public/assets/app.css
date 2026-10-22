@@ -1367,6 +1367,7 @@ svg {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .row-icon {
@@ -1594,6 +1595,9 @@ svg {
 
 .community-list {
   display: grid;
+  /* minmax(0, 1fr): si no, la columna toma el tamaño del enlace largo y los
+     botones quedan fuera de la tarjeta (y sin poder desplazarse). */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .community-row {
@@ -1602,6 +1606,7 @@ svg {
   gap: 12px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
 }
 
 .community-row:last-child {
@@ -1615,6 +1620,22 @@ svg {
 .community-row .actions {
   align-items: center;
   flex: none;
+}
+
+/* En móvil los botones de la comunidad pasan a su propia línea. */
+@media (max-width: 640px) {
+  .community-row {
+    flex-wrap: wrap;
+  }
+
+  .community-row .actions {
+    margin-left: auto;
+  }
+
+  /* El nombre puede ocupar dos líneas: los botones siguen a la derecha. */
+  .community-row .cell-title {
+    white-space: normal;
+  }
 }
 
 /* ── Acting as ──────────────────────────────────────────────────────────── */
