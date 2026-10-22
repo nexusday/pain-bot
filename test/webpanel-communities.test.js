@@ -140,6 +140,82 @@ test('webpanel: comunidades (crear, listar, editar y borrar)', async (t) => {
   assert.ok(handle)
 })
 
+test('webpanel: el usuario configura su sub-bot y ve el menú', async (t) => {
+  const { handle, pedir, root } = await panelDePrueba(t)
+  const phone = '5215500000777'
+
+  const registro = await pedir('/api/auth/register', {
+    method: 'POST',
+    body: { username: 'dueno', password: 'dueno12345' },
+  })
+  const cookie = registro.cookie
+  const csrf = registro.datos.csrf
+  const usuario = await handle.store.buscarUsuarioPorNombre('dueno')
+  await handle.store.upsertBot({ userId: usuario.id, phone, folder: phone })
+
+  const config = await pedir(`/api/bots/${phone}/config`, { cookie })
+  assert.equal(config.status, 200)
+  assert.equal(config.datos.config.name, '')
+  assert.equal(config.datos.config.lang, 'es')
+  assert.ok(config.datos.preview.texto.length > 50)
+  assert.ok(Array.isArray(config.datos.preview.categorias))
+  assert.ok(config.datos.preview.categorias.length > 3)
+
+  const guardado = await pedir(`/api/bots/${phone}/config`, {
+    method: 'PATCH',
+    cookie,
+    csrf,
+    body: { name: 'Mi Sub Bot', lang: 'en', menuModo: 'ios', autoRead: true },
+  })
+  assert.equal(guardado.status, 200)
+  assert.equal(guardado.datos.config.name, 'Mi Sub Bot')
+  assert.equal(guardado.datos.config.lang, 'en')
+  assert.equal(guardado.datos.config.menuModo, 'ios')
+  assert.equal(guardado.datos.config.autoRead, true)
+
+  // El cambio se escribe en el config.json que lee el bot en WhatsApp.
+  const enDisco = JSON.parse(fs.readFileSync(path.join(root, phone, 'config.json'), 'utf8'))
+  assert.equal(enDisco.name, 'Mi Sub Bot')
+  assert.equal(enDisco.lang, 'en')
+
+  // Nombre inválido.
+  const invalido = await pedir(`/api/bots/${phone}/config`, {
+    method: 'PATCH',
+    cookie,
+    csrf,
+    body: { name: '' },
+  })
+  assert.equal(invalido.status, 400)
+
+  // Imagen (data URL de 1x1 png).
+  const png =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  const imagen = await pedir(`/api/bots/${phone}/config/image`, {
+    method: 'POST',
+    cookie,
+    csrf,
+    body: { dataUrl: png },
+  })
+  assert.equal(imagen.status, 200)
+  assert.ok(imagen.datos.image)
+
+  const descarga = await fetch(`http://127.0.0.1:${handle.server.address().port}${imagen.datos.image}`, {
+    headers: { cookie },
+  })
+  assert.equal(descarga.status, 200)
+  assert.match(descarga.headers.get('content-type') || '', /image/)
+
+  // Otro usuario no puede tocar la configuración.
+  const intruso = await pedir('/api/auth/register', {
+    method: 'POST',
+    body: { username: 'intruso', password: 'intruso12345' },
+  })
+  const prohibido = await pedir(`/api/bots/${phone}/config`, {
+    cookie: intruso.cookie,
+  })
+  assert.equal(prohibido.status, 403)
+})
+
 test('webpanel: los límites de intentos son configurables', async (t) => {
   const { pedir } = await panelDePrueba(t)
 

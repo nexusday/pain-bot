@@ -539,6 +539,38 @@ Con el panel activo, la vinculación de sub-bots **no se hace en el chat**:
 La URL global sale de `PAIN_WEB_PUBLIC_URL` o, si no está, de
 `PAIN_WEB_SUBDOMAIN` + `PAIN_WEB_DOMAIN`.
 
+### Configurar tu sub-bot desde el panel
+
+En **Mis bots** cada sub-bot tiene un botón de engranaje (*Configurar*) que
+abre todo lo que se puede cambiar, sin pasar por el chat:
+
+| Opción | Equivale a | Qué cambia |
+|---|---|---|
+| Nombre del bot | `.setbotname` | El nombre que sale en el menú y en los mensajes |
+| Imagen del menú | `.setbotimg` | La foto que se envía con el menú (JPG/PNG/WEBP, máx. 4 MB) |
+| Idioma | `.setlen es/in/pt` | El idioma del bot |
+| Estilo del menú | `.setmenu ios/android` | Carrusel con botones (Android) o lista de secciones (iOS) |
+| Marcar como leídos | `.setautoread on/off` | El doble check azul automático |
+| Privado con desconocidos | `.antipv on/off` | Que no conteste en privado a quien no es owner |
+
+A la derecha del formulario hay una **vista previa de cómo se verá el menú en
+WhatsApp**: la imagen, la burbuja con el menú tal cual llega al chat y la lista
+de secciones. La vista previa se arma con las **mismas funciones** que usa el
+bot, así que no es una aproximación: es el menú real.
+
+Todo se guarda en `Serbot/<número>/config.json`, el mismo archivo que leen
+los comandos, así que el cambio aplica al siguiente mensaje sin tocar nada
+más.
+
+Endpoints (solo el dueño del sub-bot o un administrador):
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/api/bots/:numero/config` | Configuración + vista previa del menú |
+| `PATCH` | `/api/bots/:numero/config` | Guarda nombre, idioma, menú, auto-leer y anti-pv |
+| `POST` | `/api/bots/:numero/config/image` | Sube la imagen del menú (data URL) |
+| `GET` | `/api/bots/:numero/image` | Devuelve la imagen configurada |
+
 ### Comunidades de WhatsApp
 
 En **Administración → Comunidades** el administrador publica los grupos de la

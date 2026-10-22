@@ -741,6 +741,7 @@ function botRow(bot) {
     <td>${bot.worker ? `<span class="mono tiny muted">${h(bot.worker)}</span>` : '<span class="tiny muted">—</span>'}</td>
     <td><span class="tiny muted">${fmtDate(bot.linked_at)}</span></td>
     <td><div class="actions">
+      <button class="icon-btn sm" data-action="bot-config" data-phone="${h(bot.phone)}" title="Configurar">${icon('settings')}</button>
       <button class="icon-btn sm" data-action="bot-reconnect" data-phone="${h(bot.phone)}" title="Reconectar" ${canReconnect ? '' : 'disabled'}>${icon('rotate')}</button>
       <button class="icon-btn sm" data-action="bot-relink" data-phone="${h(bot.phone)}" title="Re-vincular">${icon('link')}</button>
       <button class="icon-btn sm" data-action="bot-rename" data-phone="${h(bot.phone)}" data-label="${h(bot.label || '')}" title="Renombrar">${icon('pencil')}</button>
@@ -2357,6 +2358,170 @@ function esperarReinicio() {
   setTimeout(revisar, 2500)
 }
 
+/* ── Configuración del sub-bot (nombre, imagen, menú…) ───────────────────── */
+/** Convierte el formato de WhatsApp (*negrita*, _cursiva_, `código`) a HTML. */
+function formatoWhatsApp(texto) {
+  return h(texto)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>')
+    .replace(/_([^_\n]+)_/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>')
+}
+
+function previewMenuHTML(datos) {
+  const preview = datos?.preview || {}
+  const imagen = datos?.image
+  return `
+    <div class="wa-preview">
+      <div class="wa-head">
+        <div class="wa-avatar">${icon('bot')}</div>
+        <div class="wa-head-info">
+          <div class="wa-name">${h(preview.nombreBot || 'Bot')}</div>
+          <div class="wa-sub">vista previa del menú</div>
+        </div>
+      </div>
+      <div class="wa-body">
+        ${imagen
+          ? `<div class="wa-image"><img src="${h(imagen)}?v=${Date.now()}" alt="Imagen del menú" /></div>`
+          : '<div class="wa-image wa-image-empty"><span>Sin imagen configurada</span></div>'}
+        <div class="wa-bubble">${formatoWhatsApp(preview.texto || '')}</div>
+      </div>
+    </div>
+    <div class="wa-cats">
+      ${(preview.categorias || []).map((categoria) => `
+        <div class="wa-cat">
+          <div class="wa-cat-title">${h(categoria.title)}</div>
+          <div class="wa-cat-desc">${h(categoria.description || '')}</div>
+        </div>`).join('')}
+    </div>`
+}
+
+async function openBotConfigModal(phone) {
+  let datos
+  try {
+    datos = await api.get(`/api/bots/${encodeURIComponent(phone)}/config`)
+  } catch (error) {
+    showToast(error.message || 'No se pudo abrir la configuración.', 'error')
+    return
+  }
+  const config = datos.config || {}
+  openModal({
+    title: 'Configurar tu sub-bot',
+    subtitle: fmtPhone(phone),
+    wide: true,
+    body: `<div class="bot-config">
+      <div class="bot-config-panel">
+        <form id="bot-config-form" data-phone="${h(phone)}">
+          <div class="form-error">${icon('alert')}<span></span></div>
+          <div class="form-success">${icon('check')}<span></span></div>
+          <div class="field">
+            <label class="label" for="cfg-name">Nombre del bot</label>
+            <input id="cfg-name" name="name" class="input" maxlength="40" placeholder="Pain Bot" value="${h(config.name || '')}" />
+            <div class="hint">Es el nombre que sale en el menú y en los mensajes del bot. Equivale a <span class="mono">.setbotname</span>.</div>
+          </div>
+          <div class="field">
+            <label class="label">Imagen del menú</label>
+            <div class="img-picker">
+              <div class="img-preview" id="cfg-image-preview">
+                ${datos.image
+                  ? `<img src="${h(datos.image)}?v=${Date.now()}" alt="" />`
+                  : '<span>Sin imagen</span>'}
+              </div>
+              <div class="img-picker-actions">
+                <label class="btn btn-secondary btn-sm" for="cfg-image">${icon('image')} Elegir imagen</label>
+                <input id="cfg-image" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+                <div class="hint">JPG, PNG o WEBP (máx. 4 MB). Es la foto que aparece con el menú, como <span class="mono">.setbotimg</span>.</div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="cfg-lang">Idioma del bot</label>
+            <select id="cfg-lang" name="lang" class="select">
+              <option value="es" ${config.lang === 'es' ? 'selected' : ''}>Español</option>
+              <option value="en" ${config.lang === 'en' ? 'selected' : ''}>English</option>
+              <option value="pt" ${config.lang === 'pt' ? 'selected' : ''}>Português</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="cfg-menu">Estilo del menú</label>
+            <select id="cfg-menu" name="menuModo" class="select">
+              <option value="android" ${config.menuModo !== 'ios' ? 'selected' : ''}>Android (carrusel y botones)</option>
+              <option value="ios" ${config.menuModo === 'ios' ? 'selected' : ''}>iOS (lista de secciones)</option>
+            </select>
+          </div>
+          <label class="check switch">
+            <input type="checkbox" name="autoRead" ${config.autoRead ? 'checked' : ''} />
+            <span><b>Marcar mensajes como leídos</b><br /><span class="muted">Auto-leer (doble check azul) como <span class="mono">.setautoread on</span>.</span></span>
+          </label>
+          <label class="check switch">
+            <input type="checkbox" name="antiPv" ${config.antiPv ? 'checked' : ''} />
+            <span><b>Privado con desconocidos</b><br /><span class="muted">No responde en privado a quien no es owner (como <span class="mono">.antipv on</span>).</span></span>
+          </label>
+          <button class="btn btn-primary btn-block" type="submit">${icon('check')} Guardar cambios</button>
+        </form>
+      </div>
+      <div class="bot-config-preview">
+        <div class="preview-title">${icon('eye')} Así se verá tu menú en WhatsApp</div>
+        <div id="cfg-preview">${previewMenuHTML(datos)}</div>
+      </div>
+    </div>`,
+    footer: `<button class="btn btn-ghost" data-action="modal-close">Cerrar</button>`,
+    onMount(root) {
+      const input = root.querySelector('#cfg-image')
+      input?.addEventListener('change', async () => {
+        const archivo = input.files?.[0]
+        if (!archivo) return
+        if (archivo.size > 4 * 1024 * 1024) {
+          showToast('La imagen es muy grande (máximo 4 MB).', 'error')
+          input.value = ''
+          return
+        }
+        const lector = new FileReader()
+        lector.onload = async () => {
+          try {
+            const dataUrl = String(lector.result || '')
+            const respuesta = await api.post(`/api/bots/${encodeURIComponent(phone)}/config/image`, { dataUrl })
+            const marco = root.querySelector('#cfg-image-preview')
+            if (marco) marco.innerHTML = `<img src="${respuesta.image}?v=${Date.now()}" alt="" />`
+            showToast('Imagen actualizada.', 'success')
+          } catch (error) {
+            showToast(error.message || 'No se pudo guardar la imagen.', 'error')
+          } finally {
+            input.value = ''
+          }
+        }
+        lector.readAsDataURL(archivo)
+      })
+    },
+  })
+}
+
+async function handleBotConfigSave(form) {
+  const phone = form.dataset.phone
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  hideFormSuccess(form)
+  const cuerpo = {
+    name: String(form.querySelector('[name="name"]')?.value || '').trim(),
+    lang: String(form.querySelector('[name="lang"]')?.value || 'es'),
+    menuModo: String(form.querySelector('[name="menuModo"]')?.value || 'android'),
+    autoRead: Boolean(form.querySelector('[name="autoRead"]')?.checked),
+    antiPv: Boolean(form.querySelector('[name="antiPv"]')?.checked),
+  }
+  setLoading(submit, true, 'Guardando…')
+  try {
+    const datos = await api.patch(`/api/bots/${encodeURIComponent(phone)}/config`, cuerpo)
+    const contenedor = document.getElementById('cfg-preview')
+    if (contenedor) contenedor.innerHTML = previewMenuHTML(datos)
+    showFormSuccess(form, 'Cambios guardados. El bot los aplica al siguiente mensaje.')
+    showToast('Configuración guardada.', 'success')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo guardar la configuración.')
+  } finally {
+    setLoading(submit, false)
+  }
+}
+
 /* ── Handlers de administración ─────────────────────────────────────────── */
 async function handleUserSave(form) {
   const id = form.dataset.id
@@ -2556,6 +2721,10 @@ async function onClick(event) {
       confirmDeleteBot(phone, actionEl.dataset.label || '')
       return
     }
+    if (action === 'bot-config') {
+      await openBotConfigModal(phone)
+      return
+    }
     if (action === 'bot-reconnect') {
       await reconnectBot(phone)
       return
@@ -2694,6 +2863,11 @@ async function onSubmit(event) {
   if (id === 'settings-limits-form') {
     event.preventDefault()
     await handleSettingsLimitsSave(form)
+    return
+  }
+  if (id === 'bot-config-form') {
+    event.preventDefault()
+    await handleBotConfigSave(form)
     return
   }
   if (id === 'main-link-form') {
