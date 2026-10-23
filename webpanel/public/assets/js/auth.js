@@ -123,11 +123,116 @@ export function openAuthModal() {
         </div>` : ''}
         ${cfg.turnstileSiteKey ? `<div class="turnstile-slot" id="turnstile-slot"></div>` : ''}
         <button class="btn btn-primary btn-block auth-submit" type="submit">${tab === 'login' ? 'Entrar al panel' : 'Crear cuenta'} ${icon('arrowRight')}</button>
+        ${tab === 'login' ? `<div class="auth-forgot"><button type="button" class="link-btn" data-action="auth-forgot">¿Olvidaste tu contraseña?</button></div>` : ''}
         <div class="auth-legal">By Sunkovv</div>
       </form>
     `,
   })
   if (cfg.turnstileSiteKey) montarTurnstile(cfg.turnstileSiteKey)
+}
+
+/* ── Recuperación de contraseña ─────────────────────────────────────────── */
+export function openForgotModal(email = '') {
+  openModal({
+    title: 'Recuperar contraseña',
+    subtitle: 'Te enviaremos un código de 6 dígitos al correo de tu cuenta.',
+    body: `<form id="forgot-form">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="field">
+        <label class="label" for="forgot-email">Correo de la cuenta</label>
+        <div class="input-icon">${icon('mail')}<input class="input" id="forgot-email" name="email" type="email" value="${h(email)}" autocomplete="email" placeholder="tu@correo.com" required /></div>
+        <div class="hint">Si el correo está registrado, recibirás un código. No revelamos si la cuenta existe.</div>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">${icon('mail')} Enviar código</button>
+    </form>`,
+  })
+}
+
+export function openResetModal(email = '') {
+  openModal({
+    title: 'Restablecer contraseña',
+    subtitle: 'Escribe el código que llegó a tu correo y tu nueva contraseña.',
+    body: `<form id="reset-form">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="field">
+        <label class="label" for="reset-email">Correo</label>
+        <div class="input-icon">${icon('mail')}<input class="input" id="reset-email" name="email" type="email" value="${h(email)}" autocomplete="email" required /></div>
+      </div>
+      <div class="field">
+        <label class="label" for="reset-code">Código de 6 dígitos</label>
+        <input class="input code-input" id="reset-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\\d{6}" placeholder="000000" required />
+        <div class="hint">Caduca en 15 minutos. Si no llegó, revisa el spam o pide otro desde «¿Olvidaste tu contraseña?».</div>
+      </div>
+      <div class="field">
+        <label class="label" for="reset-password">Nueva contraseña</label>
+        <div class="input-icon">
+          ${icon('lock')}
+          <input class="input" id="reset-password" name="password" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" required />
+          <button type="button" class="icon-btn sm" data-action="toggle-password" data-input="reset-password" style="position:absolute;right:5px;top:5px;border:0;background:transparent" aria-label="Mostrar contraseña">${icon('eye')}</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="reset-confirm">Confirmar contraseña</label>
+        <div class="input-icon">${icon('lock')}<input class="input" id="reset-confirm" name="confirm" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" required /></div>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">${icon('check')} Cambiar contraseña</button>
+    </form>`,
+  })
+}
+
+export async function handleForgotPassword(form) {
+  const email = form.querySelector('[name="email"]')?.value.trim() || ''
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showFormError(form, 'Escribe un correo válido.')
+    return
+  }
+  setLoading(submit, true, 'Enviando…')
+  try {
+    const data = await api.post('/api/auth/forgot', { email })
+    if (data.mailConfigured === false) {
+      showToast('El correo todavía no está configurado. Avisa al administrador del panel.', 'warn')
+    } else {
+      showToast('Si el correo está registrado, recibirás un código.', 'success')
+    }
+    openResetModal(email)
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo solicitar el código.')
+    setLoading(submit, false)
+  }
+}
+
+export async function handleResetPassword(form) {
+  const email = form.querySelector('[name="email"]')?.value.trim() || ''
+  const code = String(form.querySelector('[name="code"]')?.value || '').replace(/\D/g, '')
+  const password = String(form.querySelector('[name="password"]')?.value || '')
+  const confirm = String(form.querySelector('[name="confirm"]')?.value || '')
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  if (!/^\d{6}$/.test(code)) {
+    showFormError(form, 'El código debe tener 6 dígitos.')
+    return
+  }
+  if (password.length < 8) {
+    showFormError(form, 'La nueva contraseña debe tener al menos 8 caracteres.')
+    return
+  }
+  if (password !== confirm) {
+    showFormError(form, 'Las contraseñas no coinciden.')
+    return
+  }
+  setLoading(submit, true, 'Cambiando…')
+  try {
+    await api.post('/api/auth/reset', { email, code, password })
+    closeModal()
+    state.authTab = 'login'
+    openAuthModal()
+    showToast('Contraseña restablecida. Ya puedes iniciar sesión.', 'success')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo cambiar la contraseña.')
+    setLoading(submit, false)
+  }
 }
 
 /* ── Handlers de autenticación ──────────────────────────────────────────── */

@@ -462,11 +462,11 @@ export function renderAccount() {
     <div class="grid-2">
       <div class="stack">
         <div class="card">
-          <div class="card-head"><div><h3>Perfil</h3><p>Información de tu cuenta</p></div>${roleBadge(user.role)}</div>
+          <div class="card-head"><div><h3>Perfil</h3><p>Información de tu cuenta</p></div>${roleBadge(user.role, user.isPrincipal ? 'Principal' : user.roleName)}</div>
           <div class="card-body">
             <div class="system-grid">
               <div class="system-item"><div class="si-label">Usuario</div><div class="si-value" style="font-size:13px">${h(user.username)}</div></div>
-              <div class="system-item"><div class="si-label">Correo</div><div class="si-value" style="font-size:13px">${h(user.email || 'Sin correo')}</div></div>
+              <div class="system-item"><div class="si-label">Correo</div><div class="si-value" style="font-size:13px">${h(user.email || 'Sin correo')} ${user.email ? (user.emailVerified ? '<span class="badge success" style="font-size:9px">Verificado</span>' : '<span class="badge warn" style="font-size:9px">Sin verificar</span>') : ''}</div></div>
               <div class="system-item"><div class="si-label">Registro</div><div class="si-value" style="font-size:13px">${fmtDate(user.created_at, false)}</div></div>
               <div class="system-item"><div class="si-label">Último acceso</div><div class="si-value" style="font-size:13px">${user.last_login_at ? fmtRelative(user.last_login_at) : '—'}</div></div>
             </div>
@@ -480,6 +480,20 @@ export function renderAccount() {
               </div>
               <button class="btn btn-primary" type="submit">${icon('check')} Guardar correo</button>
             </form>
+            ${user.email && !user.emailVerified ? `<div class="verify-box">
+              <div class="verify-head">${icon('mail')}<div><b>Verifica tu correo</b><span>Enviamos un código de 6 dígitos a ${h(user.email)}.</span></div></div>
+              <form id="email-verify-form">
+                <div class="form-error">${icon('alert')}<span></span></div>
+                <div class="form-success">${icon('check')}<span></span></div>
+                <div class="field"><label class="label" for="email-code">Código de verificación</label><input class="input code-input" id="email-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\\d{6}" placeholder="000000" required /></div>
+                <div class="flex gap-8" style="flex-wrap:wrap">
+                  <button class="btn btn-primary" type="submit">${icon('check')} Verificar correo</button>
+                  <button class="btn btn-secondary" type="button" data-action="email-verify-resend">${icon('refresh')} Reenviar código</button>
+                </div>
+                <div class="hint">Caduca en 15 minutos. Revisa también la carpeta de spam.</div>
+              </form>
+            </div>` : ''}
+            ${user.email && user.emailVerified ? `<div class="verify-ok">${icon('shieldCheck')} <span>Tu correo está verificado. Puedes recuperar tu cuenta si olvidas la contraseña.</span></div>` : ''}
             <div class="input-group" style="margin-top:16px">
               <input class="input mono" readonly value="${h(cfg.publicUrl || '')}" />
               <button class="btn btn-secondary" data-action="copy" data-copy="${h(cfg.publicUrl || '')}">${icon('copy')}</button>

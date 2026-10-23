@@ -201,13 +201,62 @@ export async function handleEmailSave(form) {
   setLoading(submit, true, 'Guardando…')
   try {
     const data = await api.patch('/api/account/email', { email })
-    state.user = { ...state.user, email: data.user?.email || email }
-    document.getElementById('email-nudge')?.remove()
+    state.user = { ...state.user, ...(data.user || {}), email: data.user?.email || email }
+    if (data.mailConfigured !== undefined) {
+      state.config = { ...(state.config || {}), mailConfigured: data.mailConfigured }
+    }
     renderAccount()
-    showToast('Correo actualizado. Tu cuenta está más protegida.', 'success')
+    if (data.emailSent) {
+      showToast('Correo guardado. Te enviamos un código para verificarlo.', 'success')
+    } else if (data.emailReason === 'mail_not_configured') {
+      showToast('Correo guardado, pero el envío de correos aún no está configurado.', 'warn')
+    } else {
+      showToast('Correo guardado. Revisa tu bandeja para verificar la cuenta.', 'info')
+    }
   } catch (error) {
     showFormError(form, error.message || 'No se pudo guardar el correo.')
     setLoading(submit, false)
+  }
+}
+
+export async function handleEmailVerify(form) {
+  const code = String(form.querySelector('[name="code"]')?.value || '').replace(/\D/g, '')
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  hideFormSuccess(form)
+  if (!/^\d{6}$/.test(code)) {
+    showFormError(form, 'El código debe tener 6 dígitos.')
+    return
+  }
+  setLoading(submit, true, 'Verificando…')
+  try {
+    const data = await api.post('/api/account/email/verify', { code })
+    state.user = { ...state.user, ...(data.user || {}), emailVerified: true }
+    renderAccount()
+    showToast('Correo verificado. Tu cuenta está protegida.', 'success')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo verificar el correo.')
+  } finally {
+    setLoading(submit, false)
+  }
+}
+
+export async function handleEmailVerifyResend() {
+  try {
+    const data = await api.post('/api/account/email/verify/send', {})
+    if (data.mailConfigured !== undefined) {
+      state.config = { ...(state.config || {}), mailConfigured: data.mailConfigured }
+    }
+    if (data.alreadyVerified) {
+      state.user = { ...state.user, emailVerified: true }
+      renderAccount()
+      showToast('Tu correo ya estaba verificado.', 'info')
+      return
+    }
+    if (data.emailSent) showToast('Código reenviado. Revisa tu correo.', 'success')
+    else showToast('No se pudo enviar el código. Avisa al administrador del panel.', 'warn')
+  } catch (error) {
+    showToast(error.message || 'No se pudo reenviar el código.', 'error')
   }
 }
 
@@ -232,7 +281,7 @@ export function esperaPanelYRecarga() {
 export function confirmarReinicioDelProceso() {
   confirmModal({
     title: 'Reiniciar el bot',
-    message: 'El proceso se cierra y vuelve a arrancar (Pterodactyl lo levanta solo). <b>El panel se corta un par de segundos</b> y los sub-bots reconectan. ¿Seguimos?',
+    message: 'El proceso se cierra y vuelve a arrancar automáticamente. <b>El panel se corta un par de segundos</b> y los sub-bots reconectan. ¿Seguimos?',
     confirmLabel: 'Reiniciar el bot',
     danger: false,
     onConfirm: async () => {

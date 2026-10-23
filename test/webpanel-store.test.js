@@ -3,7 +3,63 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import sqlite3 from 'sqlite3'
 import { PanelStore } from '../lib/webpanel/store.js'
+
+test('webpanel store: migra usuarios antiguos antes de indexar role_id y conserva datos', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-webpanel-legacy-'))
+  const filename = path.join(dir, 'panel.sqlite')
+  const legacy = await new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(filename, (error) => error ? reject(error) : resolve(db))
+  })
+  try {
+    await new Promise((resolve, reject) => legacy.exec(`
+      CREATE TABLE panel_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        email TEXT UNIQUE COLLATE NOCASE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at INTEGER NOT NULL,
+        last_login_at INTEGER,
+        last_ip TEXT
+      );
+      INSERT INTO panel_users (username, email, password_hash, role, created_at)
+      VALUES ('legacy-admin', 'admin@example.com', 'existing-hash', 'admin', 123),
+             ('legacy-user', 'user@example.com', 'user-hash', 'user', 456);
+    `, (error) => error ? reject(error) : resolve()))
+  } finally {
+    await new Promise((resolve, reject) => legacy.close((error) => error ? reject(error) : resolve()))
+  }
+  try {
+    // Reabrir también comprueba que la migración es idempotente.
+    for (let i = 0; i < 2; i++) {
+      const store = new PanelStore(filename)
+      try {
+        await store.init()
+        const admin = await store.buscarUsuarioPorNombre('legacy-admin')
+        const user = await store.buscarUsuarioPorNombre('legacy-user')
+        assert.equal(admin.password_hash, 'existing-hash')
+        assert.equal(admin.created_at, 123)
+        assert.equal(admin.is_principal, 1)
+        assert.ok(admin.role_id)
+        assert.equal(user.password_hash, 'user-hash')
+        assert.equal(user.role, 'user')
+        assert.ok(user.role_id)
+        assert.equal(await store.contarUsuarios(), 2)
+        const indices = await new Promise((resolve, reject) => store.db.all(
+          'PRAGMA index_list(panel_users)', (error, rows) => error ? reject(error) : resolve(rows)
+        ))
+        assert.ok(indices.some((index) => index.name === 'idx_panel_users_role'))
+      } finally {
+        await store.close()
+      }
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 async function conStore(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-webpanel-store-'))

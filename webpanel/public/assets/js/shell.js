@@ -8,6 +8,7 @@ import {
   initials,
   navigate,
   PANEL_VERSION,
+  puede,
   state,
   stopTimers,
   updateNavBadges,
@@ -62,8 +63,9 @@ export function renderShell() {
   if (!app || !state.user) return
   const cfg = state.config || {}
   const user = state.user
-  const isAdmin = user.role === 'admin'
+  const isAdmin = puede('admin.access')
   const publicUrl = cfg.publicUrl || ''
+  const rolVisible = user.isPrincipal ? 'Administrador principal' : (user.roleName || (isAdmin ? 'Administrador' : 'Usuario'))
 
   document.title = `${cfg.brandName || 'Pain Panel'} · Panel`
   app.innerHTML = `
@@ -80,9 +82,9 @@ export function renderShell() {
         </div>
         <nav class="nav">
           ${navLink('/dashboard', 'grid', 'Dashboard')}
-          ${navLink('/bots', 'bot', 'Mis bots', { badge: state.bots.length || '', badgeId: 'nav-bots-count' })}
-          ${navLink('/link', 'link', 'Vincular bot')}
-          ${navLink('/communities', 'globe', 'Comunidades')}
+          ${puede('bots.view') ? navLink('/bots', 'bot', 'Mis bots', { badge: state.bots.length || '', badgeId: 'nav-bots-count' }) : ''}
+          ${puede('bots.link') ? navLink('/link', 'link', 'Vincular bot') : ''}
+          ${puede('communities.view') ? navLink('/communities', 'globe', 'Comunidades') : ''}
           <div class="nav-section">Cuenta</div>
           ${navLink('/account', 'user', 'Mi cuenta')}
           ${isAdmin ? `<div class="nav-section">Administración</div>${navLink('/admin/overview', 'shield', 'Administración', { nav: '/admin' })}` : ''}
@@ -105,7 +107,7 @@ export function renderShell() {
             <button class="icon-btn" data-action="refresh" title="Actualizar">${icon('refresh')}</button>
             <div class="user-chip">
               <div class="avatar">${initials(user.username)}</div>
-              <div><div class="uc-name">${h(user.username)}</div><div class="uc-role">${isAdmin ? 'Administrador' : 'Usuario'}</div></div>
+              <div><div class="uc-name">${h(user.username)}${user.isPrincipal ? ' <span class="badge accent" style="font-size:9px;padding:1px 5px">Principal</span>' : ''}</div><div class="uc-role">${h(rolVisible)}</div></div>
             </div>
             <button class="icon-btn danger" data-action="logout" title="Cerrar sesión">${icon('logout')}</button>
           </div>
@@ -119,7 +121,11 @@ export function renderShell() {
           ${icon('mail')}
           <span><b>Añade un correo a tu cuenta.</b> Te ayuda a recuperar el acceso y la mantiene más segura.</span>
           <a class="btn btn-sm btn-secondary" href="#/account">Añadir correo</a>
-        </div>` : ''}
+        </div>` : (!user.emailVerified ? `<div class="account-nudge" id="email-nudge">
+          ${icon('mail')}
+          <span><b>Verifica tu correo (${h(user.email)}).</b> Así protegemos tu cuenta y evitamos cuentas automáticas.</span>
+          <a class="btn btn-sm btn-secondary" href="#/account">Verificar correo</a>
+        </div>` : '')}
         <div class="content" id="content"></div>
       </main>
     </div>`
@@ -155,13 +161,28 @@ export async function route() {
   setActiveNav(path)
 
   if (parts[0] === 'admin') {
-    if (state.user.role !== 'admin') {
+    if (!puede('admin.access')) {
       navigate('/dashboard')
       return
     }
     const section = parts[1] || 'overview'
-    const valid = ['overview', 'principal', 'users', 'sessions', 'pairings', 'communities', 'audit', 'settings']
-    return renderAdmin(valid.includes(section) ? section : 'overview')
+    const permisos = {
+      overview: 'admin.overview',
+      principal: 'admin.main',
+      users: 'admin.users',
+      sessions: 'admin.sessions',
+      pairings: 'admin.pairings',
+      communities: 'admin.communities',
+      audit: 'admin.audit',
+      settings: 'admin.settings',
+      roles: 'admin.settings.roles',
+      mail: 'admin.settings.mail',
+    }
+    if (!permisos[section] || !puede(permisos[section])) {
+      navigate('/dashboard')
+      return
+    }
+    return renderAdmin(section)
   }
 
   switch (parts[0] || 'dashboard') {

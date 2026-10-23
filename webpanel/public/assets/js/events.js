@@ -1,11 +1,25 @@
 /* Pain Panel — módulo events */
-import { handleAuth, handleLogout, openAuthModal, renderAuth } from './auth.js'
+import {
+  handleAuth,
+  handleForgotPassword,
+  handleLogout,
+  handleResetPassword,
+  openAuthModal,
+  openForgotModal,
+  renderAuth,
+} from './auth.js'
 import { closeModal, copyText, icon, isAdminRoute, modalRoot, showToast, state } from './core.js'
 import {
   adminReconnect,
   confirmAdminDeleteSession,
+  confirmDeleteRole,
   confirmDeleteUser,
   handleBotConfigSave,
+  handleMailSettingsSave,
+  handleMailTemplatesSave,
+  handleMailTest,
+  handleRoleSave,
+  openMailTest,
   handleMainLink,
   handleMainRelink,
   handleMainRestart,
@@ -30,6 +44,8 @@ import {
   handleCommunityEdit,
   handleCommunitySave,
   handleEmailSave,
+  handleEmailVerify,
+  handleEmailVerifyResend,
   handleLinkCancel,
   handleLinkRegenerate,
   handlePasswordChange,
@@ -47,8 +63,10 @@ import {
   eliminarSesionesSeleccionadas,
   filasSesionVisibles,
   openRenameModal,
+  openRoleModal,
   openUserModal,
   renderAdmin,
+  renderRolePermissions,
 } from './pages-admin.js'
 import { route, toggleSidebar } from './shell.js'
 
@@ -104,6 +122,10 @@ export async function onClick(event) {
     if (action === 'auth-open-register') {
       state.authTab = 'register'
       openAuthModal()
+      return
+    }
+    if (action === 'auth-forgot') {
+      openForgotModal(state.config?.adminEmail || '')
       return
     }
     if (action === 'toggle-password') {
@@ -168,6 +190,26 @@ export async function onClick(event) {
     }
     if (action === 'admin-user-delete') {
       confirmDeleteUser(id, actionEl.dataset.username || 'usuario')
+      return
+    }
+    if (action === 'admin-role-new') {
+      openRoleModal()
+      return
+    }
+    if (action === 'admin-role-edit') {
+      openRoleModal(id)
+      return
+    }
+    if (action === 'admin-role-delete') {
+      confirmDeleteRole(id, actionEl.dataset.name || 'rol')
+      return
+    }
+    if (action === 'mail-test-open') {
+      openMailTest()
+      return
+    }
+    if (action === 'email-verify-resend') {
+      await handleEmailVerifyResend()
       return
     }
     if (action === 'admin-session-reconnect') {
@@ -280,6 +322,41 @@ export async function onSubmit(event) {
     await handleEmailSave(form)
     return
   }
+  if (id === 'email-verify-form') {
+    event.preventDefault()
+    await handleEmailVerify(form)
+    return
+  }
+  if (id === 'forgot-form') {
+    event.preventDefault()
+    await handleForgotPassword(form)
+    return
+  }
+  if (id === 'reset-form') {
+    event.preventDefault()
+    await handleResetPassword(form)
+    return
+  }
+  if (id === 'role-form') {
+    event.preventDefault()
+    await handleRoleSave(form)
+    return
+  }
+  if (id === 'mail-settings-form') {
+    event.preventDefault()
+    await handleMailSettingsSave(form)
+    return
+  }
+  if (id === 'mail-test-form') {
+    event.preventDefault()
+    await handleMailTest(form)
+    return
+  }
+  if (id === 'mail-templates-form') {
+    event.preventDefault()
+    await handleMailTemplatesSave(form)
+    return
+  }
   if (id === 'rename-form') {
     event.preventDefault()
     await handleRename(form)
@@ -341,6 +418,10 @@ export function onKeydown(event) {
 /** Casillas de selección de sesiones (admin). */
 export function onChange(event) {
   const target = event.target
+  if (target instanceof HTMLSelectElement && target.id === 'role-scope') {
+    renderRolePermissions(target.value)
+    return
+  }
   if (!(target instanceof HTMLInputElement)) return
 
   if (target.matches('[data-session-check-all]')) {

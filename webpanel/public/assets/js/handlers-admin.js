@@ -317,10 +317,11 @@ export async function stopImpersonating() {
 /* ── Handlers de administración ─────────────────────────────────────────── */
 export async function handleUserSave(form) {
   const id = form.dataset.id
-  const role = form.querySelector('[name="role"]')?.value
+  const roleId = form.querySelector('[name="roleId"]')?.value
   const status = form.querySelector('[name="status"]')?.value
   const password = String(form.querySelector('[name="password"]')?.value || '')
-  const body = { role, status }
+  const body = { status }
+  if (roleId && !form.querySelector('[name="roleId"]')?.disabled) body.roleId = Number(roleId)
   if (password) body.password = password
   const button = document.getElementById('user-save-btn')
 
@@ -329,9 +330,8 @@ export async function handleUserSave(form) {
   try {
     const data = await api.patch(`/api/admin/users/${encodeURIComponent(id)}`, body)
     if (Number(id) === Number(state.user?.id) && data.user) {
-      state.user.role = data.user.role
-      state.user.status = data.user.status
-      if (data.user.role !== 'admin') {
+      state.user = { ...state.user, ...data.user }
+      if (!data.user.isAdmin) {
         closeModal()
         renderShell()
         navigate('/dashboard')
@@ -444,6 +444,137 @@ export async function handleSettingsTurnstileSave(form) {
     showFormError(form, error.message || 'No se pudo guardar Turnstile.')
     setLoading(submit, false)
   }
+}
+
+/* ── Roles y permisos ───────────────────────────────────────────────────── */
+export async function handleRoleSave(form) {
+  const id = form.dataset.id
+  const name = String(form.querySelector('[name="name"]')?.value || '').trim()
+  const description = String(form.querySelector('[name="description"]')?.value || '').trim()
+  const scope = form.querySelector('[name="scope"]')?.value === 'user' ? 'user' : 'admin'
+  const permissions = [...form.querySelectorAll('[data-role-permission]:checked')]
+    .map((input) => input.dataset.rolePermission)
+  const button = document.getElementById('role-save-btn')
+
+  hideFormError(form)
+  if (name.length < 2) {
+    showFormError(form, 'Escribe un nombre de al menos 2 caracteres.')
+    return
+  }
+  setLoading(button, true, 'Guardando…')
+  try {
+    const body = { name, description, permissions }
+    if (!id) body.scope = scope
+    const data = id
+      ? await api.patch(`/api/admin/roles/${encodeURIComponent(id)}`, body)
+      : await api.post('/api/admin/roles', body)
+    closeModal()
+    showToast(id ? 'Rol actualizado.' : 'Rol creado.', 'success')
+    if (Number(state.user?.roleId) === Number(data.role?.id)) {
+      // Si el principal editó su propio rol (no debería), refresca la sesión.
+      state.user.permissions = data.role.permissions
+    }
+    await renderAdmin('roles')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo guardar el rol.')
+    setLoading(button, false)
+  }
+}
+
+export function confirmDeleteRole(id, name) {
+  confirmModal({
+    title: 'Eliminar rol',
+    message: `Se eliminará el rol <b>${h(name)}</b>. Solo se puede borrar si no tiene usuarios asignados. Esta acción no se puede deshacer.`,
+    confirmLabel: 'Eliminar rol',
+    onConfirm: async () => {
+      await api.del(`/api/admin/roles/${encodeURIComponent(id)}`)
+      showToast('Rol eliminado.', 'success')
+      await renderAdmin('roles')
+    },
+  })
+}
+
+/* ── Correo / SMTP / plantillas ─────────────────────────────────────────── */
+export async function handleMailSettingsSave(form) {
+  const submit = form.querySelector('button[type="submit"]')
+  const password = String(form.querySelector('[name="password"]')?.value || '')
+  const body = {
+    host: String(form.querySelector('[name="host"]')?.value || '').trim(),
+    port: Number(form.querySelector('[name="port"]')?.value || 465),
+    encryption: form.querySelector('[name="encryption"]')?.value || 'ssl',
+    mailer: form.querySelector('[name="mailer"]')?.value || 'smtp',
+    user: String(form.querySelector('[name="user"]')?.value || '').trim(),
+    from: String(form.querySelector('[name="from"]')?.value || '').trim(),
+    fromName: String(form.querySelector('[name="fromName"]')?.value || '').trim(),
+    requireEmailVerification: Boolean(form.querySelector('[name="requireEmailVerification"]')?.checked),
+  }
+  if (password) body.password = password
+
+  hideFormError(form)
+  setLoading(submit, true, 'Guardando…')
+  try {
+    const data = await api.patch('/api/admin/mail', body)
+    state.adminMail = { ...(state.adminMail || {}), config: data.config, requireEmailVerification: data.requireEmailVerification }
+    state.config = { ...(state.config || {}), mailConfigured: data.config?.configured, requireEmailVerification: data.requireEmailVerification }
+    showFormSuccess(form, 'Configuración de correo guardada.')
+    showToast(data.config?.configured ? 'Correo configurado.' : 'Guardado. Faltan datos para poder enviar correos.', data.config?.configured ? 'success' : 'warn')
+    await renderAdmin('mail')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo guardar el correo.')
+    setLoading(submit, false)
+  }
+}
+
+export async function handleMailTest(form) {
+  const to = String(form.querySelector('[name="to"]')?.value || '').trim()
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    showFormError(form, 'Escribe un correo de destino válido.')
+    return
+  }
+  setLoading(submit, true, 'Enviando…')
+  try {
+    const data = await api.post('/api/admin/mail/test', { to })
+    showFormSuccess(form, `Correo de prueba enviado a ${to}.`)
+    showToast(`Prueba enviada a ${data.to || to}.`, 'success')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo enviar la prueba.')
+  } finally {
+    setLoading(submit, false)
+  }
+}
+
+export async function handleMailTemplatesSave(form) {
+  const submit = form.querySelector('button[type="submit"]')
+  const templates = {}
+  for (const bloque of form.querySelectorAll('[data-template-key]')) {
+    const key = bloque.dataset.templateKey
+    templates[key] = {
+      subject: String(bloque.querySelector(`[name="subject-${key}"]`)?.value || ''),
+      html: String(bloque.querySelector(`[name="html-${key}"]`)?.value || ''),
+      text: String(bloque.querySelector(`[name="text-${key}"]`)?.value || ''),
+    }
+  }
+  hideFormError(form)
+  setLoading(submit, true, 'Guardando…')
+  try {
+    const data = await api.patch('/api/admin/mail/templates', { templates })
+    state.adminMail = { ...(state.adminMail || {}), templates: data.templates }
+    showFormSuccess(form, 'Mensajes guardados.')
+    showToast('Mensajes de correo guardados.', 'success')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudieron guardar los mensajes.')
+  } finally {
+    setLoading(submit, false)
+  }
+}
+
+export function openMailTest() {
+  const form = document.getElementById('mail-test-form')
+  if (!form) return
+  form.style.display = form.style.display === 'none' ? '' : 'none'
+  if (form.style.display !== 'none') form.querySelector('input')?.focus()
 }
 
 export async function handleSettingsLimitsSave(form) {

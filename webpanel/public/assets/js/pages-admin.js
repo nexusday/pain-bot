@@ -14,10 +14,12 @@ import {
   h,
   icon,
   initials,
+  esPrincipal,
   isAdminRoute,
   loadingBlock,
   navigate,
   openModal,
+  puede,
   roleBadge,
   setPage,
   showToast,
@@ -30,16 +32,18 @@ import {
 /* ── Administración ─────────────────────────────────────────────────────── */
 export function adminTabs(active) {
   const tabs = [
-    ['overview', 'Resumen', 'grid'],
-    ['principal', 'Bot principal', 'bot'],
-    ['users', 'Usuarios', 'users'],
-    ['sessions', 'Sesiones', 'server'],
-    ['pairings', 'Vinculaciones', 'link'],
-    ['communities', 'Comunidades', 'globe'],
-    ['audit', 'Auditoría', 'activity'],
-    ['settings', 'Ajustes', 'settings'],
+    ['overview', 'Resumen', 'grid', 'admin.overview'],
+    ['principal', 'Bot principal', 'bot', 'admin.main'],
+    ['users', 'Usuarios', 'users', 'admin.users'],
+    ['sessions', 'Sesiones', 'server', 'admin.sessions'],
+    ['pairings', 'Vinculaciones', 'link', 'admin.pairings'],
+    ['communities', 'Comunidades', 'globe', 'admin.communities'],
+    ['audit', 'Auditoría', 'activity', 'admin.audit'],
+    ['roles', 'Roles', 'shield', 'admin.settings.roles'],
+    ['mail', 'Correo', 'mail', 'admin.settings.mail'],
+    ['settings', 'Ajustes', 'settings', 'admin.settings'],
   ]
-  return `<div class="admin-tabs">${tabs.map(([id, label, iconName]) => `
+  return `<div class="admin-tabs">${tabs.filter(([, , , permiso]) => puede(permiso)).map(([id, label, iconName]) => `
     <a class="admin-tab ${active === id ? 'active' : ''}" href="#/admin/${id}">${icon(iconName)}${h(label)}</a>`).join('')}</div>`
 }
 
@@ -51,6 +55,8 @@ export const ADMIN_META = {
   pairings: ['Vinculaciones', 'Historial de intentos de vinculación'],
   communities: ['Comunidades', 'Comunidades de WhatsApp para los usuarios del panel'],
   audit: ['Auditoría', 'Actividad reciente del panel'],
+  roles: ['Roles y permisos', 'Crea roles y decide qué puede hacer cada administrador'],
+  mail: ['Correo y plantillas', 'Configura el SMTP y edita los mensajes que reciben los usuarios'],
   settings: ['Ajustes', 'Configuración global del panel'],
 }
 
@@ -78,8 +84,13 @@ export async function renderAdmin(section) {
 
     if (section === 'users') {
       const data = await api.get('/api/admin/users?limit=200')
+      let rolesData = null
+      try {
+        rolesData = await api.get('/api/admin/roles')
+      } catch {}
       if (!isAdminRoute('users')) return
       state.adminUsers = Array.isArray(data.users) ? data.users : []
+      state.adminRoles = Array.isArray(rolesData?.roles) ? rolesData.roles : []
       content(adminTabs('users') + adminUsersHTML(data))
       attachRowFilter('#admin-users-search', '[data-user-row]')
       return
@@ -116,6 +127,23 @@ export async function renderAdmin(section) {
       if (!isAdminRoute('audit')) return
       state.adminAudit = Array.isArray(data.audit) ? data.audit : []
       content(adminTabs('audit') + adminAuditHTML(data))
+      return
+    }
+
+    if (section === 'roles') {
+      const data = await api.get('/api/admin/roles')
+      if (!isAdminRoute('roles')) return
+      state.adminRoles = Array.isArray(data.roles) ? data.roles : []
+      state.adminPermissions = Array.isArray(data.permissions) ? data.permissions : []
+      content(adminTabs('roles') + adminRolesHTML(data))
+      return
+    }
+
+    if (section === 'mail') {
+      const data = await api.get('/api/admin/mail')
+      if (!isAdminRoute('mail')) return
+      state.adminMail = data
+      content(adminTabs('mail') + adminMailHTML(data))
       return
     }
 
@@ -376,20 +404,21 @@ export function usersTable(users) {
     <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Registro</th><th>Último acceso</th><th class="right">Acciones</th></tr></thead>
     <tbody>${users.map((user) => {
       const self = Number(user.id) === selfId
-      const search = [user.username, user.email || '', user.role, user.status].join(' ').toLowerCase()
+      const search = [user.username, user.email || '', user.role, user.roleName || '', user.status].join(' ').toLowerCase()
+      const principal = Boolean(user.isPrincipal)
       return `<tr data-user-row data-search="${h(search)}">
         <td><div class="cell-main">
           <div class="avatar" style="width:34px;height:34px;border-radius:9px">${initials(user.username)}</div>
-          <div class="grow"><div class="cell-title">${h(user.username)}${self ? ' <span class="badge neutral" style="margin-left:4px">Tú</span>' : ''}</div><div class="cell-sub">${h(user.email || 'Sin correo')}</div></div>
+          <div class="grow"><div class="cell-title">${h(user.username)}${self ? ' <span class="badge neutral" style="margin-left:4px">Tú</span>' : ''}${principal ? ' <span class="badge accent" style="margin-left:4px">Principal</span>' : ''}</div><div class="cell-sub">${h(user.email || 'Sin correo')}${user.email && !user.emailVerified ? ' · <span class="text-warn">Sin verificar</span>' : ''}</div></div>
         </div></td>
-        <td>${roleBadge(user.role)}</td>
+        <td>${roleBadge(user.role, principal ? 'Principal' : user.roleName)}</td>
         <td>${badge(user.status)}</td>
         <td><span class="tiny muted">${fmtDate(user.created_at, false)}</span></td>
         <td><span class="tiny muted">${user.last_login_at ? fmtRelative(user.last_login_at) : 'Nunca'}</span></td>
         <td><div class="actions">
-          <button class="icon-btn sm" data-action="admin-impersonate" data-id="${user.id}" data-username="${h(user.username)}" title="Entrar como este usuario" ${self ? 'disabled' : ''}>${icon('user')}</button>
-          <button class="icon-btn sm" data-action="admin-user-edit" data-id="${user.id}" title="Editar">${icon('pencil')}</button>
-          <button class="icon-btn sm danger" data-action="admin-user-delete" data-id="${user.id}" data-username="${h(user.username)}" title="Eliminar" ${self ? 'disabled' : ''}>${icon('trash')}</button>
+          ${puede('admin.users.impersonate') ? `<button class="icon-btn sm" data-action="admin-impersonate" data-id="${user.id}" data-username="${h(user.username)}" title="Entrar como este usuario" ${self ? 'disabled' : ''}>${icon('user')}</button>` : ''}
+          ${puede('admin.users.edit') ? `<button class="icon-btn sm" data-action="admin-user-edit" data-id="${user.id}" title="Editar">${icon('pencil')}</button>` : ''}
+          ${puede('admin.users.delete') ? `<button class="icon-btn sm danger" data-action="admin-user-delete" data-id="${user.id}" data-username="${h(user.username)}" title="Eliminar" ${self || principal ? 'disabled' : ''}>${icon('trash')}</button>` : ''}
         </div></td>
       </tr>`
     }).join('')}</tbody>
@@ -736,7 +765,7 @@ export function adminSettingsHTML(data) {
           <div class="pairing-alert" style="margin-top:14px">${icon('info')}<div>Para cambiar el subdominio, dominio o puerto, edita <span class="mono">config.js</span> (o las variables <span class="mono">PAIN_WEB_*</span>) y reinicia el bot. Nada está fijo en el código.</div></div>
         </div>
       </div>
-      <div class="card">
+      ${data.canTurnstile ? `<div class="card">
         <div class="card-head">
           <div><h3>Cloudflare Turnstile</h3><p>Captcha anti-bots en el acceso</p></div>
           <span class="badge ${data.turnstileEnabled ? 'success' : 'neutral'}"><span class="dot"></span>${data.turnstileEnabled ? 'Activo' : 'Inactivo'}</span>
@@ -760,7 +789,7 @@ export function adminSettingsHTML(data) {
             <button class="btn btn-primary" type="submit">${icon('check')} Guardar Turnstile</button>
           </form>
         </div>
-      </div>
+      </div>` : ''}
       <div class="card">
         <div class="card-head"><div><h3>Mantenimiento</h3><p>Actualizar sin reiniciar el servidor</p></div></div>
         <div class="card-body">
@@ -769,12 +798,204 @@ export function adminSettingsHTML(data) {
             <div class="system-item"><div class="si-label">Commit</div><div class="si-value mono" style="font-size:13px">${h(repo.corto || '—')}</div></div>
           </div>
           <div class="notice" style="margin-top:14px">${icon('info')}<div>Trae el código del remoto y lo aplica <b>sin reiniciar el proceso</b>: los sub-bots no se desconectan, el bot y sus workers recargan sus plugins y el panel se recarga con el código nuevo. Tus cambios locales se guardan antes de actualizar.</div></div>
-          <div class="flex gap-8" style="margin-top:14px;flex-wrap:wrap">
-            <button class="btn btn-primary" data-action="admin-update">${icon('refresh')} Actualizar en caliente</button>
+          ${puede('admin.update') ? `<div class="flex gap-8" style="margin-top:14px;flex-wrap:wrap">
+            <button class="btn btn-primary" data-action="admin-update">${icon('refresh')} Aplicar cambios</button>
             <button class="btn btn-secondary" data-action="admin-reload">${icon('rotate')} Recargar código</button>
-          </div>
+          </div>` : '<div class="hint" style="margin-top:12px">No tienes permiso para aplicar actualizaciones.</div>'}
           <div id="update-result" class="hint" style="margin-top:12px"></div>
         </div>
+      </div>
+    </div>
+  </div>`
+}
+
+/* ── Roles y permisos ───────────────────────────────────────────────────── */
+function permissionGroupsHTML(selected = [], scope = 'admin') {
+  const activos = new Set(selected.includes('*') ? state.adminPermissions.map((p) => p.key) : selected)
+  const grupos = new Map()
+  for (const permiso of state.adminPermissions) {
+    if (scope === 'user' && permiso.scope !== 'user') continue
+    if (!grupos.has(permiso.group)) grupos.set(permiso.group, [])
+    grupos.get(permiso.group).push(permiso)
+  }
+  return `<div class="permission-groups">${[...grupos.entries()].map(([grupo, permisos]) => `
+    <div class="permission-group">
+      <div class="permission-group-title">${h(grupo)}</div>
+      <div class="permission-list">
+        ${permisos.map((permiso) => {
+          const principalOnly = Boolean(permiso.principalOnly)
+          const checked = activos.has(permiso.key) || (scope === 'admin' && permiso.key === 'admin.access')
+          return `<label class="permission-item ${principalOnly ? 'locked' : ''}">
+            <input type="checkbox" data-role-permission="${h(permiso.key)}" ${checked ? 'checked' : ''} ${principalOnly ? 'disabled' : ''} />
+            <span><b>${h(permiso.label)}</b>${principalOnly ? ' <span class="badge accent" style="font-size:9px">Solo principal</span>' : ''}<small>${h(permiso.key)}</small></span>
+          </label>`
+        }).join('')}
+      </div>
+    </div>`).join('')}</div>`
+}
+
+export function renderRolePermissions(scope) {
+  const box = document.getElementById('role-permissions')
+  if (!box) return
+  const selected = [...box.querySelectorAll('[data-role-permission]:checked')].map((input) => input.dataset.rolePermission)
+  box.innerHTML = permissionGroupsHTML(selected, scope === 'user' ? 'user' : 'admin')
+}
+
+export function adminRolesHTML(data) {
+  const roles = data.roles || []
+  const canManage = Boolean(data.canManage)
+  return `<div class="stack">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Roles y permisos</h3><p>Define exactamente qué puede hacer cada administrador</p></div>
+        ${canManage ? `<button class="btn btn-primary" data-action="admin-role-new">${icon('plus')} Nuevo rol</button>` : ''}
+      </div>
+      <div class="card-body tight">
+        <div class="role-list">${roles.map((rol) => {
+          const esPrincipal = rol.key === 'principal'
+          const bloqueado = rol.key === 'user'
+          return `<div class="role-row">
+            <div class="role-main">
+              <div class="role-icon">${icon(esPrincipal ? 'shieldCheck' : 'shield')}</div>
+              <div class="grow">
+                <div class="cell-title">${h(rol.name)} ${esPrincipal ? '<span class="badge accent" style="font-size:9px">Principal</span>' : ''} ${rol.system && !esPrincipal ? '<span class="badge neutral" style="font-size:9px">Sistema</span>' : ''}</div>
+                <div class="cell-sub">${h(rol.description || 'Sin descripción')}</div>
+              </div>
+            </div>
+            <div class="role-meta">
+              <span class="badge ${rol.scope === 'admin' ? 'accent' : 'neutral'}">${rol.scope === 'admin' ? 'Administrador' : 'Usuario'}</span>
+              <span class="tiny muted">${Number(rol.userCount || 0)} usuario(s)</span>
+              <span class="tiny muted">${rol.permissions?.includes('*') ? 'Todos los permisos' : `${rol.permissions?.length || 0} permiso(s)`}</span>
+            </div>
+            ${canManage && !esPrincipal && !bloqueado ? `<div class="actions">
+              <button class="icon-btn sm" data-action="admin-role-edit" data-id="${rol.id}" title="Editar rol">${icon('pencil')}</button>
+              ${rol.system ? '' : `<button class="icon-btn sm danger" data-action="admin-role-delete" data-id="${rol.id}" data-name="${h(rol.name)}" title="Eliminar rol">${icon('trash')}</button>`}
+            </div>` : ''}
+          </div>`
+        }).join('')}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h3>Cómo funcionan</h3><p>El administrador principal siempre conserva el control total</p></div></div>
+      <div class="card-body">
+        <div class="pairing-alert">${icon('info')}<div>El <b>principal</b> no se puede limitar ni eliminar. Los permisos de <b>Turnstile</b> y de <b>Roles</b> son exclusivos del principal. Los demás roles se pueden editar al 100%: marca las casillas y guarda. Si un rol tiene acceso de administrador, hereda también las funciones normales de usuario.</div></div>
+      </div>
+    </div>
+  </div>`
+}
+
+export function openRoleModal(id = null) {
+  const rol = id ? state.adminRoles.find((item) => Number(item.id) === Number(id)) : null
+  if (id && !rol) {
+    showToast('No se encontró el rol. Actualiza la lista.', 'error')
+    return
+  }
+  const esNuevo = !rol
+  const scope = rol?.scope === 'user' ? 'user' : 'admin'
+  const seleccionados = rol?.permissions || (scope === 'admin' ? ['admin.access'] : [])
+  openModal({
+    title: esNuevo ? 'Nuevo rol' : 'Editar rol',
+    subtitle: esNuevo ? 'Crea un rol y elige sus permisos' : (rol?.name || ''),
+    wide: true,
+    body: `<form id="role-form" data-id="${rol?.id || ''}">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="label" for="role-name">Nombre del rol</label>
+          <input id="role-name" name="name" class="input" maxlength="40" value="${h(rol?.name || '')}" placeholder="Ej: Soporte, Moderador, Admin 2…" required />
+        </div>
+        <div class="field">
+          <label class="label" for="role-scope">Tipo de rol</label>
+          <select id="role-scope" name="scope" class="select" ${esNuevo ? '' : 'disabled'}>
+            <option value="admin" ${scope === 'admin' ? 'selected' : ''}>Administrador</option>
+            <option value="user" ${scope === 'user' ? 'selected' : ''}>Usuario</option>
+          </select>
+          <div class="hint">Los roles de administrador pueden entrar al panel de administración si tienen el permiso de acceso.</div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="role-description">Descripción <span class="muted">(opcional)</span></label>
+        <input id="role-description" name="description" class="input" maxlength="180" value="${h(rol?.description || '')}" placeholder="Para qué sirve este rol" />
+      </div>
+      <div class="label" style="margin-top:4px">Permisos</div>
+      <div id="role-permissions">${permissionGroupsHTML(seleccionados, scope)}</div>
+    </form>`,
+    footer: `<button class="btn btn-ghost" data-action="modal-close">Cancelar</button><button class="btn btn-primary" id="role-save-btn" type="submit" form="role-form">${esNuevo ? 'Crear rol' : 'Guardar cambios'}</button>`,
+  })
+}
+
+/* ── Correo y plantillas ────────────────────────────────────────────────── */
+export function adminMailHTML(data) {
+  const config = data.config || {}
+  const plantillas = data.templates || {}
+  const variables = data.variables || []
+  const variablesHTML = variables.map((variable) => `<span class="variable-chip" title="${h(variable.label)}"><b>{{${h(variable.key)}}}</b><span>${h(variable.label)}</span></span>`).join('')
+  return `<div class="stack">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Servidor de correo (SMTP)</h3><p>Se usa para verificar cuentas y recuperar contraseñas</p></div>
+        <span class="badge ${config.configured ? 'success' : 'warn'}"><span class="dot"></span>${config.configured ? 'Configurado' : 'Incompleto'}</span>
+      </div>
+      <div class="card-body">
+        <form id="mail-settings-form">
+          <div class="form-error">${icon('alert')}<span></span></div>
+          <div class="form-success">${icon('check')}<span></span></div>
+          <div class="mail-grid">
+            <div class="field"><label class="label" for="mail-host">Servidor SMTP</label><input id="mail-host" name="host" class="input mono" value="${h(config.host || '')}" placeholder="mail.spacemail.com" autocomplete="off" /></div>
+            <div class="field"><label class="label" for="mail-port">Puerto</label><input id="mail-port" name="port" type="number" min="1" max="65535" class="input" value="${h(config.port || 465)}" /></div>
+            <div class="field"><label class="label" for="mail-encryption">Cifrado</label>
+              <select id="mail-encryption" name="encryption" class="select">
+                <option value="ssl" ${config.encryption === 'ssl' ? 'selected' : ''}>SSL</option>
+                <option value="starttls" ${config.encryption === 'starttls' ? 'selected' : ''}>STARTTLS</option>
+                <option value="none" ${config.encryption === 'none' ? 'selected' : ''}>Sin cifrado</option>
+              </select>
+            </div>
+            <div class="field"><label class="label" for="mail-mailer">Tipo</label>
+              <select id="mail-mailer" name="mailer" class="select">
+                <option value="smtp" ${config.mailer === 'smtp' ? 'selected' : ''}>SMTP</option>
+              </select>
+            </div>
+            <div class="field"><label class="label" for="mail-user">Usuario SMTP</label><input id="mail-user" name="user" class="input mono" value="${h(config.user || '')}" placeholder="hosting-soporte@nexcodea.com" autocomplete="off" /></div>
+            <div class="field"><label class="label" for="mail-password">Contraseña SMTP</label>
+              <div class="input-icon">${icon('key')}<input id="mail-password" name="password" type="password" class="input" value="" placeholder="${config.passwordSet ? '•••••••••• (guardada)' : 'Escribe la contraseña'}" autocomplete="new-password" /><button type="button" class="icon-btn sm" data-action="toggle-password" data-input="mail-password" style="position:absolute;right:5px;top:5px;border:0;background:transparent" aria-label="Mostrar u ocultar">${icon('eye')}</button></div>
+              <div class="hint">Nunca se muestra la contraseña guardada. Déjala vacía para conservarla.</div>
+            </div>
+            <div class="field"><label class="label" for="mail-from">Correo remitente</label><input id="mail-from" name="from" type="email" class="input mono" value="${h(config.from || '')}" placeholder="hosting-soporte@nexcodea.com" /></div>
+            <div class="field"><label class="label" for="mail-from-name">Nombre remitente</label><input id="mail-from-name" name="fromName" class="input" value="${h(config.fromName || '')}" placeholder="NEXCODEA CLOUD" /></div>
+          </div>
+          <label class="check switch" style="margin-top:14px">
+            <input type="checkbox" name="requireEmailVerification" ${data.requireEmailVerification ? 'checked' : ''} />
+            <span><b>Exigir correo verificado para vincular sub-bots</b><small>Recomendado para evitar cuentas automáticas. Los usuarios pueden verificar su correo desde Mi cuenta.</small></span>
+          </label>
+          <div class="flex gap-8" style="margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn-primary" type="submit">${icon('check')} Guardar correo</button>
+            <button class="btn btn-secondary" type="button" data-action="mail-test-open">${icon('mail')} Enviar prueba</button>
+          </div>
+        </form>
+        <form id="mail-test-form" style="margin-top:16px;display:none">
+          <div class="field"><label class="label" for="mail-test-to">Correo de destino de la prueba</label><input id="mail-test-to" name="to" type="email" class="input" value="${h(state.user?.email || '')}" placeholder="tu@correo.com" required /><div class="hint">Se enviará un mensaje de prueba con la plantilla «Correo de prueba».</div></div>
+          <button class="btn btn-secondary" type="submit">${icon('mail')} Enviar prueba</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h3>Mensajes de correo</h3><p>Edita el asunto, el HTML y la versión en texto plano</p></div></div>
+      <div class="card-body">
+        <div class="variables-box"><div class="variables-title">${icon('info')} Variables disponibles</div><div class="variables-list">${variablesHTML}</div></div>
+        <form id="mail-templates-form">
+          <div class="form-error">${icon('alert')}<span></span></div>
+          <div class="form-success">${icon('check')}<span></span></div>
+          ${Object.entries(plantillas).map(([key, plantilla]) => `<details class="mail-template" ${key === 'verify' ? 'open' : ''}>
+            <summary><span>${icon('mail')} ${h(plantilla.label || key)}</span><span class="tiny muted">${h(key)}</span></summary>
+            <div class="mail-template-body" data-template-key="${h(key)}">
+              <p class="hint" style="margin-top:0">${h(plantilla.description || '')}</p>
+              <div class="field"><label class="label">Asunto</label><input class="input" name="subject-${h(key)}" value="${h(plantilla.subject || '')}" maxlength="200" /></div>
+              <div class="field"><label class="label">HTML</label><textarea class="textarea mono" name="html-${h(key)}" rows="10" spellcheck="false">${h(plantilla.html || '')}</textarea></div>
+              <div class="field"><label class="label">Texto plano <span class="muted">(para clientes sin HTML)</span></label><textarea class="textarea" name="text-${h(key)}" rows="6">${h(plantilla.text || '')}</textarea></div>
+            </div>
+          </details>`).join('')}
+          <button class="btn btn-primary" type="submit" style="margin-top:14px">${icon('check')} Guardar mensajes</button>
+        </form>
       </div>
     </div>
   </div>`
@@ -786,6 +1007,19 @@ export function openUserModal(id) {
     showToast('No se encontró el usuario. Actualiza la lista.', 'error')
     return
   }
+  const roles = state.adminRoles.length
+    ? state.adminRoles
+    : [
+      { id: 'user', name: 'Usuario', scope: 'user', permissions: [] },
+      { id: 'admin', name: 'Administrador', scope: 'admin', permissions: [] },
+    ]
+  const puedeRoles = puede('admin.users.roles') && !user.isPrincipal
+  const opciones = roles.filter((rol) => rol.key !== 'principal').map((rol) => {
+    const selected = user.roleId
+      ? Number(rol.id) === Number(user.roleId)
+      : (rol.scope === 'admin' ? user.role === 'admin' : user.role !== 'admin')
+    return `<option value="${h(rol.id)}" ${selected ? 'selected' : ''}>${h(rol.name)}${rol.scope === 'admin' ? ' · administrador' : ''}</option>`
+  }).join('')
   openModal({
     title: 'Editar usuario',
     subtitle: '@' + user.username,
@@ -793,17 +1027,18 @@ export function openUserModal(id) {
       <div class="form-error">${icon('alert')}<span></span></div>
       <div class="field"><label class="label">Usuario</label><input class="input" value="${h(user.username)}" disabled /></div>
       <div class="field"><label class="label" for="user-role">Rol</label>
-        <select id="user-role" name="role" class="select">
-          <option value="user" ${user.role === 'user' ? 'selected' : ''}>Usuario</option>
-          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Administrador</option>
+        <select id="user-role" name="roleId" class="select" ${puedeRoles ? '' : 'disabled'}>
+          ${opciones}
         </select>
+        <div class="hint">${user.isPrincipal ? 'El rol del administrador principal no se puede cambiar.' : (puedeRoles ? 'Los permisos de cada rol se editan en la pestaña Roles.' : 'No tienes permiso para asignar roles.')}</div>
       </div>
       <div class="field"><label class="label" for="user-status">Estado</label>
-        <select id="user-status" name="status" class="select">
+        <select id="user-status" name="status" class="select" ${user.isPrincipal ? 'disabled' : ''}>
           <option value="active" ${user.status === 'active' ? 'selected' : ''}>Activo</option>
           <option value="banned" ${user.status === 'banned' ? 'selected' : ''}>Bloqueado</option>
         </select>
       </div>
+      <div class="field"><label class="label">Correo</label><input class="input" value="${h(user.email || 'Sin correo')}" disabled /><div class="hint">${user.email ? (user.emailVerified ? 'Correo verificado.' : 'Correo pendiente de verificación.') : 'Esta cuenta no tiene correo.'}</div></div>
       <div class="field"><label class="label" for="user-password">Nueva contraseña <span class="muted">(opcional)</span></label><input id="user-password" name="password" type="password" class="input" autocomplete="new-password" minlength="8" placeholder="Déjalo vacío para no cambiarla" /><div class="hint">Mínimo 8 caracteres. Al bloquear al usuario se cierran sus sesiones.</div></div>
     </form>`,
     footer: `<button class="btn btn-ghost" data-action="modal-close">Cancelar</button><button class="btn btn-primary" id="user-save-btn" type="submit" form="user-form">Guardar cambios</button>`,

@@ -201,8 +201,9 @@ if (isSubbotWorker) {
 // registra y no se propaga).
 if (!isSubbotWorker && global.webPanel?.enabled !== false && process.env.PAIN_WEB_ENABLED !== '0') {
   try {
-    const { startWebPanel } = await import('./lib/webpanel/server.js')
-    global.webPanelHandle = await startWebPanel()
+    const modulo = await import('./lib/webpanel/server.js')
+    global.webPanelStart = modulo.startWebPanel
+    global.webPanelHandle = await modulo.startWebPanel()
   } catch (error) {
     console.error('[webpanel] No se pudo iniciar el panel:', error?.message || error)
   }
@@ -820,20 +821,73 @@ global.reiniciarPrincipalLimpio = async function reiniciarPrincipalLimpio({ time
  * Las sesiones de WhatsApp de los sub-bots no se tocan.
  */
 global.reiniciarPanelWeb = async function reiniciarPanelWeb() {
+  const anterior = global.webPanelHandle
+  const arranqueAnterior = global.webPanelStart
+  let arranqueNuevo = null
+
+  // 1. Validar el código nuevo ANTES de cerrar nada. Si hay un error de
+  // sintaxis o un import roto, el panel actual sigue funcionando.
   try {
-    await global.webPanelHandle?.close?.()
+    globalThis.__HOT_EPOCH = Date.now()
+    const modulo = await import('./lib/webpanel/server.js')
+    arranqueNuevo = modulo.startWebPanel
+    if (typeof arranqueNuevo !== 'function') throw new Error('startWebPanel no está disponible')
+  } catch (error) {
+    console.error('[webpanel] El código nuevo no se pudo cargar; se mantiene el panel anterior:', error?.message || error)
+    return false
+  }
+
+  const arrancarConReintentos = async (fn) => {
+    let ultimoError = null
+    for (let intento = 0; intento < 6; intento++) {
+      try {
+        const handle = await fn()
+        if (handle) return handle
+        ultimoError = new Error('El panel no quedó escuchando.')
+      } catch (error) {
+        ultimoError = error
+      }
+      // El puerto puede tardar unos milisegundos en liberarse del todo.
+      await new Promise((resolver) => setTimeout(resolver, 350 + intento * 150))
+    }
+    throw ultimoError || new Error('No se pudo arrancar el panel.')
+  }
+
+  // 2. Cerrar el panel viejo y levantar el nuevo.
+  try {
+    await anterior?.close?.()
   } catch (error) {
     console.error('[webpanel] No se pudo cerrar el panel anterior:', error?.message || error)
   }
   global.webPanelHandle = null
+
   try {
-    const { startWebPanel } = await import('./lib/webpanel/server.js')
-    global.webPanelHandle = await startWebPanel()
+    global.webPanelHandle = await arrancarConReintentos(arranqueNuevo)
+    const cfg = global.webPanelHandle?.config
+    if (!cfg) throw new Error('El panel nuevo no devolvió configuración.')
+    const host = cfg.host === '0.0.0.0' || cfg.host === '::' ? '127.0.0.1' : cfg.host
+    const salud = await fetch(`http://${host}:${cfg.port}/healthz`, {
+      signal: AbortSignal.timeout?.(5000),
+    })
+    if (!salud.ok) throw new Error(`Health check falló (${salud.status}).`)
+    global.webPanelStart = arranqueNuevo
+    console.log('[webpanel] Panel recargado con el código nuevo (sin reiniciar el proceso).')
+    return true
   } catch (error) {
-    console.error('[webpanel] No se pudo reiniciar el panel:', error?.message || error)
+    console.error('[webpanel] El panel nuevo falló; se intenta restaurar el anterior:', error?.message || error)
+    try { await global.webPanelHandle?.close?.() } catch {}
+    global.webPanelHandle = null
+    if (typeof arranqueAnterior === 'function') {
+      try {
+        global.webPanelHandle = await arrancarConReintentos(arranqueAnterior)
+        global.webPanelStart = arranqueAnterior
+        console.warn('[webpanel] Se restauró el panel anterior.')
+      } catch (restoreError) {
+        console.error('[webpanel] Tampoco se pudo restaurar el panel anterior:', restoreError?.message || restoreError)
+      }
+    }
     return false
   }
-  return Boolean(global.webPanelHandle)
 }
 
 /**

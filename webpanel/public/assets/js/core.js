@@ -11,7 +11,7 @@ export const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-export const PANEL_VERSION = '1.6.8'
+export const PANEL_VERSION = '1.7.0'
 
 export const state = {
   user: null,
@@ -32,6 +32,9 @@ export const state = {
   adminPairings: [],
   adminAudit: [],
   adminSettings: null,
+  adminRoles: [],
+  adminPermissions: [],
+  adminMail: null,
   adminCommunities: [],
   sessionFilter: 'all',
   selectedSessions: new Set(),
@@ -176,10 +179,26 @@ export function badge(status) {
   return `<span class="badge ${meta.cls}"><span class="dot"></span>${h(meta.label)}</span>`
 }
 
-export function roleBadge(role) {
-  return role === 'admin'
-    ? '<span class="badge accent"><span class="dot"></span>Administrador</span>'
-    : '<span class="badge neutral"><span class="dot"></span>Usuario</span>'
+export function roleBadge(role, roleName = '') {
+  const admin = role === 'admin'
+  const label = roleName || (admin ? 'Administrador' : 'Usuario')
+  return `<span class="badge ${admin ? 'accent' : 'neutral'}"><span class="dot"></span>${h(label)}</span>`
+}
+
+/** Permisos del usuario actual (el principal siempre puede todo). */
+export function puede(permiso) {
+  const user = state.user
+  if (!user) return false
+  if (user.isPrincipal) return true
+  const permisos = Array.isArray(user.permissions) ? user.permissions : []
+  if (permisos.includes('*') || permisos.includes(permiso)) return true
+  // Los administradores también pueden usar las funciones normales de usuario.
+  if (!String(permiso).startsWith('admin.') && permisos.includes('admin.access')) return true
+  return false
+}
+
+export function esPrincipal() {
+  return Boolean(state.user?.isPrincipal)
 }
 
 export function statusIconTone(status) {
