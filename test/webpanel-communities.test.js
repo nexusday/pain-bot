@@ -62,7 +62,7 @@ test('webpanel: comunidades (crear, listar, editar y borrar)', async (t) => {
 
   const registro = await pedir('/api/auth/register', {
     method: 'POST',
-    body: { username: 'usuario', password: 'usuario12345' },
+    body: { username: 'usuario', email: 'usuario@example.com', password: 'usuario12345' },
   })
   assert.equal(registro.status, 201)
   const cookieUsuario = registro.cookie
@@ -148,7 +148,7 @@ test('webpanel: el usuario configura su sub-bot y ve el menú', async (t) => {
 
   const registro = await pedir('/api/auth/register', {
     method: 'POST',
-    body: { username: 'dueno', password: 'dueno12345' },
+    body: { username: 'dueno', email: 'dueno@example.com', password: 'dueno12345' },
   })
   const cookie = registro.cookie
   const csrf = registro.datos.csrf
@@ -210,7 +210,7 @@ test('webpanel: el usuario configura su sub-bot y ve el menú', async (t) => {
   // Otro usuario no puede tocar la configuración.
   const intruso = await pedir('/api/auth/register', {
     method: 'POST',
-    body: { username: 'intruso', password: 'intruso12345' },
+    body: { username: 'intruso', email: 'intruso@example.com', password: 'intruso12345' },
   })
   const prohibido = await pedir(`/api/bots/${phone}/config`, {
     cookie: intruso.cookie,
@@ -223,7 +223,7 @@ test('webpanel: el admin puede entrar como usuario y volver a su cuenta', async 
 
   const registro = await pedir('/api/auth/register', {
     method: 'POST',
-    body: { username: 'cliente', password: 'cliente12345' },
+    body: { username: 'cliente', email: 'cliente@example.com', password: 'cliente12345' },
   })
   assert.equal(registro.status, 201)
   const usuario = await handle.store.buscarUsuarioPorNombre('cliente')

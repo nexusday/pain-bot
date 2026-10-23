@@ -1,0 +1,100 @@
+.main-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  flex-wrap: wrap;
+}
+
+.main-hero-logo {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  flex: none;
+  background: var(--surface-2);
+}
+
+.main-hero-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.main-hero-info {
+  min-width: 190px;
+  flex: 1 1 220px;
+}
+
+.main-hero-info h3 {
+  font-size: 16px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.main-hero-info p {
+  font-size: 12.5px;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.main-hero-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.notice {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.notice svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--muted-2);
+  flex: none;
+}
+
+.notice.warn {
+  border-color: rgba(227, 174, 60, 0.28);
+  background: var(--warn-soft);
+}
+
+.notice.warn svg {
+  color: var(--warn);
+}
+
+.notice.danger {
+  border-color: rgba(239, 77, 77, 0.28);
+  background: var(--danger-soft);
+}
+
+.notice.danger svg {
+  color: var(--danger);
+}
+
+.notice b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */

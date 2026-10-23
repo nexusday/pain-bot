@@ -1,0 +1,163 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 8, 0.7);
+  backdrop-filter: blur(3px);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.modal-root,
+#modal-root.open .modal-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal {
+  position: fixed;
+  z-index: 61;
+  top: 50%;
+  left: 50%;
+  width: min(480px, calc(100vw - 32px));
+  transform: translate(-50%, -50%) scale(0.97);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+#modal-root.open .modal {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.modal.wide {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px 15px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.modal-head h3 {
+  font-size: 15.5px;
+}
+
+.modal-head p {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.modal-body {
+  padding: 19px 20px;
+  overflow-y: auto;
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-soft);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* ── Toasts ─────────────────────────────────────────────────────────────── */
+#toast-root {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  display: grid;
+  gap: 9px;
+  width: min(360px, calc(100vw - 36px));
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  animation: toast-in 0.18s ease;
+}
+
+.toast svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--muted);
+}
+
+.toast span {
+  flex: 1;
+  line-height: 1.5;
+}
+
+.toast.success {
+  border-color: rgba(52, 196, 139, 0.3);
+}
+
+.toast.success svg {
+  color: var(--success);
+}
+
+.toast.error {
+  border-color: rgba(239, 77, 77, 0.32);
+}
+
+.toast.error svg {
+  color: var(--danger);
+}
+
+.toast.warn {
+  border-color: rgba(227, 174, 60, 0.3);
+}
+
+.toast.warn svg {
+  color: var(--warn);
+}
+
+.toast-close {
+  border: 0;
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.toast-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ── Bot principal ──────────────────────────────────────────────────────── */

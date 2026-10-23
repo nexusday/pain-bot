@@ -63,7 +63,7 @@ test('webpanel main: solo el admin gestiona el bot principal', async (t) => {
 
   const registro = await pedir('/api/auth/register', {
     method: 'POST',
-    body: { username: 'usuario', password: 'usuario12345' },
+    body: { username: 'usuario', email: 'usuario@example.com', password: 'usuario12345' },
   })
   assert.equal(registro.status, 201)
   const cookieUsuario = registro.cookie

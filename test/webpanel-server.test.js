@@ -103,9 +103,27 @@ test('webpanel server: registro, login, permisos admin y CSRF', async (t) => {
   const cookieUsuario = registro.cookie
   const csrfUsuario = registro.datos.csrf
 
+  // El correo es obligatorio al registrarse.
+  const sinCorreo = await pedir('/api/auth/register', {
+    method: 'POST',
+    body: { username: 'sincorreo', password: 'userpass123' },
+  })
+  assert.equal(sinCorreo.status, 400)
+  assert.equal(sinCorreo.datos.code, 'missing_email')
+
+  // La cuenta puede añadir o cambiar su correo después.
+  const cambioCorreo = await pedir('/api/account/email', {
+    method: 'PATCH',
+    cookie: cookieUsuario,
+    csrf: csrfUsuario,
+    body: { email: 'webuser.nuevo@example.com' },
+  })
+  assert.equal(cambioCorreo.status, 200)
+  assert.equal(cambioCorreo.datos.user.email, 'webuser.nuevo@example.com')
+
   const duplicado = await pedir('/api/auth/register', {
     method: 'POST',
-    body: { username: 'webuser', password: 'userpass123' },
+    body: { username: 'webuser', email: 'webuser2@example.com', password: 'userpass123' },
   })
   assert.equal(duplicado.status, 409)
 
@@ -207,8 +225,69 @@ test('webpanel server: registro, login, permisos admin y CSRF', async (t) => {
   assert.equal(despuesLogout.status, 401)
 })
 
-test('webpanel server: genera y guarda la contraseña inicial del admin', async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-webpanel-admin-'))
+test('webpanel server: cambia el usuario del entorno sin pisar la contraseña guardada', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-webpanel-admin-sync-'))
+  const root = path.join(dir, 'Serbot')
+  fs.mkdirSync(root, { recursive: true })
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+
+  const base = {
+    port: 0,
+    host: '127.0.0.1',
+    publicUrl: 'http://127.0.0.1',
+    dataDir: dir,
+    root,
+    publicDir: path.resolve('webpanel', 'public'),
+    allowRegistration: false,
+    requireInvite: false,
+    trustProxy: false,
+  }
+
+  async function arrancar(adminUser, adminPass) {
+    const handle = await startWebPanel({ ...base, adminUser, adminPass })
+    const pedir = crearCliente(`http://127.0.0.1:${handle.server.address().port}`)
+    return { handle, pedir }
+  }
+
+  const primero = await arrancar('admin', 'admin12345')
+  const inicial = await primero.pedir('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'admin12345' },
+  })
+  assert.equal(inicial.status, 200)
+  await primero.handle.close()
+
+  // Al cambiar PAIN_WEB_ADMIN_USER se crea ese admin sin borrar el anterior.
+  const segundo = await arrancar('nuevo', 'nuevo12345')
+  const nuevo = await segundo.pedir('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'nuevo', password: 'nuevo12345' },
+  })
+  assert.equal(nuevo.status, 200)
+  assert.equal(nuevo.datos.user.role, 'admin')
+  const anteriorSigue = await segundo.pedir('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'admin12345' },
+  })
+  assert.equal(anteriorSigue.status, 200)
+  await segundo.handle.close()
+
+  // Sin PAIN_WEB_ADMIN_RESET, una contraseña nueva del .env no pisa la del panel.
+  const tercero = await arrancar('admin', 'otra12345')
+  const guardada = await tercero.pedir('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'admin12345' },
+  })
+  assert.equal(guardada.status, 200)
+  const delEntorno = await tercero.pedir('/api/auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'otra12345' },
+  })
+  assert.equal(delEntorno.status, 401)
+  await tercero.handle.close()
+})
+
+test('webpanel server: genera y guarda la contraseña inicial del admin', async (t) => {  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-webpanel-admin-'))
   const root = path.join(dir, 'Serbot')
   fs.mkdirSync(root, { recursive: true })
   const anterior = process.env.PAIN_WEB_ADMIN_PASS

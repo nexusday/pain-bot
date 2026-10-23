@@ -1,0 +1,433 @@
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+/* Contenedor de badges en el topbar (solo se muestra cuando hay datos) */
+.stat-badge-skeleton-box {
+  display: none;
+  gap: 10px;
+  align-items: center;
+}
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-soft);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.cell-main {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.cell-title {
+  font-weight: 570;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell-sub {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.row-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  flex: none;
+}
+
+.row-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.row-icon.green {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: rgba(52, 196, 139, 0.24);
+}
+
+.row-icon.amber {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: rgba(227, 174, 60, 0.24);
+}
+
+.row-icon.red {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: rgba(239, 77, 77, 0.24);
+}
+
+.row-icon.cyan {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: rgba(74, 166, 240, 0.24);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* ── Badges ─────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 560;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.badge.success {
+  background: var(--success-soft);
+  border-color: rgba(52, 196, 139, 0.26);
+  color: #74dfb2;
+}
+
+.badge.info {
+  background: var(--info-soft);
+  border-color: rgba(74, 166, 240, 0.26);
+  color: #93c9f7;
+}
+
+.badge.warn {
+  background: var(--warn-soft);
+  border-color: rgba(227, 174, 60, 0.26);
+  color: #f0cd7d;
+}
+
+.badge.danger {
+  background: var(--danger-soft);
+  border-color: rgba(239, 77, 77, 0.26);
+  color: #ff9d9d;
+}
+
+.badge.accent {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: #ffb3ae;
+}
+
+.badge.neutral {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* ── Sesiones: filtros y selección ─────────────────────────────────────── */
+.check-col {
+  width: 42px;
+  text-align: center;
+}
+
+.row-check {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--bg-soft);
+}
+
+.filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 520;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: #2e3340;
+}
+
+.chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: #ffb3ae;
+}
+
+.chip-count {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip.active .chip-count {
+  color: inherit;
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Comunidades ────────────────────────────────────────────────────────── */
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.community-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.community-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.community-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  flex: none;
+}
+
+.community-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.community-list {
+  display: grid;
+  /* minmax(0, 1fr): si no, la columna toma el tamaño del enlace largo y los
+     botones quedan fuera de la tarjeta (y sin poder desplazarse). */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.community-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
+}
+
+.community-row:last-child {
+  border-bottom: 0;
+}
+
+.community-row.off {
+  opacity: 0.55;
+}
+
+.community-row .actions {
+  align-items: center;
+  flex: none;
+}
+
+/* En móvil los botones de la comunidad pasan a su propia línea. */
+@media (max-width: 640px) {
+  .community-row {
+    flex-wrap: wrap;
+  }
+
+  .community-row .actions {
+    margin-left: auto;
+  }
+
+  /* El nombre puede ocupar dos líneas: los botones siguen a la derecha. */
+  .community-row .cell-title {
+    white-space: normal;
+  }
+}
+
+/* ── Acting as ──────────────────────────────────────────────────────────── */
+.impersonating-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  background: #2b2412;
+  border-bottom: 1px solid rgba(227, 174, 60, 0.35);
+  color: #f0cd7d;
+  font-size: 12.5px;
+}
+
+.impersonating-bar svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.impersonating-bar span {
+  flex: 1;
+  min-width: 180px;
+}
+
+.impersonating-bar b {
+  color: #ffe3a8;
+}
+
+/* ── Aviso: la cuenta no tiene correo ────────────────────────────────────── */
+.account-nudge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent-line);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.account-nudge svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--accent);
+}
+
+.account-nudge span {
+  flex: 1;
+  min-width: 180px;
+}
+
+.account-nudge b {
+  color: var(--text);
+}
+
+/* ── Cloudflare Turnstile ────────────────────────────────────────────────── */
+.turnstile-slot {
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
+  margin: 4px 0 14px;
+}
+
+/* ── Aviso de versión desactualizada ─────────────────────────────────────── */
+.version-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  background: #3a2a12;
+  border-top: 1px solid rgba(227, 174, 60, 0.4);
+  color: #f0cd7d;
+  font-size: 12.5px;
+}
+
+.version-banner svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* ── Configuración del sub-bot ──────────────────────────────────────────── */

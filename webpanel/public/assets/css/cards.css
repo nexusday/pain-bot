@@ -1,0 +1,242 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.card-head h3 {
+  font-size: 14.5px;
+  margin-bottom: 3px;
+}
+
+.card-head p {
+  font-size: 12px;
+  color: var(--muted-2);
+}
+
+.card-body {
+  padding: 18px;
+}
+
+.card-body.tight {
+  padding: 0;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 15px 16px;
+}
+
+.stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stat-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.stat-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.stat-accent .stat-icon {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+.stat-green .stat-icon {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: rgba(52, 196, 139, 0.24);
+}
+
+.stat-cyan .stat-icon {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: rgba(74, 166, 240, 0.24);
+}
+
+.stat-amber .stat-icon {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: rgba(227, 174, 60, 0.24);
+}
+
+.stat-red .stat-icon {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: rgba(239, 77, 77, 0.24);
+}
+
+.stat-violet .stat-icon {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.24);
+}
+
+.stat-value {
+  margin: 12px 0 2px;
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-weight: 680;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.stat-foot {
+  margin-top: 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
+/* ── Badges de stats en tiempo real (landing + shell) ────────────────────── */
+.auth-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.auth-stats:empty {
+  display: none;
+}
+
+.auth-stats .stat-badge {
+  justify-content: center;
+  padding: 12px 14px;
+  font-size: 13px;
+  background: var(--surface);
+}
+
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.stat-badge svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-2);
+}
+
+.stat-badge b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.stat-online {
+  color: var(--success);
+  border-color: var(--success-soft);
+  background: var(--success-soft);
+}
+
+.stat-online svg {
+  color: var(--success);
+}
+
+.stat-online b {
+  color: var(--success);
+}
+
+/* ── Acceso: botones y aviso gratuito ───────────────────────────────────── */
+.auth-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 240px) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.auth-actions .btn {
+  min-height: 44px;
+}
+
+.auth-gratis {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.auth-gratis:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.auth-gratis svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-2);
+}
+
+.auth-gratis:hover svg {
+  color: var(--accent);
+}
+
+/* ── Dashboard: más métricas ─────────────────────────────────────────────── */
