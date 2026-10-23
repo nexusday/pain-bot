@@ -55,12 +55,12 @@ export function renderAuth() {
         </div>
         <div class="auth-hero">
           <img class="auth-logo" src="/assets/logo-wide.webp" alt="${h(brand)}" />
-          <h1 class="auth-title">Vincula y administra tus números de WhatsApp</h1>
-          <p class="auth-lead">Cada sub-bot vive en su propia sesión y se conecta al servidor por separado. Desde aquí generas el código, ves el estado real de cada número y lo dejas en marcha o lo retiras.</p>
+          <h1 class="auth-title">Tu propio bot de WhatsApp</h1>
+          <p class="auth-lead">Conecta tu número a ${h(brand)} y dale tu estilo al bot. Cambia su nombre, elige una imagen y ajusta el menú desde tu cuenta. Si necesitas revisar la conexión, también lo haces aquí.</p>
           <ul class="auth-features">
-            <li><span class="fi">${icon('link')}</span><div><b>Código de 8 dígitos</b><span>Sin escanear QR: WhatsApp → Dispositivos vinculados → Vincular con número.</span></div></li>
-            <li><span class="fi">${icon('activity')}</span><div><b>Estado en vivo</b><span>Conectado, vinculado o pendiente de re-vincular, siempre a la vista.</span></div></li>
-            <li><span class="fi">${icon('shieldCheck')}</span><div><b>Acceso por cuenta</b><span>Cada usuario ve solo sus números; el panel de administración va aparte.</span></div></li>
+            <li><span class="fi">${icon('link')}</span><div><b>Conéctalo con un código</b><span>Introduce los 8 dígitos en Dispositivos vinculados de WhatsApp. No necesitas escanear un QR.</span></div></li>
+            <li><span class="fi">${icon('settings')}</span><div><b>Dale tu toque</b><span>El nombre, la imagen y el menú de tu bot se pueden cambiar desde el panel.</span></div></li>
+            <li><span class="fi">${icon('activity')}</span><div><b>Tus bots, en un solo lugar</b><span>Mira cuáles están conectados, reconecta un número o desvincúlalo cuando lo necesites.</span></div></li>
           </ul>
           <div class="auth-stats" id="auth-stats"></div>
           <div class="auth-actions">
