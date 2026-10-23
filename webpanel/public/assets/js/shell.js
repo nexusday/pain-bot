@@ -1,5 +1,6 @@
 /* Pain Panel — módulo shell */
 import { renderAuth } from './auth.js'
+import { api } from './api.js'
 import {
   app,
   closeModal,
@@ -11,6 +12,7 @@ import {
   puede,
   state,
   stopTimers,
+  showToast,
   updateNavBadges,
 } from './core.js'
 import { renderAdmin } from './pages-admin.js'
@@ -66,6 +68,7 @@ export function renderShell() {
   const isAdmin = puede('admin.access')
   const publicUrl = cfg.publicUrl || ''
   const rolVisible = user.isPrincipal ? 'Administrador principal' : (user.roleName || (isAdmin ? 'Administrador' : 'Usuario'))
+  const adminInicio = Object.entries(ADMIN_PERMISSIONS).find(([, permiso]) => puede(permiso))?.[0]
 
   document.title = `${cfg.brandName || 'Pain Panel'} · Panel`
   app.innerHTML = `
@@ -87,7 +90,7 @@ export function renderShell() {
           ${puede('communities.view') ? navLink('/communities', 'globe', 'Comunidades') : ''}
           <div class="nav-section">Cuenta</div>
           ${navLink('/account', 'user', 'Mi cuenta')}
-          ${isAdmin ? `<div class="nav-section">Administración</div>${navLink('/admin/overview', 'shield', 'Administración', { nav: '/admin' })}` : ''}
+          ${isAdmin && adminInicio ? `<div class="nav-section">Administración</div>${navLink(`/admin/${adminInicio}`, 'shield', 'Administración', { nav: '/admin' })}` : ''}
         </nav>
         <div class="sidebar-foot">
           <div class="hint">Panel público · v${h(PANEL_VERSION)}</div>
@@ -147,6 +150,13 @@ export function setActiveNav(path) {
 
 
 /* ── Router ─────────────────────────────────────────────────────────────── */
+const ADMIN_PERMISSIONS = {
+  overview: 'admin.overview', principal: 'admin.main', users: 'admin.users',
+  sessions: 'admin.sessions', pairings: 'admin.pairings', communities: 'admin.communities',
+  audit: 'admin.audit', roles: 'admin.settings.roles', mail: 'admin.settings.mail',
+  settings: 'admin.settings',
+}
+
 export async function route() {
   closeModal()
   stopTimers()
@@ -155,6 +165,21 @@ export async function route() {
     return
   }
   const raw = location.hash.replace(/^#/, '') || '/dashboard'
+  // Los roles pueden cambiar con una sesión abierta; no conservar permisos
+  // antiguos en las pestañas, el menú o la identificación de la cuenta.
+  try {
+    const me = await api.get('/api/auth/me')
+    const changed = JSON.stringify(state.user) !== JSON.stringify(me.user)
+    state.user = me.user
+    state.csrf = me.csrf
+    state.impersonatedBy = me.impersonatedBy || null
+    state.config = { ...(state.config || {}), ...(me.config || {}) }
+    if (changed) renderShell()
+  } catch (error) {
+    if (error.status !== 401) showToast(error.message || 'No se pudo actualizar la sesión.', 'error')
+    return
+  }
+  if ((location.hash.replace(/^#/, '') || '/dashboard') !== raw) return
   const [path, queryString] = raw.split('?')
   const parts = path.split('/').filter(Boolean)
   state.route = { path, query: new URLSearchParams(queryString || ''), parts }
@@ -165,19 +190,8 @@ export async function route() {
       navigate('/dashboard')
       return
     }
-    const section = parts[1] || 'overview'
-    const permisos = {
-      overview: 'admin.overview',
-      principal: 'admin.main',
-      users: 'admin.users',
-      sessions: 'admin.sessions',
-      pairings: 'admin.pairings',
-      communities: 'admin.communities',
-      audit: 'admin.audit',
-      settings: 'admin.settings',
-      roles: 'admin.settings.roles',
-      mail: 'admin.settings.mail',
-    }
+    const section = parts[1] || Object.entries(ADMIN_PERMISSIONS).find(([, permiso]) => puede(permiso))?.[0]
+    const permisos = ADMIN_PERMISSIONS
     if (!permisos[section] || !puede(permisos[section])) {
       navigate('/dashboard')
       return

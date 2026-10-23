@@ -688,6 +688,7 @@ export function adminSettingsHTML(data) {
         <div class="card-head"><div><h3>Límites de sub-bots</h3><p>Se aplican a todo el servidor</p></div></div>
         <div class="card-body">
           <form id="settings-form">
+            <fieldset style="border:0;padding:0;margin:0;min-width:0" ${data.canLimits ? '' : 'disabled'}>
             <div class="form-error">${icon('alert')}<span></span></div>
             <div class="field">
               <label class="label" for="settings-max">Máximo de sub-bots del servidor</label>
@@ -705,6 +706,7 @@ export function adminSettingsHTML(data) {
               <div class="hint">Cuentas distintas que se pueden vincular desde la misma conexión. <b>0</b> = sin límite.</div>
             </div>
             <button class="btn btn-primary" type="submit">${icon('check')} Guardar límites</button>
+            </fieldset>
           </form>
         </div>
       </div>
@@ -714,6 +716,7 @@ export function adminSettingsHTML(data) {
         </div>
         <div class="card-body">
           <form id="settings-limits-form">
+            <fieldset style="border:0;padding:0;margin:0;min-width:0" ${data.canLimits ? '' : 'disabled'}>
             <div class="form-error">${icon('alert')}<span></span></div>
             <div class="field">
               <label class="label" for="settings-attempts-hour">Intentos por hora y usuario</label>
@@ -741,6 +744,7 @@ export function adminSettingsHTML(data) {
               <div class="hint">Cuánto vive el código de 8 dígitos antes de caducar (es la cuenta atrás que ve el usuario).</div>
             </div>
             <button class="btn btn-primary" type="submit">${icon('check')} Guardar intentos</button>
+            </fieldset>
           </form>
         </div>
       </div>
@@ -878,7 +882,7 @@ export function adminRolesHTML(data) {
     <div class="card">
       <div class="card-head"><div><h3>Cómo funcionan</h3><p>El administrador principal siempre conserva el control total</p></div></div>
       <div class="card-body">
-        <div class="pairing-alert">${icon('info')}<div>El <b>principal</b> no se puede limitar ni eliminar. Los permisos de <b>Turnstile</b> y de <b>Roles</b> son exclusivos del principal. Los demás roles se pueden editar al 100%: marca las casillas y guarda. Si un rol tiene acceso de administrador, hereda también las funciones normales de usuario.</div></div>
+        <div class="pairing-alert">${icon('info')}<div>El <b>principal</b> no se puede limitar ni eliminar. Los permisos de <b>Turnstile</b> y de <b>Roles</b> se pueden delegar marcando sus casillas. Los demás roles se pueden editar: marca los permisos y guarda. Si un rol tiene acceso de administrador, hereda también las funciones normales de usuario.</div></div>
       </div>
     </div>
   </div>`

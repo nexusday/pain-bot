@@ -255,6 +255,7 @@ test('webpanel server: cambia el usuario del entorno sin pisar la contraseña gu
     body: { username: 'admin', password: 'admin12345' },
   })
   assert.equal(inicial.status, 200)
+  assert.equal(inicial.datos.user.isPrincipal, true)
   await primero.handle.close()
 
   // Al cambiar PAIN_WEB_ADMIN_USER se crea ese admin sin borrar el anterior.
@@ -265,11 +266,27 @@ test('webpanel server: cambia el usuario del entorno sin pisar la contraseña gu
   })
   assert.equal(nuevo.status, 200)
   assert.equal(nuevo.datos.user.role, 'admin')
+  assert.equal(nuevo.datos.user.isPrincipal, true)
+  assert.deepEqual(nuevo.datos.user.permissions, ['*'])
+  const nuevosRoles = await segundo.pedir('/api/admin/roles', { cookie: nuevo.cookie })
+  assert.equal(nuevosRoles.status, 200)
+  assert.equal(nuevosRoles.datos.canManage, true)
+  const nuevosAjustes = await segundo.pedir('/api/admin/settings', { cookie: nuevo.cookie })
+  assert.equal(nuevosAjustes.datos.canTurnstile, true)
+  assert.equal(nuevosAjustes.datos.canRoles, true)
+  assert.equal(nuevosAjustes.datos.canMail, true)
+  assert.equal(nuevosAjustes.datos.canLimits, true)
   const anteriorSigue = await segundo.pedir('/api/auth/login', {
     method: 'POST',
     body: { username: 'admin', password: 'admin12345' },
   })
   assert.equal(anteriorSigue.status, 200)
+  assert.equal(anteriorSigue.datos.user.isPrincipal, false)
+  assert.ok(!anteriorSigue.datos.user.permissions.includes('*'))
+  // Incluso la sesión abierta antes del cambio pierde el rol de principal.
+  const sesionAnterior = await segundo.pedir('/api/auth/me', { cookie: inicial.cookie })
+  assert.equal(sesionAnterior.datos.user.isPrincipal, false)
+  assert.ok(!sesionAnterior.datos.user.permissions.includes('*'))
   await segundo.handle.close()
 
   // Sin PAIN_WEB_ADMIN_RESET, una contraseña nueva del .env no pisa la del panel.
@@ -279,6 +296,7 @@ test('webpanel server: cambia el usuario del entorno sin pisar la contraseña gu
     body: { username: 'admin', password: 'admin12345' },
   })
   assert.equal(guardada.status, 200)
+  assert.equal(guardada.datos.user.isPrincipal, true)
   const delEntorno = await tercero.pedir('/api/auth/login', {
     method: 'POST',
     body: { username: 'admin', password: 'otra12345' },
