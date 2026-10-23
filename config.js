@@ -76,7 +76,7 @@ global.webPanel = {
   // includePort: true para que la URL pública incluya :10022. Con reverse
   // proxy (recomendado) se omite y queda https://subdominio.dominio.
   includePort: process.env.PAIN_WEB_INCLUDE_PORT === '1',
-  brandName: process.env.PAIN_WEB_BRAND || 'Pain Bot',
+  brandName: process.env.PAIN_WEB_BRAND || 'PAIN BOT MD',
   // Cuenta administradora inicial. La contraseña NO se escribe aquí: se lee
   // de PAIN_WEB_ADMIN_PASS (.env local o Startup → Environment en Pterodactyl).
   // Si queda vacía, se genera una aleatoria y se guarda en

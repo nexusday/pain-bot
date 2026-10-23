@@ -70,7 +70,7 @@ export function renderShell() {
   const rolVisible = user.isPrincipal ? 'Administrador principal' : (user.roleName || (isAdmin ? 'Administrador' : 'Usuario'))
   const adminInicio = Object.entries(ADMIN_PERMISSIONS).find(([, permiso]) => puede(permiso))?.[0]
 
-  document.title = `${cfg.brandName || 'Pain Panel'} · Panel`
+  document.title = `${cfg.brandName || 'PAIN BOT MD'} · Panel`
   app.innerHTML = `
     <div class="app-shell${menuColapsado() ? ' sidebar-collapsed' : ''}" id="app-shell">
       <aside class="sidebar">
@@ -78,7 +78,7 @@ export function renderShell() {
           <div class="brand">
             <div class="brand-mark"><img src="/assets/logo.webp" alt="" /></div>
             <div class="brand-text">
-              <div class="brand-name">${h(cfg.brandName || 'Pain Bot')}</div>
+              <div class="brand-name">${h(cfg.brandName || 'PAIN BOT MD')}</div>
               <div class="brand-sub">Panel de control</div>
             </div>
           </div>

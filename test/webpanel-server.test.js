@@ -69,13 +69,13 @@ test('webpanel server: registro, login, permisos admin y CSRF', async (t) => {
 
   const config = await pedir('/api/config')
   assert.equal(config.status, 200)
-  assert.equal(config.datos.brandName, 'Pain Bot')
+  assert.equal(config.datos.brandName, 'PAIN BOT MD')
   assert.equal(config.datos.allowRegistration, true)
 
   const index = await pedir('/')
   assert.equal(index.status, 200)
   assert.match(index.res.headers.get('content-type') || '', /text\/html/)
-  assert.match(index.texto, /Pain Panel|Pain Bot/)
+  assert.match(index.texto, /PAIN BOT MD/)
   assert.match(index.res.headers.get('content-security-policy') || '', /default-src 'self'/)
 
   // Los assets se revalidan siempre: tras un git pull el navegador recibe la

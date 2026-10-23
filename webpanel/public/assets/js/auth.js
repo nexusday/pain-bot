@@ -36,7 +36,7 @@ export function renderAuth() {
   closeModal()
   if (!app) return
   const cfg = state.config || {}
-  const brand = cfg.brandName || 'Pain Bot'
+  const brand = cfg.brandName || 'PAIN BOT MD'
   const allowRegistration = cfg.allowRegistration !== false
   if (!allowRegistration && state.authTab === 'register') state.authTab = 'login'
   const tab = state.authTab
@@ -54,7 +54,6 @@ export function renderAuth() {
           </div>
         </div>
         <div class="auth-hero">
-          <img class="auth-logo" src="/assets/logo-wide.webp" alt="${h(brand)}" />
           <h1 class="auth-title">Tu propio bot de WhatsApp</h1>
           <p class="auth-lead">Conecta tu número a ${h(brand)} y dale tu estilo al bot. Cambia su nombre, elige una imagen y ajusta el menú desde tu cuenta. Si necesitas revisar la conexión, también lo haces aquí.</p>
           <ul class="auth-features">
@@ -82,7 +81,7 @@ export function renderAuth() {
 /* ── Modal flotante de acceso (login / registro) ────────────────────────── */
 export function openAuthModal() {
   const cfg = state.config || {}
-  const brand = cfg.brandName || 'Pain Bot'
+  const brand = cfg.brandName || 'PAIN BOT MD'
   const allowRegistration = cfg.allowRegistration !== false
   const tab = state.authTab
 

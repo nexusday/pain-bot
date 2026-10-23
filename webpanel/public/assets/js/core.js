@@ -227,7 +227,7 @@ export function setPage(title, subtitle = '') {
   const subEl = document.getElementById('page-sub')
   if (titleEl) titleEl.textContent = title
   if (subEl) subEl.textContent = subtitle
-  document.title = `${title} · ${state.config?.brandName || 'Pain Panel'}`
+  document.title = `${title} · ${state.config?.brandName || 'PAIN BOT MD'}`
 }
 
 export function navigate(path) {
