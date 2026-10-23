@@ -196,14 +196,15 @@ if (isSubbotWorker) {
 
 // El panel web arranca PRIMERO: la web tiene que estar disponible aunque el
 // bot todavía esté emparejando (o sin principal vinculado). Solo el proceso
-// principal abre el puerto; los workers de sub-bots nunca escuchan en red.
+// principal supervisa un proceso HTTP separado; ningún socket público corre
+// en el event loop que atiende WhatsApp.
 // Si el puerto está ocupado, el bot sigue funcionando igual (el error se
 // registra y no se propaga).
 if (!isSubbotWorker && global.webPanel?.enabled !== false && process.env.PAIN_WEB_ENABLED !== '0') {
   try {
-    const modulo = await import('./lib/webpanel/server.js')
-    global.webPanelStart = modulo.startWebPanel
-    global.webPanelHandle = await modulo.startWebPanel()
+    const modulo = await import('./lib/webpanel/isolated.js')
+    global.webPanelStart = modulo.startIsolatedWebPanel
+    global.webPanelHandle = await modulo.startIsolatedWebPanel()
   } catch (error) {
     console.error('[webpanel] No se pudo iniciar el panel:', error?.message || error)
   }
@@ -821,6 +822,12 @@ global.reiniciarPrincipalLimpio = async function reiniciarPrincipalLimpio({ time
  * Las sesiones de WhatsApp de los sub-bots no se tocan.
  */
 global.reiniciarPanelWeb = async function reiniciarPanelWeb() {
+  if (global.webPanelHandle?.isolated) {
+    try { return await global.webPanelHandle.restart() } catch (error) {
+      console.error('[webpanel] No se pudo recargar el proceso web:', error?.message || error)
+      return false
+    }
+  }
   const anterior = global.webPanelHandle
   const arranqueAnterior = global.webPanelStart
   let arranqueNuevo = null

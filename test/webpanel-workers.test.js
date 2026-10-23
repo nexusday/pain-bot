@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { hayWorkersConSesiones } from '../lib/webpanel/pairing.js'
 import { subBotsPermitidos } from '../lib/process-isolation.js'
-
-const CARPETA = path.resolve('storage', 'process-status')
 
 test('supervisor: los workers arrancan si hay sub-bots aunque no haya principal', () => {
   // Sin principal y sin sub-bots: los workers esperan (no tiene sentido
@@ -19,10 +18,12 @@ test('supervisor: los workers arrancan si hay sub-bots aunque no haya principal'
 })
 
 test('pairing: los sub-bots no dependen del principal si los workers viven', () => {
-  fs.mkdirSync(CARPETA, { recursive: true })
-  const archivo = path.join(CARPETA, 'test-worker-1.json')
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-panel-workers-'))
+  const carpeta = path.join(root, 'storage', 'process-status')
+  fs.mkdirSync(carpeta, { recursive: true })
+  const archivo = path.join(carpeta, 'test-worker-1.json')
   try {
-    assert.equal(hayWorkersConSesiones(), false)
+    assert.equal(hayWorkersConSesiones(root), false)
 
     fs.writeFileSync(archivo, JSON.stringify({
       workerId: 'test-worker-1',
@@ -32,7 +33,7 @@ test('pairing: los sub-bots no dependen del principal si los workers viven', () 
     }))
 
     // Con workers vivos se puede vincular aunque el principal no esté.
-    assert.equal(hayWorkersConSesiones(), true)
+    assert.equal(hayWorkersConSesiones(root), true)
 
     // Un worker sin sesiones no cuenta.
     fs.writeFileSync(archivo, JSON.stringify({
@@ -41,8 +42,8 @@ test('pairing: los sub-bots no dependen del principal si los workers viven', () 
       updatedAt: Date.now(),
       sessions: [],
     }))
-    assert.equal(hayWorkersConSesiones(), false)
+    assert.equal(hayWorkersConSesiones(root), false)
   } finally {
-    fs.rmSync(archivo, { force: true })
+    fs.rmSync(root, { recursive: true, force: true })
   }
 })

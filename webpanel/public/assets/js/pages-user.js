@@ -189,11 +189,10 @@ export async function renderDashboard() {
   // Auto-actualizar datos del dashboard cada 30s (solo mientras se esté en esta ruta)
   if (state.dashboardPoll) clearInterval(state.dashboardPoll)
   state.dashboardPoll = setInterval(async () => {
+    if (document.hidden) return
     if (location.hash.replace(/^#/, '') !== '/dashboard' && location.hash.replace(/^#/, '') !== '') return
     try {
-      await loadBots()
-      updateNavBadges()
-      renderDashboard()
+      await renderDashboard()
     } catch {}
   }, 30_000)
   state.dashboardPoll.unref?.()

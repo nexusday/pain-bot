@@ -4,6 +4,7 @@ import { icon, state } from './core.js'
 
 /* ── Stats en tiempo real ────────────────────────────────────────────────── */
 export async function cargarStats() {
+  if (document.hidden) return
   try {
     const data = await api.get('/api/stats')
     state.stats = data

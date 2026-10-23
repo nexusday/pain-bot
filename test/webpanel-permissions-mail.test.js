@@ -67,10 +67,12 @@ test('webpanel: permisos efectivos, protección del principal y SMTP obligatorio
     userId: user.id, email: user.email, purpose: 'reset',
     codeHash: tokenHash('123456'), expiresAt: Date.now() + 60_000,
   })
-  const reset = await request('/api/auth/reset', null, 'POST', {
-    email: user.email, code: '123456', password: 'newpassword123',
-  })
-  assert.equal(reset.status, 200)
+  const resetBody = { email: user.email, code: '123456', password: 'newpassword123' }
+  const resets = await Promise.all([
+    request('/api/auth/reset', null, 'POST', resetBody),
+    request('/api/auth/reset', null, 'POST', resetBody),
+  ])
+  assert.deepEqual(resets.map((result) => result.status).sort(), [200, 400])
   assert.equal((await request('/api/auth/me', limited)).status, 401)
   assert.equal((await request('/api/auth/reset', null, 'POST', {
     email: user.email, code: '123456', password: 'anotherpassword123',
