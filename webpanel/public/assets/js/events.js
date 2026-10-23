@@ -1,4 +1,6 @@
 /* Pain Panel — módulo events */
+import { enablePush, disablePush, dismissPush, syncPush } from './push.js'
+import { handlePushSend, handlePushSettings, handleBackupExport, handleBackupImport } from './admin-tools.js'
 import {
   handleAuth,
   handleForgotPassword,
@@ -77,6 +79,14 @@ export async function onClick(event) {
     const action = actionEl.dataset.action
     const phone = actionEl.dataset.phone
     const id = actionEl.dataset.id
+    if (action === 'push-enable') { await enablePush();return }
+    if (action === 'push-disable') { await disablePush();return }
+    if (action === 'push-dismiss') { await dismissPush();return }
+    if (action === 'push-check') { await syncPush(true);return }
+    if (action === 'push-history-refresh') { await renderAdmin('notifications');return }
+    if (action === 'push-users-next' || action === 'push-users-prev') {
+      state.pushOffset=Math.max(0,(state.pushOffset||0)+(action==='push-users-next'?200:-200));await renderAdmin('notifications');return
+    }
 
     if (action === 'toggle-sidebar') {
       toggleSidebar()
@@ -301,6 +311,11 @@ export async function onSubmit(event) {
   const form = event.target
   if (!(form instanceof HTMLFormElement)) return
   const id = form.id
+  if (id==='push-send-form') { event.preventDefault();await handlePushSend(form);return }
+  if (id==='push-settings-form') { event.preventDefault();await handlePushSettings(form);return }
+  if (id==='push-users-search') { event.preventDefault();state.pushQuery=form.elements.q.value.trim();state.pushOffset=0;await renderAdmin('notifications');return }
+  if (id==='backup-export-form') { event.preventDefault();await handleBackupExport(form);return }
+  if (id==='backup-import-form') { event.preventDefault();await handleBackupImport(form);return }
 
   if (id === 'auth-form') {
     event.preventDefault()
@@ -418,6 +433,11 @@ export function onKeydown(event) {
 /** Casillas de selección de sesiones (admin). */
 export function onChange(event) {
   const target = event.target
+  if (target instanceof HTMLInputElement && target.matches('[data-push-user]')) {
+    state.adminPushSelection ||= new Set()
+    if(target.checked)state.adminPushSelection.add(Number(target.dataset.pushUser));else state.adminPushSelection.delete(Number(target.dataset.pushUser))
+    return
+  }
   if (target instanceof HTMLSelectElement && target.id === 'role-scope') {
     renderRolePermissions(target.value)
     return

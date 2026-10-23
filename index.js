@@ -16,6 +16,7 @@ import {
 import { ARCHIVO_REENLACE_PENDIENTE, sesionEnEmparejamiento } from './lib/subbot-recovery.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { crearCoordinadorSubme } from './lib/subme-coordinator.js'
+import { acquireRuntimeLease } from './lib/runtime-lease.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const mainPath = join(__dirname, 'main.js')
@@ -29,6 +30,7 @@ try {
 }
 
 await import('./config.js')
+acquireRuntimeLease(join(__dirname,'storage'),'supervisor')
 console.log('Verificando base compartida antes de iniciar los procesos...')
 await new ArchivoSqliteCompartido(
   join(__dirname, 'storage', 'databases', 'database.sqlite'),

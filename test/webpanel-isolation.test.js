@@ -28,6 +28,7 @@ test('webpanel aislado: un cierre HTTP no termina el bot y se recupera conservan
   })
   handle = await startIsolatedWebPanel({
     host: '127.0.0.1', port: 0, dataDir: dir, root,
+    runtimeLockDir: path.join(dir,'runtime'),
     publicUrl: 'http://127.0.0.1', adminUser: 'admin', adminPass: 'admin12345',
   })
   assert.ok(handle.isolated)

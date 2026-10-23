@@ -61,6 +61,7 @@ import NodeCache from 'node-cache'
 import qrcode from 'qrcode-terminal'
 import { EventEmitter } from 'node:events'
 import os from 'node:os'
+import { acquireRuntimeLease } from './lib/runtime-lease.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const {
@@ -72,6 +73,7 @@ const {
 } = await import('@whiskeysockets/baileys')
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 3000
+acquireRuntimeLease(path.resolve('storage'),process.env.PAIN_ROLE==='subbot'?'subbot':'primary')
 
 protoType()
 serialize()

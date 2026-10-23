@@ -1,3 +1,18 @@
+.push-prompt {
+  position:fixed;right:24px;bottom:24px;z-index:950;display:flex;gap:14px;
+  width:min(410px,calc(100vw - 32px));padding:20px;border:1px solid var(--line);
+  border-radius:16px;background:var(--surface,#16191f);box-shadow:0 14px 50px #0008;
+}
+.push-prompt b { font-size:14px; }
+.push-prompt p { font-size:12px;line-height:1.65;color:var(--muted);margin:8px 0 14px; }
+.push-prompt-icon { color:var(--accent);padding-top:2px; }
+.push-prompt-icon svg { width:22px;height:22px; }
+.push-user-list { max-height:320px;overflow:auto;display:grid;gap:8px; }
+.push-user { display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:9px; }
+.push-user input { accent-color:var(--accent); }
+#push-send-form textarea { min-height:120px;height:auto;resize:vertical;line-height:1.6; }
+#backup-import-form .toggle, #push-settings-form .toggle { display:flex;gap:10px;align-items:flex-start;line-height:1.6; }
+#backup-import-form .toggle input, #push-settings-form .toggle input { margin-top:4px;accent-color:var(--accent); }
 .bot-config {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -464,12 +479,17 @@
 /* ── Tabs admin ─────────────────────────────────────────────────────────── */
 .admin-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   overflow-x: auto;
   padding-bottom: 2px;
   margin-bottom: 18px;
   border-bottom: 1px solid var(--line);
   scrollbar-width: thin;
+}
+@media (max-width: 760px) {
+  .admin-tabs { flex-wrap: nowrap; }
+  .push-prompt { right: 16px; bottom: 16px; }
 }
 
 .admin-tab {

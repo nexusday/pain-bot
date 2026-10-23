@@ -82,6 +82,7 @@
     "tesseract.js": "^7.0.0",
     "url-file-size": "^1.0.5-1",
     "url-regex-safe": "^3.0.0",
+    "web-push": "^3.6.7",
     "ws": "^8.17.1",
     "yargs": "^17.6.0",
     "yt-search": "^2.10.3"

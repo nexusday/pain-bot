@@ -1,4 +1,5 @@
 /* Pain Panel — módulo pages-user */
+import { pushAccountHTML } from './push.js'
 import { api } from './api.js'
 import {
   attachRowFilter,
@@ -458,6 +459,7 @@ export function renderAccount() {
   const cfg = state.config || {}
   content(`
     <div class="page-head"><div><h2>Mi cuenta</h2><p>Información de tu perfil y seguridad.</p></div></div>
+    <div id="account-push" style="margin-bottom:20px">${pushAccountHTML()}</div>
     <div class="grid-2">
       <div class="stack">
         <div class="card">

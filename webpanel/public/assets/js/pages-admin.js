@@ -1,4 +1,5 @@
 /* Pain Panel — módulo pages-admin */
+import { notificationsHTML, backupsHTML } from './admin-tools.js'
 import { api } from './api.js'
 import {
   attachRowFilter,
@@ -41,6 +42,8 @@ export function adminTabs(active) {
     ['audit', 'Auditoría', 'activity', 'admin.audit'],
     ['roles', 'Roles', 'shield', 'admin.settings.roles'],
     ['mail', 'Correo', 'mail', 'admin.settings.mail'],
+    ['notifications', 'Notificaciones', 'mail', 'admin.notifications'],
+    ['backups', 'Copias', 'server', 'admin.backups'],
     ['settings', 'Ajustes', 'settings', 'admin.settings'],
   ]
   return `<div class="admin-tabs">${tabs.filter(([, , , permiso]) => puede(permiso)).map(([id, label, iconName]) => `
@@ -58,6 +61,8 @@ export const ADMIN_META = {
   roles: ['Roles y permisos', 'Crea roles y decide qué puede hacer cada administrador'],
   mail: ['Correo y plantillas', 'Configura el SMTP y edita los mensajes que reciben los usuarios'],
   settings: ['Ajustes', 'Configuración global del panel'],
+  notifications: ['Notificaciones', 'Envía novedades y consulta qué usuarios tienen avisos activos'],
+  backups: ['Copias de seguridad', 'Exporta tus datos y prepara una migración segura'],
 }
 
 export async function renderAdmin(section) {
@@ -66,6 +71,12 @@ export async function renderAdmin(section) {
   content(adminTabs(section) + loadingBlock())
 
   try {
+    if (section === 'notifications') {
+      const data=await api.get(`/api/admin/notifications?q=${encodeURIComponent(state.pushQuery||'')}&offset=${state.pushOffset||0}`)
+      if (!isAdminRoute('notifications')) return
+      content(adminTabs('notifications')+notificationsHTML(data));return
+    }
+    if (section === 'backups') { content(adminTabs('backups')+backupsHTML());return }
     if (section === 'overview') {
       const data = await api.get('/api/admin/overview')
       if (!isAdminRoute('overview')) return
@@ -414,7 +425,7 @@ export function usersTable(users) {
         <td>${roleBadge(user.role, principal ? 'Principal' : user.roleName)}</td>
         <td>${badge(user.status)}</td>
         <td><span class="tiny muted">${fmtDate(user.created_at, false)}</span></td>
-        <td><span class="tiny muted">${user.last_login_at ? fmtRelative(user.last_login_at) : 'Nunca'}</span></td>
+        <td><span class="tiny muted">${user.last_login_at ? fmtRelative(user.last_login_at) : 'Nunca'}</span>${user.lastIp?`<div class="cell-sub mono">${h(user.lastIp)}</div>`:''}</td>
         <td><div class="actions">
           ${puede('admin.users.impersonate') ? `<button class="icon-btn sm" data-action="admin-impersonate" data-id="${user.id}" data-username="${h(user.username)}" title="Entrar como este usuario" ${self ? 'disabled' : ''}>${icon('user')}</button>` : ''}
           ${puede('admin.users.edit') ? `<button class="icon-btn sm" data-action="admin-user-edit" data-id="${user.id}" title="Editar">${icon('pencil')}</button>` : ''}
@@ -828,9 +839,10 @@ function permissionGroupsHTML(selected = [], scope = 'admin') {
       <div class="permission-list">
         ${permisos.map((permiso) => {
           const principalOnly = Boolean(permiso.principalOnly)
+          const privateLocked = permiso.key === 'admin.users.ip' && !puede('admin.users.ip')
           const checked = activos.has(permiso.key) || (scope === 'admin' && permiso.key === 'admin.access')
           return `<label class="permission-item ${principalOnly ? 'locked' : ''}">
-            <input type="checkbox" data-role-permission="${h(permiso.key)}" ${checked ? 'checked' : ''} ${principalOnly ? 'disabled' : ''} />
+            <input type="checkbox" data-role-permission="${h(permiso.key)}" ${checked ? 'checked' : ''} ${principalOnly || privateLocked ? 'disabled' : ''} />
             <span><b>${h(permiso.label)}</b>${principalOnly ? ' <span class="badge accent" style="font-size:9px">Solo principal</span>' : ''}<small>${h(permiso.key)}</small></span>
           </label>`
         }).join('')}

@@ -1,6 +1,7 @@
 /* Pain Panel — módulo shell */
 import { renderAuth } from './auth.js'
 import { api } from './api.js'
+import { startPushClient } from './push.js'
 import {
   app,
   closeModal,
@@ -155,6 +156,7 @@ const ADMIN_PERMISSIONS = {
   sessions: 'admin.sessions', pairings: 'admin.pairings', communities: 'admin.communities',
   audit: 'admin.audit', roles: 'admin.settings.roles', mail: 'admin.settings.mail',
   settings: 'admin.settings',
+  notifications: 'admin.notifications', backups: 'admin.backups',
 }
 
 export async function route() {
@@ -180,6 +182,7 @@ export async function route() {
     return
   }
   if ((location.hash.replace(/^#/, '') || '/dashboard') !== raw) return
+  startPushClient()
   const [path, queryString] = raw.split('?')
   const parts = path.split('/').filter(Boolean)
   state.route = { path, query: new URLSearchParams(queryString || ''), parts }

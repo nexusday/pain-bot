@@ -15,10 +15,13 @@ import {
 } from './core.js'
 import { renderStatsBadges } from './stats.js'
 import { montarTurnstile, reiniciarTurnstile } from './turnstile.js'
+import { disablePush, stopPushClient } from './push.js'
 
 /* ── Sesión expirada ────────────────────────────────────────────────────── */
 export function handleSessionExpired() {
   if (!state.user) return
+  stopPushClient()
+  state.adminUsers=[];state.adminRoles=[];state.adminAudit=[];state.adminPairings=[];state.adminPushUsers=[];state.adminPushSelection=new Set()
   state.user = null
   state.csrf = null
   state.bots = []
@@ -291,6 +294,9 @@ export async function handleAuth(form) {
 }
 
 export async function handleLogout() {
+  await disablePush(true)
+  stopPushClient()
+  state.adminPushUsers=[];state.adminPushSelection=new Set();state.pushQuery='';state.pushOffset=0;state.pushSelectionOwner=null
   try {
     await api.post('/api/auth/logout', {})
   } catch {}
