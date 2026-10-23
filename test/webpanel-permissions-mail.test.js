@@ -78,4 +78,23 @@ test('webpanel: permisos efectivos, protección del principal y SMTP obligatorio
   const newLogin = await request('/api/auth/login', null, 'POST', { username: user.username, password: 'newpassword123' })
   assert.equal(newLogin.status, 200)
   assert.equal(newLogin.data.user.emailVerified, true)
+  const adminRole = await handle.store.obtenerRolPorKey('admin')
+  const granted = [...adminRole.permissions, 'admin.settings.turnstile', 'admin.settings.roles']
+  const grant = await request(`/api/admin/roles/${adminRole.id}`, principal, 'PATCH', { permissions: granted })
+  assert.equal(grant.status, 200)
+  assert.ok(grant.data.role.permissions.includes('admin.settings.turnstile'))
+  assert.ok(grant.data.role.permissions.includes('admin.settings.roles'))
+  const delegatedSettings = await request('/api/admin/settings', secondary)
+  assert.equal(delegatedSettings.data.canTurnstile, true)
+  assert.equal(delegatedSettings.data.turnstileSecretKey, 'private-secret')
+  assert.equal((await request('/api/admin/settings', secondary, 'PATCH', { turnstileSiteKey: '' })).status, 200)
+  const roles = await request('/api/admin/roles', secondary)
+  assert.equal(roles.data.canManage, true)
+  assert.equal((await request('/api/admin/roles', secondary, 'POST', {
+    name: 'Delegated role', scope: 'user', permissions: ['bots.view'],
+  })).status, 201)
+  assert.equal((await request(`/api/admin/impersonate/${owner.id}`, secondary, 'POST')).status, 403)
+  await request(`/api/admin/roles/${adminRole.id}`, principal, 'PATCH', { permissions: adminRole.permissions })
+  assert.equal((await request('/api/admin/settings', secondary)).data.canTurnstile, false)
+  assert.equal((await request('/api/admin/roles', secondary)).data.canManage, false)
 })
