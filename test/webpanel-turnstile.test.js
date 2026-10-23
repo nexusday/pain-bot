@@ -58,6 +58,10 @@ test('webpanel: Turnstile se configura sin perder la secret key', async (t) => {
   const configInicial = await pedir('/api/config')
   assert.equal(configInicial.status, 200)
   assert.equal(configInicial.datos.turnstileSiteKey, '')
+  const forgotInactive = await pedir('/api/auth/forgot', {
+    method: 'POST', body: { email: 'unknown@example.com' },
+  })
+  assert.equal(forgotInactive.status, 200)
 
   const login = await pedir('/api/auth/login', {
     method: 'POST',
@@ -106,4 +110,28 @@ test('webpanel: Turnstile se configura sin perder la secret key', async (t) => {
   })
   assert.equal(sinToken.status, 400)
   assert.equal(sinToken.datos.code, 'captcha_missing')
+  const forgotMissing = await pedir('/api/auth/forgot', {
+    method: 'POST', body: { email: 'unknown@example.com' },
+  })
+  assert.equal(forgotMissing.status, 400)
+  assert.equal(forgotMissing.datos.code, 'captcha_missing')
+  const originalFetch = globalThis.fetch
+  t.mock.method(globalThis, 'fetch', (url, options) => {
+    if (url === 'https://challenges.cloudflare.com/turnstile/v0/siteverify') {
+      assert.equal(options.body.get('secret'), 'secreto-de-prueba')
+      return Promise.resolve(new Response(JSON.stringify({
+        success: options.body.get('response') === 'valid-test-token',
+      }), { headers: { 'content-type': 'application/json' } }))
+    }
+    return originalFetch(url, options)
+  })
+  const forgotInvalid = await pedir('/api/auth/forgot', {
+    method: 'POST', body: { email: 'unknown@example.com', turnstileToken: 'invalid-test-token' },
+  })
+  assert.equal(forgotInvalid.status, 400)
+  assert.equal(forgotInvalid.datos.code, 'captcha_failed')
+  const forgotValid = await pedir('/api/auth/forgot', {
+    method: 'POST', body: { email: 'unknown@example.com', turnstileToken: 'valid-test-token' },
+  })
+  assert.equal(forgotValid.status, 200)
 })

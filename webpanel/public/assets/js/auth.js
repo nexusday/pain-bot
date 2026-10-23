@@ -133,6 +133,7 @@ export function openAuthModal() {
 
 /* ── Recuperación de contraseña ─────────────────────────────────────────── */
 export function openForgotModal(email = '') {
+  const cfg = state.config || {}
   openModal({
     title: 'Recuperar contraseña',
     subtitle: 'Te enviaremos un código de 6 dígitos al correo de tu cuenta.',
@@ -143,9 +144,11 @@ export function openForgotModal(email = '') {
         <div class="input-icon">${icon('mail')}<input class="input" id="forgot-email" name="email" type="email" value="${h(email)}" autocomplete="email" placeholder="tu@correo.com" required /></div>
         <div class="hint">Si el correo está registrado, recibirás un código. No revelamos si la cuenta existe.</div>
       </div>
+      ${cfg.turnstileSiteKey ? '<div class="turnstile-slot" id="turnstile-slot"></div>' : ''}
       <button class="btn btn-primary btn-block" type="submit">${icon('mail')} Enviar código</button>
     </form>`,
   })
+  if (cfg.turnstileSiteKey) montarTurnstile(cfg.turnstileSiteKey)
 }
 
 export function openResetModal(email = '') {
@@ -188,9 +191,13 @@ export async function handleForgotPassword(form) {
     showFormError(form, 'Escribe un correo válido.')
     return
   }
+  if (state.config?.turnstileSiteKey && !state.turnstileToken) {
+    showFormError(form, 'Completa la verificación de seguridad.')
+    return
+  }
   setLoading(submit, true, 'Enviando…')
   try {
-    const data = await api.post('/api/auth/forgot', { email })
+    const data = await api.post('/api/auth/forgot', { email, turnstileToken: state.turnstileToken || '' })
     if (data.mailConfigured === false) {
       showToast('El correo todavía no está configurado. Avisa al administrador del panel.', 'warn')
     } else {
@@ -200,6 +207,7 @@ export async function handleForgotPassword(form) {
   } catch (error) {
     showFormError(form, error.message || 'No se pudo solicitar el código.')
     setLoading(submit, false)
+    reiniciarTurnstile()
   }
 }
 
