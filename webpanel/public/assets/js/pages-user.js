@@ -127,7 +127,7 @@ export async function renderDashboard() {
         <a class="btn btn-primary" href="#/link">${icon('plus')} Vincular bot</a>
       </div>
     </div>
-    ${mainLinked ? '' : `<div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div>El <b>bot principal</b> todavía no está vinculado, así que los sub-bots no pueden conectarse.${isAdmin ? ' Vincúlalo desde <a href="#/admin/principal"><b>Administración → Bot principal</b></a>.' : ' Avisa al administrador del servidor.'}</div></div>`}
+    ${mainLinked ? '' : `<div class="notice" style="margin-bottom:16px">${icon('info')}<div>El <b>bot principal</b> todavía no está vinculado. Tus sub-bots funcionan igual: solo falta el número que atiende los comandos del propietario.${isAdmin ? ' Vincúlalo desde <a href="#/admin/principal"><b>Administración → Bot principal</b></a>.' : ' Avisa al administrador del servidor.'}</div></div>`}
     <div class="stats-group">
       <div class="stats-group-head"><b>Total del servidor</b><span>Lo que hay ahora mismo en toda la instancia</span></div>
       <div class="stats-row">
