@@ -135,7 +135,7 @@ export async function onClick(event) {
       return
     }
     if (action === 'auth-forgot') {
-      openForgotModal(state.config?.adminEmail || '')
+      openForgotModal('')
       return
     }
     if (action === 'toggle-password') {

@@ -118,7 +118,7 @@ export function renderShell() {
         </header>
         ${state.impersonatedBy ? `<div class="impersonating-bar">
           ${icon('user')}
-          <span>Estás <b>acting como @${h(state.user.username)}</b>. Todo lo que cambies afecta a esa cuenta.</span>
+          <span>Estás entrando como <b>@${h(state.user.username)}</b>. Todo lo que cambies afecta a esa cuenta.</span>
           <button class="btn btn-sm btn-secondary" data-action="stop-impersonating">${icon('logout')} Volver a @${h(state.impersonatedBy.username)}</button>
         </div>` : ''}
         ${!user.email ? `<div class="account-nudge" id="email-nudge">

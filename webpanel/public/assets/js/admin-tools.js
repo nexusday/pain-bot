@@ -81,8 +81,10 @@ export async function handleBackupExport(form) {
       body: JSON.stringify(Object.fromEntries(new FormData(form))),
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'No se pudo exportar.')
+      const text = await response.text()
+      let error = null
+      try { error = JSON.parse(text) } catch {}
+      throw new Error(error?.error || 'No se pudo exportar.')
     }
     const blob = await response.blob(),
       url = URL.createObjectURL(blob),

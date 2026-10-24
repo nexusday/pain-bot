@@ -325,27 +325,42 @@ export async function handleUserSave(form) {
   if (password) body.password = password
   const button = document.getElementById('user-save-btn')
 
-  hideFormError(form)
-  setLoading(button, true, 'Guardando…')
-  try {
-    const data = await api.patch(`/api/admin/users/${encodeURIComponent(id)}`, body)
-    if (Number(id) === Number(state.user?.id) && data.user) {
-      state.user = { ...state.user, ...data.user }
-      if (!data.user.isAdmin) {
-        closeModal()
-        renderShell()
-        navigate('/dashboard')
-        showToast('Tu cuenta ya no tiene permisos de administrador.', 'warn')
-        return
+  const aplicar = async () => {
+    hideFormError(form)
+    setLoading(button, true, 'Guardando…')
+    try {
+      const data = await api.patch(`/api/admin/users/${encodeURIComponent(id)}`, body)
+      if (Number(id) === Number(state.user?.id) && data.user) {
+        state.user = { ...state.user, ...data.user }
+        if (!data.user.isAdmin) {
+          closeModal()
+          renderShell()
+          navigate('/dashboard')
+          showToast('Tu cuenta ya no tiene permisos de administrador.', 'warn')
+          return
+        }
       }
+      closeModal()
+      showToast('Usuario actualizado.', 'success')
+      await renderAdmin('users')
+    } catch (error) {
+      showFormError(form, error.message || 'No se pudo actualizar el usuario.')
+      setLoading(button, false)
     }
-    closeModal()
-    showToast('Usuario actualizado.', 'success')
-    await renderAdmin('users')
-  } catch (error) {
-    showFormError(form, error.message || 'No se pudo actualizar el usuario.')
-    setLoading(button, false)
   }
+
+  // Bloquear una cuenta es destructivo (cierra sus sesiones): pedir confirmación.
+  if (status === 'banned') {
+    confirmModal({
+      title: 'Bloquear usuario',
+      message: 'La cuenta quedará bloqueada: no podrá iniciar sesión y se cerrarán todas sus sesiones activas. Puedes reactivarla después con el estado «Activo».',
+      confirmLabel: 'Bloquear cuenta',
+      onConfirm: aplicar,
+    })
+    return
+  }
+
+  await aplicar()
 }
 
 export function confirmDeleteUser(id, username) {
