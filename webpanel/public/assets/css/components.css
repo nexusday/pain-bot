@@ -37,6 +37,13 @@
   transform: none;
 }
 
+/* Enlaces que actúan como botón deshabilitado (aria-disabled en <a>): */
+.btn[aria-disabled='true'] {
+  opacity: 0.55;
+  pointer-events: none;
+  transform: none;
+}
+
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);

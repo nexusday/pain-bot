@@ -24,7 +24,6 @@ import {
   openMailTest,
   handleMainLink,
   handleMainRelink,
-  handleMainRestart,
   handleMainUnlink,
   handleSettingsLimitsSave,
   handleSettingsSave,
@@ -37,7 +36,6 @@ import {
 } from './handlers-admin.js'
 import {
   aplicarCambiosEnCaliente,
-  confirmarReinicioDelProceso,
   confirmDeleteBot,
   confirmDeleteCommunity,
   handleAdminReload,
@@ -186,10 +184,6 @@ export async function onClick(event) {
       await aplicarCambiosEnCaliente()
       return
     }
-    if (action === 'restart-bot') {
-      await confirmarReinicioDelProceso()
-      return
-    }
     if (action === 'stop-impersonating') {
       await stopImpersonating()
       return
@@ -236,10 +230,6 @@ export async function onClick(event) {
     }
     if (action === 'main-relink') {
       openRelinkModal()
-      return
-    }
-    if (action === 'main-restart') {
-      await handleMainRestart()
       return
     }
     if (action === 'main-clear-code') {

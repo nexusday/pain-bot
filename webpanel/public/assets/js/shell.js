@@ -108,12 +108,12 @@ export function renderShell() {
           </div>
           <div class="topbar-actions">
             <div id="stats-badges" class="stat-badge-skeleton-box" style="display:none;"></div>
-            <button class="icon-btn" data-action="refresh" title="Actualizar">${icon('refresh')}</button>
+            <button class="icon-btn" data-action="refresh" title="Actualizar" aria-label="Actualizar">${icon('refresh')}</button>
             <div class="user-chip">
               <div class="avatar">${initials(user.username)}</div>
               <div><div class="uc-name">${h(user.username)}${user.isPrincipal ? ' <span class="badge accent" style="font-size:9px;padding:1px 5px">Principal</span>' : ''}</div><div class="uc-role">${h(rolVisible)}</div></div>
             </div>
-            <button class="icon-btn danger" data-action="logout" title="Cerrar sesión">${icon('logout')}</button>
+            <button class="icon-btn danger" data-action="logout" title="Cerrar sesión" aria-label="Cerrar sesión">${icon('logout')}</button>
           </div>
         </header>
         ${state.impersonatedBy ? `<div class="impersonating-bar">

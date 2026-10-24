@@ -289,6 +289,7 @@ export function showToast(message, type = 'info', ms = 4200) {
   while (toastRoot.children.length >= 4) toastRoot.firstElementChild?.remove()
   const el = document.createElement('div')
   el.className = `toast ${type}`
+  el.setAttribute('role', type === 'error' || type === 'warn' ? 'alert' : 'status')
   const iconName = type === 'success' ? 'check' : type === 'error' || type === 'warn' ? 'alert' : 'info'
   el.innerHTML = `${icon(iconName)}<span>${h(message)}</span><button class="toast-close" data-action="close-toast" aria-label="Cerrar">${icon('x')}</button>`
   toastRoot.appendChild(el)

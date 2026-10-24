@@ -48,11 +48,11 @@ export function botRow(bot) {
     <td>${bot.worker ? `<span class="mono tiny muted">${h(bot.worker)}</span>` : '<span class="tiny muted">—</span>'}</td>
     <td><span class="tiny muted">${fmtDate(bot.linked_at)}</span></td>
     <td><div class="actions">
-      <button class="icon-btn sm" data-action="bot-config" data-phone="${h(bot.phone)}" title="Configurar">${icon('settings')}</button>
+      <button class="icon-btn sm" data-action="bot-config" data-phone="${h(bot.phone)}" title="Configurar" aria-label="Configurar sub-bot">${icon('settings')}</button>
       <button class="icon-btn sm" data-action="bot-reconnect" data-phone="${h(bot.phone)}" title="Reconectar" ${canReconnect ? '' : 'disabled'}>${icon('rotate')}</button>
-      <button class="icon-btn sm" data-action="bot-relink" data-phone="${h(bot.phone)}" title="Re-vincular">${icon('link')}</button>
-      <button class="icon-btn sm" data-action="bot-rename" data-phone="${h(bot.phone)}" data-label="${h(bot.label || '')}" title="Renombrar">${icon('pencil')}</button>
-      <button class="icon-btn sm danger" data-action="bot-delete" data-phone="${h(bot.phone)}" data-label="${h(label)}" title="Eliminar">${icon('trash')}</button>
+      <button class="icon-btn sm" data-action="bot-relink" data-phone="${h(bot.phone)}" title="Re-vincular" aria-label="Re-vincular sub-bot">${icon('link')}</button>
+      <button class="icon-btn sm" data-action="bot-rename" data-phone="${h(bot.phone)}" data-label="${h(bot.label || '')}" title="Renombrar" aria-label="Renombrar sub-bot">${icon('pencil')}</button>
+      <button class="icon-btn sm danger" data-action="bot-delete" data-phone="${h(bot.phone)}" data-label="${h(label)}" title="Eliminar" aria-label="Eliminar sub-bot">${icon('trash')}</button>
     </div></td>
   </tr>`
 }
@@ -123,7 +123,7 @@ export async function renderDashboard() {
       <div class="stack">
         <div class="card">
           <div class="card-head">
-            <div><h3>Tus bots</h3><p>${total ? `${total} sesión(es) registrada(s)` : 'Aún no has vinculado ningún número'}</p></div>
+            <div><h3>Tus bots</h3><p>${total ? `${total} ${total === 1 ? 'sub-bot registrado' : 'sub-bots registrados'}` : 'Aún no has vinculado ningún número'}</p></div>
             <a class="btn btn-ghost btn-sm" href="#/bots">Gestionar ${icon('chevronRight')}</a>
           </div>
           <div class="card-body tight">${botsTable(bots, 5)}</div>
@@ -222,7 +222,7 @@ export async function renderBots() {
   const limiteAlcanzado = Boolean(limite && !limite.unlimited && limite.used >= limite.max)
   content(`
     <div class="page-head">
-      <div><h2>Mis bots</h2><p>${bots.length} sesión(es) vinculada(s) a tu cuenta.${limite && !limite.unlimited ? ` Límite: ${limite.used}/${limite.max}.` : ''}</p></div>
+      <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta.${limite && !limite.unlimited ? ` Límite: ${limite.used}/${limite.max}.` : ''}</p></div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="refresh">${icon('refresh')} Actualizar</button>
         <a class="btn btn-primary" href="#/link" ${limiteAlcanzado ? 'aria-disabled="true"' : ''}>${icon('plus')} Vincular bot</a>
@@ -231,7 +231,7 @@ export async function renderBots() {
     ${limiteAlcanzado ? `<div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div>Tu cuenta ya llegó al límite de <b>${limite.max}</b> sub-bot(s). Pide al administrador del servidor que lo amplíe si necesitas más.</div></div>` : ''}
     <div class="card">
       <div class="card-head">
-        <div><h3>Sesiones</h3><p>Estado actual de cada sub-bot</p></div>
+        <div><h3>Sub-bots</h3><p>Estado actual de cada sesión vinculada</p></div>
         <div class="input-icon" style="max-width:290px;width:100%">
           ${icon('search')}
           <input id="bots-search" class="input" placeholder="Buscar por número o nombre…" value="${h(state.botsFilter)}" />

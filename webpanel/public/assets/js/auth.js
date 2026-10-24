@@ -126,7 +126,6 @@ export function openAuthModal() {
         ${cfg.turnstileSiteKey ? `<div class="turnstile-slot" id="turnstile-slot"></div>` : ''}
         <button class="btn btn-primary btn-block auth-submit" type="submit">${tab === 'login' ? 'Entrar al panel' : 'Crear cuenta'} ${icon('arrowRight')}</button>
         ${tab === 'login' ? `<div class="auth-forgot"><button type="button" class="link-btn" data-action="auth-forgot">¿Olvidaste tu contraseña?</button></div>` : ''}
-        <div class="auth-legal">By Sunkovv</div>
       </form>
     `,
   })

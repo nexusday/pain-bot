@@ -17,7 +17,7 @@ import {
   showToast,
   state,
 } from './core.js'
-import { esperarReinicio, reconnectReason } from './handlers-user.js'
+import { reconnectReason } from './handlers-user.js'
 import { renderAdmin } from './pages-admin.js'
 import { renderShell } from './shell.js'
 
@@ -103,20 +103,6 @@ export async function handleMainRelink(form) {
     showFormError(form, error.message || 'No se pudo generar el código.')
     setLoading(submit, false)
   }
-}
-
-export async function handleMainRestart() {
-  confirmModal({
-    title: 'Reiniciar el proceso del bot',
-    message: 'El proceso principal se cierra y vuelve a arrancar. <b>El panel web se corta unos segundos</b> y las sesiones de los sub-bots se reconectan solas. Úsalo solo si el bot está atascado: para cambiar de número usa "Cambiar número", que no corta nada.',
-    confirmLabel: 'Reiniciar proceso',
-    danger: false,
-    onConfirm: async () => {
-      await api.post('/api/main/restart', {})
-      showToast('Reiniciando el proceso…', 'info')
-      esperarReinicio()
-    },
-  })
 }
 
 /* ── Configuración del sub-bot (nombre, imagen, menú…) ───────────────────── */

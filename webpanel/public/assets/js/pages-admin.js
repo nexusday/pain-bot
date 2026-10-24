@@ -428,7 +428,7 @@ export function usersTable(users) {
         <td><span class="tiny muted">${user.last_login_at ? fmtRelative(user.last_login_at) : 'Nunca'}</span>${user.lastIp?`<div class="cell-sub mono">${h(user.lastIp)}</div>`:''}</td>
         <td><div class="actions">
           ${puede('admin.users.impersonate') ? `<button class="icon-btn sm" data-action="admin-impersonate" data-id="${user.id}" data-username="${h(user.username)}" title="Entrar como este usuario" ${self ? 'disabled' : ''}>${icon('user')}</button>` : ''}
-          ${puede('admin.users.edit') ? `<button class="icon-btn sm" data-action="admin-user-edit" data-id="${user.id}" title="Editar">${icon('pencil')}</button>` : ''}
+          ${puede('admin.users.edit') ? `<button class="icon-btn sm" data-action="admin-user-edit" data-id="${user.id}" title="Editar" aria-label="Editar usuario">${icon('pencil')}</button>` : ''}
           ${puede('admin.users.delete') ? `<button class="icon-btn sm danger" data-action="admin-user-delete" data-id="${user.id}" data-username="${h(user.username)}" title="Eliminar" ${self || principal ? 'disabled' : ''}>${icon('trash')}</button>` : ''}
         </div></td>
       </tr>`
@@ -475,7 +475,7 @@ export function sessionsTable(sessions) {
         <td>${session.worker ? `<span class="mono tiny muted">${h(session.worker)}</span>` : '<span class="tiny muted">—</span>'}</td>
         <td><div class="actions">
           <button class="icon-btn sm" data-action="admin-session-reconnect" data-phone="${h(phone)}" title="Reconectar" ${canReconnect ? '' : 'disabled'}>${icon('rotate')}</button>
-          <button class="icon-btn sm danger" data-action="admin-session-delete" data-phone="${h(phone)}" title="Eliminar">${icon('trash')}</button>
+          <button class="icon-btn sm danger" data-action="admin-session-delete" data-phone="${h(phone)}" title="Eliminar" aria-label="Eliminar sesión">${icon('trash')}</button>
         </div></td>
       </tr>`
     }).join('')}</tbody>
@@ -665,10 +665,10 @@ export function adminCommunitiesHTML(data) {
               ${comunidad.description ? `<div class="hint" style="margin-top:4px">${h(comunidad.description)}</div>` : ''}
             </div>
             <div class="actions">
-              <button class="icon-btn sm" data-action="community-edit" data-id="${comunidad.id}" title="Editar">${icon('pencil')}</button>
-              <button class="icon-btn sm" data-action="copy" data-copy="${h(comunidad.link)}" title="Copiar enlace">${icon('copy')}</button>
-              <button class="icon-btn sm" data-action="community-toggle" data-id="${comunidad.id}" data-active="${comunidad.active ? 1 : 0}" title="${comunidad.active ? 'Ocultar' : 'Mostrar'}">${icon(comunidad.active ? 'eyeOff' : 'eye')}</button>
-              <button class="icon-btn sm danger" data-action="community-delete" data-id="${comunidad.id}" data-name="${h(comunidad.name)}" title="Eliminar">${icon('trash')}</button>
+              <button class="icon-btn sm" data-action="community-edit" data-id="${comunidad.id}" title="Editar" aria-label="Editar comunidad">${icon('pencil')}</button>
+              <button class="icon-btn sm" data-action="copy" data-copy="${h(comunidad.link)}" title="Copiar enlace" aria-label="Copiar enlace de la comunidad">${icon('copy')}</button>
+              <button class="icon-btn sm" data-action="community-toggle" data-id="${comunidad.id}" data-active="${comunidad.active ? 1 : 0}" title="${comunidad.active ? 'Ocultar' : 'Mostrar'}" aria-label="${comunidad.active ? 'Ocultar' : 'Mostrar'} comunidad">${icon(comunidad.active ? 'eyeOff' : 'eye')}</button>
+              <button class="icon-btn sm danger" data-action="community-delete" data-id="${comunidad.id}" data-name="${h(comunidad.name)}" title="Eliminar" aria-label="Eliminar comunidad">${icon('trash')}</button>
             </div>
           </div>`).join('')}</div>` : emptyState('globe', 'Sin comunidades', 'Crea la primera comunidad para que tus usuarios puedan unirse desde el panel.')}
       </div>
@@ -884,8 +884,8 @@ export function adminRolesHTML(data) {
               <span class="tiny muted">${rol.permissions?.includes('*') ? 'Todos los permisos' : `${rol.permissions?.length || 0} permiso(s)`}</span>
             </div>
             ${canManage && !esPrincipal && !bloqueado ? `<div class="actions">
-              <button class="icon-btn sm" data-action="admin-role-edit" data-id="${rol.id}" title="Editar rol">${icon('pencil')}</button>
-              ${rol.system ? '' : `<button class="icon-btn sm danger" data-action="admin-role-delete" data-id="${rol.id}" data-name="${h(rol.name)}" title="Eliminar rol">${icon('trash')}</button>`}
+              <button class="icon-btn sm" data-action="admin-role-edit" data-id="${rol.id}" title="Editar rol" aria-label="Editar rol">${icon('pencil')}</button>
+              ${rol.system ? '' : `<button class="icon-btn sm danger" data-action="admin-role-delete" data-id="${rol.id}" data-name="${h(rol.name)}" title="Eliminar rol" aria-label="Eliminar rol">${icon('trash')}</button>`}
             </div>` : ''}
           </div>`
         }).join('')}</div>
@@ -971,13 +971,13 @@ export function adminMailHTML(data) {
                 <option value="smtp" ${config.mailer === 'smtp' ? 'selected' : ''}>SMTP</option>
               </select>
             </div>
-            <div class="field"><label class="label" for="mail-user">Usuario SMTP</label><input id="mail-user" name="user" class="input mono" value="${h(config.user || '')}" placeholder="hosting-soporte@nexcodea.com" autocomplete="off" /></div>
+            <div class="field"><label class="label" for="mail-user">Usuario SMTP</label><input id="mail-user" name="user" class="input mono" value="${h(config.user || '')}" placeholder="usuario@tu-dominio.com" autocomplete="off" /></div>
             <div class="field"><label class="label" for="mail-password">Contraseña SMTP</label>
               <div class="input-icon">${icon('key')}<input id="mail-password" name="password" type="password" class="input" value="" placeholder="${config.passwordSet ? '•••••••••• (guardada)' : 'Escribe la contraseña'}" autocomplete="new-password" /><button type="button" class="icon-btn sm" data-action="toggle-password" data-input="mail-password" style="position:absolute;right:5px;top:5px;border:0;background:transparent" aria-label="Mostrar u ocultar">${icon('eye')}</button></div>
               <div class="hint">Nunca se muestra la contraseña guardada. Déjala vacía para conservarla.</div>
             </div>
-            <div class="field"><label class="label" for="mail-from">Correo remitente</label><input id="mail-from" name="from" type="email" class="input mono" value="${h(config.from || '')}" placeholder="hosting-soporte@nexcodea.com" /></div>
-            <div class="field"><label class="label" for="mail-from-name">Nombre remitente</label><input id="mail-from-name" name="fromName" class="input" value="${h(config.fromName || '')}" placeholder="NEXCODEA CLOUD" /></div>
+            <div class="field"><label class="label" for="mail-from">Correo remitente</label><input id="mail-from" name="from" type="email" class="input mono" value="${h(config.from || '')}" placeholder="avisos@tu-dominio.com" /></div>
+            <div class="field"><label class="label" for="mail-from-name">Nombre remitente</label><input id="mail-from-name" name="fromName" class="input" value="${h(config.fromName || '')}" placeholder="Notificaciones del panel" /></div>
           </div>
           <label class="check switch" style="margin-top:14px">
             <input type="checkbox" name="requireEmailVerification" ${data.requireEmailVerification ? 'checked' : ''} />
