@@ -78,8 +78,11 @@ export function botsTable(bots, limit = 0) {
 export async function renderDashboard() {
   setPage('Dashboard', 'Resumen de tu cuenta y tus sub-bots')
   content(loadingPage('Cargando tu dashboard…'))
+  let globalStats = null
   try {
-    await loadBots()
+    const [, statsData] = await Promise.all([loadBots(), api.get('/api/stats').catch(() => null)])
+    globalStats = statsData || state.stats || null
+    if (globalStats) state.stats = globalStats
   } catch (error) {
     content(errorPage(error.message))
     return
@@ -103,6 +106,18 @@ export async function renderDashboard() {
     ? Boolean(state.main?.linked)
     : state.config?.mainLinked !== false
   const mainPhone = state.main?.phone || ''
+  // Totales de toda la instancia (no solo los de esta cuenta).
+  const servidor = globalStats || {}
+  const cuenta = (valor) => {
+    if (valor === null || valor === undefined || valor === '') return null
+    const numero = Number(valor)
+    return Number.isFinite(numero) ? numero : null
+  }
+  const usuariosTotal = cuenta(servidor.users)
+  const botsTotal = cuenta(servidor.bots)
+  const conectadosTotal = cuenta(servidor.sessionsConnected)
+  const guardadasTotal = cuenta(servidor.sessions)
+  const guardadasCreds = cuenta(servidor.sessionsSaved)
 
   content(`
     <div class="page-head">
@@ -113,11 +128,23 @@ export async function renderDashboard() {
       </div>
     </div>
     ${mainLinked ? '' : `<div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div>El <b>bot principal</b> todavía no está vinculado, así que los sub-bots no pueden conectarse.${isAdmin ? ' Vincúlalo desde <a href="#/admin/principal"><b>Administración → Bot principal</b></a>.' : ' Avisa al administrador del servidor.'}</div></div>`}
-    <div class="stats-row">
-      ${statCard('Sub-bots', total, 'bot', 'accent')}
-      ${statCard('Conectados', connected, 'wifi', connected > 0 ? 'green' : 'muted')}
-      ${statCard('Requieren atención', relink, 'alert', 'amber')}
-      ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? 'Límite del servidor' : 'Sin límite configurado'}</span>`)}
+    <div class="stats-group">
+      <div class="stats-group-head"><b>Total del servidor</b><span>Lo que hay ahora mismo en toda la instancia</span></div>
+      <div class="stats-row">
+        ${statCard('Usuarios', usuariosTotal ?? '—', 'users', 'violet', '<span>Cuentas registradas</span>')}
+        ${statCard('Sub-bots', botsTotal ?? '—', 'bot', 'cyan', '<span>Vinculados en el panel</span>')}
+        ${statCard('Conectados', conectadosTotal ?? '—', 'wifi', (conectadosTotal || 0) > 0 ? 'green' : 'muted', '<span>Sesiones en línea</span>')}
+        ${statCard('Guardadas', guardadasTotal ?? '—', 'server', 'amber', `<span>${guardadasCreds ?? '—'} con credenciales</span>`)}
+      </div>
+    </div>
+    <div class="stats-group">
+      <div class="stats-group-head"><b>Tu cuenta</b><span>Solo los números vinculados a ti</span></div>
+      <div class="stats-row">
+        ${statCard('Tus sub-bots', total, 'bot', 'accent', `<span>${total === 1 ? '1 número vinculado' : `${total} números vinculados`}</span>`)}
+        ${statCard('Conectados', connected, 'wifi', connected > 0 ? 'green' : 'muted', '<span>De tu cuenta</span>')}
+        ${statCard('Requieren atención', relink, 'alert', 'amber', '<span>Necesitan re-vincularse</span>')}
+        ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? 'Límite del servidor' : 'Sin límite configurado'}</span>`)}
+      </div>
     </div>
     <div class="grid-2">
       <div class="stack">

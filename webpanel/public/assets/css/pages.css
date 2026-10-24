@@ -5,6 +5,36 @@
   margin: 14px 0;
 }
 
+/* Grupos de tarjetas del dashboard: "Total del servidor" y "Tu cuenta". */
+.stats-group {
+  margin-bottom: 2px;
+}
+
+.stats-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.stats-group-head b {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.stats-group-head span {
+  font-size: 12px;
+  color: var(--muted-2);
+}
+
+.stats-group .stats-row {
+  margin-top: 10px;
+}
+
 /* Contenedor de badges en el topbar (solo se muestra cuando hay datos) */
 .stat-badge-skeleton-box {
   display: none;
