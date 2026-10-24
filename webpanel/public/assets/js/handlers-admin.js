@@ -447,6 +447,65 @@ export async function handleSettingsTurnstileSave(form) {
   }
 }
 
+/* ── Ajustes del sub-bot premium (anuncios) ─────────────────────────────── */
+export async function handleSettingsPremiumSave(form) {
+  const submit = form.querySelector('button[type="submit"]')
+  const numero = (nombre, porDefecto) => {
+    const valor = Number(form.querySelector(`[name="${nombre}"]`)?.value)
+    return Number.isFinite(valor) ? valor : porDefecto
+  }
+  const texto = (nombre) => String(form.querySelector(`[name="${nombre}"]`)?.value || '').trim()
+  const premium = {
+    enabled: Boolean(form.querySelector('[name="enabled"]')?.checked),
+    adMinutes: numero('adMinutes', 60),
+    adSeconds: numero('adSeconds', 5),
+    cooldownSeconds: numero('cooldownSeconds', 5),
+    maxHours: numero('maxHours', 24),
+    unlockHours: numero('unlockHours', 10),
+    smartlink: texto('smartlink'),
+    placements: Object.fromEntries(['dashboard', 'bots', 'premium', 'communities', 'link', 'account'].map((pagina) => [pagina,
+      Object.fromEntries(['header', 'footer'].map((zona) => [zona, Boolean(form.querySelector(`[name="ad-${pagina}-${zona}"]`)?.checked)])),
+    ])),
+    banners: {
+      small: texto('bannerSmall'),
+      medium: texto('bannerMedium'),
+      native: texto('bannerNative'),
+      square: texto('bannerSquare'),
+      tall: texto('bannerTall'),
+      leaderboard: texto('bannerLeaderboard'),
+      wide: texto('bannerWide'),
+    },
+  }
+  hideFormError(form)
+  if (premium.maxHours < 1) {
+    showFormError(form, 'El tope del banco debe ser de al menos 1 hora.')
+    return
+  }
+  if (premium.unlockHours >= premium.maxHours) {
+    showFormError(form, 'El desbloqueo debe ser menor que el tope (si no, el botón nunca se reabriría).')
+    return
+  }
+  setLoading(submit, true, 'Guardando…')
+  try {
+    const data = await api.patch('/api/admin/settings', { premium })
+    const guardado = data.premium || premium
+    if (state.config) {
+      state.config.adsPlacements = guardado.placements
+      state.config.adsBanners = guardado.banners
+    }
+    showToast(
+      guardado.enabled === false
+        ? 'Premium desactivado.'
+        : `Premium actualizado: ${guardado.adMinutes} min por anuncio, tope ${guardado.maxHours} h.`,
+      guardado.enabled === false ? 'warn' : 'success'
+    )
+    await renderAdmin('settings')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo guardar la configuración de anuncios.')
+    setLoading(submit, false)
+  }
+}
+
 /* ── Roles y permisos ───────────────────────────────────────────────────── */
 export async function handleRoleSave(form) {
   const id = form.dataset.id

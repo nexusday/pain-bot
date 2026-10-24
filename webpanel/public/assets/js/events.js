@@ -11,6 +11,7 @@ import {
   renderAuth,
 } from './auth.js'
 import { closeModal, copyText, icon, isAdminRoute, modalRoot, showToast, state } from './core.js'
+import { guardarPremiumEdiciones, iniciarAnuncioPremium } from './pages-premium.js'
 import {
   adminReconnect,
   confirmAdminDeleteSession,
@@ -26,6 +27,7 @@ import {
   handleMainRelink,
   handleMainUnlink,
   handleSettingsLimitsSave,
+  handleSettingsPremiumSave,
   handleSettingsSave,
   handleSettingsTurnstileSave,
   handleUserSave,
@@ -148,10 +150,20 @@ export async function onClick(event) {
       confirmDeleteBot(phone, actionEl.dataset.label || '')
       return
     }
-    if (action === 'bot-config') {
-      await openBotConfigModal(phone)
-      return
-    }
+  if (action === 'bot-config') {
+    await openBotConfigModal(phone)
+    return
+  }
+  if (action === 'premium-ad') {
+    await iniciarAnuncioPremium(actionEl)
+    return
+  }
+  if (action === 'premium-menu-reset') {
+    const area = actionEl.closest('form')?.querySelector('[name="menuTexto"]')
+    if (area) area.value = ''
+    showToast('Menú por defecto: pulsa Guardar para aplicarlo.', 'info')
+    return
+  }
     if (action === 'bot-reconnect') {
       await reconnectBot(phone)
       return
@@ -390,6 +402,16 @@ export async function onSubmit(event) {
   if (id === 'bot-config-form') {
     event.preventDefault()
     await handleBotConfigSave(form)
+    return
+  }
+  if (form.classList.contains('premium-form')) {
+    event.preventDefault()
+    await guardarPremiumEdiciones(form)
+    return
+  }
+  if (id === 'settings-premium-form') {
+    event.preventDefault()
+    await handleSettingsPremiumSave(form)
     return
   }
   if (id === 'main-link-form') {

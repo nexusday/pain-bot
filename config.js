@@ -7,6 +7,13 @@ import './lib/load-env.js'
 import { watchFile, unwatchFile } from 'fs' 
 import chalk from 'chalk'
 import { fileURLToPath } from 'url'
+// El premium de los sub-bots cambia `moneda`, `canal` y `rcanal` por mensaje.
+// Esto los convierte en propiedades del contexto: lo que ves aquí abajo sigue
+// siendo el valor por defecto, y un sub-bot premium usa el suyo sin tocar al
+// resto de sub-bots que comparten el mismo proceso.
+import { instalarContextoPremium } from './lib/premium.js'
+
+instalarContextoPremium()
 
 
 // CAMBIA POR EL NUMERO O TU wa.me/@usuario DEL OWNER
@@ -33,6 +40,7 @@ global.AFBots = true
 global.packname = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧 𝗠𝗗'
 global.namebot = '𝗣𝗔𝗜𝗡 𝗕𝗢𝗧 𝗠𝗗'
 global.author = 'Sunkovv'
+// Moneda global. Un sub-bot premium puede usar la suya (panel → Premium).
 global.moneda = 'USD'
 
 

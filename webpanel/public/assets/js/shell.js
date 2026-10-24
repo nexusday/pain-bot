@@ -17,6 +17,7 @@ import {
   updateNavBadges,
 } from './core.js'
 import { renderAdmin } from './pages-admin.js'
+import { renderPremium } from './pages-premium.js'
 import {
   renderAccount,
   renderBots,
@@ -89,6 +90,7 @@ export function renderShell() {
           ${puede('bots.view') ? navLink('/bots', 'bot', 'Mis bots', { badge: state.bots.length || '', badgeId: 'nav-bots-count' }) : ''}
           ${puede('bots.link') ? navLink('/link', 'link', 'Vincular bot') : ''}
           ${puede('communities.view') ? navLink('/communities', 'globe', 'Comunidades') : ''}
+          ${puede('bots.view') ? navLink('/premium', 'sparkles', 'Premium') : ''}
           <div class="nav-section">Cuenta</div>
           ${navLink('/account', 'user', 'Mi cuenta')}
           ${isAdmin && adminInicio ? `<div class="nav-section">Administración</div>${navLink(`/admin/${adminInicio}`, 'shield', 'Administración', { nav: '/admin' })}` : ''}
@@ -211,6 +213,8 @@ export async function route() {
       return renderLinkPage()
     case 'communities':
       return renderCommunities()
+    case 'premium':
+      return renderPremium()
     case 'account':
       return renderAccount()
     default:

@@ -55,6 +55,7 @@ import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
 import { confirmSessionLease, requestReconnectAll, requestReconnectOne, requestReloadAll } from './lib/process-isolation.js'
+import { ejecutarEnContextoBot } from './lib/premium.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
@@ -738,7 +739,10 @@ global.reloadHandler = async function (restartConn) {
       if (!sub.authState?.creds?.registered) return
       const modulo = global.handlerModule
       if (!modulo?.handler) return
-      return modulo.handler.call(sub, chatUpdate)
+      // Cada mensaje se atiende dentro del contexto de SU sub-bot: la moneda,
+      // el canal y los textos del menú premium no se mezclan entre sub-bots
+      // que comparten este proceso.
+      return ejecutarEnContextoBot(sub, () => modulo.handler.call(sub, chatUpdate))
     }
     const handlersAnteriores = new Set([sub.handler, sub._upsertVivo])
     for (const handlerAnterior of handlersAnteriores) {

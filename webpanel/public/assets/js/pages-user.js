@@ -1,6 +1,7 @@
 /* Pain Panel — módulo pages-user */
 import { pushAccountHTML } from './push.js'
 import { api } from './api.js'
+import { anunciosCabeceraHTML, anunciosPieHTML } from './pages-premium.js'
 import {
   attachRowFilter,
   badge,
@@ -36,13 +37,18 @@ export async function loadBots() {
 
 export function botRow(bot) {
   const label = bot.label || fmtPhone(bot.phone)
+  const premium = Boolean(bot.premium?.active)
   const sub = bot.label ? fmtPhone(bot.phone) : 'WhatsApp'
+  const tipo = premium ? 'SUBBOT PREMIUM' : 'SUBBOT'
+  const insigniaPremium = premium
+    ? '<span class="badge accent" style="font-size:9px;padding:1px 6px;margin-left:6px">PREMIUM</span>'
+    : ''
   const canReconnect = ['linked', 'connected', 'unknown', 'missing'].includes(bot.status)
   const search = `${bot.phone} ${bot.label || ''} ${bot.status}`.toLowerCase()
   return `<tr data-bot-row data-search="${h(search)}">
     <td><div class="cell-main">
       <div class="row-icon ${statusIconTone(bot.status)}">${icon('bot')}</div>
-      <div class="grow"><div class="cell-title">${h(label)}</div><div class="cell-sub">${h(sub)}</div></div>
+      <div class="grow"><div class="cell-title">${h(label)}${insigniaPremium}</div><div class="cell-sub">${h(sub)} · ${tipo}</div></div>
     </div></td>
     <td>${badge(bot.status)}</td>
     <td>${bot.worker ? `<span class="mono tiny muted">${h(bot.worker)}</span>` : '<span class="tiny muted">—</span>'}</td>
@@ -99,6 +105,8 @@ export async function renderDashboard() {
   const connected = bots.filter((bot) => bot.status === 'connected').length
   const relink = bots.filter((bot) => bot.status === 'relink').length
   const pending = bots.filter((bot) => ['pairing', 'pending'].includes(bot.status)).length
+  const premiumActivos = bots.filter((bot) => bot.premium?.active).length
+  const sinPremium = total - premiumActivos
   const maxSubs = Number(state.config?.maxSubs || 0)
   const slots = maxSubs > 0 ? `${total}/${maxSubs}` : 'Ilimitado'
   const publicUrl = state.config?.publicUrl || ''
@@ -120,6 +128,7 @@ export async function renderDashboard() {
   const guardadasCreds = cuenta(servidor.sessionsSaved)
 
   content(`
+    ${anunciosCabeceraHTML()}
     <div class="page-head">
       <div><h2>Hola, ${h(state.user.username)}</h2><p>Estado en vivo de tu cuenta y tus sub-bots.</p></div>
       <div class="page-actions">
@@ -150,11 +159,21 @@ export async function renderDashboard() {
       <div class="stack">
         <div class="card">
           <div class="card-head">
-            <div><h3>Tus bots</h3><p>${total ? `${total} ${total === 1 ? 'sub-bot registrado' : 'sub-bots registrados'}` : 'Aún no has vinculado ningún número'}</p></div>
+            <div><h3>Tus bots</h3><p>${total ? `${total} ${total === 1 ? 'sub-bot registrado' : 'sub-bots registrados'}${premiumActivos ? ` · ${premiumActivos} premium` : ''}` : 'Aún no has vinculado ningún número'}</p></div>
             <a class="btn btn-ghost btn-sm" href="#/bots">Gestionar ${icon('chevronRight')}</a>
           </div>
           <div class="card-body tight">${botsTable(bots, 5)}</div>
         </div>
+        <section class="premium-invite" aria-labelledby="dashboard-premium-title">
+          <div class="premium-invite-icon" aria-hidden="true">${icon('sparkles')}</div>
+          <div class="premium-invite-copy">
+            <span class="premium-invite-label">SUB-BOT PREMIUM · GRATIS CON ANUNCIOS</span>
+            <h3 id="dashboard-premium-title">Tu sub-bot, con tu propio estilo.</h3>
+            <p>¿Quieres que tu sub-bot sea Premium? Mira anuncios y gana tiempo para personalizarlo.</p>
+            <div class="premium-invite-perks"><span>Menú a tu gusto</span><span>Tu moneda</span><span>Tu canal</span></div>
+          </div>
+          <a class="btn premium-invite-button" href="#/premium">Quiero ser Premium ${icon('chevronRight')}</a>
+        </section>
         ${pending ? `<div class="card"><div class="card-body">
           <div class="flex items-center gap-12">
             <div class="row-icon cyan">${icon('link')}</div>
@@ -212,7 +231,9 @@ export async function renderDashboard() {
           </div>
         </div>
       </div>
-    </div>`)
+    </div>
+    ${anunciosPieHTML()}
+  `)
 
   // Auto-actualizar datos del dashboard cada 30s (solo mientras se esté en esta ruta).
   // Evita repintar si el usuario está escribiendo en la vista y conserva la posición de scroll.
@@ -248,6 +269,7 @@ export async function renderBots() {
   const limite = state.botLimit || null
   const limiteAlcanzado = Boolean(limite && !limite.unlimited && limite.used >= limite.max)
   content(`
+    ${anunciosCabeceraHTML()}
     <div class="page-head">
       <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta.${limite && !limite.unlimited ? ` Límite: ${limite.used}/${limite.max}.` : ''}</p></div>
       <div class="page-actions">
@@ -265,7 +287,18 @@ export async function renderBots() {
         </div>
       </div>
       <div class="card-body tight">${botsTable(bots)}</div>
-    </div>`)
+    </div>
+    <section class="premium-invite" aria-labelledby="premium-invite-title">
+      <div class="premium-invite-icon" aria-hidden="true">${icon('sparkles')}</div>
+      <div class="premium-invite-copy">
+        <span class="premium-invite-label">SUB-BOT PREMIUM · GRATIS CON ANUNCIOS</span>
+        <h3 id="premium-invite-title">Tu sub-bot, con tu propio estilo.</h3>
+        <p>¿Quieres que tu sub-bot sea Premium? Mira anuncios y gana tiempo para personalizarlo.</p>
+        <div class="premium-invite-perks"><span>Menú a tu gusto</span><span>Tu moneda</span><span>Tu canal</span></div>
+      </div>
+      <a class="btn premium-invite-button" href="#/premium">Quiero ser Premium ${icon('chevronRight')}</a>
+    </section>
+    ${anunciosPieHTML()}`)
   attachRowFilter('#bots-search', '[data-bot-row]')
 }
 
@@ -380,6 +413,7 @@ export function renderLinkPage() {
   setPage('Vincular bot', 'Genera un código y conéctalo desde WhatsApp')
   const active = state.pairing && !['linked', 'expired', 'error', 'cancelled'].includes(state.pairing.status)
   content(`
+    ${active ? '' : anunciosCabeceraHTML('link')}
     <div class="page-head">
       <div><h2>Vincular un sub-bot</h2><p>La sesión queda registrada en tu cuenta y el supervisor la conecta automáticamente.</p></div>
       <div class="page-actions"><a class="btn btn-secondary" href="#/bots">${icon('bot')} Mis bots</a></div>
@@ -387,7 +421,8 @@ export function renderLinkPage() {
     <div class="link-layout">
       <div>${state.pairing ? pairingCardHTML() : linkFormHTML()}</div>
       <div>${stepsCardHTML()}</div>
-    </div>`)
+    </div>
+    ${active ? '' : anunciosPieHTML('link')}`)
 
   const phoneInput = document.getElementById('link-phone')
   phoneInput?.addEventListener('input', () => {
@@ -467,6 +502,7 @@ export async function renderCommunities() {
     const data = await api.get('/api/communities')
     const comunidades = Array.isArray(data.communities) ? data.communities : []
     content(`
+      ${anunciosCabeceraHTML('communities')}
       <div class="page-head">
         <div><h2>Comunidades</h2><p>${comunidades.length ? 'Entra con un clic a la comunidad que quieras.' : 'Todavía no hay comunidades publicadas.'}</p></div>
       </div>
@@ -481,7 +517,8 @@ export async function renderCommunities() {
           </div>
           <a class="btn btn-primary btn-block" href="${h(comunidad.link)}" target="_blank" rel="noopener noreferrer">${icon('external')} Unirme a la comunidad</a>
           <button class="btn btn-ghost btn-sm btn-block" style="margin-top:8px" data-action="copy" data-copy="${h(comunidad.link)}">${icon('copy')} Copiar enlace</button>
-        </div>`).join('')}</div>` : `<div class="card">${emptyState('globe', 'Sin comunidades todavía', 'El administrador todavía no ha publicado ninguna comunidad. Vuelve más tarde.')}</div>`}`)
+        </div>`).join('')}</div>` : `<div class="card">${emptyState('globe', 'Sin comunidades todavía', 'El administrador todavía no ha publicado ninguna comunidad. Vuelve más tarde.')}</div>`}
+      ${anunciosPieHTML('communities')}`)
   } catch (error) {
     content(errorPage(error.message))
   }
@@ -493,6 +530,7 @@ export function renderAccount() {
   const user = state.user
   const cfg = state.config || {}
   content(`
+    ${anunciosCabeceraHTML('account')}
     <div class="page-head"><div><h2>Mi cuenta</h2><p>Información de tu perfil y seguridad.</p></div></div>
     <div id="account-push" style="margin-bottom:20px">${pushAccountHTML()}</div>
     <div class="grid-2">
@@ -571,5 +609,6 @@ export function renderAccount() {
           </div>
         </div>
       </div>
-    </div>`)
+    </div>
+    ${anunciosPieHTML('account')}`)
 }

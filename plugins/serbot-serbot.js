@@ -26,6 +26,7 @@ import {
 } from '../lib/subbot-recovery.js'
 import { fileURLToPath } from "url"
 import { tr } from '../lib/lang.js'
+import { ejecutarEnContextoBot } from '../lib/premium.js'
 import {
   confirmSessionLease,
   releaseSessionLease,
@@ -33,7 +34,8 @@ import {
 } from '../lib/process-isolation.js'
 
 
-const rcanal = global.rcanal || {
+// Se resuelve en cada uso: un sub-bot premium puede tener su propio canal.
+const rcanalPorDefecto = {
   contextInfo: {
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
@@ -41,6 +43,11 @@ const rcanal = global.rcanal || {
       serverMessageId: 100,
       newsletterName: ''
     }
+  }
+}
+const rcanal = {
+  get contextInfo() {
+    return (global.rcanal || rcanalPorDefecto).contextInfo
   }
 }
 
@@ -1045,7 +1052,9 @@ async function iniciarSubBot(options) {
         if (!sock.authState?.creds?.registered) return
         const modulo = global.handlerModule
         if (!modulo?.handler) return
-        return modulo.handler.call(sock, chatUpdate)
+        // Contexto por mensaje: moneda, canal y menú premium del sub-bot que
+        // atiende, sin afectar a los demás sub-bots del proceso.
+        return ejecutarEnContextoBot(sock, () => modulo.handler.call(sock, chatUpdate))
       }
       sock.connectionUpdate = actualizacionConexion.bind(sock)
       sock.credsUpdate = saveCreds.bind(sock, true)

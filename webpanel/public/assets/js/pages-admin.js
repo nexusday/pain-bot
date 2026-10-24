@@ -683,6 +683,98 @@ export function adminAuditHTML(data) {
   </div>`
 }
 
+/** Ajustes del sub-bot premium: anuncios de Adsterra y reglas del banco. */
+function adminPremiumHTML(premium) {
+  const banners = premium.banners || {}
+  const activo = premium.enabled !== false
+  const campoBanner = (nombre, clave, etiqueta, tamano, valor) => {
+    const opcion = premium.opciones?.[clave] || null
+    const definido = Boolean(valor)
+    const detalle = opcion?.width && opcion?.height
+      ? `${opcion.width} × ${opcion.height} · atOptions detectado`
+      : `${tamano} · pega el bloque completo`
+    return `
+    <div class="ad-config-row">
+      <div class="ad-config-head">
+        <div><b>${etiqueta}</b><span class="muted"> · ${detalle}</span></div>
+        <span class="badge ${definido ? 'success' : 'neutral'}">${definido ? 'Configurado' : 'Sin configurar'}</span>
+      </div>
+      <textarea id="pm-banner-${nombre}" name="${nombre}" class="input mono ad-code-input" rows="3" placeholder="Pega aquí el bloque completo de Adsterra…" spellcheck="false">${h(valor || '')}</textarea>
+      ${definido ? `<details class="ad-preview"><summary>Vista previa guardada</summary><iframe title="Vista previa ${etiqueta}" src="/api/premium/frame?b=${clave}" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></details>` : ''}
+    </div>`
+  }
+  return `<div class="card">
+    <div class="card-head">
+      <div><h3>Sub-bot premium</h3><p>Anuncios, tiempo por anuncio y tope del banco</p></div>
+      <span class="badge ${activo ? 'success' : 'neutral'}"><span class="dot"></span>${activo ? 'Activo' : 'Desactivado'}</span>
+    </div>
+    <div class="card-body">
+      <form id="settings-premium-form">
+        <div class="form-error">${icon('alert')}<span></span></div>
+        <div class="form-success">${icon('check')}<span></span></div>
+        <label class="check switch">
+          <input type="checkbox" name="enabled" ${activo ? 'checked' : ''} />
+          <span><b>Permitir premium con anuncios</b><br /><span class="muted">Si lo desactivas, las páginas premium dejan de dar horas (las que ya tienen siguen vigentes).</span></span>
+        </label>
+        <div class="grid-3">
+          <div class="field">
+            <label class="label" for="pm-minutes">Minutos por anuncio</label>
+            <input id="pm-minutes" name="adMinutes" type="number" min="1" max="1440" class="input" value="${Number(premium.adMinutes || 60)}" />
+          </div>
+          <div class="field">
+            <label class="label" for="pm-seconds">Segundos en el anuncio</label>
+            <input id="pm-seconds" name="adSeconds" type="number" min="3" max="60" class="input" value="${Number(premium.adSeconds || 5)}" />
+            <div class="hint">Se valida en el servidor.</div>
+          </div>
+          <div class="field">
+            <label class="label" for="pm-cooldown">Espera entre anuncios (s)</label>
+            <input id="pm-cooldown" name="cooldownSeconds" type="number" min="0" max="3600" class="input" value="${Number(premium.cooldownSeconds ?? 5)}" />
+          </div>
+        </div>
+        <div class="grid-2-tight">
+          <div class="field">
+            <label class="label" for="pm-maxhours">Tope del banco (horas)</label>
+            <input id="pm-maxhours" name="maxHours" type="number" min="1" max="720" class="input" value="${Number(premium.maxHours || 24)}" />
+            <div class="hint">Al llegar, el botón de sumar tiempo se bloquea.</div>
+          </div>
+          <div class="field">
+            <label class="label" for="pm-unlockhours">Se desbloquea al bajar de (horas)</label>
+            <input id="pm-unlockhours" name="unlockHours" type="number" min="0" max="720" class="input" value="${Number(premium.unlockHours ?? 10)}" />
+            <div class="hint">Debe ser menor que el tope.</div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="pm-smartlink">Smartlink (se abre en una pestaña)</label>
+          <div class="input-icon">${icon('external')}<input id="pm-smartlink" name="smartlink" class="input mono" value="${h(premium.smartlink || '')}" placeholder="https://www.effectiveratecpm.com/…" spellcheck="false" /></div>
+        </div>
+        <fieldset class="field">
+          <legend class="label">Dónde mostrar los anuncios</legend>
+          <p class="hint">Cabecera automática: 728 × 90 en espacios amplios, 468 × 60 en medianos y 320 × 50 en móvil, si están configurados. El pie usa 320 × 50 y no lo repite si ya aparece arriba. Desmarca ambas opciones para no mostrar anuncios en esa página.</p>
+          <div class="grid-2-tight">
+            ${[['dashboard', 'Dashboard'], ['bots', 'Mis bots'], ['premium', 'Premium'], ['communities', 'Comunidades'], ['link', 'Vincular bot'], ['account', 'Mi cuenta']].map(([pagina, titulo]) => `
+              <div class="ad-config-row"><b>${titulo}</b>
+                <label class="check"><input type="checkbox" name="ad-${pagina}-header" ${premium.placements?.[pagina]?.header !== false ? 'checked' : ''} /> Cabecera automática</label>
+                <label class="check"><input type="checkbox" name="ad-${pagina}-footer" ${premium.placements?.[pagina]?.footer !== false ? 'checked' : ''} /> Banner pequeño al final</label>
+              </div>`).join('')}
+          </div>
+          <p class="hint">Native y los formatos 300 × 250, 160 × 300 y 160 × 600 quedan guardados, pero no se insertan automáticamente: necesitan zonas más grandes. Los anuncios nunca van dentro de formularios. Durante una vinculación activa se ocultan para evitar distracciones y recargas de publicidad.</p>
+        </fieldset>
+        <div class="ad-config-grid">
+          ${campoBanner('bannerLeaderboard', 'leaderboard', 'Banner 728 × 90', '728 × 90 · 31908120', banners.leaderboard)}
+          ${campoBanner('bannerSmall', 'small', 'Banner 320 × 50', '320 × 50 · 31905924', banners.small)}
+          ${campoBanner('bannerNative', 'native', 'Native banner', 'NativeBanner_1', banners.native)}
+          ${campoBanner('bannerWide', 'wide', 'Banner 468 × 60', '468 × 60 · 31908121', banners.wide)}
+          ${campoBanner('bannerSquare', 'square', 'Banner 300 × 250', '300 × 250 · 31908118', banners.square)}
+          ${campoBanner('bannerMedium', 'medium', 'Banner 160 × 300', '160 × 300 · 31908125', banners.medium)}
+          ${campoBanner('bannerTall', 'tall', 'Banner 160 × 600', '160 × 600 · 31908119', banners.tall)}
+        </div>
+        <div class="hint" style="margin-bottom:12px">Pega el <b>bloque completo de Adsterra</b> (el <span class="mono">script</span> con su <span class="mono">div</span>, el de <span class="mono">atOptions</span> o la URL <span class="mono">invoke.js</span>): se guarda solo lo que hace falta. Si lo que pegas no se entiende, el formulario lo avisa en vez de guardarlo vacío. Los anuncios se sirven en un iframe aislado y se comprueba que cargan de verdad (anti bloqueador).</div>
+        <button class="btn btn-primary" type="submit">${icon('check')} Guardar premium</button>
+      </form>
+    </div>
+  </div>`
+}
+
 export function adminSettingsHTML(data) {
   const maxSubs = Number(data.maxSubs || 0)
   const maxPorUsuario = Number(data.maxSubsPerUser || 0)
@@ -805,6 +897,7 @@ export function adminSettingsHTML(data) {
           </form>
         </div>
       </div>` : ''}
+      ${data.canPremium ? adminPremiumHTML(data.premium || {}) : ''}
       <div class="card">
         <div class="card-head"><div><h3>Mantenimiento</h3><p>Actualizar sin reiniciar el servidor</p></div></div>
         <div class="card-body">

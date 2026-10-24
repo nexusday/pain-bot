@@ -373,14 +373,16 @@ export function stopTimers() {
 }
 
 /* ── Toasts / modales ───────────────────────────────────────────────────── */
-export function openModal({ title, subtitle = '', body, footer = '', wide = false, onMount }) {
-  if (!modalRoot) return
+export function openModal({ title, subtitle = '', body, footer = '', wide = false, dismissible = true, onMount }) {
+  if (!modalRoot || modalRoot.dataset.dismissible === 'false') return
+  modalRoot.dataset.dismissible = String(dismissible)
+  if (!dismissible && app) app.inert = true
   modalRoot.innerHTML = `
-    <div class="modal-backdrop" data-action="modal-close"></div>
+    <div class="modal-backdrop" ${dismissible ? 'data-action="modal-close"' : ''}></div>
     <div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${h(title)}">
       <div class="modal-head">
         <div><h3>${h(title)}</h3>${subtitle ? `<p>${h(subtitle)}</p>` : ''}</div>
-        <button class="icon-btn sm" data-action="modal-close" aria-label="Cerrar">${icon('x')}</button>
+        ${dismissible ? `<button class="icon-btn sm" data-action="modal-close" aria-label="Cerrar">${icon('x')}</button>` : ''}
       </div>
       <div class="modal-body">${body}</div>
       ${footer ? `<div class="modal-foot">${footer}</div>` : ''}
@@ -390,7 +392,7 @@ export function openModal({ title, subtitle = '', body, footer = '', wide = fals
 }
 
 export function closeModal() {
-  if (!modalRoot) return
+  if (!modalRoot || modalRoot.dataset.dismissible === 'false') return
   modalRoot.classList.remove('open')
   modalRoot.innerHTML = ''
   state.turnstileToken = ''
