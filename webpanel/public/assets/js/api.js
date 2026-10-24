@@ -9,6 +9,46 @@ export function registrarExpiracionSesion(fn) {
   alExpirarSesion = fn
 }
 
+/* ── Vigilante de reconexión ────────────────────────────────────────────── */
+/**
+ * Si el proceso del panel se reinicia (bot reiniciado por SSH, «Aplicar
+ * cambios», etc.), las pestañas abiertas quedan con la conexión muerta y el
+ * usuario tendría que recargar a mano. Este vigilante sondea /healthz y
+ * recarga la página en cuanto el panel vuelve a responder, sin necesidad de
+ * que nadie toque nada.
+ */
+let vigilanteReconexion = null
+
+function iniciarVigilanteReconexion() {
+  if (vigilanteReconexion) return
+  if (typeof window === 'undefined' || typeof setInterval === 'undefined') return
+  let revisando = false
+  vigilanteReconexion = setInterval(async () => {
+    if (revisando) return
+    revisando = true
+    try {
+      const respuesta = await fetch('/healthz', { cache: 'no-store' })
+      if (!respuesta.ok) return
+      clearInterval(vigilanteReconexion)
+      vigilanteReconexion = null
+      window.location.reload()
+    } catch {
+      // sigue esperando al siguiente intento
+    } finally {
+      revisando = false
+    }
+  }, 3000)
+  // Tope de 2 minutos: si el panel sigue sin volver, deja de sondear y avisa.
+  setTimeout(() => {
+    if (!vigilanteReconexion) return
+    clearInterval(vigilanteReconexion)
+    vigilanteReconexion = null
+    import('./core.js').then(({ showToast }) =>
+      showToast('El panel no volvió a responder. Recarga la página en unos segundos.', 'warn')
+    ).catch(() => {})
+  }, 120_000).unref?.()
+}
+
 /* ── Cliente HTTP ───────────────────────────────────────────────────────── */
 export async function request(method, path, body, options = {}) {
   const headers = { Accept: 'application/json' }
@@ -25,6 +65,10 @@ export async function request(method, path, body, options = {}) {
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
+    // El proceso del panel no responde (reiniciando el bot, desplegando
+    // cambios…): empezar el vigilante para que la pestaña se recargue sola
+    // en cuanto vuelva.
+    iniciarVigilanteReconexion()
     const error = new Error('No se pudo conectar con el servidor.')
     error.status = 0
     throw error
