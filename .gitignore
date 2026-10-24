@@ -17,6 +17,8 @@ storage/databases/database.sqlite.*.tmp
 storage/process-mode.json
 storage/process-status/
 storage/runtime-pids/
+storage/main-config.json
+storage/cmd18.json
 storage/staff.json
 storage/maxsubs.json
 storage/soporte.json
