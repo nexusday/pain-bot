@@ -16,6 +16,7 @@ storage/databases/database.sqlite.claims.sqlite.lock/
 storage/databases/database.sqlite.*.tmp
 storage/process-mode.json
 storage/process-status/
+storage/runtime-pids/
 storage/staff.json
 storage/maxsubs.json
 storage/soporte.json
