@@ -842,8 +842,23 @@ export function adminSettingsHTML(data) {
               <div class="hint">Espera antes de volver a pedir un código para el mismo número. <b>0</b> = sin espera.</div>
             </div>
             <div class="field">
+              <label class="label" for="settings-max-login-global">Intentos globales de login</label>
+              <input id="settings-max-login-global" name="maxLoginAttemptsGlobal" type="number" min="0" class="input" value="${data.maxLoginAttemptsGlobal ?? 12}" />
+              <div class="hint">Máximo de intentos de login globales (todos los usuarios). <b>0</b> = sin límite.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-max-login-user">Intentos por usuario de login</label>
+              <input id="settings-max-login-user" name="maxLoginAttemptsPerUser" type="number" min="0" class="input" value="${data.maxLoginAttemptsPerUser ?? 6}" />
+              <div class="hint">Máximo de intentos por usuario de login. <b>0</b> = sin límite.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="settings-cooldown-login">Tiempo de espera (minutos)</label>
+              <input id="settings-cooldown-login" name="loginCooldownMinutes" type="number" min="0" class="input" value="${data.loginCooldownMinutes != null ? data.loginCooldownMinutes : Math.round((data.loginCooldownMs ?? config.loginCooldownMs ?? 3000) / 60000)}" />
+              <div class="hint">Tiempo de espera después de exceder los límites. <b>0</b> = sin espera.</div>
+            </div>
+            <div class="field">
               <label class="label" for="settings-code-ttl">Duración del código (segundos)</label>
-              <input id="settings-code-ttl" name="pairCodeSeconds" type="number" min="15" class="input" value="${duracionCodigo}" />
+              <input id="settings-code-ttl" name="pairCodeSeconds" type="number" min="5" class="input" value="${duracionCodigo}" />
               <div class="hint">Cuánto vive el código de 8 dígitos antes de caducar (es la cuenta atrás que ve el usuario).</div>
             </div>
             <button class="btn btn-primary" type="submit">${icon('check')} Guardar intentos</button>
