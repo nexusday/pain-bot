@@ -17,6 +17,9 @@
     "start:raw": "node index.js",
     "fix:sharp": "node scripts/ensure-sharp.js",
     "sync:chars": "node scripts/sync-characters-catalog.js --batch 200 --concurrency 5 --delay 200",
+    "sync:chars:modern": "node scripts/sync-modern-characters.js",
+    "sync:chars:all-modern": "node scripts/sync-modern-characters.js --full",
+    "sync:chars:anipersona": "node scripts/import-anipersona.js",
     "sync:chars:fast": "node scripts/sync-characters-catalog.js --batch 400 --concurrency 8 --delay 120",
     "sync:chars:reset": "node scripts/sync-characters-catalog.js --reset --batch 200 --concurrency 5 --delay 200",
     "enrich:chars:combat": "node scripts/enrich-characters-combat.js"
