@@ -126,6 +126,8 @@ export async function renderDashboard() {
   const conectadosTotal = cuenta(servidor.sessionsConnected)
   const guardadasTotal = cuenta(servidor.sessions)
   const guardadasCreds = cuenta(servidor.sessionsSaved)
+  const premiumActivosServidor = cuenta(servidor.premiumActive)
+  const premiumGuardadosServidor = cuenta(servidor.premiumSaved)
 
   content(`
     ${anunciosCabeceraHTML()}
@@ -144,6 +146,8 @@ export async function renderDashboard() {
         ${statCard('Sub-bots', botsTotal ?? '—', 'bot', 'cyan', '<span>Vinculados en el panel</span>')}
         ${statCard('Conectados', conectadosTotal ?? '—', 'wifi', (conectadosTotal || 0) > 0 ? 'green' : 'muted', '<span>Sesiones en línea</span>')}
         ${statCard('Guardadas', guardadasTotal ?? '—', 'server', 'amber', `<span>${guardadasCreds ?? '—'} con credenciales</span>`)}
+        ${statCard('Premium activos', premiumActivosServidor ?? '—', 'sparkles', (premiumActivosServidor || 0) > 0 ? 'violet' : 'muted', '<span>Con plan vigente</span>')}
+        ${statCard('Premium guardados', premiumGuardadosServidor ?? '—', 'zap', (premiumGuardadosServidor || 0) > 0 ? 'cyan' : 'muted', '<span>Cambios guardados, sin plan</span>')}
       </div>
     </div>
     <div class="stats-group">

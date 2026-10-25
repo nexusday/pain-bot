@@ -143,7 +143,10 @@
 /* ── Badges de stats en tiempo real (landing + shell) ────────────────────── */
 .auth-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Seis distintivos (usuarios, sub-bots, conectados, comunidades y los dos de
+     premium) en una sola fila cuando hay sitio; en pantallas menores se van
+     partiendo en 3 y 2 columnas desde responsive.css. */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin-top: 20px;
 }
@@ -154,8 +157,8 @@
 
 .auth-stats .stat-badge {
   justify-content: center;
-  padding: 12px 14px;
-  font-size: 13px;
+  padding: 11px 12px;
+  font-size: 12.5px;
   background: var(--surface);
 }
 

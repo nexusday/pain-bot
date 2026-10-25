@@ -1,7 +1,17 @@
+/* Los seis distintivos del acceso (usuarios, sub-bots, conectados,
+   comunidades y los dos de premium) solo caben en una fila en pantallas
+   anchas: por debajo pasan a 3 columnas y, más abajo, a 2. */
+@media (max-width: 1300px) {
+  .auth-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1180px) {
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
 
   .grid-2,
   .link-layout {

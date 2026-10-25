@@ -495,6 +495,33 @@ test('premium: solo el administrador con permiso ajusta los anuncios', async () 
   assert.equal(leido.datos.premium.adMinutes, 90)
 })
 
+test('premium: el dashboard cuenta los premium activos y los guardados sin plan', async () => {
+  // Activo: plan vigente. Guardado: plan caducado pero con personalización
+  // conservada (vuelve sola cuando el dueño suma tiempo).
+  guardarConfigSubBot(ROOT, PHONE, {
+    premium: { expiresAt: Date.now() + 60 * 60 * 1000 },
+    premiumEdits: { moneda: 'PEN', menu: { creador: 'Creador' }, canal: { jid: '', nombre: '' } },
+  })
+  guardarConfigSubBot(ROOT, PHONE_OTRO, {
+    premium: { expiresAt: Date.now() - 1000 },
+    premiumEdits: { moneda: 'USD', menu: { creador: 'Otro' }, canal: { jid: '', nombre: '' } },
+  })
+
+  // El sondeo público está cacheado 5 s: se fuerza una lectura nueva.
+  await delay(5200)
+  const stats = await pedir('/api/stats')
+  assert.equal(stats.res.status, 200)
+  assert.equal(stats.datos.premiumActive, 1)
+  assert.equal(stats.datos.premiumSaved, 1)
+
+  // Un bot sin personalización y sin plan no suma en ninguna de las dos.
+  guardarConfigSubBot(ROOT, '5215500000001', { premium: { expiresAt: 0 } })
+  await delay(5200)
+  const otra = await pedir('/api/stats')
+  assert.equal(otra.datos.premiumActive, 1)
+  assert.equal(otra.datos.premiumSaved, 1)
+})
+
 test('premium: el iframe del anuncio se sirve aislado y solo si está configurado', async () => {
   await guardarAjustesPremium(handle.store, {
     banners: { small: 'https://www.highperformanceformat.com/31905924/invoke.js', medium: '', native: '' },
