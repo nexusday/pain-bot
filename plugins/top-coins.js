@@ -1,16 +1,19 @@
-let handler = async (m, { conn, args, usedPrefix, command }) => {
+import { agruparTopParejas } from '../lib/parejas.js'
+
+let handler = async (m, { conn, args, usedPrefix, command, participants = [] }) => {
   try {
        
-     const todosUsuarios = Object.entries(global.db.data.users)
+     const filas = Object.entries(global.db.data.users)
        .filter(([jid, usuario]) => usuario && typeof usuario.coins === 'number')
        .map(([jid, usuario]) => ({
          jid: jid,
-         coins: (usuario.coins || 0) + (usuario.bancoDinero || 0), 
+          coins: (Number(usuario.coins) || 0) + (Number(usuario.bancoDinero) || 0),
          name: usuario.name || 'Usuario'
        }))
       .filter(usuario => usuario.coins > 0) 
-      .sort((a, b) => b.coins - a.coins) 
-      .slice(0, 10) 
+     const todosUsuarios = agruparTopParejas(filas, global.db.data, m.chat, conn, participants)
+       .sort((a, b) => b.coins - a.coins)
+       .slice(0, 10)
 
     if (todosUsuarios.length === 0) {
       return conn.sendMessage(m.chat, {
@@ -22,7 +25,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     
-    let texto = `💰 𝗧𝗼𝗽 𝗴𝗹𝗼𝗯𝗮𝗹𝗲𝘀 \n\n`
+     let texto = `💰 𝗧𝗼𝗽 𝗴𝗹𝗼𝗯𝗮𝗹𝗲𝘀 \n> Las parejas con /unip se suman globalmente; sus cuentas siguen separadas.\n\n`
 
     
     todosUsuarios.forEach((usuario, indice) => {
@@ -37,7 +40,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         default: emoji = '💰'; break
       }
       
-      texto += `  𓂃 ࣪ ִֶָ☾. *${posicion}.* ${usuario.name}\n`
+       const nombre = usuario.pareja ? `💞 Pareja: ${usuario.nombres.join(' y ')}` : usuario.name
+       texto += `  𓂃 ࣪ ִֶָ☾. *${posicion}.* ${nombre}\n`
       texto += `  𓂃 ࣪ ִֶָ☾. *${global.moneda}:* ${usuario.coins.toLocaleString()}\n\n`
     })
 
@@ -63,4 +67,4 @@ handler.help = [`#topcoins\n→ Muestra el top 10 global de usuarios con más ${
 handler.tags = ['juegos', 'economía']
 handler.command = ['topcoins', 'topcoin', 'top-coins', 'richest', 'ricos']
 
-export default handler 
+export default handler

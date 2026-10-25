@@ -4,6 +4,7 @@ import { findGroupParticipant } from '../lib/group-participant.js'
 import { getRpgSnapshot, formatNumber } from '../lib/rpg-level.js'
 import { ensureMsgStats, getChatMsgCount, getTotalMsgCount } from '../lib/msg-activity.js'
 import { resolveDbUser } from '../lib/michi-users.js'
+import { vinculoPareja, unionActiva, estadoDiarioPareja, tiempoPareja } from '../lib/parejas.js'
 
 
 async function jidMencionCaption(jid, chatId, participants, conn) {
@@ -204,6 +205,13 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
   const moneda = global.moneda || 'coins'
   const comipPct = Math.min(Math.max(Math.floor(Number(datosUsuario.comisionPareja) || 0), 0), 50)
   const lineaComip = datosUsuario.partner ? `\n┊ comip  ·  \`${comipPct}%\`` : ''
+  const vinculo = vinculoPareja(global.db.data, targetUser, conn, groupParts)
+  const lineaUnion = (() => {
+    if (!vinculo) return ''
+    const activa = unionActiva(global.db.data, m.chat, vinculo, conn, groupParts)
+    const diario = estadoDiarioPareja(vinculo)
+    return `\n┊ tops globales  ·  \`${activa ? 'pareja (solo suma visual)' : 'separados'}\`\n┊ cuentas  ·  \`siempre separadas\`\n┊ diario de pareja  ·  \`${diario.sinFecha ? 'sin fecha registrada' : diario.disponible ? 'disponible con ' + usedPrefix + 'dma' : 'en ' + tiempoPareja(diario.restante)}\`\n┊ racha de pareja  ·  \`${diario.racha} días\``
+  })()
   const lineaCasados = (() => {
     if (!datosUsuario.partner) return ''
     const desde = Number(datosUsuario.marriedAt) || 0
@@ -232,7 +240,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
 ┊ cumple  ·  \`${cumple}\`
 ┊ ${desc}
 ┊ favorito  ·  \`${favorito}\`
-┊ ${lineaVinculo}${lineaComip}${lineaCasados}
+┊ ${lineaVinculo}${lineaComip}${lineaCasados}${lineaUnion}
 
 \`*˚   ✩    ✦    ✩   ˚*\`
 
@@ -248,7 +256,8 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
 
 \`${usedPrefix}setname\`  \`${usedPrefix}setage\`  \`${usedPrefix}setgenre\`
 \`${usedPrefix}setbirth\`  \`${usedPrefix}setdesc\`  \`${usedPrefix}setfav\`
-\`${usedPrefix}marry\`  \`${usedPrefix}divorce\`  \`${usedPrefix}comip\``.trim()
+\`${usedPrefix}marry\`  \`${usedPrefix}divorce\`  \`${usedPrefix}comip\`
+\`${usedPrefix}pareja\`  \`${usedPrefix}unip\`  \`${usedPrefix}dma\``.trim()
 
   const botNumber = conn.user?.jid?.split('@')[0].replace(/\D/g, '')
   const configPath = join('./Serbot', botNumber, 'config.json')

@@ -1,8 +1,8 @@
 import { showTopHarem } from '../lib/characters/index.js'
 
-let handler = async (m, { conn, usedPrefix, args }) => {
+let handler = async (m, { conn, usedPrefix, args, participants = [] }) => {
   try {
-    await showTopHarem(m, conn, usedPrefix || '.', args?.[0] || '10')
+    await showTopHarem(m, conn, usedPrefix || '.', args?.[0] || '10', participants)
   } catch (error) {
     console.error('char-topharem:', error)
     await conn.sendMessage(m.chat, {

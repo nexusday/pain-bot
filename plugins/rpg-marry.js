@@ -77,6 +77,8 @@ function syncPartner(aJid, bJid, conn, participants) {
   b.partner = aStore
   a.marriedAt = ahora
   b.marriedAt = ahora
+  delete a.diarioPareja
+  delete b.diarioPareja
 
   for (const [key, user] of Object.entries(global.db.data.users)) {
     if (key === aStore || key === bStore) continue
@@ -101,6 +103,7 @@ function clearPartner(jid, conn, participants) {
       delete u.comisionPareja
       delete u.comisionEnviada
       delete u.comisionRecibida
+      delete u.diarioPareja
     }
     if (key === partnerRaw || isSamePlayer(key, partnerRaw, conn, participants)) {
       u.partner = ''
@@ -108,6 +111,7 @@ function clearPartner(jid, conn, participants) {
       delete u.comisionPareja
       delete u.comisionEnviada
       delete u.comisionRecibida
+      delete u.diarioPareja
     }
   }
   return partnerRaw
@@ -133,6 +137,8 @@ let handler = async (m, { conn, usedPrefix, command, participants, args }) => {
           contextInfo: { ...(global.rcanal?.contextInfo || {}) },
         }, { quoted: m })
       }
+
+      await global.db.write?.()
 
       // Igual que /ban: m.sender + jid del otro en el grupo
       const yo = m.sender
@@ -301,6 +307,7 @@ handler.all = async function (m, { conn, participants }) {
     const aKey = resolveDbUser(yo, conn, partes).jid || yo
     const bKey = resolveDbUser(quien, conn, partes).jid || quien
     syncPartner(aKey, bKey, conn, partes)
+    await global.db.write?.()
 
     const prefijoComip = formatearPrefijoVisible(conn?.prefix || global.prefix, '.')
     return conn.sendMessage(m.chat, {
@@ -310,6 +317,8 @@ handler.all = async function (m, { conn, participants }) {
         `> @${yo.split('@')[0]} y @${quien.split('@')[0]} ahora son pareja.`,
         `> Se verá en *perfil*.`,
         `> Compartan ganancias con *${prefijoComip}comip <1-50>* (máx. 50%).`,
+        `> ¿Quieren aparecer juntos en los tops globales? Usen *${prefijoComip}unip*: tu pareja deberá aceptar. Solo suma los totales, no mezcla las cuentas.`,
+        `> Tras 24 horas casados, *${prefijoComip}dma* entrega un premio a cada uno. Consulten su estado con *${prefijoComip}pareja*.`,
       ].join('\n'),
       contextInfo: {
         ...(global.rcanal?.contextInfo || {}),
