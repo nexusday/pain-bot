@@ -6,6 +6,8 @@ import {
   handleForgotPassword,
   handleLogout,
   handleResetPassword,
+  handleVerifyEmail,
+  handleVerifyResend,
   openAuthModal,
   openForgotModal,
   renderAuth,
@@ -136,6 +138,10 @@ export async function onClick(event) {
     }
     if (action === 'auth-forgot') {
       openForgotModal('')
+      return
+    }
+    if (action === 'auth-verify-resend') {
+      await handleVerifyResend()
       return
     }
     if (action === 'toggle-password') {
@@ -342,6 +348,11 @@ export async function onSubmit(event) {
   if (id === 'email-verify-form') {
     event.preventDefault()
     await handleEmailVerify(form)
+    return
+  }
+  if (id === 'auth-verify-form') {
+    event.preventDefault()
+    await handleVerifyEmail(form)
     return
   }
   if (id === 'forgot-form') {

@@ -844,7 +844,7 @@ export function adminSettingsHTML(data) {
             <div class="field">
               <label class="label" for="settings-max-login-global">Intentos globales de login</label>
               <input id="settings-max-login-global" name="maxLoginAttemptsGlobal" type="number" min="0" class="input" value="${data.maxLoginAttemptsGlobal ?? 12}" />
-              <div class="hint">Máximo de intentos de login globales (todos los usuarios). <b>0</b> = sin límite.</div>
+              <div class="hint">Intentos de login permitidos por conexión dentro de la espera configurada abajo. <b>0</b> = sin límite.</div>
             </div>
             <div class="field">
               <label class="label" for="settings-max-login-user">Intentos por usuario de login</label>
@@ -852,9 +852,9 @@ export function adminSettingsHTML(data) {
               <div class="hint">Máximo de intentos por usuario de login. <b>0</b> = sin límite.</div>
             </div>
             <div class="field">
-              <label class="label" for="settings-cooldown-login">Tiempo de espera (minutos)</label>
-              <input id="settings-cooldown-login" name="loginCooldownMinutes" type="number" min="0" class="input" value="${data.loginCooldownMinutes != null ? data.loginCooldownMinutes : Math.round((data.loginCooldownMs ?? config.loginCooldownMs ?? 3000) / 60000)}" />
-              <div class="hint">Tiempo de espera después de exceder los límites. <b>0</b> = sin espera.</div>
+              <label class="label" for="settings-cooldown-login">Espera tras superar los intentos (minutos)</label>
+              <input id="settings-cooldown-login" name="loginCooldownMinutes" type="number" min="0" class="input" value="${data.loginCooldownMinutes != null ? data.loginCooldownMinutes : Math.round((data.loginCooldownMs ?? 300000) / 60000)}" />
+              <div class="hint">Cuánto tiempo hay que esperar después de gastar los intentos. <b>0</b> = sin espera.</div>
             </div>
             <div class="field">
               <label class="label" for="settings-code-ttl">Duración del código (segundos)</label>
@@ -1089,8 +1089,32 @@ export function adminMailHTML(data) {
           </div>
           <label class="check switch" style="margin-top:14px">
             <input type="checkbox" name="requireEmailVerification" ${data.requireEmailVerification ? 'checked' : ''} />
-            <span><b>Exigir correo verificado para vincular sub-bots</b><small>Recomendado para evitar cuentas automáticas. Los usuarios pueden verificar su correo desde Mi cuenta.</small></span>
+            <span><b>Exigir correo verificado para entrar y vincular sub-bots</b><small>Las cuentas nuevas deben confirmar el código que reciben por correo antes de iniciar sesión. Necesita el SMTP configurado.</small></span>
           </label>
+          <div class="variables-title" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line)">${icon('mail')} Códigos por correo</div>
+          <p class="hint" style="margin-top:6px">Cuántos códigos de verificación y recuperación se pueden enviar y cuánto duran. Se aplican al instante, sin reiniciar.</p>
+          <div class="mail-grid">
+            <div class="field">
+              <label class="label" for="mail-code-max">Códigos por hora y cuenta</label>
+              <input id="mail-code-max" name="emailCodeMaxPerHour" type="number" min="1" class="input" value="${h(data.emailCodeMaxPerHour ?? 10)}" />
+              <div class="hint">Máximo de códigos que recibe una misma cuenta en una hora.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="mail-code-cooldown">Espera entre códigos (segundos)</label>
+              <input id="mail-code-cooldown" name="emailCodeCooldownSeconds" type="number" min="5" class="input" value="${h(data.emailCodeCooldownSeconds ?? 60)}" />
+              <div class="hint">Tiempo que debe pasar antes de enviar otro código a la misma cuenta.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="mail-code-ttl">Duración del código (segundos)</label>
+              <input id="mail-code-ttl" name="emailCodeTtlSeconds" type="number" min="60" class="input" value="${h(data.emailCodeTtlSeconds ?? 900)}" />
+              <div class="hint">Cuánto vive el código antes de caducar (900 s = 15 minutos).</div>
+            </div>
+            <div class="field">
+              <label class="label" for="mail-code-attempts">Intentos por código</label>
+              <input id="mail-code-attempts" name="emailCodeMaxAttempts" type="number" min="1" class="input" value="${h(data.emailCodeMaxAttempts ?? 5)}" />
+              <div class="hint">Fallos permitidos antes de invalidar el código y pedir uno nuevo.</div>
+            </div>
+          </div>
           <div class="flex gap-8" style="margin-top:16px;flex-wrap:wrap">
             <button class="btn btn-primary" type="submit">${icon('check')} Guardar correo</button>
             <button class="btn btn-secondary" type="button" data-action="mail-test-open">${icon('mail')} Enviar prueba</button>

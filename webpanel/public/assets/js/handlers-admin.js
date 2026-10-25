@@ -569,12 +569,27 @@ export async function handleMailSettingsSave(form) {
     requireEmailVerification: Boolean(form.querySelector('[name="requireEmailVerification"]')?.checked),
   }
   if (password) body.password = password
+  // Límites de los códigos de correo (opcionales: solo si el formulario los trae).
+  for (const campo of ['emailCodeMaxPerHour', 'emailCodeCooldownSeconds', 'emailCodeTtlSeconds', 'emailCodeMaxAttempts']) {
+    const input = form.querySelector(`[name="${campo}"]`)
+    if (!input) continue
+    const valor = Number(input.value)
+    if (Number.isFinite(valor) && valor >= 0) body[campo] = valor
+  }
 
   hideFormError(form)
   setLoading(submit, true, 'Guardando…')
   try {
     const data = await api.patch('/api/admin/mail', body)
-    state.adminMail = { ...(state.adminMail || {}), config: data.config, requireEmailVerification: data.requireEmailVerification }
+    state.adminMail = {
+      ...(state.adminMail || {}),
+      config: data.config,
+      requireEmailVerification: data.requireEmailVerification,
+      emailCodeMaxPerHour: data.emailCodeMaxPerHour,
+      emailCodeCooldownSeconds: data.emailCodeCooldownSeconds,
+      emailCodeTtlSeconds: data.emailCodeTtlSeconds,
+      emailCodeMaxAttempts: data.emailCodeMaxAttempts,
+    }
     state.config = { ...(state.config || {}), mailConfigured: data.config?.configured, requireEmailVerification: data.requireEmailVerification }
     showFormSuccess(form, 'Configuración de correo guardada.')
     showToast(data.config?.configured ? 'Correo configurado.' : 'Guardado. Faltan datos para poder enviar correos.', data.config?.configured ? 'success' : 'warn')
@@ -647,10 +662,18 @@ export async function handleSettingsLimitsSave(form) {
   const porIp = numero('[name="maxPairAttemptsPerIpPerHour"]')
   const espera = numero('[name="pairCooldownSeconds"]')
   const duracion = numero('[name="pairCodeSeconds"]')
+  // Límites del login: intentos globales, por usuario y espera tras superarlos.
+  const loginGlobal = numero('[name="maxLoginAttemptsGlobal"]')
+  const loginUsuario = numero('[name="maxLoginAttemptsPerUser"]')
+  const loginEspera = numero('[name="loginCooldownMinutes"]')
   const submit = form.querySelector('button[type="submit"]')
   hideFormError(form)
   if ([porHora, porDia, porIp, espera, duracion].some((valor) => Number.isNaN(valor))) {
     showFormError(form, 'Todos los valores deben ser 0 o un número mayor.')
+    return
+  }
+  if ([loginGlobal, loginUsuario, loginEspera].some((valor) => Number.isNaN(valor))) {
+    showFormError(form, 'Los intentos de login deben ser 0 (sin límite) o un número mayor, y la espera en minutos.')
     return
   }
   if (duracion < 15) {
@@ -665,6 +688,9 @@ export async function handleSettingsLimitsSave(form) {
       maxPairAttemptsPerIpPerHour: porIp,
       pairCooldownSeconds: espera,
       pairCodeSeconds: duracion,
+      maxLoginAttemptsGlobal: loginGlobal,
+      maxLoginAttemptsPerUser: loginUsuario,
+      loginCooldownMinutes: loginEspera,
     })
     showToast('Límites de intentos actualizados.', 'success')
     await renderAdmin('settings')

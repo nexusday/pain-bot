@@ -184,6 +184,85 @@ export function openResetModal(email = '') {
   })
 }
 
+/* ── Verificación del correo después del registro ───────────────────────── */
+export function openVerifyModal(email = '') {
+  const cfg = state.config || {}
+  openModal({
+    title: 'Verifica tu correo',
+    subtitle: 'Te enviamos un código de 6 dígitos. Escríbelo para activar tu cuenta.',
+    body: `<form id="auth-verify-form">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="field">
+        <label class="label" for="verify-email">Correo</label>
+        <div class="input-icon">${icon('mail')}<input class="input" id="verify-email" name="email" type="email" value="${h(email)}" autocomplete="email" placeholder="tu@correo.com" required /></div>
+        <div class="hint">El mismo correo con el que te registraste.</div>
+      </div>
+      <div class="field">
+        <label class="label" for="verify-code">Código de 6 dígitos</label>
+        <input class="input code-input" id="verify-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\\d{6}" placeholder="000000" required />
+        <div class="hint">Revisa la bandeja de entrada y la carpeta de spam.</div>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">${icon('check')} Verificar y entrar</button>
+      <div class="auth-forgot"><button type="button" class="link-btn" data-action="auth-verify-resend">Reenviar código</button></div>
+    </form>`,
+  })
+  if (!cfg.mailConfigured) {
+    showToast('El envío de correos aún no está configurado. Avisa al administrador del panel.', 'warn')
+  }
+}
+
+export async function handleVerifyEmail(form) {
+  const email = form.querySelector('[name="email"]')?.value.trim() || ''
+  const code = String(form.querySelector('[name="code"]')?.value || '').replace(/\D/g, '')
+  const submit = form.querySelector('button[type="submit"]')
+  hideFormError(form)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showFormError(form, 'Escribe el correo con el que te registraste.')
+    return
+  }
+  if (!/^\d{6}$/.test(code)) {
+    showFormError(form, 'El código debe tener 6 dígitos.')
+    return
+  }
+  setLoading(submit, true, 'Verificando…')
+  try {
+    const data = await api.post('/api/auth/verify', { email, code })
+    state.user = data.user
+    state.csrf = data.csrf
+    state.authTab = 'login'
+    try {
+      const config = await api.get('/api/config')
+      state.config = { ...(state.config || {}), ...config }
+    } catch {}
+    entrarAlPanel()
+    showToast('Correo verificado. ¡Bienvenido!', 'success')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo verificar el correo.')
+    setLoading(submit, false)
+  }
+}
+
+export async function handleVerifyResend() {
+  const form = document.getElementById('auth-verify-form')
+  const email = form?.querySelector('[name="email"]')?.value.trim() || ''
+  if (!form) return
+  hideFormError(form)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showFormError(form, 'Escribe el correo con el que te registraste.')
+    return
+  }
+  try {
+    const data = await api.post('/api/auth/verify/send', { email })
+    if (data.emailSent) showToast('Código reenviado. Revisa tu correo.', 'success')
+    else if (data.emailReason === 'mail_not_configured') showToast('El envío de correos no está configurado. Avisa al administrador.', 'warn')
+    else if (data.emailReason === 'email_code_cooldown') showToast('Espera un momento antes de pedir otro código.', 'warn')
+    else if (data.emailReason === 'email_code_limit') showToast('Pediste demasiados códigos. Inténtalo más tarde.', 'warn')
+    else showToast('No se pudo enviar el código.', 'warn')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo reenviar el código.')
+  }
+}
+
 export async function handleForgotPassword(form) {
   const email = form.querySelector('[name="email"]')?.value.trim() || ''
   const submit = form.querySelector('button[type="submit"]')
@@ -276,6 +355,22 @@ export async function handleAuth(form) {
       ? await api.post('/api/auth/register', { username, email, password, invite, turnstileToken: state.turnstileToken || '' })
       : await api.post('/api/auth/login', { username, password, turnstileToken: state.turnstileToken || '' })
 
+    // Con la verificación obligatoria activa el registro no abre sesión: hay
+    // que confirmar el código del correo primero.
+    if (data.pendingVerification) {
+      state.user = null
+      state.csrf = null
+      state.authTab = 'login'
+      openVerifyModal(email)
+      showToast(
+        data.emailSent
+          ? 'Cuenta creada. Te enviamos un código para verificar tu correo.'
+          : 'Cuenta creada, pero no se pudo enviar el correo. Pide el código aquí o avisa al administrador.',
+        data.emailSent ? 'success' : 'warn'
+      )
+      return
+    }
+
     state.user = data.user
     state.csrf = data.csrf
     state.authTab = 'login'
@@ -284,8 +379,20 @@ export async function handleAuth(form) {
       state.config = { ...(state.config || {}), ...config }
     } catch {}
     entrarAlPanel()
-    showToast(mode === 'register' ? 'Cuenta creada. Bienvenido.' : 'Bienvenido de vuelta.', 'success')
+    const avisoCorreo = mode === 'register' && data.emailVerified === false
+    showToast(
+      mode === 'register'
+        ? (avisoCorreo ? 'Cuenta creada. Verifica tu correo desde Mi cuenta.' : 'Cuenta creada. Bienvenido.')
+        : 'Bienvenido de vuelta.',
+      'success'
+    )
   } catch (error) {
+    if (error.code === 'email_not_verified') {
+      openVerifyModal('')
+      showToast(error.message || 'Verifica tu correo para entrar.', 'warn')
+      setLoading(submit, false)
+      return
+    }
     showFormError(form, error.message || 'No se pudo completar la operación.')
     setLoading(submit, false)
     reiniciarTurnstile()
