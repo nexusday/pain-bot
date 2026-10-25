@@ -1,7 +1,8 @@
-import { agruparTopParejas } from '../lib/parejas.js'
+import { agruparTopParejas, prepararIdentidadesPareja } from '../lib/parejas.js'
 
 let handler = async (m, { conn, args, usedPrefix, command, participants = [] }) => {
   try {
+     participants = await prepararIdentidadesPareja(m, conn, participants, global.db.data, false)
        
      const filas = Object.entries(global.db.data.users)
        .filter(([jid, usuario]) => usuario && typeof usuario.coins === 'number')

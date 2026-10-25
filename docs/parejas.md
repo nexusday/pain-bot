@@ -17,6 +17,16 @@ no transfiere personajes y no cambia quién puede gastar o vender cada cosa.
 
 ## Tops
 
+### Identidades de WhatsApp
+
+Los matrimonios anteriores pueden estar guardados por teléfono (PN) o LID.
+Los comandos resuelven sus equivalencias usando los datos del mensaje, metadata
+del grupo y el mapeo oficial de Baileys antes de abrir la transacción SQLite.
+Una ficha de registro vacía no debe ocultar el matrimonio guardado en otro alias
+verificado de la misma persona. No se fusionan monedas, no se cambia la fecha
+de boda y no se inventa una relación de vuelta cuando el otro usuario no la tiene.
+El perfil resuelve la mención solo para mostrarla, sin reescribir el vínculo.
+
 `/topcoins` agrupa los matrimonios que aceptaron la unión global con `/unip`.
 Suma cartera + banco de ambos y muestra una sola fila «Pareja: X y Y», sin
 repetirlos en puestos individuales. Se aplica desde cualquier grupo y también

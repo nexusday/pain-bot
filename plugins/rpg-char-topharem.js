@@ -1,7 +1,9 @@
 import { showTopHarem } from '../lib/characters/index.js'
+import { prepararIdentidadesPareja } from '../lib/parejas.js'
 
 let handler = async (m, { conn, usedPrefix, args, participants = [] }) => {
   try {
+    participants = await prepararIdentidadesPareja(m, conn, participants, global.db.data, false)
     await showTopHarem(m, conn, usedPrefix || '.', args?.[0] || '10', participants)
   } catch (error) {
     console.error('char-topharem:', error)

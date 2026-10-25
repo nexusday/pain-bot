@@ -1,4 +1,4 @@
-import { gestionarUnion, vinculoPareja, unionActiva, estadoDiarioPareja, reclamarDiarioPareja, tiempoPareja, DIA_PAREJA } from '../lib/parejas.js'
+import { gestionarUnion, vinculoPareja, unionActiva, estadoDiarioPareja, reclamarDiarioPareja, tiempoPareja, DIA_PAREJA, prepararIdentidadesPareja } from '../lib/parejas.js'
 
 async function responder(m, conn, text, miembros = []) {
   return conn.sendMessage(m.chat, { text, contextInfo: { ...(global.rcanal?.contextInfo || {}), mentionedJid: miembros } }, { quoted: m })
@@ -11,7 +11,7 @@ async function ejecutarUnion(m, conn, participants, accion, usedPrefix = '.') {
     (datos, ahora) => gestionarUnion(datos, { jid: m.sender, chat: m.chat, accion, conn, participants }, ahora))
   const r = tx.result || {}
   const mensajes = {
-    sin_pareja: '💍 Necesitas un matrimonio mutuo para usar esta opción.',
+    sin_pareja: '💍 No pude verificar el matrimonio en los registros de ambos. Si tu perfil ya muestra pareja, no te divorcies: puede faltar la correspondencia entre tu teléfono y tu LID de WhatsApp.',
     ausente: '💞 Ambos deben estar en este grupo para aceptar la unión de los tops.',
     desactivada: '💞 Unión global desactivada. Volverán a aparecer por separado en todos los tops.',
     sin_solicitud: 'No tienes una solicitud de unión vigente de tu pareja en este grupo.',
@@ -31,11 +31,13 @@ async function ejecutarUnion(m, conn, participants, accion, usedPrefix = '.') {
 let handler = async (m, { conn, participants = [], args = [], command, usedPrefix = '.' }) => {
   if (!m.isGroup) return responder(m, conn, 'Estas opciones se usan en grupos.')
   try {
+    await global.db.adapter.refresh?.(global.db.data)
+    participants = await prepararIdentidadesPareja(m, conn, participants)
     if (command === 'dma') {
       const tx = await global.db.adapter.claimAndUpdate(global.db.data, `dma:${m.sender}`, DIA_PAREJA,
         (datos, ahora) => reclamarDiarioPareja(datos, m.sender, conn, participants, ahora))
       const r = tx.result || {}
-      if (r.code === 'sin_pareja') return responder(m, conn, '💍 Necesitas estar casado/a para reclamar el premio de matrimonio.')
+      if (r.code === 'sin_pareja') return responder(m, conn, '💍 No pude verificar el matrimonio de ambos para entregar el premio. No se modificaron sus monedas.')
       if (r.code === 'sin_fecha') return responder(m, conn, 'Tu matrimonio no tiene fecha registrada. No se puede calcular todavía el premio; no se modificaron tus monedas.')
       if (r.code === 'espera') return responder(m, conn, `💞 El siguiente premio estará disponible en *${tiempoPareja(r.restante)}*.\nEl primero se entrega tras 24 horas casados y cualquiera reclama para ambos, una vez cada 24 horas.`)
       if (r.code !== 'premio') return responder(m, conn, 'No se pudo reclamar el premio. Inténtalo de nuevo.')
@@ -43,7 +45,7 @@ let handler = async (m, { conn, participants = [], args = [], command, usedPrefi
     }
     if (command === 'pareja') {
       const v = vinculoPareja(global.db.data, m.sender, conn, participants)
-      if (!v) return responder(m, conn, `💍 No tienes un matrimonio mutuo. Usa ${usedPrefix}marry @usuario.`)
+      if (!v) return responder(m, conn, '💍 No pude verificar el vínculo guardado de ambos. Si el perfil muestra pareja, no hace falta divorciarse: puede faltar resolver su identidad de WhatsApp.')
       const estado = estadoDiarioPareja(v)
       const total = [v.a, v.b].reduce((n, x) => n + (Number(x.user.coins) || 0) + (Number(x.user.bancoDinero) || 0), 0)
       return responder(m, conn, `💞 *Nuestra pareja*\n\n${etiquetas([v.a.key, v.b.key])}\nJuntos: ${v.desde ? Math.floor((Date.now() - v.desde) / DIA_PAREJA) + ' días' : 'sin fecha registrada'}\nTops globales: *${unionActiva(global.db.data, m.chat, v, conn, participants) ? 'juntos' : 'separados'}*\nSuma de sus saldos: *${total.toLocaleString()} ${global.moneda || 'coins'}*\n*Las cuentas y los personajes siguen separados.*\n\nRacha: ${estado.racha} días\nPremio: ${estado.sinFecha ? 'sin fecha registrada' : estado.disponible ? 'disponible' : 'en ' + tiempoPareja(estado.restante)}\n\n${usedPrefix}unip · ${usedPrefix}unip off · ${usedPrefix}dma · ${usedPrefix}comip`, [v.a.key, v.b.key])
@@ -61,9 +63,10 @@ handler.all = async function (m, { conn, participants = [] }) {
   if (!m.isGroup || !/^(si|sí|no)$/i.test(m.text?.trim() || '')) return
   const solicitud = global.db?.data?.chats?.[m.chat]?.parejaTopSolicitud
   if (!solicitud || solicitud.expira <= Date.now()) return
-  const v = vinculoPareja(global.db.data, m.sender, conn, participants)
-  if (!v || solicitud.target !== v.a.key) return
   try {
+    participants = await prepararIdentidadesPareja(m, conn, participants)
+    const v = vinculoPareja(global.db.data, m.sender, conn, participants)
+    if (!v || solicitud.target !== v.a.key) return
     m.commandExecuted = true
     await ejecutarUnion(m, conn, participants, m.text.trim().toLowerCase().replace('sí', 'si'))
   } catch (error) { console.error('pareja-union.all:', error) }

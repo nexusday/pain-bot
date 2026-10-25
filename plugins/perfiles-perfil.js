@@ -4,7 +4,7 @@ import { findGroupParticipant } from '../lib/group-participant.js'
 import { getRpgSnapshot, formatNumber } from '../lib/rpg-level.js'
 import { ensureMsgStats, getChatMsgCount, getTotalMsgCount } from '../lib/msg-activity.js'
 import { resolveDbUser } from '../lib/michi-users.js'
-import { vinculoPareja, unionActiva, estadoDiarioPareja, tiempoPareja } from '../lib/parejas.js'
+import { vinculoPareja, unionActiva, estadoDiarioPareja, tiempoPareja, prepararIdentidadesPareja } from '../lib/parejas.js'
 
 
 async function jidMencionCaption(jid, chatId, participants, conn) {
@@ -170,26 +170,30 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
     totalCoins += (datosUsuario.bancoDinero || 0)
   }
 
-  const groupParts = m.isGroup
+  let groupParts = m.isGroup
     ? (participants || conn.chats[m.chat]?.metadata?.participants || [])
     : []
+  groupParts = await prepararIdentidadesPareja(
+    targetUser === m.sender ? m : { sender: targetUser, chat: m.chat, isGroup: m.isGroup },
+    conn, groupParts, global.db.data, false
+  )
+  const vinculo = vinculoPareja(global.db.data, targetUser, conn, groupParts)
+  const fichaMatrimonio = vinculo?.a.user || datosUsuario
+  const parejaRegistrada = vinculo?.b.key || fichaMatrimonio.partner
 
   let partnerMention = ''
   let lineaVinculo = 'soltero/a'
-  if (datosUsuario.partner) {
+  if (parejaRegistrada) {
     partnerMention = await jidMencionCaption(
-      datosUsuario.partner,
+      parejaRegistrada,
       m.isGroup ? m.chat : null,
       groupParts,
       conn
     )
     if (partnerMention) {
       lineaVinculo = `casado/a con @${String(partnerMention).split('@')[0]}`
-      if (String(partnerMention).endsWith('@s.whatsapp.net')) {
-        datosUsuario.partner = partnerMention
-      }
     } else {
-      const parejaUser = resolveDbUser(datosUsuario.partner, conn, groupParts).user
+      const parejaUser = resolveDbUser(parejaRegistrada, conn, groupParts).user
       const nombre = parejaUser?.name && parejaUser.name !== 'Usuario' ? parejaUser.name : null
       lineaVinculo = nombre ? `casado/a con ${nombre}` : 'en pareja'
     }
@@ -203,9 +207,8 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
   const desc = datosUsuario.desc && datosUsuario.desc !== 'Sin descripción' ? datosUsuario.desc : 'sin descripción aún'
   const favorito = datosUsuario.favourite && datosUsuario.favourite !== 'No establecido' ? datosUsuario.favourite : '—'
   const moneda = global.moneda || 'coins'
-  const comipPct = Math.min(Math.max(Math.floor(Number(datosUsuario.comisionPareja) || 0), 0), 50)
-  const lineaComip = datosUsuario.partner ? `\n┊ comip  ·  \`${comipPct}%\`` : ''
-  const vinculo = vinculoPareja(global.db.data, targetUser, conn, groupParts)
+  const comipPct = Math.min(Math.max(Math.floor(Number(fichaMatrimonio.comisionPareja) || 0), 0), 50)
+  const lineaComip = parejaRegistrada ? `\n┊ comip  ·  \`${comipPct}%\`` : ''
   const lineaUnion = (() => {
     if (!vinculo) return ''
     const activa = unionActiva(global.db.data, m.chat, vinculo, conn, groupParts)
@@ -213,8 +216,8 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
     return `\n┊ tops globales  ·  \`${activa ? 'pareja (solo suma visual)' : 'separados'}\`\n┊ cuentas  ·  \`siempre separadas\`\n┊ diario de pareja  ·  \`${diario.sinFecha ? 'sin fecha registrada' : diario.disponible ? 'disponible con ' + usedPrefix + 'dma' : 'en ' + tiempoPareja(diario.restante)}\`\n┊ racha de pareja  ·  \`${diario.racha} días\``
   })()
   const lineaCasados = (() => {
-    if (!datosUsuario.partner) return ''
-    const desde = Number(datosUsuario.marriedAt) || 0
+    if (!parejaRegistrada) return ''
+    const desde = vinculo?.desde || Number(fichaMatrimonio.marriedAt) || 0
     if (!desde) return ''
     const min = Math.floor(Math.max(0, Date.now() - desde) / 60000)
     const dias = Math.floor(min / 1440)

@@ -14,10 +14,19 @@ test('comandos: propuesta, respuesta de la pareja, tops combinados, diario y sep
   const prev = { db: global.db, rcanal: global.rcanal, moneda: global.moneda }
   const A = '5211111111111@s.whatsapp.net'
   const B = '5222222222222@s.whatsapp.net'
+  const LA = '777777777777@lid'
+  const LB = '888888888888@lid'
   const CHAT = 'prueba@g.us'
-  const participants = [{ id: A }, { id: B }]
+  const participants = [{ id: LA }, { id: LB }]
   const enviados = []
-  const conn = { decodeJid: j => j, sendMessage: async (chat, content) => { enviados.push(content); return { key: { id: 'enviado' } } } }
+  const conn = {
+    decodeJid: j => j,
+    signalRepository: { lidMapping: {
+      getPNForLID: async j => ({ [LA]: A, [LB]: B })[j],
+      getLIDForPN: async j => ({ [A]: LA, [B]: LB })[j],
+    } },
+    sendMessage: async (chat, content) => { enviados.push(content); return { key: { id: 'enviado' } } },
+  }
   const m = (sender, text = '') => ({ sender, chat: CHAT, isGroup: true, text, key: { id: String(enviados.length) } })
   const contexto = command => ({ conn, participants, command, usedPrefix: '/', args: [] })
   let adapter
@@ -34,12 +43,12 @@ test('comandos: propuesta, respuesta de la pareja, tops combinados, diario y sep
     global.rcanal = { contextInfo: {} }
     global.moneda = 'monedas'
 
-    await pareja(m(A), contexto('unip'))
+    await pareja(m(LA), contexto('unip'))
     assert.match(enviados.at(-1).text, /Propuesta de unión/)
     assert.match(enviados.at(-1).text, /No se mezcla el dinero/)
     await pareja.all(m(A, 'si'), { conn, participants })
     assert.equal(enviados.length, 1, 'el proponente no puede aceptar por sí mismo')
-    await pareja.all(m(B, 'sí'), { conn, participants })
+    await pareja.all(m(LB, 'sí'), { conn, participants })
     assert.match(enviados.at(-1).text, /activada/)
 
     await topcoins(m(A), contexto('topcoins'))
@@ -64,11 +73,11 @@ test('comandos: propuesta, respuesta de la pareja, tops combinados, diario y sep
     await topharem({ ...m(A), chat: 'otro@g.us' }, { ...contexto('topharem'), participants: [] })
     assert.match(enviados.at(-1).text, /Pareja:/)
 
-    await pareja(m(A), contexto('dma'))
+    await pareja(m(LA), contexto('dma'))
     assert.match(enviados.at(-1).text, /para cada uno/)
     assert.equal(global.db.data.users[A].coins, 2100)
     assert.equal(global.db.data.users[B].coins, 2200)
-    await pareja(m(B), contexto('dma'))
+    await pareja(m(LB), contexto('dma'))
     assert.match(enviados.at(-1).text, /siguiente premio/)
     assert.equal(global.db.data.users[B].coins, 2200)
 
