@@ -15,6 +15,7 @@ storage/databases/database.sqlite.claims.sqlite
 storage/databases/database.sqlite.claims.sqlite.lock/
 storage/databases/database.sqlite.*.tmp
 storage/comments/
+storage/profile-images/
 storage/process-mode.json
 storage/process-status/
 storage/runtime-pids/
