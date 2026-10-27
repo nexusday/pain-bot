@@ -5,6 +5,7 @@ import vm from 'node:vm'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { datosReaccion } from '../lib/reacciones.js'
+import { crearReaccionDelirius } from '../lib/reacciones-delirius.js'
 
 const A = '5211111111111@s.whatsapp.net'
 const B = '5222222222222@s.whatsapp.net'
@@ -67,6 +68,7 @@ function cargarPlugin(archivo, { fallaConversion = false } = {}) {
     .replace('export default handler', 'globalThis.handler = handler')
   const contexto = vm.createContext({
     datosReaccion, Buffer,
+    crearReaccionDelirius: opciones => crearReaccionDelirius(opciones, { obtenerVideo: async tipo => `https://cdn.delirius.online/v2/reaction/sfw/${tipo}/prueba.mp4` }),
     console: { error() {} },
     fetch: async () => {
       if (fallaConversion) return { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }
@@ -126,9 +128,10 @@ for (const [archivo, command, obligatorio, texto] of plugins) {
   })
 }
 
-test('kiss: si ffmpeg falla, el fallback conserva al destinatario de la respuesta', async () => {
-  const { enviados } = await ejecutar('reaccion-beso.js', 'kiss', mensaje({ quoted: { sender: B } }), { fallaConversion: true })
+test('kiss: envía el MP4 de Delirius conservando al destinatario de la respuesta', async () => {
+  const { enviados } = await ejecutar('reaccion-beso.js', 'kiss', mensaje({ quoted: { sender: B } }))
   assert.equal(enviados.length, 1)
-  assert.ok(enviados[0].content.video.url)
+  assert.match(enviados[0].content.video.url, /delirius\.online\/.*kiss\/prueba\.mp4$/)
+  assert.equal(enviados[0].content.mimetype, 'video/mp4')
   assert.deepEqual(Array.from(enviados[0].content.contextInfo.mentionedJid), [A, B])
 })
