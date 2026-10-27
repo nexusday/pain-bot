@@ -7,6 +7,7 @@
  *  - Cada anuncio suma `adMinutes` (por defecto 60 min).
  *  - El banco tiene un tope (`maxHours`, 24 h): al llegar, el botón se bloquea.
  *  - Se vuelve a desbloquear al bajar de `unlockHours` (10 h).
+ *  - Una vez abierto, permite recargar hasta alcanzar de nuevo `maxHours`.
  *  - Al caducar el premium, las personalizaciones dejan de aplicarse al
  *    instante pero siguen guardadas: vuelven solas al recuperar tiempo.
  */
@@ -118,10 +119,8 @@ function tarjetaBot(bot, reglas, plantilla) {
         <div class="progress premium-progress"><span style="width:${porcentaje}%"></span></div>
       </div>
       ${bot.locked
-        ? `<div class="notice warn">${icon('alert')}<div>Este bot tiene el máximo de <b>${reglas.maxHours} h</b> de premium guardadas. El botón se desbloquea cuando baje de <b>${reglas.unlockHours} h</b>.</div></div>`
-        : !bot.canAdd
-          ? `<div class="notice">${icon('info')}<div>Le quedan más de <b>${reglas.unlockHours} h</b>. Podrás sumar más tiempo cuando baje de ese límite.</div></div>`
-          : ''}
+        ? `<div class="notice warn">${icon('alert')}<div>Este bot alcanzó el máximo de <b>${reglas.maxHours} h</b>. El botón se reabre cuando le queden <b>${reglas.unlockHours} h o menos</b>; después podrás volver a llenarlo hasta <b>${reglas.maxHours} h</b>.</div></div>`
+        : ''}
       <div class="premium-actions">
         <button class="btn btn-primary" data-action="premium-ad" data-phone="${h(bot.phone)}"
           ${bot.locked || !bot.canAdd ? 'disabled' : ''}>
@@ -297,7 +296,7 @@ export async function renderPremium() {
     <div class="premium-rules">
       <div class="premium-rule">${icon('sparkles')}<div><b>${reglas.adMinutes} min por anuncio</b><span>Hay que permanecer ${reglas.adSeconds} s en el anuncio.</span></div></div>
       <div class="premium-rule">${icon('server')}<div><b>Máximo ${reglas.maxHours} h</b><span>Al llegar al tope el botón se bloquea.</span></div></div>
-      <div class="premium-rule">${icon('refresh')}<div><b>Se reabre a las ${reglas.unlockHours} h</b><span>Vuelve a sumar cuando baje de ese tiempo.</span></div></div>
+      <div class="premium-rule">${icon('refresh')}<div><b>Se reabre con ${reglas.unlockHours} h restantes</b><span>Desde ahí puedes seguir sumando hasta volver al máximo de ${reglas.maxHours} h.</span></div></div>
       <div class="premium-rule">${icon('shieldCheck')}<div><b>Sin perder nada</b><span>Tu moneda, menú y canal quedan guardados al caducar.</span></div></div>
     </div>
 

@@ -23,6 +23,7 @@ import {
   findBotParticipant,
   findCurrentBotParticipant,
   isAdminRole,
+  resolverAdminRemitente,
   candidatosJidRemitente,
   jidsSeSolapan
 } from './lib/group-participant.js'
@@ -445,10 +446,11 @@ if (m.isGroup) {
   groupMetadata = (await metadataGrupo(this, m.chat)) || (this.chats[m.chat] || {}).metadata || {}
   participants = groupMetadata.participants || []
 }
-let user = (m.isGroup ? findGroupParticipant(participants, m, this) : null) || {}
+const rolRemitente = m.isGroup ? await resolverAdminRemitente(participants, m, this, groupMetadata.owner) : null
+let user = rolRemitente?.user || {}
 let bot = (m.isGroup ? findBotParticipant(participants, this) : null) || {}
-let isRAdmin = user?.admin === 'superadmin'
-let isAdmin = isAdminRole(user?.admin)
+let isRAdmin = !!rolRemitente?.isRAdmin
+let isAdmin = !!rolRemitente?.isAdmin
 let isBotAdmin = isAdminRole(bot?.admin)
 
 if (shouldBlockByGrupoOff(m, this)) return
@@ -704,10 +706,11 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
       if (metadataActualizada?.participants?.length) {
         groupMetadata = metadataActualizada
         participants = metadataActualizada.participants
-        user = findGroupParticipant(participants, m, this) || {}
+        const rolActual = await resolverAdminRemitente(participants, m, this, groupMetadata.owner)
+        user = rolActual.user
         bot = await findCurrentBotParticipant(this, participants) || {}
-        isRAdmin = user?.admin === 'superadmin'
-        isAdmin = isAdminRole(user?.admin)
+        isRAdmin = rolActual.isRAdmin
+        isAdmin = rolActual.isAdmin
         isBotAdmin = isAdminRole(bot?.admin)
       }
     }

@@ -7,7 +7,7 @@ import vm from 'node:vm'
 import { setTimeout as delay } from 'node:timers/promises'
 import { startWebPanel } from '../lib/webpanel/server.js'
 import { hashPassword } from '../lib/webpanel/auth.js'
-import { guardarConfigSubBot } from '../lib/webpanel/subbot-config.js'
+import { guardarConfigSubBot, leerConfigSubBot } from '../lib/webpanel/subbot-config.js'
 import {
   PREMIUM_DEFECTOS,
   estadoPremium,
@@ -442,11 +442,11 @@ test('premium: ciclo de anuncio, tope, bloqueador y aislamiento entre usuarios',
   })
   assert.equal(repetido.res.status, 410)
 
-  // Con más del desbloqueo (10 h) no se puede sumar más tiempo.
-  guardarConfigSubBot(ROOT, PHONE, { premium: { expiresAt: Date.now() + 12 * 60 * 60 * 1000 } })
+  // Después de llenar el banco, se espera al umbral de reapertura.
+  guardarConfigSubBot(ROOT, PHONE, { premium: { expiresAt: Date.now() + 12 * 60 * 60 * 1000, adBankLocked: true, adBankMaxHours: 24 } })
   const porEncima = await pedir('/api/premium/ad/start', sesionDueno, 'POST', { phone: PHONE })
   assert.equal(porEncima.res.status, 409)
-  assert.equal(porEncima.datos.code, 'premium_cooldown_hours')
+  assert.equal(porEncima.datos.code, 'premium_locked')
 
   // Banco lleno (24 h): el botón queda bloqueado hasta bajar de 10 h.
   guardarConfigSubBot(ROOT, PHONE, { premium: { expiresAt: Date.now() + 25 * 60 * 60 * 1000 } })
@@ -457,6 +457,46 @@ test('premium: ciclo de anuncio, tope, bloqueador y aislamiento entre usuarios',
   // Si el dueño no es el de la sesión, no hay acceso.
   const intruso = await pedir(`/api/premium/${PHONE_OTRO}`, sesionDueno, 'PATCH', { moneda: 'USD' })
   assert.equal(intruso.res.status, 404)
+})
+
+test('premium: la API permite recargar a 9 h 1 min y vuelve a bloquear únicamente al llenar las 24 h', async () => {
+  const anteriores = await leerAjustesPremium(handle.store)
+  const configAnterior = leerConfigSubBot(ROOT, PHONE)
+  try {
+    const ajustes = await guardarAjustesPremium(handle.store, { maxHours: 24, unlockHours: 9, adMinutes: 1, adSeconds: 3, cooldownSeconds: 0 })
+    guardarConfigSubBot(ROOT, PHONE, { premium: { expiresAt: Date.now() + 9 * 3_600_000 - 1000, adBankLocked: true, adBankMaxHours: 24 } })
+    const antes = await pedir('/api/premium', sesionDueno)
+    assert.equal(antes.datos.bots[0].canAdd, true)
+    const inicio = await pedir('/api/premium/ad/start', sesionDueno, 'POST', { phone: PHONE })
+    assert.equal(inicio.res.status, 200)
+    await delay(4100)
+    const premio = await pedir('/api/premium/ad/claim', sesionDueno, 'POST', { phone: PHONE, token: inicio.datos.token })
+    assert.equal(premio.res.status, 200)
+    assert.ok(premio.datos.remainingMs > 9 * 3_600_000)
+    assert.equal(premio.datos.canAdd, true)
+    assert.equal(premio.datos.locked, false)
+    const siguiente = await pedir('/api/premium/ad/start', sesionDueno, 'POST', { phone: PHONE })
+    assert.equal(siguiente.res.status, 200, 'superar 9 h no debe volver a bloquear el anuncio')
+    await guardarAjustesPremium(handle.store, { cooldownSeconds: 60 })
+    const esperaCorta = await pedir('/api/premium/ad/start', sesionDueno, 'POST', { phone: PHONE })
+    assert.equal(esperaCorta.res.status, 429)
+    assert.equal(esperaCorta.datos.code, 'premium_too_soon', 'el cooldown entre anuncios es independiente del bloqueo del banco')
+    const disponible = await pedir('/api/premium', sesionDueno)
+    assert.equal(disponible.datos.bots[0].canAdd, true)
+    await guardarAjustesPremium(handle.store, { cooldownSeconds: 0 })
+    sumarPremium(ROOT, PHONE, 24 * 60, ajustes)
+    const lleno = await pedir('/api/premium/ad/start', sesionDueno, 'POST', { phone: PHONE })
+    assert.equal(lleno.res.status, 409)
+    assert.equal(lleno.datos.code, 'premium_locked')
+    const antesDelReclamo = leerConfigSubBot(ROOT, PHONE).premium.ads
+    const reclamoLleno = await pedir('/api/premium/ad/claim', sesionDueno, 'POST', { phone: PHONE, token: siguiente.datos.token })
+    assert.equal(reclamoLleno.res.status, 409)
+    assert.equal(reclamoLleno.datos.code, 'premium_locked')
+    assert.equal(leerConfigSubBot(ROOT, PHONE).premium.ads, antesDelReclamo)
+  } finally {
+    guardarConfigSubBot(ROOT, PHONE, configAnterior)
+    await guardarAjustesPremium(handle.store, anteriores)
+  }
 })
 
 test('premium: solo el administrador con permiso ajusta los anuncios', async () => {
