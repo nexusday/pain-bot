@@ -56,6 +56,7 @@ import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
 import { confirmSessionLease, requestReconnectAll, requestReconnectOne, requestReloadAll } from './lib/process-isolation.js'
 import { ejecutarEnContextoBot } from './lib/premium.js'
+import { registrarComandoGlobal } from './lib/webpanel/runtime-stats.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
@@ -1362,6 +1363,9 @@ process.once('SIGINT', () => cerrarConexionesDelProceso('SIGINT'))
 process.once('SIGTERM', () => cerrarConexionesDelProceso('SIGTERM'))
 process.on('message', (message) => {
   if (message?.type === 'shutdown') cerrarConexionesDelProceso('shutdown')
+  if (message?.type === 'global-command-stats' && !isSubbotWorker && message.command) {
+    registrarComandoGlobal(message.command, message.chatId, { user: { jid: message.bot } })
+  }
 })
 
 // Compactación del WAL: con 6 procesos escribiendo sin parar el checkpoint

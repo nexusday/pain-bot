@@ -11,7 +11,7 @@ export const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-export const PANEL_VERSION = '1.9.8'
+export const PANEL_VERSION = '1.9.9'
 
 export const state = {
   user: null,
