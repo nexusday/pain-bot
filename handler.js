@@ -42,6 +42,7 @@ import { coincideRespuesta } from './lib/banco-adivinanzas.js'
 import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
 import { juegosBloqueadosEn, verificarComandoJuegos, esPluginJuegos } from './lib/Modos/modo-games.js'
 import { COMANDOS_SIN_COMISION, aplicarComisionPareja } from './lib/pareja-comision.js'
+import { registrarComandoGlobal } from './lib/webpanel/runtime-stats.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -777,9 +778,10 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
         args,
         text: args.join(' ').trim()
       })
-      m.plugin = plugin.name
-      m.command = command
-      m.args = args
+       m.plugin = plugin.name
+       m.command = command
+       m.args = args
+       if (m.error == null) registrarComandoGlobal(command, m.chat, this)
 
       if (m.error == null && !m.rpgAwarded) {
         const usuarioDb = global.db.data.users[m.sender]

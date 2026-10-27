@@ -1007,3 +1007,18 @@
   border-radius: 6px;
   padding: 1px 5px;
 }
+.global-overview-card { margin-bottom: 18px; }
+.global-overview-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.global-metric { display: grid; gap: 4px; padding: 18px 20px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--bg-soft); }
+.global-metric-value { color: var(--text); font-size: 28px; font-weight: 760; line-height: 1; }
+.global-metric-label { color: var(--muted-2); font-size: 12px; }
+.global-command-list { display: grid; gap: 0; }
+.global-command-row { display: grid; grid-template-columns: 24px minmax(100px, 1fr) auto; align-items: center; gap: 10px; min-height: 34px; padding: 5px 18px; border-bottom: 1px solid var(--line-soft); color: var(--muted-2); font-size: 12px; }
+.global-command-row:last-child { border-bottom: 0; }
+.global-command-row b { color: var(--accent); text-align: center; }
+.global-command-row code { color: var(--text); font-family: var(--mono); }
+.global-command-row .dot-success { width: 7px; height: 7px; border-radius: 50%; background: #46d39a; }
+.empty-inline { padding: 16px 18px; color: var(--muted-2); font-size: 12px; }
+.dashboard-activity-stats { margin-bottom: 18px; }
+.recent-commands-card { margin-bottom: 18px; }
+@media (max-width: 640px) { .global-overview-metrics { grid-template-columns: 1fr; } }

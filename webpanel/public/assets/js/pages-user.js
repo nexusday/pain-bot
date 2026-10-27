@@ -2,6 +2,7 @@
 import { pushAccountHTML } from './push.js'
 import { api } from './api.js'
 import { anunciosCabeceraHTML, anunciosPieHTML } from './pages-premium.js'
+import { dashboardGlobalStatsHTML } from './stats.js'
 import {
   attachRowFilter,
   badge,
@@ -160,6 +161,7 @@ export async function renderDashboard() {
         ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? 'Límite del servidor' : 'Sin límite configurado'}</span>`)}
       </div>
     </div>
+    <div id="dashboard-global-stats">${dashboardGlobalStatsHTML(servidor)}</div>
     <div class="grid-2">
       <div class="stack">
         <div class="card">

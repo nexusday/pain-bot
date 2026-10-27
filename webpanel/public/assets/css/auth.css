@@ -217,3 +217,7 @@
 }
 
 /* ── Shell ──────────────────────────────────────────────────────────────── */
+.auth-global-stats { margin-top: 18px; text-align: left; }
+.auth-global-stats .dashboard-activity-stats { margin-bottom: 12px; }
+.auth-global-stats .card { background: rgba(20, 22, 29, .72); }
+@media (max-width: 760px) { .auth-global-stats .stats-row-compact { grid-template-columns: 1fr; } }

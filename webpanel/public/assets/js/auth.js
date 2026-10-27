@@ -64,12 +64,13 @@ export function renderAuth() {
             <li><span class="fi">${icon('settings')}</span><div><b>Dale tu toque</b><span>El nombre, la imagen y el menú de tu bot se pueden cambiar desde el panel.</span></div></li>
             <li><span class="fi">${icon('activity')}</span><div><b>Tus bots, en un solo lugar</b><span>Mira cuáles están conectados, reconecta un número o desvincúlalo cuando lo necesites.</span></div></li>
           </ul>
-          <div class="auth-stats" id="auth-stats"></div>
           <div class="auth-actions">
             <button class="btn btn-primary btn-block" data-action="auth-open-login">${icon('login')} Iniciar sesión</button>
             ${allowRegistration ? `<button class="btn btn-secondary btn-block" data-action="auth-open-register">${icon('userPlus')} Registrarse</button>` : ''}
             <div class="auth-gratis" data-action="auth-open-login">${icon('zap')} Totalmente gratis</div>
           </div>
+          <div class="auth-stats" id="auth-stats"></div>
+          <div class="auth-global-stats" id="auth-global-stats"></div>
           <div class="auth-meta">
             <span>${h(publicUrl.replace(/^https?:\/\//, '') || 'Panel privado')}</span>
             <span class="sep"></span>

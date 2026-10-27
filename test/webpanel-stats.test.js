@@ -28,8 +28,8 @@ test('webpanel UI: los distintivos del acceso muestran premium activos y guardad
     assert.match(html, /<b>12<\/b> comunidades/)
     assert.match(html, /<b>7<\/b> premium activos/)
     assert.match(html, /<b>3<\/b> premium guardados/)
-    // Mantiene el mismo distintivo que el resto (nada de bloques nuevos).
-    assert.equal((html.match(/class="stat-badge/g) || []).length, 6)
+    // Las métricas globales nuevas también se muestran en el acceso.
+    assert.equal((html.match(/class="stat-badge/g) || []).length, 8)
 
     // Un servidor sin premium muestra 0, nunca "undefined".
     state.stats = { users: 1, bots: 0, sessionsConnected: 0, communities: 0 }
