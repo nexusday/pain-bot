@@ -306,9 +306,11 @@ export async function handleUserSave(form) {
   const roleId = form.querySelector('[name="roleId"]')?.value
   const status = form.querySelector('[name="status"]')?.value
   const password = String(form.querySelector('[name="password"]')?.value || '')
+  const maxSubsEl = form.querySelector('[name="maxSubs"]')
   const body = { status }
   if (roleId && !form.querySelector('[name="roleId"]')?.disabled) body.roleId = Number(roleId)
   if (password) body.password = password
+  if (maxSubsEl && !maxSubsEl.disabled) body.maxSubs = maxSubsEl.value.trim() === '' ? null : Number(maxSubsEl.value)
   const button = document.getElementById('user-save-btn')
 
   const aplicar = async () => {
@@ -347,6 +349,17 @@ export async function handleUserSave(form) {
   }
 
   await aplicar()
+}
+
+export async function grantUserPremium(userId, phone, hours, infinite = false) {
+  try {
+    await api.post(`/api/admin/users/${encodeURIComponent(userId)}/premium`, { phone, hours: infinite ? 'infinite' : Number(hours), infinite })
+    showToast(infinite ? 'Premium infinito concedido.' : `Premium concedido por ${hours} h.`, 'success')
+    const data = await api.get('/api/admin/users?limit=200')
+    state.adminUsers = data.users || []
+    const { openUserModal } = await import('./pages-admin.js')
+    openUserModal(userId)
+  } catch (error) { showToast(error.message || 'No se pudo conceder Premium.', 'error') }
 }
 
 export function confirmDeleteUser(id, username) {
