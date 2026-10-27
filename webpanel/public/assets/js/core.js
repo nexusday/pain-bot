@@ -11,7 +11,7 @@ export const toastRoot = document.getElementById('toast-root')
 
 // Versión de los recursos del panel. Si el servidor tiene otra, el navegador
 // está con la copia vieja: se avisa para que recarguen.
-export const PANEL_VERSION = '1.9.1'
+export const PANEL_VERSION = '1.9.2'
 
 export const state = {
   user: null,
@@ -46,6 +46,11 @@ export const state = {
   stats: null,
   statsPoll: null,
   dashboardPoll: null,
+  comments: [],
+  commentsMeta: null,
+  commentsStream: null,
+  commentsReply: null,
+  commentsUnread: 0,
 }
 
 /* ── Iconos (stroke, sin dependencias) ──────────────────────────────────── */
@@ -84,6 +89,7 @@ export const ICONS = {
   eyeOff: '<path d="m3 3 18 18"/><path d="M10.6 10.6A2.5 2.5 0 0 0 13.4 13.4"/><path d="M9.9 5.2A10.6 10.6 0 0 1 12 5c6.5 0 10 6 10 6a17.5 17.5 0 0 1-2.2 3.1"/><path d="M6.6 6.6A17.6 17.6 0 0 0 2 11s3.5 6 10 6a10.5 10.5 0 0 0 5.4-1.5"/>',
   lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  message: '<path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
   sparkles: '<path d="m12 3 1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3L7.5 7.5l3.3-1.2L12 3Z"/><path d="m19 13 .8 2.2L22 16l-2.2.8L19 19l-.8-2.2L16 16l2.2-.8L19 13Z"/><path d="m5 14 .9 2.1L8 17l-2.1.9L5 20l-.9-2.1L2 17l2.1-.9L5 14Z"/>',
   arrowRight: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
@@ -370,6 +376,11 @@ export function stopTimers() {
     clearInterval(state.mainPoll)
     state.mainPoll = null
   }
+  if (state.commentsStream) {
+    state.commentsStream.close()
+    state.commentsStream = null
+  }
+  state.commentsReply = null
 }
 
 /* ── Toasts / modales ───────────────────────────────────────────────────── */
@@ -423,10 +434,16 @@ export function confirmModal({ title, message, confirmLabel = 'Confirmar', dange
 
 export function updateNavBadges() {
   const el = document.getElementById('nav-bots-count')
-  if (!el) return
-  const count = state.bots.length
-  el.textContent = String(count)
-  el.style.display = count ? '' : 'none'
+  if (el) {
+    const count = state.bots.length
+    el.textContent = String(count)
+    el.style.display = count ? '' : 'none'
+  }
+  const comments = document.getElementById('nav-comments-count')
+  if (comments) {
+    comments.textContent = state.commentsUnread ? String(state.commentsUnread) : ''
+    comments.style.display = state.commentsUnread ? '' : 'none'
+  }
 }
 
 /* ── Widgets compartidos ────────────────────────────────────────────────── */

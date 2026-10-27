@@ -73,6 +73,7 @@ import {
   renderRolePermissions,
 } from './pages-admin.js'
 import { route, toggleSidebar } from './shell.js'
+import { blockCommentUser, deleteComment, openCommentImage, replyToComment, submitComment, toggleCommentMenu } from './pages-comments.js'
 
 /* ── Delegación de eventos ──────────────────────────────────────────────── */
 export async function onClick(event) {
@@ -156,6 +157,12 @@ export async function onClick(event) {
       confirmDeleteBot(phone, actionEl.dataset.label || '')
       return
     }
+    if (action === 'comment-menu') { toggleCommentMenu(actionEl.dataset.commentId); return }
+    if (action === 'comment-image') { openCommentImage(actionEl.dataset.imageUrl); return }
+    if (action === 'comment-reply') { replyToComment(actionEl.dataset.commentId); return }
+    if (action === 'comment-cancel-reply') { state.commentsReply = null; route(); return }
+    if (action === 'comment-delete') { await deleteComment(actionEl.dataset.commentId); return }
+    if (action === 'comment-block') { await blockCommentUser(actionEl.dataset.userId, actionEl.dataset.username || 'este usuario'); return }
   if (action === 'bot-config') {
     await openBotConfigModal(phone)
     return
@@ -320,6 +327,7 @@ export async function onSubmit(event) {
   if (!(form instanceof HTMLFormElement)) return
   const id = form.id
   if (id==='push-send-form') { event.preventDefault();await handlePushSend(form);return }
+  if (id === 'comment-form') { event.preventDefault(); await submitComment(form); return }
   if (id==='push-settings-form') { event.preventDefault();await handlePushSettings(form);return }
   if (id==='push-users-search') { event.preventDefault();state.pushQuery=form.elements.q.value.trim();state.pushOffset=0;await renderAdmin('notifications');return }
   if (id==='backup-export-form') { event.preventDefault();await handleBackupExport(form);return }
@@ -456,6 +464,11 @@ export function onKeydown(event) {
 /** Casillas de selección de sesiones (admin). */
 export function onChange(event) {
   const target = event.target
+  if (target instanceof HTMLInputElement && target.matches('#comment-form input[type="file"]')) {
+    const label = document.getElementById('comment-file-name')
+    if (label) label.textContent = target.files?.[0]?.name || ''
+    return
+  }
   if (target instanceof HTMLInputElement && target.matches('[data-push-user]')) {
     state.adminPushSelection ||= new Set()
     if(target.checked)state.adminPushSelection.add(Number(target.dataset.pushUser));else state.adminPushSelection.delete(Number(target.dataset.pushUser))

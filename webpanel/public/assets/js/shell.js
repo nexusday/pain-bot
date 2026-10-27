@@ -26,6 +26,7 @@ import {
   renderLinkPage,
 } from './pages-user.js'
 import { renderStatsBadges } from './stats.js'
+import { renderComments } from './pages-comments.js'
 
 /* ── Shell principal ────────────────────────────────────────────────────── */
 export function navLink(path, iconName, label, options = {}) {
@@ -89,7 +90,8 @@ export function renderShell() {
           ${navLink('/dashboard', 'grid', 'Dashboard')}
           ${puede('bots.view') ? navLink('/bots', 'bot', 'Mis bots', { badge: state.bots.length || '', badgeId: 'nav-bots-count' }) : ''}
           ${puede('bots.link') ? navLink('/link', 'link', 'Vincular bot') : ''}
-          ${puede('communities.view') ? navLink('/communities', 'globe', 'Comunidades') : ''}
+           ${puede('communities.view') ? navLink('/communities', 'globe', 'Comunidades') : ''}
+           ${navLink('/comments', 'message', 'Comentarios', { badge: state.commentsUnread ? String(state.commentsUnread) : '', badgeId: 'nav-comments-count' })}
           ${puede('bots.view') ? navLink('/premium', 'sparkles', 'Premium') : ''}
           <div class="nav-section">Cuenta</div>
           ${navLink('/account', 'user', 'Mi cuenta')}
@@ -213,6 +215,8 @@ export async function route() {
       return renderLinkPage()
     case 'communities':
       return renderCommunities()
+    case 'comments':
+      return renderComments()
     case 'premium':
       return renderPremium()
     case 'account':
