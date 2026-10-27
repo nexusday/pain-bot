@@ -33,6 +33,7 @@ import {
   handleSettingsSave,
   handleSettingsTurnstileSave,
   handleUserSave,
+  grantUserPremium,
   impersonarUsuario,
   openBotConfigModal,
   openRelinkModal,
@@ -50,6 +51,8 @@ import {
   handleEmailSave,
   handleEmailVerify,
   handleEmailVerifyResend,
+  handleProfileImageRemove,
+  handleProfileImageSave,
   handleLinkCancel,
   handleLinkRegenerate,
   handlePasswordChange,
@@ -217,6 +220,12 @@ export async function onClick(event) {
       openUserModal(id)
       return
     }
+    if (action === 'admin-user-premium' || action === 'admin-user-premium-infinite') {
+      const row = actionEl.closest('.admin-user-bot-row')
+      const hours = row?.querySelector('.user-premium-hours')?.value || 24
+      await grantUserPremium(actionEl.dataset.userId, actionEl.dataset.phone, hours, action === 'admin-user-premium-infinite')
+      return
+    }
     if (action === 'admin-user-delete') {
       confirmDeleteUser(id, actionEl.dataset.username || 'usuario')
       return
@@ -239,6 +248,10 @@ export async function onClick(event) {
     }
     if (action === 'email-verify-resend') {
       await handleEmailVerifyResend()
+      return
+    }
+    if (action === 'profile-image-remove') {
+      await handleProfileImageRemove()
       return
     }
     if (action === 'admin-session-reconnect') {
@@ -356,6 +369,11 @@ export async function onSubmit(event) {
   if (id === 'email-verify-form') {
     event.preventDefault()
     await handleEmailVerify(form)
+    return
+  }
+  if (id === 'profile-image-form') {
+    event.preventDefault()
+    await handleProfileImageSave(form)
     return
   }
   if (id === 'auth-verify-form') {

@@ -260,6 +260,39 @@ export async function handleEmailVerifyResend() {
   }
 }
 
+export async function handleProfileImageSave(form) {
+  const file = form.querySelector('[name="image"]')?.files?.[0]
+  if (!file) return showToast('Selecciona una imagen primero.', 'warn')
+  if (file.size > 10 * 1024 * 1024) return showToast('La foto no puede superar 10 MB.', 'error')
+  const submit = form.querySelector('button[type="submit"]')
+  setLoading(submit, true, 'Guardando…')
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    const data = await api.post('/api/account/avatar', { image })
+    state.user = { ...state.user, ...(data.user || {}) }
+    renderAccount()
+    document.querySelector('.user-avatar')?.replaceChildren(Object.assign(document.createElement('img'), { src: `${state.user.profileImage}?v=${Date.now()}`, alt: `Foto de ${state.user.username}` }))
+    showToast('Foto de perfil actualizada.', 'success')
+  } catch (error) { showToast(error.message || 'No se pudo guardar la foto.', 'error') }
+  finally { setLoading(submit, false) }
+}
+
+export async function handleProfileImageRemove() {
+  try {
+    const data = await api.del('/api/account/avatar')
+    state.user = { ...state.user, ...(data.user || {}), profileImage: null }
+    renderAccount()
+    const avatar = document.querySelector('.user-avatar')
+    if (avatar) avatar.textContent = state.user.username.slice(0, 2).toUpperCase()
+    showToast('Foto de perfil eliminada.', 'success')
+  } catch (error) { showToast(error.message || 'No se pudo quitar la foto.', 'error') }
+}
+
 /* ── Handlers de las comunidades ────────────────────────────────────────── */
 /* ── Mantenimiento: actualizar sin reiniciar ─────────────────────────────── */
 export function esperaPanelYRecarga() {

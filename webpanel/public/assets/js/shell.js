@@ -113,8 +113,8 @@ export function renderShell() {
           <div class="topbar-actions">
             <div id="stats-badges" class="stat-badge-skeleton-box" style="display:none;"></div>
             <button class="icon-btn" data-action="refresh" title="Actualizar" aria-label="Actualizar">${icon('refresh')}</button>
-            <div class="user-chip">
-              <div class="avatar">${initials(user.username)}</div>
+             <div class="user-chip">
+              <div class="avatar user-avatar">${user.profileImage ? `<img src="${h(user.profileImage)}?v=${encodeURIComponent(user.emailVerifiedAt || '')}" alt="Foto de ${h(user.username)}" />` : initials(user.username)}</div>
               <div><div class="uc-name">${h(user.username)}${user.isPrincipal ? ' <span class="badge accent" style="font-size:9px;padding:1px 5px">Principal</span>' : ''}</div><div class="uc-role">${h(rolVisible)}</div></div>
             </div>
             <button class="icon-btn danger" data-action="logout" title="Cerrar sesión" aria-label="Cerrar sesión">${icon('logout')}</button>
@@ -164,6 +164,7 @@ const ADMIN_PERMISSIONS = {
 }
 
 export async function route() {
+  const generation = ++state.routeGeneration
   closeModal()
   stopTimers()
   if (!state.user) {
@@ -175,6 +176,7 @@ export async function route() {
   // antiguos en las pestañas, el menú o la identificación de la cuenta.
   try {
     const me = await api.get('/api/auth/me')
+    if (generation !== state.routeGeneration) return
     const changed = JSON.stringify(state.user) !== JSON.stringify(me.user)
     state.user = me.user
     state.csrf = me.csrf
@@ -189,7 +191,7 @@ export async function route() {
   startPushClient()
   const [path, queryString] = raw.split('?')
   const parts = path.split('/').filter(Boolean)
-  state.route = { path, query: new URLSearchParams(queryString || ''), parts }
+    state.route = { path, query: new URLSearchParams(queryString || ''), parts }
   setActiveNav(path)
 
   if (parts[0] === 'admin') {

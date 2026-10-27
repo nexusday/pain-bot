@@ -17,7 +17,7 @@ function comentarioHTML(item) {
     ? `<div class="comment-menu"><button class="icon-btn sm" data-action="comment-menu" data-comment-id="${item.id}" aria-label="Acciones del comentario" title="Más acciones">•••</button></div>`
     : ''
   return `<article class="comment-row${item.deleted ? ' is-deleted' : ''}${Number(item.userId) === Number(state.user?.id) ? ' is-own' : ''}" data-comment-id="${item.id}">
-    <div class="comment-avatar">${initials(item.username)}</div>
+    <div class="comment-avatar">${item.profileImage ? `<img src="${h(item.profileImage)}" alt="Foto de ${h(item.username)}" loading="lazy">` : initials(item.username)}</div>
     <div class="comment-bubble">
       <div class="comment-meta"><b>${h(item.username)}${item.verifiedAuthor ? '<span class="comment-verified" title="Administrador verificado" aria-label="Administrador verificado">✓</span>' : ''}</b><span>${h(fmtRelative(item.createdAt))}</span>${item.authorBlocked ? '<span class="badge danger comment-badge">bloqueado</span>' : ''}${menu}</div>
       ${parent ? `<div class="comment-reply-context"><b>En respuesta a ${h(parent.username)}</b><span>${h(parent.text || 'Imagen')}</span></div>` : ''}

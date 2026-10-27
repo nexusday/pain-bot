@@ -66,27 +66,30 @@ export const ADMIN_META = {
 }
 
 export async function renderAdmin(section) {
+  const generation = state.routeGeneration
+  const isCurrentAdminRoute = (name) => isAdminRoute(name) && state.routeGeneration === generation
   const meta = ADMIN_META[section] || ADMIN_META.overview
+  if (!isCurrentAdminRoute(section)) return
   setPage(meta[0], meta[1])
   content(adminTabs(section) + loadingBlock())
 
   try {
     if (section === 'notifications') {
       const data=await api.get(`/api/admin/notifications?q=${encodeURIComponent(state.pushQuery||'')}&offset=${state.pushOffset||0}`)
-      if (!isAdminRoute('notifications')) return
+       if (!isCurrentAdminRoute('notifications')) return
       content(adminTabs('notifications')+notificationsHTML(data));return
     }
     if (section === 'backups') { content(adminTabs('backups')+backupsHTML());return }
     if (section === 'overview') {
       const data = await api.get('/api/admin/overview')
-      if (!isAdminRoute('overview')) return
+       if (!isCurrentAdminRoute('overview')) return
       content(adminTabs('overview') + adminOverviewHTML(data))
       return
     }
 
     if (section === 'principal') {
       const data = await api.get('/api/main')
-      if (!isAdminRoute('principal')) return
+       if (!isCurrentAdminRoute('principal')) return
       state.main = data.main || null
       content(adminTabs('principal') + adminMainHTML(data.main || {}))
       vigilarVinculacionPrincipal()
@@ -99,7 +102,7 @@ export async function renderAdmin(section) {
       try {
         rolesData = await api.get('/api/admin/roles')
       } catch {}
-      if (!isAdminRoute('users')) return
+       if (!isCurrentAdminRoute('users')) return
       state.adminUsers = Array.isArray(data.users) ? data.users : []
       state.adminRoles = Array.isArray(rolesData?.roles) ? rolesData.roles : []
       content(adminTabs('users') + adminUsersHTML(data))
@@ -109,7 +112,7 @@ export async function renderAdmin(section) {
 
     if (section === 'sessions') {
       const data = await api.get('/api/admin/sessions')
-      if (!isAdminRoute('sessions')) return
+       if (!isCurrentAdminRoute('sessions')) return
       state.adminSessions = Array.isArray(data.sessions) ? data.sessions : []
       content(adminTabs('sessions') + adminSessionsHTML(data))
       document.getElementById('admin-sessions-search')?.addEventListener('input', aplicarFiltrosSesiones)
@@ -119,7 +122,7 @@ export async function renderAdmin(section) {
 
     if (section === 'pairings') {
       const data = await api.get('/api/admin/pairings')
-      if (!isAdminRoute('pairings')) return
+       if (!isCurrentAdminRoute('pairings')) return
       state.adminPairings = Array.isArray(data.pairings) ? data.pairings : []
       content(adminTabs('pairings') + adminPairingsHTML(data))
       return
@@ -127,7 +130,7 @@ export async function renderAdmin(section) {
 
     if (section === 'communities') {
       const data = await api.get('/api/admin/communities')
-      if (!isAdminRoute('communities')) return
+       if (!isCurrentAdminRoute('communities')) return
       state.adminCommunities = Array.isArray(data.communities) ? data.communities : []
       content(adminTabs('communities') + adminCommunitiesHTML(data))
       return
@@ -135,7 +138,7 @@ export async function renderAdmin(section) {
 
     if (section === 'audit') {
       const data = await api.get('/api/admin/audit?limit=150')
-      if (!isAdminRoute('audit')) return
+       if (!isCurrentAdminRoute('audit')) return
       state.adminAudit = Array.isArray(data.audit) ? data.audit : []
       content(adminTabs('audit') + adminAuditHTML(data))
       return
@@ -143,7 +146,7 @@ export async function renderAdmin(section) {
 
     if (section === 'roles') {
       const data = await api.get('/api/admin/roles')
-      if (!isAdminRoute('roles')) return
+       if (!isCurrentAdminRoute('roles')) return
       state.adminRoles = Array.isArray(data.roles) ? data.roles : []
       state.adminPermissions = Array.isArray(data.permissions) ? data.permissions : []
       content(adminTabs('roles') + adminRolesHTML(data))
@@ -152,14 +155,14 @@ export async function renderAdmin(section) {
 
     if (section === 'mail') {
       const data = await api.get('/api/admin/mail')
-      if (!isAdminRoute('mail')) return
+       if (!isCurrentAdminRoute('mail')) return
       state.adminMail = data
       content(adminTabs('mail') + adminMailHTML(data))
       return
     }
 
     const data = await api.get('/api/admin/settings')
-    if (!isAdminRoute('settings')) return
+     if (!isCurrentAdminRoute('settings')) return
     state.adminSettings = data
     content(adminTabs('settings') + adminSettingsHTML(data))
   } catch (error) {
@@ -168,7 +171,7 @@ export async function renderAdmin(section) {
       navigate('/dashboard')
       return
     }
-    if (!isAdminRoute(section)) return
+     if (!isCurrentAdminRoute(section)) return
     content(adminTabs(section) + errorPage(error.message))
   }
 }

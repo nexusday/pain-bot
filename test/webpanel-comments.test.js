@@ -29,6 +29,12 @@ test('comentarios: correo verificado publica, responde y los permisos moderan', 
   const userCsrf = registro.data.csrf
   const usuario = await handle.store.buscarUsuarioPorNombre('comentador')
   await handle.store.marcarEmailVerificado(usuario.id, usuario.email)
+  const avatar = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+  const foto = await pedir('/api/account/avatar', { method: 'POST', cookie: userCookie, csrf: userCsrf, body: { image: avatar } })
+  assert.equal(foto.res.status, 200)
+  assert.ok(foto.data.user.profileImage)
+  const fotoPublica = await pedir(`/api/account/avatar/${usuario.id}`, { cookie: userCookie })
+  assert.equal(fotoPublica.res.status, 200)
 
   const lista = await pedir('/api/comments', { cookie: userCookie })
   assert.equal(lista.res.status, 200)
@@ -44,6 +50,13 @@ test('comentarios: correo verificado publica, responde y los permisos moderan', 
   const adminLogin = await pedir('/api/auth/login', { method: 'POST', body: { username: 'admin', password: 'admin12345' } })
   const adminCookie = adminLogin.cookie
   const adminCsrf = adminLogin.data.csrf
+  const limite = await pedir(`/api/admin/users/${usuario.id}`, { method: 'PATCH', cookie: adminCookie, csrf: adminCsrf, body: { maxSubs: 3 } })
+  assert.equal(limite.res.status, 200)
+  assert.equal(limite.data.user.maxSubs, 3)
+  await handle.store.upsertBot({ userId: usuario.id, phone: '5215555555555', folder: '5215555555555', status: 'linked' })
+  const premium = await pedir(`/api/admin/users/${usuario.id}/premium`, { method: 'POST', cookie: adminCookie, csrf: adminCsrf, body: { phone: '5215555555555', hours: 12 } })
+  assert.equal(premium.res.status, 200)
+  assert.equal(premium.data.premium.active, true)
   const eliminadoSinPermiso = await pedir(`/api/comments/${id}`, { method: 'DELETE', cookie: userCookie, csrf: userCsrf })
   assert.equal(eliminadoSinPermiso.res.status, 403)
   const eliminado = await pedir(`/api/comments/${id}`, { method: 'DELETE', cookie: adminCookie, csrf: adminCsrf })

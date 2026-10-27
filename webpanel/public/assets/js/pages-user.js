@@ -214,9 +214,9 @@ export async function renderDashboard() {
               </div>
               <div class="hint">Esta es la dirección con la que entra tu equipo. El subdominio se configura en <span class="mono">config.js</span> o en las variables <span class="mono">PAIN_WEB_*</span>.</div>
             </div>
-            <div class="field">
-              <label class="label">Cuenta</label>
-              <div class="system-grid">
+             <div class="field">
+               <label class="label">Cuenta</label>
+               <div class="system-grid">
                 <div class="system-item"><div class="si-label">Usuario</div><div class="si-value" style="font-size:13px">${h(state.user.username)}</div></div>
                 <div class="system-item"><div class="si-label">Rol</div><div class="si-value" style="font-size:13px">${state.user.role === 'admin' ? 'Administrador' : 'Usuario'}</div></div>
               </div>
@@ -541,9 +541,13 @@ export function renderAccount() {
       <div class="stack">
         <div class="card">
           <div class="card-head"><div><h3>Perfil</h3><p>Información de tu cuenta</p></div>${roleBadge(user.role, user.isPrincipal ? 'Principal' : user.roleName)}</div>
-          <div class="card-body">
-            <div class="system-grid">
-              <div class="system-item"><div class="si-label">Usuario</div><div class="si-value" style="font-size:13px">${h(user.username)}</div></div>
+           <div class="card-body">
+             <div class="account-profile-photo">
+               <div class="account-photo-preview">${user.profileImage ? `<img src="${h(user.profileImage)}?v=${encodeURIComponent(user.emailVerifiedAt || '')}" alt="Foto de perfil" />` : initials(user.username)}</div>
+               <div class="account-photo-copy"><b>Foto de perfil</b><span>JPG, PNG, WebP o GIF · máximo 10 MB</span>${user.emailVerified ? `<form id="profile-image-form"><label class="btn btn-secondary btn-sm">${icon('image')} Elegir foto<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden /></label><button class="btn btn-primary btn-sm" type="submit">Guardar foto</button>${user.profileImage ? '<button class="btn btn-ghost btn-sm" type="button" data-action="profile-image-remove">Quitar</button>' : ''}</form>` : '<span class="text-warn">Verifica tu correo para añadir una foto.</span>'}</div>
+             </div>
+             <div class="system-grid">
+               <div class="system-item"><div class="si-label">Usuario</div><div class="si-value" style="font-size:13px">${h(user.username)}</div></div>
               <div class="system-item"><div class="si-label">Correo</div><div class="si-value" style="font-size:13px">${h(user.email || 'Sin correo')} ${user.email ? (user.emailVerified ? '<span class="badge success" style="font-size:9px">Verificado</span>' : '<span class="badge warn" style="font-size:9px">Sin verificar</span>') : ''}</div></div>
               <div class="system-item"><div class="si-label">Registro</div><div class="si-value" style="font-size:13px">${fmtDate(user.created_at, false)}</div></div>
               <div class="system-item"><div class="si-label">Último acceso</div><div class="si-value" style="font-size:13px">${user.last_login_at ? fmtRelative(user.last_login_at) : '—'}</div></div>
