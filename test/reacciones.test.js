@@ -60,8 +60,8 @@ const plugins = [
   ['reaccion-dance.js', 'dance', false, /bailando/],
 ]
 
-// Ejecuta los handlers reales con transporte y conversión simulados. No
-// descarga GIFs ni crea archivos temporales durante los tests.
+// Ejecuta los handlers reales con la API de Delirius simulada. No consulta
+// la red ni descarga archivos durante los tests.
 function cargarPlugin(archivo, { fallaConversion = false } = {}) {
   const source = fs.readFileSync(new URL(`../plugins/${archivo}`, import.meta.url), 'utf8')
     .replace(/^import[^\n]*\n/gm, '')
