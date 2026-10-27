@@ -783,11 +783,6 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
        m.args = args
        if (m.error == null) {
          registrarComandoGlobal(command, m.chat, this)
-         if (process.env.PAIN_ROLE === 'subbot' && typeof process.send === 'function') {
-           try {
-             process.send({ type: 'global-command-stats', command, chatId: m.chat, bot: this.user?.jid || this.user?.id || null }, () => {})
-           } catch {}
-         }
        }
 
       if (m.error == null && !m.rpgAwarded) {

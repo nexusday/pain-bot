@@ -299,13 +299,6 @@ function startSlot(id, slot) {
       })
       return
     }
-    if (message?.type === 'global-command-stats' && id !== 'primary') {
-      const primary = slots.get('primary')?.child
-      if (primary) {
-        try { primary.send(message, () => {}) } catch {}
-      }
-      return
-    }
     if (message?.type === 'reconcile-sessions') {
       reconcile()
       return

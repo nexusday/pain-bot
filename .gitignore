@@ -18,6 +18,7 @@ storage/comments/
 storage/profile-images/
 storage/process-mode.json
 storage/process-status/
+storage/runtime-stats/
 storage/runtime-pids/
 storage/main-config.json
 storage/cmd18.json
