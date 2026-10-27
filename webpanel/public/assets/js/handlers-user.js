@@ -282,6 +282,43 @@ export async function handleProfileImageSave(form) {
   finally { setLoading(submit, false) }
 }
 
+export function handleProfileImageSelect(input) {
+  const form = input.form
+  const file = input.files?.[0]
+  const status = form?.querySelector('#profile-image-status')
+  const submit = form?.querySelector('button[type="submit"]')
+  const preview = document.querySelector('.account-photo-preview')
+  if (!file) {
+    if (submit) submit.disabled = true
+    if (status) status.textContent = 'Elige una imagen para ver la vista previa.'
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    if (submit) submit.disabled = true
+    if (status) status.textContent = 'La imagen supera el límite de 10 MB.'
+    return
+  }
+  if (!/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
+    if (submit) submit.disabled = true
+    if (status) status.textContent = 'Formato no válido. Usa JPG, PNG, WebP o GIF.'
+    return
+  }
+  if (submit) submit.disabled = false
+  if (status) status.textContent = `Cargando vista previa… ${file.name} · ${(file.size / (1024 * 1024)).toFixed(2)} MB`
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (preview) {
+      preview.replaceChildren(Object.assign(document.createElement('img'), { src: String(reader.result), alt: 'Vista previa de la foto seleccionada' }))
+    }
+    if (status) status.textContent = `Seleccionada: ${file.name} · ${(file.size / (1024 * 1024)).toFixed(2)} MB`
+  }
+  reader.onerror = () => {
+    if (submit) submit.disabled = true
+    if (status) status.textContent = 'No se pudo generar la vista previa.'
+  }
+  reader.readAsDataURL(file)
+}
+
 export async function handleProfileImageRemove() {
   try {
     const data = await api.del('/api/account/avatar')

@@ -52,6 +52,7 @@ import {
   handleEmailVerify,
   handleEmailVerifyResend,
   handleProfileImageRemove,
+  handleProfileImageSelect,
   handleProfileImageSave,
   handleLinkCancel,
   handleLinkRegenerate,
@@ -330,8 +331,18 @@ export async function onClick(event) {
   }
 
   const nav = event.target.closest('.nav-link')
-  if (nav && window.innerWidth <= 900) {
-    document.getElementById('app-shell')?.classList.remove('sidebar-open')
+  if (nav) {
+    const destino = nav.getAttribute('href')
+    // No dependemos del comportamiento nativo del hash: algunos navegadores
+    // no emiten hashchange al pulsar de nuevo la ruta activa.
+    if (destino?.startsWith('#/')) {
+      event.preventDefault()
+      if (location.hash === destino) await route()
+      else location.hash = destino
+    }
+    if (window.innerWidth <= 900) {
+      document.getElementById('app-shell')?.classList.remove('sidebar-open')
+    }
   }
 }
 
@@ -482,6 +493,10 @@ export function onKeydown(event) {
 /** Casillas de selección de sesiones (admin). */
 export function onChange(event) {
   const target = event.target
+  if (target instanceof HTMLInputElement && target.matches('#profile-image-form input[type="file"]')) {
+    handleProfileImageSelect(target)
+    return
+  }
   if (target instanceof HTMLInputElement && target.matches('#comment-form input[type="file"]')) {
     const label = document.getElementById('comment-file-name')
     if (label) label.textContent = target.files?.[0]?.name || ''

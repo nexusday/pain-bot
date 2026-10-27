@@ -13,6 +13,7 @@ import {
   fmtRelative,
   h,
   icon,
+  initials,
   isLinkRoute,
   loadingPage,
   roleBadge,
@@ -544,7 +545,7 @@ export function renderAccount() {
            <div class="card-body">
              <div class="account-profile-photo">
                <div class="account-photo-preview">${user.profileImage ? `<img src="${h(user.profileImage)}?v=${encodeURIComponent(user.emailVerifiedAt || '')}" alt="Foto de perfil" />` : initials(user.username)}</div>
-               <div class="account-photo-copy"><b>Foto de perfil</b><span>JPG, PNG, WebP o GIF · máximo 10 MB</span>${user.emailVerified ? `<form id="profile-image-form"><label class="btn btn-secondary btn-sm">${icon('image')} Elegir foto<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden /></label><button class="btn btn-primary btn-sm" type="submit">Guardar foto</button>${user.profileImage ? '<button class="btn btn-ghost btn-sm" type="button" data-action="profile-image-remove">Quitar</button>' : ''}</form>` : '<span class="text-warn">Verifica tu correo para añadir una foto.</span>'}</div>
+               <div class="account-photo-copy"><b>Foto de perfil</b><span>JPG, PNG, WebP o GIF · máximo 10 MB</span>${user.emailVerified ? `<form id="profile-image-form"><label class="btn btn-secondary btn-sm">${icon('image')} Elegir foto<input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden /></label><button class="btn btn-primary btn-sm" type="submit" disabled>Guardar foto</button>${user.profileImage ? '<button class="btn btn-ghost btn-sm" type="button" data-action="profile-image-remove">Quitar</button>' : ''}<span class="account-photo-status" id="profile-image-status">Elige una imagen para ver la vista previa.</span></form>` : '<span class="text-warn">Verifica tu correo para añadir una foto.</span>'}</div>
              </div>
              <div class="system-grid">
                <div class="system-item"><div class="si-label">Usuario</div><div class="si-value" style="font-size:13px">${h(user.username)}</div></div>

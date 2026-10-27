@@ -5,6 +5,8 @@ import { startPushClient } from './push.js'
 import {
   app,
   closeModal,
+  content,
+  errorPage,
   h,
   icon,
   initials,
@@ -194,36 +196,41 @@ export async function route() {
     state.route = { path, query: new URLSearchParams(queryString || ''), parts }
   setActiveNav(path)
 
-  if (parts[0] === 'admin') {
-    if (!puede('admin.access')) {
-      navigate('/dashboard')
-      return
+  try {
+    if (parts[0] === 'admin') {
+      if (!puede('admin.access')) {
+        navigate('/dashboard')
+        return
+      }
+      const section = parts[1] || Object.entries(ADMIN_PERMISSIONS).find(([, permiso]) => puede(permiso))?.[0]
+      const permisos = ADMIN_PERMISSIONS
+      if (!permisos[section] || !puede(permisos[section])) {
+        navigate('/dashboard')
+        return
+      }
+      return renderAdmin(section)
     }
-    const section = parts[1] || Object.entries(ADMIN_PERMISSIONS).find(([, permiso]) => puede(permiso))?.[0]
-    const permisos = ADMIN_PERMISSIONS
-    if (!permisos[section] || !puede(permisos[section])) {
-      navigate('/dashboard')
-      return
-    }
-    return renderAdmin(section)
-  }
 
-  switch (parts[0] || 'dashboard') {
-    case 'dashboard':
-      return renderDashboard()
-    case 'bots':
-      return renderBots()
-    case 'link':
-      return renderLinkPage()
-    case 'communities':
-      return renderCommunities()
-    case 'comments':
-      return renderComments()
-    case 'premium':
-      return renderPremium()
-    case 'account':
-      return renderAccount()
-    default:
-      navigate('/dashboard')
+    switch (parts[0] || 'dashboard') {
+      case 'dashboard':
+        return renderDashboard()
+      case 'bots':
+        return renderBots()
+      case 'link':
+        return renderLinkPage()
+      case 'communities':
+        return renderCommunities()
+      case 'comments':
+        return renderComments()
+      case 'premium':
+        return renderPremium()
+      case 'account':
+        return renderAccount()
+      default:
+        navigate('/dashboard')
+    }
+  } catch (error) {
+    console.error('[panel] No se pudo renderizar la ruta:', raw, error)
+    content(errorPage(error?.message || 'No se pudo cargar esta sección.'))
   }
 }
