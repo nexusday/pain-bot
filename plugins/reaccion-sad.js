@@ -3,8 +3,9 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { writeFileSync, unlinkSync, existsSync } from 'fs'
 import { spawn } from 'child_process'
+import { datosReaccion } from '../lib/reacciones.js'
 
-let handler = async (m, { conn }) => {
+let handler = async (m, { conn, participants = [] }) => {
   const gifs = [
     'https://media.tenor.com/Cb7siZ71KJYAAAAM/sad.gif',
     'https://media.tenor.com/8Ob5KEU7vKAAAAAM/anime-my-dress-up-darling.gif',
@@ -20,10 +21,8 @@ let handler = async (m, { conn }) => {
    
   ]
 
-  const remitente = m.sender
-  const mencion = [remitente]
-  const etiquetaUsuario = '@' + remitente.split('@')[0]
-  const texto = `${etiquetaUsuario} se puso triste 😢`
+  const { objetivo, mencion, etiquetaUsuario, targetTag } = datosReaccion(m, conn, participants)
+  const texto = objetivo ? `${etiquetaUsuario} se puso triste al leer a ${targetTag} 😢` : `${etiquetaUsuario} se puso triste 😢`
 
   let urlGif = gifs[Math.floor(Math.random() * gifs.length)]
 
@@ -42,6 +41,7 @@ let handler = async (m, { conn }) => {
     await new Promise((resolve, reject) => {
       const ff = spawn('ffmpeg', ['-y', '-i', rutaGif, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', "scale=trunc(iw/2)*2:trunc(ih/2)*2", rutaMp4])
       let stderr = ''
+      ff.on('error', reject)
       ff.stderr.on('data', d => stderr += d.toString())
       ff.on('close', code => {
         if (code === 0 && existsSync(rutaMp4)) resolve()
@@ -67,7 +67,7 @@ let handler = async (m, { conn }) => {
   }
 }
 
-handler.help = ['triste', 'sad']
+handler.help = ['triste / sad [@user o responder]']
 handler.tags = ['diversion']
 handler.command = ['triste', 'sad']
 

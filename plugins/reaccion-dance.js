@@ -3,8 +3,9 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { writeFileSync, unlinkSync, existsSync } from 'fs'
 import { spawn } from 'child_process'
+import { datosReaccion } from '../lib/reacciones.js'
 
-let handler = async (m, { conn }) => {
+let handler = async (m, { conn, participants = [] }) => {
   const gifs = [
     'https://media.tenor.com/KeqbuC5yrgUAAAAm/deal-with-it-trailblazer.gif',
     'https://media.tenor.com/jxYz5DbA0VUAAAAm/cute-dance.gif',
@@ -43,14 +44,11 @@ let handler = async (m, { conn }) => {
     'https://media.tenor.com/db0yF9G7qn4AAAAM/cat-dance.gif',
     'https://media.tenor.com/LzCV-UOvyBAAAAAM/s%C5%8Dsuke-aizen-gin-ichimaru.gif',
     'https://media.tenor.com/b-xhltuOrEYAAAAM/anime-dance-kawaii-dance.gif',
-    ''
    
   ]
 
-  const remitente = m.sender
-  const mencion = [remitente]
-  const etiquetaUsuario = '@' + remitente.split('@')[0]
-  const texto = `${etiquetaUsuario} está bailando 🎶`
+  const { objetivo, mencion, etiquetaUsuario, targetTag } = datosReaccion(m, conn, participants)
+  const texto = objetivo ? `${etiquetaUsuario} está bailando con ${targetTag} 🎶` : `${etiquetaUsuario} está bailando 🎶`
 
   let urlGif = gifs[Math.floor(Math.random() * gifs.length)]
 
@@ -69,6 +67,7 @@ let handler = async (m, { conn }) => {
     await new Promise((resolve, reject) => {
       const ff = spawn('ffmpeg', ['-y', '-i', rutaGif, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', "scale=trunc(iw/2)*2:trunc(ih/2)*2", rutaMp4])
       let stderr = ''
+      ff.on('error', reject)
       ff.stderr.on('data', d => stderr += d.toString())
       ff.on('close', code => {
         if (code === 0 && existsSync(rutaMp4)) resolve()
@@ -94,7 +93,7 @@ let handler = async (m, { conn }) => {
   }
 }
 
-handler.help = ['dance', 'danzar']
+handler.help = ['dance / danzar [@user o responder]']
 handler.tags = ['diversion']
 handler.command = ['dance', 'danzar']
 
