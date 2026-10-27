@@ -47,6 +47,14 @@ function restanteTexto(ms) {
   return `${minutos} min`
 }
 
+function caducidadTexto(bot) {
+  if (bot.infinite) return 'Sin caducidad · Premium ilimitado'
+  const fecha = Number(bot.expiresAt)
+  return Number.isFinite(fecha) && fecha > 0
+    ? `Caduca el ${new Date(fecha).toLocaleString('es')}`
+    : 'Sin fecha de caducidad disponible'
+}
+
 function formularioEdiciones(bot, plantilla = '') {
   const ediciones = bot.edits || {}
   const menu = ediciones.menu || {}
@@ -96,7 +104,7 @@ function formularioEdiciones(bot, plantilla = '') {
 
 function tarjetaBot(bot, reglas, plantilla) {
   const restante = Number(bot.remainingMs || 0)
-  const porcentaje = Math.min(100, Math.round((restante / (reglas.maxHours * MS_HORA)) * 100))
+  const porcentaje = bot.infinite ? 100 : Math.min(100, Math.round((restante / (reglas.maxHours * MS_HORA)) * 100))
   const premium = Boolean(bot.active)
   const nombre = bot.label || fmtPhone(bot.phone)
   const detalle = bot.label ? `${fmtPhone(bot.phone)} · ` : ''
@@ -115,7 +123,7 @@ function tarjetaBot(bot, reglas, plantilla) {
     </div>
     <div class="card-body">
       <div class="premium-time">
-        <div><b>${premium ? restanteTexto(restante) : 'Sin premium activo'}</b><span>${premium ? `Caduca el ${new Date(bot.expiresAt).toLocaleString('es')}` : 'Mira un anuncio para activarlo'}</span></div>
+         <div><b>${premium ? (bot.infinite ? 'Ilimitado' : restanteTexto(restante)) : 'Sin premium activo'}</b><span>${premium ? caducidadTexto(bot) : 'Mira un anuncio para activarlo'}</span></div>
         <div class="progress premium-progress"><span style="width:${porcentaje}%"></span></div>
       </div>
       ${bot.locked
