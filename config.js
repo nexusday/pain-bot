@@ -29,7 +29,7 @@ global.owner = [
 //PRIVADO PARA SACAR TU LID
 global.ownerLid = [
   ['198119006412828', 'Sunkovv', true],
-  ['113619819831397', 'Alexander', true],
+  ['107061421596782', 'Alexander', true], 
   ['258196690227436', 'Linnight', true]
 ]
 
