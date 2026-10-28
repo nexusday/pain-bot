@@ -185,6 +185,24 @@
 }
 
 @media (max-width: 640px) {
+  /* La tabla de sub-bots no obliga a desplazarse horizontalmente: las
+     acciones quedan en una fila visible debajo de cada bot. */
+  .table-wrap:has(.table [data-bot-row]) { overflow-x: visible; }
+  .table:has([data-bot-row]) { min-width: 0; display: block; }
+  .table:has([data-bot-row]) thead { display: none; }
+  .table:has([data-bot-row]) tbody,
+  .table:has([data-bot-row]) tr { display: block; width: 100%; }
+  .table:has([data-bot-row]) tr { padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+  .table:has([data-bot-row]) tr:last-child { border-bottom: 0; }
+  .table:has([data-bot-row]) td { display: inline-flex; width: auto; padding: 5px 10px; border: 0; }
+  .table:has([data-bot-row]) td:nth-child(1) { width: 62%; }
+  .table:has([data-bot-row]) td:nth-child(2) { width: 38%; justify-content: flex-end; }
+  .table:has([data-bot-row]) td:nth-child(3),
+  .table:has([data-bot-row]) td:nth-child(4) { display: none; }
+  .table:has([data-bot-row]) td:last-child { display: block; width: 100%; padding-top: 9px; }
+  .table:has([data-bot-row]) td:last-child .actions { justify-content: flex-start; flex-wrap: wrap; gap: 7px; }
+  .table:has([data-bot-row]) td:last-child .actions::before { content: 'Acciones'; width: 100%; color: var(--muted-2); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+
   .system-grid {
     grid-template-columns: minmax(0, 1fr);
   }

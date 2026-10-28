@@ -56,7 +56,7 @@ export function botRow(bot) {
     <td>${bot.worker ? `<span class="mono tiny muted">${h(bot.worker)}</span>` : '<span class="tiny muted">—</span>'}</td>
     <td><span class="tiny muted">${fmtDate(bot.linked_at)}</span></td>
     <td><div class="actions">
-      <button class="icon-btn sm" data-action="bot-config" data-phone="${h(bot.phone)}" title="Configurar" aria-label="Configurar sub-bot">${icon('settings')}</button>
+      <button class="btn btn-ghost btn-sm" data-action="bot-config" data-phone="${h(bot.phone)}" title="Editar este sub-bot" aria-label="Editar este sub-bot">${icon('settings')} <span>Editar</span></button>
       <button class="icon-btn sm" data-action="bot-reconnect" data-phone="${h(bot.phone)}" title="Reconectar" ${canReconnect ? '' : 'disabled'}>${icon('rotate')}</button>
       <button class="icon-btn sm" data-action="bot-relink" data-phone="${h(bot.phone)}" title="Re-vincular" aria-label="Re-vincular sub-bot">${icon('link')}</button>
       <button class="icon-btn sm" data-action="bot-rename" data-phone="${h(bot.phone)}" data-label="${h(bot.label || '')}" title="Renombrar" aria-label="Renombrar sub-bot">${icon('pencil')}</button>
@@ -278,7 +278,7 @@ export async function renderBots() {
   content(`
     ${anunciosCabeceraHTML()}
     <div class="page-head">
-      <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta.${limite && !limite.unlimited ? ` Límite: ${limite.used}/${limite.max}.` : ''}</p></div>
+       <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta.${limite && !limite.unlimited ? ` Límite: ${limite.used}/${limite.max}.` : ''} Usa <b>Editar</b> para cambiar el nombre, menú, imagen, privacidad y owners.</p></div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="refresh">${icon('refresh')} Actualizar</button>
         <a class="btn btn-primary" href="#/link" ${limiteAlcanzado ? 'aria-disabled="true"' : ''}>${icon('plus')} Vincular bot</a>

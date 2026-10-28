@@ -92,6 +92,11 @@ function formularioEdiciones(bot, plantilla = '') {
         <div class="hint">Es el texto completo que verá tu grupo al escribir el menú (salto de línea, negritas <span class="mono">*así*</span> y enlaces tal cual). Déjalo <b>vacío</b> y guarda para volver al menú original del bot.</div>
         <div class="hint">Valores que se rellenan solos: ${tokens.map((token) => `<code>{${token}}</code>`).join(' ')}</div>
       </div>
+      <div class="field">
+        <label class="label">Comandos ocultos de este sub-bot</label>
+        <input class="input mono" name="comandosOcultos" maxlength="2000" placeholder="code, play, sticker" value="${h((ediciones.comandosOcultos || []).join(', '))}" />
+        <div class="hint">Escribe los comandos sin prefijo, separados por comas. Se ocultan del menú y de las sugerencias solo en este sub-bot. Puedes quitarlos de aquí para volver a mostrarlos.</div>
+      </div>
       <div class="grid-2-tight">
         <div class="field">
           <label class="label">Canal (ID o link)</label>
@@ -503,6 +508,7 @@ export async function guardarPremiumEdiciones(form) {
       // Menú completo: vacío = vuelve al menú por defecto del bot.
       menu: { texto: String(form.querySelector('[name="menuTexto"]')?.value ?? '') },
       canal: { jid: valor('canalJid'), nombre: valor('canalNombre') },
+      comandosOcultos: valor('comandosOcultos').split(',').map((v) => v.trim().toLowerCase()).filter(Boolean),
     })
     if (ok) {
       ok.classList.add('show')
