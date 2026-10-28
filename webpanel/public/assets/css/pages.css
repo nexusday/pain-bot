@@ -645,6 +645,9 @@
   font-weight: 500;
 }
 
+.premium-duration-inline { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.premium-duration-inline .premium-days-value { width: 72px; }
+
 .premium-editor summary::-webkit-details-marker {
   display: none;
 }

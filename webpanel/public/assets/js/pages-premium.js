@@ -146,10 +146,41 @@ function tarjetaBot(bot, reglas, plantilla) {
           ${icon('sparkles')} Ver anuncio y ganar ${reglas.adMinutes} min
         </button>
         <span class="tiny muted" id="premium-timer-${h(bot.phone)}" data-seconds="${reglas.adSeconds}">Duración del anuncio: ${reglas.adSeconds} s</span>
-      </div>
+        ${bot.canGrantInfinite ? (bot.infinite
+          ? `<span class="badge accent">∞ Premium infinito activo</span>`
+          : `<button class="btn btn-secondary" data-action="premium-infinite" data-phone="${h(bot.phone)}">${icon('sparkles')} Activar Premium infinito</button>`)
+           : ''}
+        ${bot.canGrantDuration && !bot.infinite ? `<span class="premium-duration-inline"><input class="input input-sm premium-days-value" type="number" min="1" max="3650" value="30" aria-label="Días Premium" /><button class="btn btn-secondary" data-action="premium-duration" data-phone="${h(bot.phone)}">${icon('clock')} Activar días</button></span>` : ''}
+       </div>
       ${formularioEdiciones(bot, plantilla)}
     </div>
   </div>`
+}
+
+export async function activarPremiumInfinito(boton) {
+  try {
+    boton.disabled = true
+    await api.post('/api/premium/infinite', { phone: boton.dataset.phone })
+    showToast('Premium infinito activado para este sub-bot.', 'success')
+    await renderPremium()
+  } catch (error) {
+    boton.disabled = false
+    showToast(error.message || 'No se pudo activar Premium infinito.', 'error')
+  }
+}
+
+export async function activarPremiumDias(boton) {
+  const card = boton.closest('[data-premium-card]')
+  const dias = Number(card?.querySelector('.premium-days-value')?.value || 30)
+  try {
+    boton.disabled = true
+    await api.post('/api/premium/duration', { phone: boton.dataset.phone, days: dias })
+    showToast(`Premium activado por ${dias} día(s).`, 'success')
+    await renderPremium()
+  } catch (error) {
+    boton.disabled = false
+    showToast(error.message || 'No se pudo activar Premium por días.', 'error')
+  }
 }
 
 // Orden de las zonas en el tablero: primero el banner corto (en su propia

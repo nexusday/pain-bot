@@ -13,7 +13,7 @@ import {
   renderAuth,
 } from './auth.js'
 import { closeModal, copyText, icon, isAdminRoute, modalRoot, showToast, state } from './core.js'
-import { guardarPremiumEdiciones, iniciarAnuncioPremium } from './pages-premium.js'
+import { activarPremiumDias, activarPremiumInfinito, guardarPremiumEdiciones, iniciarAnuncioPremium } from './pages-premium.js'
 import {
   adminReconnect,
   confirmAdminDeleteSession,
@@ -175,10 +175,18 @@ export async function onClick(event) {
     await openBotConfigModal(phone)
     return
   }
-  if (action === 'premium-ad') {
-    await iniciarAnuncioPremium(actionEl)
-    return
-  }
+    if (action === 'premium-ad') {
+      await iniciarAnuncioPremium(actionEl)
+      return
+    }
+    if (action === 'premium-infinite') {
+      await activarPremiumInfinito(actionEl)
+      return
+    }
+    if (action === 'premium-duration') {
+      await activarPremiumDias(actionEl)
+      return
+    }
   if (action === 'premium-menu-reset') {
     const area = actionEl.closest('form')?.querySelector('[name="menuTexto"]')
     if (area) area.value = ''
