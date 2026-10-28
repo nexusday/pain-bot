@@ -630,6 +630,21 @@
   list-style: none;
 }
 
+.premium-editor-summary {
+  user-select: none;
+}
+
+.premium-editor-summary:hover {
+  color: var(--accent, #ff5b57);
+}
+
+.premium-editor-open-hint {
+  margin-left: 4px;
+  color: var(--muted-2);
+  font-size: 11px;
+  font-weight: 500;
+}
+
 .premium-editor summary::-webkit-details-marker {
   display: none;
 }

@@ -35,6 +35,7 @@ import {
   handleUserSave,
   grantUserPremium,
   grantUserPremiumDays,
+  grantUserPremiumDuration,
   impersonarUsuario,
   openBotConfigModal,
   handleBotOwnerSave,
@@ -224,14 +225,14 @@ export async function onClick(event) {
       openUserModal(id)
       return
     }
-    if (action === 'admin-user-premium' || action === 'admin-user-premium-days' || action === 'admin-user-premium-infinite') {
+    if (action === 'admin-user-premium' || action === 'admin-user-premium-infinite') {
       const row = actionEl.closest('.admin-user-bot-row')
-      const hours = row?.querySelector('.user-premium-hours')?.value || 24
-      if (action === 'admin-user-premium-days') {
-        const days = row?.querySelector('.user-premium-days')?.value || 1
-        await grantUserPremiumDays(actionEl.dataset.userId, actionEl.dataset.phone, days)
+      if (action === 'admin-user-premium-infinite') {
+        await grantUserPremium(actionEl.dataset.userId, actionEl.dataset.phone, 0, true)
       } else {
-        await grantUserPremium(actionEl.dataset.userId, actionEl.dataset.phone, hours, action === 'admin-user-premium-infinite')
+        const value = row?.querySelector('.user-premium-value')?.value || 24
+        const unit = row?.querySelector('.user-premium-unit')?.value || 'hours'
+        await grantUserPremiumDuration(actionEl.dataset.userId, actionEl.dataset.phone, value, unit)
       }
       return
     }

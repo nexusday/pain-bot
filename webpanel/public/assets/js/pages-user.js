@@ -109,7 +109,7 @@ export async function renderDashboard() {
   const pending = bots.filter((bot) => ['pairing', 'pending'].includes(bot.status)).length
   const premiumActivos = bots.filter((bot) => bot.premium?.active).length
   const sinPremium = total - premiumActivos
-  const maxSubs = Number(state.config?.maxSubs || 0)
+  const maxSubs = Number(state.botLimit?.max || 0)
   const slots = maxSubs > 0 ? `${total}/${maxSubs}` : 'Ilimitado'
   const publicUrl = state.config?.publicUrl || ''
   const mainLinked = isAdmin
@@ -158,7 +158,7 @@ export async function renderDashboard() {
         ${statCard('Tus sub-bots', total, 'bot', 'accent', `<span>${total === 1 ? '1 número vinculado' : `${total} números vinculados`}</span>`)}
         ${statCard('Conectados', connected, 'wifi', connected > 0 ? 'green' : 'muted', '<span>De tu cuenta</span>')}
         ${statCard('Requieren atención', relink, 'alert', 'amber', '<span>Necesitan re-vincularse</span>')}
-        ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? 'Límite del servidor' : 'Sin límite configurado'}</span>`)}
+        ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? `${Math.max(0, maxSubs - total)} disponibles` : 'Sin límite configurado'}</span>`)}
       </div>
     </div>
     <div id="dashboard-global-stats">${dashboardGlobalStatsHTML(servidor)}</div>
@@ -278,7 +278,7 @@ export async function renderBots() {
   content(`
     ${anunciosCabeceraHTML()}
     <div class="page-head">
-       <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta.${limite && !limite.unlimited ? ` Límite: ${limite.used}/${limite.max}.` : ''} Usa <b>Editar</b> para cambiar el nombre, menú, imagen, privacidad y owners.</p></div>
+       <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta.${limite && !limite.unlimited ? ` Cupos: ${limite.used}/${limite.max} · ${limite.remaining} disponibles.` : ' Cupos ilimitados.'} Usa <b>Editar</b> para cambiar el nombre, menú, imagen, privacidad y owners.</p></div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="refresh">${icon('refresh')} Actualizar</button>
         <a class="btn btn-primary" href="#/link" ${limiteAlcanzado ? 'aria-disabled="true"' : ''}>${icon('plus')} Vincular bot</a>

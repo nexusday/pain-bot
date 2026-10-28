@@ -70,7 +70,7 @@ function formularioEdiciones(bot, plantilla = '') {
   const textoMenu = menu.texto || plantilla
   const tokens = ['nombre', 'usuario', 'idioma', 'rol', 'ping', 'uptime', 'comandos', 'memoria', 'panel', 'prefix']
   return `<details class="premium-editor" ${bot.active ? '' : 'data-inactivo="1"'}>
-    <summary>${icon('settings')} Personalización premium
+    <summary class="premium-editor-summary">${icon('settings')} <b>Editar personalización Premium</b><span class="premium-editor-open-hint">Haz clic para abrir</span>
       ${bot.active
         ? '<span class="badge success"><span class="dot"></span>Aplicada</span>'
         : '<span class="badge neutral">Guardada · se aplica con premium</span>'}
@@ -298,8 +298,8 @@ export async function renderPremium() {
   content(`
     ${anunciosCabeceraHTML()}
     <div class="page-head">
-      <div><h2>Sub-bot premium</h2><p>${bots.length
-        ? `${premiumActivos} de ${bots.length} ${bots.length === 1 ? 'sub-bot' : 'sub-bots'} con premium activo.`
+       <div><h2>Sub-bot premium</h2><p>${bots.length
+         ? `${premiumActivos} de ${bots.length} ${bots.length === 1 ? 'sub-bot' : 'sub-bots'} con premium activo. Cada bot tiene su propio tiempo y personalización.`
         : 'Vincula un sub-bot para empezar.'}</p></div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="refresh">${icon('refresh')} Actualizar</button>

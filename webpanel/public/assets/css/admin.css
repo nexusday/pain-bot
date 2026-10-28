@@ -979,3 +979,6 @@
 .admin-user-bot-row { display: flex; align-items: center; gap: 7px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .admin-user-bot-row:last-child { border-bottom: 0; }
 .admin-user-bot-row .input-sm { width: 76px; min-height: 32px; padding: 6px 8px; }
+.premium-duration-controls { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.premium-duration-controls .user-premium-value { width: 68px; }
+.premium-duration-controls .user-premium-unit { width: 82px; min-height: 32px; padding: 6px 8px; }

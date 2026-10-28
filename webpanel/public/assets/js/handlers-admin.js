@@ -410,6 +410,15 @@ export async function grantUserPremiumDays(userId, phone, days) {
   } catch (error) { showToast(error.message || 'No se pudo conceder Premium.', 'error') }
 }
 
+export async function grantUserPremiumDuration(userId, phone, value, unit) {
+  try {
+    const body = unit === 'days' ? { phone, days: Number(value) } : { phone, hours: Number(value) }
+    await api.post(`/api/admin/users/${encodeURIComponent(userId)}/premium`, body)
+    showToast(`Premium concedido por ${value} ${unit === 'days' ? 'día(s)' : 'hora(s)'}.`, 'success')
+    await renderAdmin()
+  } catch (error) { showToast(error.message || 'No se pudo conceder Premium.', 'error') }
+}
+
 export function confirmDeleteUser(id, username) {
   confirmModal({
     title: 'Eliminar usuario',
