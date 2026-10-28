@@ -138,7 +138,7 @@ test('premium runtime: canal vacío desactiva el canal oficial', () => {
     conectado: canalPremiumDeConexion(conn(SIN_CANAL)),
   }))
   assert.equal(resultado.canal, null)
-  assert.equal(resultado.rcanal, null)
+  assert.deepEqual(resultado.rcanal, { contextInfo: {} })
   assert.equal(resultado.conectado, null)
 })
 

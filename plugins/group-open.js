@@ -1,6 +1,7 @@
 ﻿import { findGroupParticipant } from '../lib/group-participant.js'
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner, isPrems, usedPrefix, command }) => {
+  const contextoCanal = global.rcanal?.contextInfo || {}
   // Verificación de admin
   const metadatosVerificacionAdmin = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await conn.groupMetadata(m.chat).catch(_ => null)) : {}) || {}  
   const participantesGrupo = (m.isGroup ? metadatosVerificacionAdmin.participants : []) || []  
@@ -20,7 +21,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
   if (!m.isGroup) return conn.sendMessage(m.chat, {
     text: '[❗] Este comando solo puede ser usado en grupos.',
     contextInfo: {
-      ...rcanal.contextInfo
+      ...contextoCanal
     }
   }, { quoted: m })
   
@@ -34,7 +35,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
       return conn.sendMessage(m.chat, {
         text: `[❗] Este grupo ya está abierto.`,
         contextInfo: {
-          ...rcanal.contextInfo
+          ...contextoCanal
         }
       }, { quoted: m })
     }
@@ -44,7 +45,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     return conn.sendMessage(m.chat, {
       text: `🌴 𝗚𝗿𝘂𝗽𝗼 𝗮𝗯𝗶𝗲𝗿𝘁𝗼 𝗰𝗼𝗿𝗿𝗲𝗰𝘁𝗮𝗺𝗲𝗻𝘁𝗲\n\n> *Por:*: @${m.sender.split('@')[0]}\n> *Grupo:* ${nombreGrupo}`,
       contextInfo: {
-        ...rcanal.contextInfo,
+        ...contextoCanal,
         mentionedJid: [m.sender]
       }
     }, { quoted: m })
@@ -54,7 +55,7 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
     return conn.sendMessage(m.chat, {
       text: '[❗] Debo ser admin para ejecutar este Comando.',
       contextInfo: {
-        ...rcanal.contextInfo
+        ...contextoCanal
       }
     }, { quoted: m })
   }
