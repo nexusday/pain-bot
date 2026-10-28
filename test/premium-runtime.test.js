@@ -16,6 +16,7 @@ const RAIZ = fs.mkdtempSync(path.join(os.tmpdir(), 'pain-premium-runtime-'))
 const PREMIUM = '51911111111'
 const VENCIDO = '51922222222'
 const NORMAL = '51933333333'
+const SIN_CANAL = '51944444444'
 
 fs.mkdirSync(path.join(RAIZ, 'Serbot', PREMIUM), { recursive: true })
 fs.writeFileSync(
@@ -39,6 +40,11 @@ fs.writeFileSync(
 )
 fs.mkdirSync(path.join(RAIZ, 'Serbot', NORMAL), { recursive: true })
 fs.writeFileSync(path.join(RAIZ, 'Serbot', NORMAL, 'config.json'), JSON.stringify({ name: 'Normal' }))
+fs.mkdirSync(path.join(RAIZ, 'Serbot', SIN_CANAL), { recursive: true })
+fs.writeFileSync(path.join(RAIZ, 'Serbot', SIN_CANAL, 'config.json'), JSON.stringify({
+  premium: { expiresAt: Date.now() + 2 * 60 * 60 * 1000 },
+  premiumEdits: { canal: { jid: '', nombre: '' } },
+}))
 
 process.chdir(RAIZ)
 global.bot = 'Serbot'
@@ -124,6 +130,18 @@ test('premium runtime: el canal premium se sigue al conectar', () => {
   assert.equal(canalPremiumDeConexion(conn(NORMAL)), null)
 })
 
+test('premium runtime: canal vacío desactiva el canal oficial', () => {
+  limpiarCachePremium()
+  const resultado = ejecutarEnContextoBot(conn(SIN_CANAL), () => ({
+    canal: global.canal,
+    rcanal: global.rcanal,
+    conectado: canalPremiumDeConexion(conn(SIN_CANAL)),
+  }))
+  assert.equal(resultado.canal, null)
+  assert.equal(resultado.rcanal, null)
+  assert.equal(resultado.conectado, null)
+})
+
 test('premium runtime: los textos del menú se usan en el encabezado', async () => {
   limpiarCachePremium()
   const { construirEncabezadoMenu } = await import('../lib/menu-categories.js')
@@ -138,6 +156,7 @@ test('premium runtime: los textos del menú se usan en el encabezado', async () 
   const normal = construirEncabezadoMenu(m, ctx(null))
   assert.ok(normal.includes('Sunkovv'))
   assert.ok(normal.includes('Nexcodea'))
+  assert.ok(normal.includes('https://whatsapp.com/channel/120363405059433072'))
 
   const personalizado = construirEncabezadoMenu(m, ctx({ creador: 'Creador Propio', hosting: 'Mi Hosting', donar: 'Invítame un café' }))
   assert.ok(personalizado.includes('Creador Propio'))
@@ -150,6 +169,20 @@ test('premium runtime: los textos del menú se usan en el encabezado', async () 
   // En el bot real, sin ctx.textos, entra el contexto premium del mensaje.
   const desdeContexto = ejecutarEnContextoBot(conn(PREMIUM), () => construirEncabezadoMenu(m, ctx(null)))
   assert.ok(desdeContexto.includes('Creador Propio'))
+})
+
+test('premium runtime: el encabezado omite el canal cuando premium lo deja vacío', async () => {
+  limpiarCachePremium()
+  const { construirEncabezadoMenu } = await import('../lib/menu-categories.js')
+  const ctx = {
+    uso: '', usedPrefix: '.', lang: 'es', nombreBot: 'PAIN BOT', tipo: 'Sub Bot',
+    ping: '10 ms', userRole: 'usuario', botFormatUptime: '1h', totalf: 10,
+    processRamMB: 100, totalRamMB: 8000, rentalLine: '', esPrincipal: false,
+    esOwnerConfig: false, esPropietario: false,
+  }
+  const m = { sender: '5215500000000@s.whatsapp.net' }
+  const texto = ejecutarEnContextoBot(conn(SIN_CANAL), () => construirEncabezadoMenu(m, ctx))
+  assert.ok(!texto.includes('https://whatsapp.com/channel/'))
 })
 
 test('premium runtime: el texto completo del menú manda sobre el por defecto', async () => {

@@ -59,6 +59,12 @@ function formularioEdiciones(bot, plantilla = '') {
   const ediciones = bot.edits || {}
   const menu = ediciones.menu || {}
   const canal = ediciones.canal || {}
+  // Mientras el usuario no haya guardado una elección, se muestra el canal
+  // oficial como valor inicial. Si guardó ambos campos vacíos, se respetan
+  // vacíos para que pueda desactivar el canal.
+  const canalInicial = bot.canalConfigurado
+    ? canal
+    : { jid: 'https://whatsapp.com/channel/0029Vb7Y87RLikgEutyMId1h', nombre: 'Nexo Community' }
   // Si el usuario ya guardó su menú se le suelta el suyo; si no, el menú
   // por defecto con {tokens} para que edite el texto real.
   const textoMenu = menu.texto || plantilla
@@ -89,11 +95,11 @@ function formularioEdiciones(bot, plantilla = '') {
       <div class="grid-2-tight">
         <div class="field">
           <label class="label">Canal (ID o link)</label>
-          <input class="input mono" name="canalJid" maxlength="120" placeholder="1203…@newsletter" value="${h(canal.jid || '')}" />
+          <input class="input mono" name="canalJid" maxlength="120" placeholder="1203…@newsletter" value="${h(canalInicial.jid || '')}" />
         </div>
         <div class="field">
           <label class="label">Nombre del canal</label>
-          <input class="input" name="canalNombre" maxlength="40" placeholder="Nexo Community" value="${h(canal.nombre || '')}" />
+          <input class="input" name="canalNombre" maxlength="40" placeholder="Nexo Community" value="${h(canalInicial.nombre || '')}" />
         </div>
       </div>
       <button class="btn btn-primary" type="submit">${icon('check')} Guardar personalización</button>
