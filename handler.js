@@ -43,6 +43,7 @@ import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
 import { juegosBloqueadosEn, verificarComandoJuegos, esPluginJuegos } from './lib/Modos/modo-games.js'
 import { COMANDOS_SIN_COMISION, aplicarComisionPareja } from './lib/pareja-comision.js'
 import { registrarComandoGlobal } from './lib/webpanel/runtime-stats.js'
+import { comandosOcultosPremium } from './lib/premium.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const isNumber = x => typeof x === 'number' && !isNaN(x)
@@ -536,6 +537,7 @@ let comandoEjecutado = false
 
 const pluginsSesion = ['xnxx.js', 'hentai.js', 'xvideos.js']
 const { lista: pluginsProcesados, conAll, comandos } = pluginsEnCache()
+const comandosOcultos = comandosOcultosPremium()
 
 for (let plugin of pluginsProcesados) {
   if (plugin.handler && typeof plugin.handler.before === 'function' && pluginsSesion.includes(plugin.name)) {
@@ -652,6 +654,13 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
   })
 
   if (esComandoCoincide) {
+    // Premium puede ocultar comandos solo para este sub-bot. No se desactiva
+    // el plugin global: simplemente se ignora aquí y no se ejecuta.
+    if (comandosOcultos.has(String(command || '').toLowerCase())) {
+      comandoEjecutado = true
+      m.commandExecuted = true
+      break
+    }
     
   
     if (m.isGroup && global.db.data.soloAdmin && global.db.data.soloAdmin[m.chat] === true) {
