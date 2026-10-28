@@ -152,6 +152,7 @@ export async function openBotConfigModal(phone) {
     return
   }
   const config = datos.config || {}
+  const owners = Array.isArray(datos.owners) ? datos.owners : []
   openModal({
     title: 'Configurar tu sub-bot',
     subtitle: fmtPhone(phone),
@@ -204,6 +205,17 @@ export async function openBotConfigModal(phone) {
             <input type="checkbox" name="antiPv" ${config.antiPv ? 'checked' : ''} />
             <span><b>Privado con desconocidos</b><br /><span class="muted">No responde en privado a quien no es owner (como <span class="mono">.antipv on</span>).</span></span>
           </label>
+          <div class="field">
+            <label class="label">Owners de este bot</label>
+            <div class="stack" id="bot-owners-list">${owners.length ? owners.map((owner) => `<div class="row-between"><span><b>${h(owner.name || owner.numbers?.[0] || 'Owner')}</b><br /><span class="cell-sub">PN: ${h((owner.numbers || []).map((n) => `${n}@s.whatsapp.net`).join(', '))} · LID: ${h((owner.lids || []).map((n) => `${n}@lid`).join(', '))}</span></span><span class="flex gap-8"><button type="button" class="btn btn-ghost btn-sm" data-action="bot-owner-edit" data-phone="${h(phone)}" data-owner-number="${h(owner.numbers?.[0] || '')}" data-owner-lid="${h(owner.lids?.[0] || '')}" title="Editar LID">${icon('pencil')}</button><button type="button" class="btn btn-ghost btn-sm danger" data-action="bot-owner-remove" data-phone="${h(phone)}" data-owner-number="${h(owner.numbers?.[0] || '')}">Quitar</button></span></div>`).join('') : '<span class="hint">Todavía no hay owners adicionales.</span>'}</div>
+            <div id="bot-owner-form" data-phone="${h(phone)}" class="flex gap-8" style="margin-top:8px;flex-wrap:wrap">
+              <input class="input" name="number" inputmode="numeric" placeholder="Número con código de país" required />
+              <input class="input" name="lid" inputmode="numeric" placeholder="LID real (opcional)" />
+              <input class="input" name="name" maxlength="40" placeholder="Nombre (opcional)" />
+              <button class="btn btn-secondary" type="button" data-action="bot-owner-add">${icon('plus')} Agregar owner</button>
+            </div>
+            <div class="hint">Obtén el LID real usando <span class="mono">/id @mención</span>. Si aún no lo tienes, guarda el número y luego edítalo con el lápiz. Solo aplica a este bot.</div>
+          </div>
           <button class="btn btn-primary btn-block" type="submit">${icon('check')} Guardar cambios</button>
         </form>
       </div>
@@ -351,6 +363,34 @@ export async function handleUserSave(form) {
   await aplicar()
 }
 
+export async function handleBotOwnerSave(form) {
+  const phone = form.dataset.phone
+  const number = String(form.querySelector('[name="number"]')?.value || '').replace(/\D/g, '')
+  const lid = String(form.querySelector('[name="lid"]')?.value || '').replace(/\D/g, '')
+    const name = String(form.querySelector('[name="name"]')?.value || '').trim()
+  if (number.length < 8 || number.length > 15) return showToast('Indica un número válido.', 'error')
+  try {
+    const datos = await api.post(`/api/bots/${encodeURIComponent(phone)}/config/owners`, { number, lid, name })
+    const lista = form.closest('.bot-config')?.querySelector('#bot-owners-list')
+    if (lista) lista.innerHTML = (datos.owners || []).map((owner) => `<div class="row-between"><span><b>${h(owner.name || owner.numbers?.[0] || 'Owner')}</b><br /><span class="cell-sub">PN: ${h((owner.numbers || []).map((n) => `${n}@s.whatsapp.net`).join(', '))} · LID: ${h((owner.lids || []).map((n) => `${n}@lid`).join(', '))}</span></span><span class="flex gap-8"><button type="button" class="btn btn-ghost btn-sm" data-action="bot-owner-edit" data-phone="${h(phone)}" data-owner-number="${h(owner.numbers?.[0] || '')}" data-owner-lid="${h(owner.lids?.[0] || '')}" title="Editar LID">${icon('pencil')}</button><button type="button" class="btn btn-ghost btn-sm danger" data-action="bot-owner-remove" data-phone="${h(phone)}" data-owner-number="${h(owner.numbers?.[0] || '')}">Quitar</button></span></div>`).join('') || '<span class="hint">Todavía no hay owners adicionales.</span>'
+    const inputNumero = form.querySelector('[name="number"]')
+    const inputNombre = form.querySelector('[name="name"]')
+    const inputLid = form.querySelector('[name="lid"]')
+    if (inputNumero) inputNumero.value = ''
+    if (inputLid) inputLid.value = ''
+    if (inputNombre) inputNombre.value = ''
+    showToast('Owner agregado a este bot.', 'success')
+  } catch (error) { showToast(error.message || 'No se pudo agregar el owner.', 'error') }
+}
+
+export async function removeBotOwner(phone, number) {
+  try {
+    await api.del(`/api/bots/${encodeURIComponent(phone)}/config/owners`, { number })
+    await openBotConfigModal(phone)
+    showToast('Owner quitado.', 'success')
+  } catch (error) { showToast(error.message || 'No se pudo quitar el owner.', 'error') }
+}
+
 export async function grantUserPremium(userId, phone, hours, infinite = false) {
   try {
     await api.post(`/api/admin/users/${encodeURIComponent(userId)}/premium`, { phone, hours: infinite ? 'infinite' : Number(hours), infinite })
@@ -359,6 +399,14 @@ export async function grantUserPremium(userId, phone, hours, infinite = false) {
     state.adminUsers = data.users || []
     const { openUserModal } = await import('./pages-admin.js')
     openUserModal(userId)
+  } catch (error) { showToast(error.message || 'No se pudo conceder Premium.', 'error') }
+}
+
+export async function grantUserPremiumDays(userId, phone, days) {
+  try {
+    await api.post(`/api/admin/users/${encodeURIComponent(userId)}/premium`, { phone, days: Number(days) })
+    showToast(`Premium concedido por ${days} día(s).`, 'success')
+    await renderAdmin()
   } catch (error) { showToast(error.message || 'No se pudo conceder Premium.', 'error') }
 }
 

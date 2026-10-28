@@ -34,8 +34,11 @@ import {
   handleSettingsTurnstileSave,
   handleUserSave,
   grantUserPremium,
+  grantUserPremiumDays,
   impersonarUsuario,
   openBotConfigModal,
+  handleBotOwnerSave,
+  removeBotOwner,
   openRelinkModal,
   stopImpersonating,
 } from './handlers-admin.js'
@@ -167,7 +170,7 @@ export async function onClick(event) {
     if (action === 'comment-cancel-reply') { state.commentsReply = null; route(); return }
     if (action === 'comment-delete') { await deleteComment(actionEl.dataset.commentId); return }
     if (action === 'comment-block') { await blockCommentUser(actionEl.dataset.userId, actionEl.dataset.username || 'este usuario'); return }
-  if (action === 'bot-config') {
+    if (action === 'bot-config') {
     await openBotConfigModal(phone)
     return
   }
@@ -221,10 +224,15 @@ export async function onClick(event) {
       openUserModal(id)
       return
     }
-    if (action === 'admin-user-premium' || action === 'admin-user-premium-infinite') {
+    if (action === 'admin-user-premium' || action === 'admin-user-premium-days' || action === 'admin-user-premium-infinite') {
       const row = actionEl.closest('.admin-user-bot-row')
       const hours = row?.querySelector('.user-premium-hours')?.value || 24
-      await grantUserPremium(actionEl.dataset.userId, actionEl.dataset.phone, hours, action === 'admin-user-premium-infinite')
+      if (action === 'admin-user-premium-days') {
+        const days = row?.querySelector('.user-premium-days')?.value || 1
+        await grantUserPremiumDays(actionEl.dataset.userId, actionEl.dataset.phone, days)
+      } else {
+        await grantUserPremium(actionEl.dataset.userId, actionEl.dataset.phone, hours, action === 'admin-user-premium-infinite')
+      }
       return
     }
     if (action === 'admin-user-delete') {
@@ -328,6 +336,24 @@ export async function onClick(event) {
       await eliminarSesionesSeleccionadas()
       return
     }
+    if (action === 'bot-owner-remove') {
+      await removeBotOwner(actionEl.dataset.phone, actionEl.dataset.ownerNumber)
+      return
+    }
+    if (action === 'bot-owner-add') {
+      await handleBotOwnerSave(actionEl.closest('#bot-owner-form'))
+      return
+    }
+    if (action === 'bot-owner-edit') {
+      const form = actionEl.closest('.bot-config')?.querySelector('#bot-owner-form')
+      if (form) {
+        form.querySelector('[name="number"]').value = actionEl.dataset.ownerNumber || ''
+        form.querySelector('[name="lid"]').value = actionEl.dataset.ownerLid || ''
+        form.querySelector('[name="name"]').value = ''
+        form.querySelector('[name="lid"]').focus()
+      }
+      return
+    }
   }
 
   const nav = event.target.closest('.nav-link')
@@ -344,6 +370,7 @@ export async function onClick(event) {
       document.getElementById('app-shell')?.classList.remove('sidebar-open')
     }
   }
+
 }
 
 export async function onSubmit(event) {
@@ -450,6 +477,11 @@ export async function onSubmit(event) {
   if (id === 'bot-config-form') {
     event.preventDefault()
     await handleBotConfigSave(form)
+    return
+  }
+  if (id === 'bot-owner-form') {
+    event.preventDefault()
+    await handleBotOwnerSave(form)
     return
   }
   if (form.classList.contains('premium-form')) {
