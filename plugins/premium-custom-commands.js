@@ -31,12 +31,34 @@ function imagenParaWhatsApp(valor) {
 }
 
 const pluginsCargados = new Map()
+const TIEMPO_MAXIMO_PLUGIN_MS = 8000
+
+function rutaPluginDelSubBot(conn, telefono, plugin) {
+  const base = conn?.pathAYBot ? path.resolve(String(conn.pathAYBot)) : path.join(process.cwd(), global.bot || 'Serbot', telefono)
+  return path.resolve(base, plugin)
+}
+
+function argumentosDelMensaje(texto, nombre) {
+  const contenido = String(texto || '')
+  const indice = contenido.toLowerCase().indexOf(String(nombre || '').toLowerCase())
+  const resto = indice >= 0 ? contenido.slice(indice + String(nombre).length).trim() : ''
+  return { text: resto, args: resto ? resto.split(/\s+/).filter(Boolean) : [] }
+}
+
+function ejecutarConTiempoLimite(promesa, ms) {
+  let temporizador
+  const limite = new Promise((_, reject) => {
+    temporizador = setTimeout(() => reject(new Error(`plugin_timeout_${ms}ms`)), ms)
+  })
+  return Promise.race([promesa, limite]).finally(() => clearTimeout(temporizador))
+}
 
 async function ejecutarPluginReal(item, m, data) {
   if (!item.plugin) return false
   const telefono = telefonoDeConexion(data.conn)
-  const archivo = path.join(process.cwd(), global.bot || 'Serbot', telefono, item.plugin)
+  const archivo = rutaPluginDelSubBot(data.conn, telefono, item.plugin)
   try {
+    if (!archivo.startsWith(path.resolve(process.cwd(), global.bot || 'Serbot'))) throw new Error('ruta_plugin_no_permitida')
     const mtime = fs.statSync(archivo).mtimeMs
     let cacheado = pluginsCargados.get(archivo)
     if (!cacheado || cacheado.mtime !== mtime) {
@@ -45,8 +67,9 @@ async function ejecutarPluginReal(item, m, data) {
       pluginsCargados.set(archivo, cacheado)
     }
     const modulo = cacheado.modulo
-    if (typeof modulo === 'function') await modulo(m, data)
-    else if (typeof modulo?.handler === 'function') await modulo.handler(m, data)
+    const ejecucion = typeof modulo === 'function' ? modulo(m, data) : typeof modulo?.handler === 'function' ? modulo.handler(m, data) : null
+    if (!ejecucion) throw new Error('plugin_sin_handler')
+    await ejecutarConTiempoLimite(ejecucion, TIEMPO_MAXIMO_PLUGIN_MS)
     return true
   } catch (error) {
     console.error('[premium-plugin]', item.name, error?.message || error)
@@ -126,7 +149,9 @@ handler.all = async function (m, { conn }) {
   m.plugin = 'premium-custom-commands.js'
   m.command = nombre
   establecerComandoPremium(nombre)
-  if (await ejecutarPluginReal(item, m, { conn, text: '', usedPrefix: conn.prefix || global.prefix, command: nombre })) return
+  const argumentos = argumentosDelMensaje(m.text, nombre)
+  const prefijoUsado = String(m.text || '').slice(0, Math.max(1, String(m.text || '').toLowerCase().indexOf(nombre))) || conn.prefix || global.prefix
+  if (await ejecutarPluginReal(item, m, { conn, text: argumentos.text, args: argumentos.args, usedPrefix: prefijoUsado, command: nombre })) return
   const respuesta = interpolarComandoPremium(`${item.prefix || ''}${item.response || ''}${item.suffix || ''}`, { usuario: m.pushName || 'Usuario', grupo: m.chat, fecha: new Date().toLocaleDateString('es'), hora: new Date().toLocaleTimeString('es'), bot: conn.user?.name || 'PAIN BOT' })
   if (item.image) {
     await conn.sendMessage(m.chat, { image: imagenParaWhatsApp(item.image), caption: respuesta }, { quoted: m })
