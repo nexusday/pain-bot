@@ -21,7 +21,7 @@ test('rab: abre y cierra en horario normal', () => {
   assert.equal(horarioEstaAbierto(horario, 8 * 60), true)
   assert.equal(horarioEstaAbierto(horario, 21 * 60 + 59), true)
   assert.equal(horarioEstaAbierto(horario, 22 * 60), false)
-  assert.deepEqual(siguienteCambio(horario, 9 * 60), { abierto: true, hora: '22:00', tipo: 'cierre' })
+  assert.deepEqual(siguienteCambio(horario, 9 * 60), { abierto: true, hora: '10:00 pm', tipo: 'cierre' })
 })
 
 test('rab: admite horarios que cruzan medianoche y rechaza errores', () => {

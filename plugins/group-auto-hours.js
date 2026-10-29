@@ -1,4 +1,4 @@
-import { activarHorario, crearHorario, desactivarHorario, invalidarEstadoHorario, revisarHorario, resumenHorario, siguienteCambio, guardarHorario } from '../lib/group-auto-hours.js'
+import { activarHorario, crearHorario, desactivarHorario, formatearHora, invalidarEstadoHorario, revisarHorario, resumenHorario, siguienteCambio, guardarHorario } from '../lib/group-auto-hours.js'
 
 const ayuda = (p) => `Uso de ${p}rab:
 • ${p}rab Peru|8:00 am|10:00 pm
@@ -32,7 +32,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
       const meta = await conn.groupMetadata(m.chat)
       estadoReal = meta?.announce ? 'cerrado' : 'abierto'
     } catch {}
-    return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗥𝗔𝗕\n\n> *Estado:* ${horarioActual.enabled ? '✅ Activo' : '⏸️ Inactivo'}\n> *Grupo ahora:* ${estadoReal}\n> *Zona:* ${horarioActual.timezoneLabel || horarioActual.timezone}\n> *Apertura:* ${horarioActual.open}\n> *Cierre:* ${horarioActual.close}\n> *Próximo ${cambio.tipo}:* ${cambio.hora}`)
+    return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗥𝗔𝗕\n\n> *Estado:* ${horarioActual.enabled ? '✅ Activo' : '⏸️ Inactivo'}\n> *Grupo ahora:* ${estadoReal}\n> *Zona:* ${horarioActual.timezoneLabel || horarioActual.timezone}\n> *Apertura:* ${formatearHora(horarioActual.openMinutes)}\n> *Cierre:* ${formatearHora(horarioActual.closeMinutes)}\n> *Próximo ${cambio.tipo}:* ${cambio.hora}`)
   }
 
   const opcion = entrada.toLowerCase()
@@ -48,7 +48,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     activarHorario(m.chat)
     invalidarEstadoHorario(conn, m.chat)
     await revisarHorario(conn, m.chat)
-    return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼\n\n> *Zona:* ${horarioActual.timezoneLabel || horarioActual.timezone}\n> *Abre:* ${horarioActual.open}\n> *Cierra:* ${horarioActual.close}`)
+    return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼\n\n> *Zona:* ${horarioActual.timezoneLabel || horarioActual.timezone}\n> *Abre:* ${formatearHora(horarioActual.openMinutes)}\n> *Cierra:* ${formatearHora(horarioActual.closeMinutes)}`)
   }
 
   const partes = entrada.split('|').map(parte => parte.trim())
@@ -58,7 +58,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     guardarHorario(m.chat, horario)
     invalidarEstadoHorario(conn, m.chat)
     await revisarHorario(conn, m.chat)
-    return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗴𝘂𝗮𝗿𝗱𝗮𝗱𝗼 𝘆 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼\n\n> *Zona:* ${horario.timezoneLabel || horario.timezone}\n> *El grupo abre:* ${horario.open}\n> *El grupo cierra:* ${horario.close}\n\n> Puedes usar *${usedPrefix}rab off* para desactivarlo sin borrar la configuración.`)
+    return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗴𝘂𝗮𝗿𝗱𝗮𝗱𝗼 𝘆 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼\n\n> *Zona:* ${horario.timezoneLabel || horario.timezone}\n> *El grupo abre:* ${formatearHora(horario.openMinutes)}\n> *El grupo cierra:* ${formatearHora(horario.closeMinutes)}\n\n> Puedes usar *${usedPrefix}rab off* para desactivarlo sin borrar la configuración.`)
   } catch (error) {
     return responder(conn, m, `❌ ${error.message}\n\n${ayudaBonita(usedPrefix)}`)
   }
