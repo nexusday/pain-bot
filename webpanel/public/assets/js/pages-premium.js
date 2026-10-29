@@ -55,6 +55,11 @@ function caducidadTexto(bot) {
     : 'Sin fecha de caducidad disponible'
 }
 
+function comandoHTML(comando = {}) {
+  const source = comando.source || (comando.response ? `const response = ${JSON.stringify(comando.response)}\nhandler.command = [${JSON.stringify(comando.name || '')}]\nexport default handler` : '')
+  return `<details class="premium-command-item" data-command-card><summary>${icon('chevronRight')}<span class="premium-command-name">/${h(comando.name || 'sin-nombre')}</span><span class="badge success">${icon('check')} Guardado</span></summary><div class="premium-command-card card"><label class="label">Nombre del comando</label><input class="input mono" data-command-name value="${h(comando.name || '')}" placeholder="hola" /><label class="label">Instrucción para la IA</label><textarea class="input" data-command-prompt rows="3" placeholder="Qué debe hacer el comando…">${h(comando.prompt || '')}</textarea><input type="hidden" data-command-response value="${h(comando.response || '')}" /><details class="premium-source-details"><summary>${icon('chevronRight')} Mostrar / editar código</summary><textarea class="premium-source-editor" data-command-source spellcheck="false">${h(source)}</textarea></details><div class="premium-command-preview"><span class="chat-bubble muted">Plugin guardado. Puedes editar su código y volver a guardarlo.</span></div><div data-command-status class="premium-command-status"></div><div class="flex gap-8"><button type="button" class="btn btn-secondary btn-sm" data-action="premium-command-generate">${icon('refresh')} Regenerar plugin</button><button type="button" class="btn btn-ghost btn-sm" data-action="premium-command-delete">${icon('trash')} Quitar</button></div></div></details>`
+}
+
 function formularioEdiciones(bot, plantilla = '') {
   const ediciones = bot.edits || {}
   const menu = ediciones.menu || {}
@@ -69,6 +74,7 @@ function formularioEdiciones(bot, plantilla = '') {
   // por defecto con {tokens} para que edite el texto real.
   const textoMenu = menu.texto || plantilla
   const tokens = ['nombre', 'usuario', 'idioma', 'rol', 'ping', 'uptime', 'comandos', 'memoria', 'panel', 'prefix']
+  const comandos = Array.isArray(ediciones.comandos) ? ediciones.comandos : []
   return `<details class="premium-editor" ${bot.active ? '' : 'data-inactivo="1"'}>
     <summary class="premium-editor-summary">${icon('settings')} <b>Editar personalización Premium</b><span class="premium-editor-open-hint">Haz clic para abrir</span>
       ${bot.active
@@ -78,6 +84,7 @@ function formularioEdiciones(bot, plantilla = '') {
     <form class="premium-form" data-phone="${h(bot.phone)}">
       <div class="form-error">${icon('alert')}<span></span></div>
       <div class="form-success">${icon('check')}<span></span></div>
+      <div class="field"><div class="premium-command-heading"><div><label class="label">Plugins Premium de este sub-bot</label><div class="hint">La IA genera un plugin JavaScript individual. Después se guarda y se ejecuta con el prefijo real.</div></div><button type="button" class="btn btn-secondary btn-sm" data-action="premium-command-add">${icon('plus')} Agregar comando</button></div><div class="premium-command-list" data-command-list>${comandos.map(comandoHTML).join('')}</div><button type="button" class="btn btn-primary btn-sm" data-action="premium-command-save">${icon('check')} Guardar plugins</button></div>
       <div class="field">
         <label class="label" for="pm-moneda-${h(bot.phone)}">Moneda del bot</label>
         <div class="input-icon">${icon('zap')}<input id="pm-moneda-${h(bot.phone)}" class="input mono" name="moneda" maxlength="8" placeholder="USD" value="${h(ediciones.moneda || '')}" /></div>
@@ -545,6 +552,7 @@ export async function guardarPremiumEdiciones(form) {
       ok.classList.add('show')
       ok.querySelector('span').textContent = 'Personalización guardada. Se aplica mientras tengas premium.'
     }
+    form.removeAttribute('data-premium-dirty')
     showToast('Personalización guardada.', 'success')
   } catch (fallo) {
     if (error) {
@@ -563,6 +571,7 @@ function iniciarVigilancia() {
   ESTADO.poll = setInterval(async () => {
     if (document.hidden) return
     if (location.hash.replace(/^#/, '') !== '/premium') return
+    if (document.querySelector('.premium-form[data-premium-dirty="1"], .premium-form[data-premium-busy="1"]')) return
     const activo = document.activeElement
     if (activo && activo.closest?.('#content') && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activo.tagName)) return
     if (ESTADO.anuncio) return

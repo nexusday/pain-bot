@@ -1,5 +1,6 @@
 /* Pain Panel — módulo events */
 import { enablePush, disablePush, dismissPush, syncPush } from './push.js'
+import { api } from './api.js'
 import { handlePushSend, handlePushSettings, handleBackupExport, handleBackupImport } from './admin-tools.js'
 import {
   handleAuth,
@@ -12,7 +13,7 @@ import {
   openForgotModal,
   renderAuth,
 } from './auth.js'
-import { closeModal, copyText, icon, isAdminRoute, modalRoot, showToast, state } from './core.js'
+import { closeModal, copyText, h, icon, isAdminRoute, modalRoot, showToast, state } from './core.js'
 import { activarPremiumDias, activarPremiumInfinito, guardarPremiumEdiciones, iniciarAnuncioPremium } from './pages-premium.js'
 import {
   adminReconnect,
@@ -82,6 +83,20 @@ import {
 } from './pages-admin.js'
 import { route, toggleSidebar } from './shell.js'
 import { blockCommentUser, deleteComment, openCommentImage, replyToComment, submitComment, toggleCommentMenu } from './pages-comments.js'
+
+function codigoJavascriptHTML(source) {
+  const patron = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\.|[^`])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:const|let|var|async|await|function|return|if|else|try|catch|new|throw|export|default|true|false|null)\b|\b\d+(?:\.\d+)?\b)/g
+  let salida = ''
+  let inicio = 0
+  for (const coincidencia of String(source || '').matchAll(patron)) {
+    salida += h(source.slice(inicio, coincidencia.index))
+    const token = coincidencia[0]
+    const clase = token.startsWith('//') || token.startsWith('/*') ? 'code-comment' : /^['"`]/.test(token) ? 'code-string' : /^(?:true|false|null|\d)/.test(token) ? 'code-number' : 'code-keyword'
+    salida += `<span class="${clase}">${h(token)}</span>`
+    inicio = coincidencia.index + token.length
+  }
+  return salida + h(String(source || '').slice(inicio))
+}
 
 /* ── Delegación de eventos ──────────────────────────────────────────────── */
 export async function onClick(event) {
@@ -187,12 +202,41 @@ export async function onClick(event) {
       await activarPremiumDias(actionEl)
       return
     }
-  if (action === 'premium-menu-reset') {
+    if (action === 'premium-menu-reset') {
     const area = actionEl.closest('form')?.querySelector('[name="menuTexto"]')
     if (area) area.value = ''
     showToast('Menú por defecto: pulsa Guardar para aplicarlo.', 'info')
     return
   }
+    if (action === 'premium-command-add') {
+      const lista = actionEl.closest('.premium-form')?.querySelector('[data-command-list]')
+      actionEl.closest('.premium-form')?.setAttribute('data-premium-dirty', '1')
+      if (lista) lista.insertAdjacentHTML('beforeend', `<details class="premium-command-item" data-command-card open><summary>${icon('chevronRight')}<span class="premium-command-name">/nuevo</span><span class="badge neutral">Sin guardar</span></summary><div class="premium-command-card card"><label class="label">Nombre del comando</label><input class="input mono" data-command-name placeholder="hola"><label class="label">Instrucción para la IA</label><textarea class="input" data-command-prompt rows="3" placeholder="Qué debe hacer…"></textarea><input type="hidden" data-command-response><div data-command-status></div><button type="button" class="btn btn-secondary btn-sm" data-action="premium-command-generate">${icon('sparkles')} Generar plugin</button><button type="button" class="btn btn-ghost btn-sm" data-action="premium-command-delete">${icon('trash')} Quitar</button></div></details>`)
+      return
+    }
+    if (action === 'premium-command-delete') { const form = actionEl.closest('.premium-form'); actionEl.closest('[data-command-card]')?.remove(); form?.setAttribute('data-premium-dirty', '1'); return }
+    if (action === 'premium-command-generate') {
+      const card = actionEl.closest('[data-command-card]'); const form = card?.closest('.premium-form'); const status = card?.querySelector('[data-command-status]')
+      form?.setAttribute('data-premium-busy', '1')
+      form?.setAttribute('data-premium-dirty', '1')
+      const value = (selector) => String(card?.querySelector(selector)?.value || '').trim()
+      actionEl.disabled = true; if (status) { status.classList.add('is-loading'); status.innerHTML = `${icon('refresh', 'premium-spin')} Generando plugin…` }
+      const inicio = Date.now()
+      try { const result = await api.post(`/api/premium/${encodeURIComponent(form.dataset.phone)}/command-generate`, { name: value('[data-command-name]'), prompt: value('[data-command-prompt]') }); await new Promise((resolve) => setTimeout(resolve, Math.max(0, 1500 - (Date.now() - inicio)))); card.querySelectorAll('[data-command-generated]').forEach((element) => element.remove()); card.querySelector('[data-command-response]').value = result.command.response; card.dataset.commandSource = result.source; card.insertAdjacentHTML('beforeend', `<details class="premium-source-details" data-command-generated><summary>${icon('chevronRight')} Mostrar / editar código</summary><textarea class="premium-source-editor" data-command-source spellcheck="false">${h(result.source)}</textarea></details><div class="premium-command-chat" data-command-chat data-command-generated><div class="hint">Prueba el plugin como en WhatsApp:</div><div class="premium-chat-messages" data-command-messages></div><div class="flex gap-8"><input class="input mono" data-command-chat-input value="/${h(value('[data-command-name]'))}" placeholder="/hola" /><button type="button" class="btn btn-secondary btn-sm" data-action="premium-command-chat-send">${icon('arrowRight')} Enviar</button></div></div>`); const titulo = card.querySelector('.premium-command-name'); if (titulo) titulo.textContent = `/${value('[data-command-name]')}`; const estado = card.querySelector('summary .badge'); if (estado) { estado.className = 'badge success'; estado.innerHTML = `${icon('check')} Generado` } actionEl.innerHTML = `${icon('refresh')} Regenerar plugin`; if (status) { status.classList.remove('is-loading'); status.innerHTML = `${icon('check')} Plugin generado. Guarda los plugins para activarlo.` } } catch (error) { await new Promise((resolve) => setTimeout(resolve, Math.max(0, 700 - (Date.now() - inicio)))); if (status) { status.classList.remove('is-loading'); status.textContent = error.message || 'No se pudo generar.' } }
+      finally { actionEl.disabled = false; form?.removeAttribute('data-premium-busy') }
+      return
+    }
+    if (action === 'premium-command-chat-send') {
+      const card = actionEl.closest('[data-command-card]'); const form = card?.closest('.premium-form'); const input = card?.querySelector('[data-command-chat-input]'); const messages = card?.querySelector('[data-command-messages]')
+      actionEl.disabled = true
+      try { const result = await api.post(`/api/premium/${encodeURIComponent(form.dataset.phone)}/command-test`, { name: card.querySelector('[data-command-name]')?.value, source: card.querySelector('[data-command-source]')?.value || card.dataset.commandSource || '', input: input?.value || '' }); messages.insertAdjacentHTML('beforeend', `<div class="chat-preview"><span class="chat-bubble user">${h(input.value)}</span><span class="chat-bubble">${h(result.response)}</span></div>`); input.value = '' } catch (error) { showToast(error.message || 'No se pudo ejecutar el plugin.', 'error') } finally { actionEl.disabled = false }
+      return
+    }
+    if (action === 'premium-command-save') {
+      const form = actionEl.closest('.premium-form'); const commands = [...form.querySelectorAll('[data-command-card]')].map((card) => ({ name: card.querySelector('[data-command-name]')?.value, prompt: card.querySelector('[data-command-prompt]')?.value, response: card.querySelector('[data-command-response]')?.value || 'Plugin generado', source: card.querySelector('[data-command-source]')?.value || card.dataset.commandSource || '' })).filter((c) => c.name && c.source)
+      try { await api.put(`/api/premium/${encodeURIComponent(form.dataset.phone)}/commands`, { commands }); form.removeAttribute('data-premium-dirty'); showToast('Plugins guardados y activados.', 'success') } catch (error) { showToast(error.message || 'No se pudieron guardar.', 'error') }
+      return
+    }
     if (action === 'bot-reconnect') {
       await reconnectBot(phone)
       return
@@ -525,10 +569,18 @@ export async function onSubmit(event) {
 }
 
 export function onKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey && event.target.matches?.('[data-command-chat-input]')) {
+    event.preventDefault(); event.target.closest('[data-command-chat]')?.querySelector('[data-action="premium-command-chat-send"]')?.click(); return
+  }
   if (event.key === 'Escape') {
     closeModal()
     document.getElementById('app-shell')?.classList.remove('sidebar-open')
   }
+}
+
+export function onInput(event) {
+  const form = event.target.closest?.('.premium-form')
+  if (form) form.setAttribute('data-premium-dirty', '1')
 }
 
 /** Casillas de selección de sesiones (admin). */

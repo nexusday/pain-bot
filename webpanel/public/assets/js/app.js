@@ -2,7 +2,7 @@
 import { api, registrarExpiracionSesion } from './api.js'
 import { definirEntradaAlPanel, handleSessionExpired, renderAuth } from './auth.js'
 import { PANEL_VERSION, h, icon, navigate, showToast, state } from './core.js'
-import { onChange, onClick, onKeydown, onSubmit } from './events.js'
+import { onChange, onClick, onInput, onKeydown, onSubmit } from './events.js'
 import { renderShell, route } from './shell.js'
 import { cargarStats, iniciarPollingStats } from './stats.js'
 
@@ -83,6 +83,7 @@ export async function boot() {
 document.addEventListener('click', onClick)
 document.addEventListener('submit', onSubmit)
 document.addEventListener('change', onChange)
+document.addEventListener('input', onInput)
 document.addEventListener('keydown', onKeydown)
 window.addEventListener('hashchange', () => { route() })
 

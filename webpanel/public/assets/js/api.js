@@ -31,7 +31,9 @@ function iniciarVigilanteReconexion() {
       if (!respuesta.ok) return
       clearInterval(vigilanteReconexion)
       vigilanteReconexion = null
-      window.location.reload()
+      import('./core.js').then(({ showToast }) =>
+        showToast('El panel volvió a responder. Tus cambios sin guardar se conservaron.', 'success')
+      ).catch(() => {})
     } catch {
       // sigue esperando al siguiente intento
     } finally {
@@ -93,6 +95,7 @@ export async function request(method, path, body, options = {}) {
 export const api = {
   get: (path) => request('GET', path, undefined, { csrf: false }),
   post: (path, body) => request('POST', path, body ?? {}),
+  put: (path, body) => request('PUT', path, body ?? {}),
   patch: (path, body) => request('PATCH', path, body ?? {}),
   del: (path, body) => request('DELETE', path, body),
 }
