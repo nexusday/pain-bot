@@ -53,12 +53,38 @@ function ejecutarConTiempoLimite(promesa, ms) {
   return Promise.race([promesa, limite]).finally(() => clearTimeout(temporizador))
 }
 
+function urlDirecta(valor) {
+  const texto = String(valor || '').trim()
+  const markdown = texto.match(/^\[\s*https?:\/\/[^\]]+\s*\]\(\s*(https?:\/\/[^)]+)\s*\)$/i)
+  return markdown ? markdown[1] : texto
+}
+
+function payloadSeguro(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.image || typeof payload.image !== 'object') return payload
+  const imagen = { ...payload.image }
+  if (typeof imagen.url === 'string') imagen.url = urlDirecta(imagen.url)
+  return { ...payload, image: imagen }
+}
+
+function conexionSegura(conn) {
+  return new Proxy(conn, {
+    get(target, propiedad, receptor) {
+      if (propiedad !== 'sendMessage') return Reflect.get(target, propiedad, receptor)
+      return (chat, payload, opciones) => target.sendMessage(chat, payloadSeguro(payload), opciones)
+    },
+  })
+}
+
 async function ejecutarPluginReal(item, m, data) {
   if (!item.plugin) return false
   const telefono = telefonoDeConexion(data.conn)
   const archivo = rutaPluginDelSubBot(data.conn, telefono, item.plugin)
   try {
     if (!archivo.startsWith(path.resolve(process.cwd(), global.bot || 'Serbot'))) throw new Error('ruta_plugin_no_permitida')
+    // Corrige también plugins guardados antes de esta validación.
+    const fuente = fs.readFileSync(archivo, 'utf8')
+    const fuenteLimpia = fuente.replace(/\[\s*(https?:\/\/[^\]]+)\s*\]\(\s*(https?:\/\/[^)]+)\s*\)/gi, '$2')
+    if (fuenteLimpia !== fuente) fs.writeFileSync(archivo, fuenteLimpia, 'utf8')
     const mtime = fs.statSync(archivo).mtimeMs
     let cacheado = pluginsCargados.get(archivo)
     if (!cacheado || cacheado.mtime !== mtime) {
@@ -67,7 +93,8 @@ async function ejecutarPluginReal(item, m, data) {
       pluginsCargados.set(archivo, cacheado)
     }
     const modulo = cacheado.modulo
-    const ejecucion = typeof modulo === 'function' ? modulo(m, data) : typeof modulo?.handler === 'function' ? modulo.handler(m, data) : null
+    const datosPlugin = { ...data, conn: conexionSegura(data.conn) }
+    const ejecucion = typeof modulo === 'function' ? modulo(m, datosPlugin) : typeof modulo?.handler === 'function' ? modulo.handler(m, datosPlugin) : null
     if (!ejecucion) throw new Error('plugin_sin_handler')
     await ejecutarConTiempoLimite(ejecucion, TIEMPO_MAXIMO_PLUGIN_MS)
     return true
@@ -152,6 +179,7 @@ handler.all = async function (m, { conn }) {
   const argumentos = argumentosDelMensaje(m.text, nombre)
   const prefijoUsado = String(m.text || '').slice(0, Math.max(1, String(m.text || '').toLowerCase().indexOf(nombre))) || conn.prefix || global.prefix
   if (await ejecutarPluginReal(item, m, { conn, text: argumentos.text, args: argumentos.args, usedPrefix: prefijoUsado, command: nombre })) return
+  if (item.plugin && item.source) return m.reply('❌ El plugin de este comando encontró un error y fue aislado. Puedes corregirlo desde el editor Premium.')
   const respuesta = interpolarComandoPremium(`${item.prefix || ''}${item.response || ''}${item.suffix || ''}`, { usuario: m.pushName || 'Usuario', grupo: m.chat, fecha: new Date().toLocaleDateString('es'), hora: new Date().toLocaleTimeString('es'), bot: conn.user?.name || 'PAIN BOT' })
   if (item.image) {
     await conn.sendMessage(m.chat, { image: imagenParaWhatsApp(item.image), caption: respuesta }, { quoted: m })
