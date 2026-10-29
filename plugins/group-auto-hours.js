@@ -19,7 +19,7 @@ function ayudaBonita(p) {
   return `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗮𝘂𝘁𝗼𝗺𝗮́𝘁𝗶𝗰𝗼 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼\n\n${ayuda(p)}`
 }
 
-const handler = async (m, { conn, text, usedPrefix }) => {
+const handler = async (m, { conn, text, usedPrefix, groupMetadata }) => {
   if (!m.isGroup) return responder(conn, m, '❗ Este comando solo funciona en grupos.')
   const entrada = String(text || '').trim()
   const horarioActual = global.db?.data?.chats?.[m.chat]?.rab
@@ -47,7 +47,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     if (!horarioActual) return responder(conn, m, `❗ No hay configuración guardada.\n\n${ayudaBonita(usedPrefix)}`)
     activarHorario(m.chat)
     invalidarEstadoHorario(conn, m.chat)
-    await revisarHorario(conn, m.chat)
+    await revisarHorario(conn, m.chat, groupMetadata)
     return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼\n\n> *Zona:* ${horarioActual.timezoneLabel || horarioActual.timezone}\n> *Abre:* ${formatearHora(horarioActual.openMinutes)}\n> *Cierra:* ${formatearHora(horarioActual.closeMinutes)}`)
   }
 
@@ -57,7 +57,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     const horario = crearHorario(partes[0], partes[1], partes[2])
     guardarHorario(m.chat, horario)
     invalidarEstadoHorario(conn, m.chat)
-    await revisarHorario(conn, m.chat)
+    await revisarHorario(conn, m.chat, groupMetadata)
     return responder(conn, m, `🌴 𝗛𝗼𝗿𝗮𝗿𝗶𝗼 𝗴𝘂𝗮𝗿𝗱𝗮𝗱𝗼 𝘆 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼\n\n> *Zona:* ${horario.timezoneLabel || horario.timezone}\n> *El grupo abre:* ${formatearHora(horario.openMinutes)}\n> *El grupo cierra:* ${formatearHora(horario.closeMinutes)}\n\n> Puedes usar *${usedPrefix}rab off* para desactivarlo sin borrar la configuración.`)
   } catch (error) {
     return responder(conn, m, `❌ ${error.message}\n\n${ayudaBonita(usedPrefix)}`)
@@ -70,8 +70,8 @@ handler.help = ['rab PAIS|hora apertura|hora cierre', 'rab on/off']
 handler.group = true
 handler.admin = true
 handler.botAdmin = true
-handler.all = async function (m, { conn }) {
-  if (m.isGroup && !m.fromMe) await revisarHorario(conn, m.chat)
+handler.all = async function (m, { conn, groupMetadata }) {
+  if (m.isGroup && !m.fromMe) await revisarHorario(conn, m.chat, groupMetadata)
 }
 
 export default handler

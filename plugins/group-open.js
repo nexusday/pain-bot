@@ -1,4 +1,5 @@
 ﻿import { findGroupParticipant } from '../lib/group-participant.js'
+import { esteBotEsResponsableDelGrupo } from './modo-sub.js'
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner, isPrems, usedPrefix, command }) => {
   const contextoCanal = global.rcanal?.contextInfo || {}
@@ -24,6 +25,8 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin, isOwner
       ...contextoCanal
     }
   }, { quoted: m })
+
+  if (!esteBotEsResponsableDelGrupo(conn, m.chat, participantesGrupo)) return
   
   
   try {
