@@ -244,24 +244,13 @@ export async function renderDashboard() {
   `)
   programarPromoPremium()
 
-  // Auto-actualizar datos del dashboard cada 30s (solo mientras se esté en esta ruta).
-  // Evita repintar si el usuario está escribiendo en la vista y conserva la posición de scroll.
-  if (state.dashboardPoll) clearInterval(state.dashboardPoll)
-  state.dashboardPoll = setInterval(async () => {
-    if (document.hidden) return
-    if (location.hash.replace(/^#/, '') !== '/dashboard' && location.hash.replace(/^#/, '') !== '') return
-    const activo = document.activeElement
-    if (activo && activo.closest?.('#content')) {
-      const tag = activo.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-    }
-    const scrollY = window.scrollY
-    try {
-      await renderDashboard()
-      window.scrollTo(0, scrollY)
-    } catch {}
-  }, 30_000)
-  state.dashboardPoll.unref?.()
+  // No repintar todo el Dashboard automáticamente: eso recreaba anuncios,
+  // tarjetas y formularios cada 30 s y parecía una recarga de la página.
+  // Las estadísticas globales ya se actualizan con el polling ligero de stats.js.
+  if (state.dashboardPoll) {
+    clearInterval(state.dashboardPoll)
+    state.dashboardPoll = null
+  }
 }
 
 /* ── Mis bots ───────────────────────────────────────────────────────────── */
