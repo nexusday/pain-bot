@@ -384,17 +384,14 @@ let avisoBloqueadorMostrado = false
 function mostrarAvisoBloqueador(motivo = 'blocked') {
   if (avisoBloqueadorMostrado) return
   avisoBloqueadorMostrado = true
-  const falloProveedor = motivo === 'script_error'
   openModal({
     dismissible: false,
-    title: falloProveedor ? 'VPN o proxy no permitido' : 'Ayúdanos a mantener los bots gratis',
-    subtitle: falloProveedor ? 'El proveedor rechazó esta conexión' : 'Permite los anuncios para apoyar este servicio',
+    title: 'No pudimos cargar los anuncios',
+    subtitle: 'Comprueba tu conexión y permite este sitio',
     body: `<div class="notice">${icon('shieldCheck')}<div><b>Los anuncios financian nuestros sub-bots y las horas de Premium para que puedas usarlos completamente gratis.</b></div></div>
-      <p class="muted">${falloProveedor
-        ? 'El proveedor detectó una VPN o un proxy anónimo en tu conexión y no puede mostrar el anuncio. Desactiva temporalmente la VPN o el proxy, recarga esta página y vuelve a intentarlo. Esto es independiente del bloqueador de anuncios.'
-        : 'Detectamos señales de un bloqueador de anuncios. Desactívalo para este sitio o añade el panel a su lista de permitidos.'}</p>
+      <p class="muted">Puede deberse a un bloqueador de anuncios, una VPN o proxy, una protección de privacidad o un problema temporal de conexión. Permite los anuncios para este sitio y, si usas VPN o proxy, desactívalo temporalmente; después vuelve a intentarlo.</p>
       <p class="hint">Después pulsa el botón de abajo: recargaremos la página y volveremos a comprobarlo. Tus bots y las horas Premium que ya ganaste no se eliminan.</p>`,
-    footer: `<button class="btn btn-primary" id="ads-recheck">${icon('refresh')} ${falloProveedor ? 'Reintentar anuncios' : 'Ya desactivé el bloqueador'}</button>`,
+    footer: `<button class="btn btn-primary" id="ads-recheck">${icon('refresh')} Reintentar anuncios</button>`,
     onMount(root) {
       const boton = root.querySelector('#ads-recheck')
       boton?.addEventListener('click', () => {
