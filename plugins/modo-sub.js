@@ -640,8 +640,16 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
   }
 
   if (!accion) {
-    if (!elegirQuienResponde(bots, conn)) return
     const activo = obtenerBotActivoDelGrupo(m.chat)
+    // `/modosub` solo consulta el estado. Si ya existe un bot elegido,
+    // la consulta debe responderla únicamente ese bot; no debe comportarse
+    // como modo `all` solo porque no se pasó un argumento.
+    if (activo) {
+      const seleccionado = bots.find((bot) => bot.number === activo)
+      if (!seleccionado || !elegirQuienResponde(bots, conn, seleccionado)) return
+    } else if (!elegirQuienResponde(bots, conn)) {
+      return
+    }
     let textoMsg = `*Modo Sub / Bot activo*\n\n`
     textoMsg += `Elige qué bot responde en este grupo.\n`
     textoMsg += `Uso: *${usedPrefix}modosub <número>*\n`
@@ -668,7 +676,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
   }
 
   if (['all', 'off', 'todos', 'reset'].includes(accion)) {
-    if (!elegirQuienResponde(bots, conn)) return
+    const activo = obtenerBotActivoDelGrupo(m.chat)
+    const seleccionado = activo ? bots.find((bot) => bot.number === activo) : null
+    if (activo ? (!seleccionado || !elegirQuienResponde(bots, conn, seleccionado)) : !elegirQuienResponde(bots, conn)) return
     establecerBotActivoDelGrupo(m.chat, 'all')
     await global.db.write?.()
     return m.reply('✅ Modo Sub desactivado.\n> Todos los bots del grupo pueden responder otra vez.')
@@ -676,7 +686,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
 
   const indice = parseInt(accion, 10)
   if (!Number.isFinite(indice) || indice < 1 || indice > bots.length) {
-    if (!elegirQuienResponde(bots, conn)) return
+    const activo = obtenerBotActivoDelGrupo(m.chat)
+    const seleccionado = activo ? bots.find((bot) => bot.number === activo) : null
+    if (activo ? (!seleccionado || !elegirQuienResponde(bots, conn, seleccionado)) : !elegirQuienResponde(bots, conn)) return
     return m.reply(`[❗] Número inválido.\n\nUsa *${usedPrefix}modosub* para ver la lista\no *${usedPrefix}modosub 1* / *${usedPrefix}modosub all*`)
   }
 
