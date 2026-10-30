@@ -384,16 +384,17 @@ let avisoBloqueadorMostrado = false
 function mostrarAvisoBloqueador(motivo = 'blocked') {
   if (avisoBloqueadorMostrado) return
   avisoBloqueadorMostrado = true
+  const falloProveedor = motivo === 'script_error'
   openModal({
     dismissible: false,
-    title: 'Ayúdanos a mantener los bots gratis',
-    subtitle: 'Permite los anuncios para apoyar este servicio',
+    title: falloProveedor ? 'No pudimos cargar los anuncios' : 'Ayúdanos a mantener los bots gratis',
+    subtitle: falloProveedor ? 'El proveedor de anuncios no respondió' : 'Permite los anuncios para apoyar este servicio',
     body: `<div class="notice">${icon('shieldCheck')}<div><b>Los anuncios financian nuestros sub-bots y las horas de Premium para que puedas usarlos completamente gratis.</b></div></div>
-      <p class="muted">${motivo === 'script_error'
-        ? 'No pudimos cargar el proveedor de anuncios. Puede deberse a un bloqueador, una protección de privacidad o un problema de conexión. Si usas un bloqueador, permite los anuncios en este sitio; si no, comprueba tu conexión y vuelve a intentarlo.'
+      <p class="muted">${falloProveedor
+        ? 'El proveedor no pudo cargar el anuncio. Puede deberse a la VPN, DNS, geolocalización, reputación de la IP o a un problema temporal de conexión. Esto no confirma que uses un bloqueador.'
         : 'Detectamos señales de un bloqueador de anuncios. Desactívalo para este sitio o añade el panel a su lista de permitidos.'}</p>
       <p class="hint">Después pulsa el botón de abajo: recargaremos la página y volveremos a comprobarlo. Tus bots y las horas Premium que ya ganaste no se eliminan.</p>`,
-    footer: `<button class="btn btn-primary" id="ads-recheck">${icon('refresh')} Ya desactivé el bloqueador</button>`,
+    footer: `<button class="btn btn-primary" id="ads-recheck">${icon('refresh')} ${falloProveedor ? 'Reintentar anuncios' : 'Ya desactivé el bloqueador'}</button>`,
     onMount(root) {
       const boton = root.querySelector('#ads-recheck')
       boton?.addEventListener('click', () => {
