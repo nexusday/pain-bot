@@ -1,7 +1,7 @@
 /* Pain Panel — módulo pages-user */
 import { pushAccountHTML } from './push.js'
 import { api } from './api.js'
-import { anunciosCabeceraHTML, anunciosPieHTML } from './pages-premium.js'
+import { anunciosCabeceraHTML, anunciosPieHTML, premiumPromoHTML, programarPromoPremium } from './pages-premium.js'
 import { dashboardGlobalStatsHTML } from './stats.js'
 import {
   attachRowFilter,
@@ -240,7 +240,9 @@ export async function renderDashboard() {
       </div>
     </div>
     ${anunciosPieHTML()}
+    ${premiumPromoHTML()}
   `)
+  programarPromoPremium()
 
   // Auto-actualizar datos del dashboard cada 30s (solo mientras se esté en esta ruta).
   // Evita repintar si el usuario está escribiendo en la vista y conserva la posición de scroll.
@@ -305,7 +307,8 @@ export async function renderBots() {
       </div>
       <a class="btn premium-invite-button" href="#/premium">Quiero ser Premium ${icon('chevronRight')}</a>
     </section>
-    ${anunciosPieHTML()}`)
+     ${anunciosPieHTML()}${premiumPromoHTML()}`)
+   programarPromoPremium()
   attachRowFilter('#bots-search', '[data-bot-row]')
 }
 

@@ -532,6 +532,10 @@ export async function handleSettingsPremiumSave(form) {
     cooldownSeconds: numero('cooldownSeconds', 5),
     maxHours: numero('maxHours', 24),
     unlockHours: numero('unlockHours', 10),
+    promo: {
+      enabled: Boolean(form.querySelector('[name="promoEnabled"]')?.checked),
+      intervalMinutes: numero('promoIntervalMinutes', 30),
+    },
     smartlink: texto('smartlink'),
     placements: Object.fromEntries(['dashboard', 'bots', 'premium', 'communities', 'link', 'account'].map((pagina) => [pagina,
       Object.fromEntries(['header', 'footer'].map((zona) => [zona, Boolean(form.querySelector(`[name="ad-${pagina}-${zona}"]`)?.checked)])),
@@ -562,6 +566,7 @@ export async function handleSettingsPremiumSave(form) {
     if (state.config) {
       state.config.adsPlacements = guardado.placements
       state.config.adsBanners = guardado.banners
+      state.config.premiumPromo = guardado.promo
     }
     showToast(
       guardado.enabled === false

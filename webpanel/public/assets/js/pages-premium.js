@@ -37,6 +37,42 @@ const ESTADO = {
 
 const MS_HORA = 60 * 60 * 1000
 
+function clavePromoPremium() {
+  return `pain-premium-promo:${String(state.user?.id || state.user?.username || 'user')}`
+}
+
+export function premiumPromoHTML() {
+  return `<aside class="premium-floating-promo" data-premium-promo hidden>
+    <button class="premium-floating-promo-close" type="button" data-action="premium-promo-close" aria-label="Cerrar">${icon('x')}</button>
+    <div class="premium-floating-promo-icon">${icon('sparkles')}</div>
+    <div class="premium-floating-promo-content">
+      <span class="premium-invite-label">SUB-BOT PREMIUM</span>
+      <h3>Haz que tu bot destaque</h3>
+      <p>Personaliza tu sub-bot con funciones reales y dale una identidad propia.</p>
+      <div class="premium-floating-promo-perks"><span>${icon('check')} Menú y moneda propios</span><span>${icon('check')} Canal personalizado</span><span>${icon('check')} Comandos creados con IA</span></div>
+      <a class="btn premium-invite-button" href="#/premium">${icon('sparkles')} Ver Premium gratis</a>
+    </div>
+  </aside>`
+}
+
+export function programarPromoPremium() {
+  if (state.premiumPromoTimer) clearTimeout(state.premiumPromoTimer)
+  const promo = state.config?.premiumPromo
+  const tieneBotNormal = Array.isArray(state.bots) && state.bots.some((bot) => !bot.premium?.active)
+  if (promo?.enabled === false || !tieneBotNormal) return
+  const intervalo = Math.max(1, Number(promo?.intervalMinutes) || 30) * 60_000
+  let ultimo = 0
+  try { ultimo = Number(localStorage.getItem(clavePromoPremium()) || 0) || 0 } catch {}
+  const espera = ultimo ? Math.max(0, ultimo + intervalo - Date.now()) : 5000
+  state.premiumPromoTimer = setTimeout(() => {
+    const tarjeta = document.querySelector('[data-premium-promo]')
+    if (!tarjeta) return
+    tarjeta.hidden = false
+    try { localStorage.setItem(clavePromoPremium(), String(Date.now())) } catch {}
+  }, espera)
+  state.premiumPromoTimer.unref?.()
+}
+
 function restanteTexto(ms) {
   if (!(ms > 0)) return 'Sin premium'
   const totalMinutos = Math.ceil(ms / 60_000)
@@ -391,7 +427,7 @@ function mostrarAvisoBloqueador(motivo = 'blocked') {
     body: `<div class="notice">${icon('shieldCheck')}<div><b>Los anuncios financian nuestros sub-bots y las horas de Premium para que puedas usarlos completamente gratis.</b></div></div>
       <p class="muted">Puede deberse a un bloqueador de anuncios, una VPN o proxy, una protección de privacidad o un problema temporal de conexión. Permite los anuncios para este sitio y, si usas VPN o proxy, desactívalo temporalmente; después vuelve a intentarlo.</p>
       <p class="hint">Después pulsa el botón de abajo: recargaremos la página y volveremos a comprobarlo. Tus bots y las horas Premium que ya ganaste no se eliminan.</p>`,
-    footer: `<button class="btn btn-primary" id="ads-recheck">${icon('refresh')} Reintentar anuncios</button>`,
+    footer: `<button class="btn btn-primary" id="ads-recheck">${icon('refresh')} Ya desactivé el bloqueador · Reintentar anuncios</button>`,
     onMount(root) {
       const boton = root.querySelector('#ads-recheck')
       boton?.addEventListener('click', () => {

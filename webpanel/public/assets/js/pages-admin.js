@@ -192,6 +192,10 @@ export function adminOverviewHTML(data) {
     </div>
     <div class="grid-2">
       <div class="stack">
+        ${puede('admin.settings.premium') ? `<div class="card admin-premium-shortcut">
+          <div class="card-head"><div><h3>Promoción Premium</h3><p>Invita a convertir sub-bots normales en Premium</p></div><span class="badge accent">Premium</span></div>
+          <div class="card-body"><p class="muted">Configura la tarjeta flotante, sus ventajas y cada cuánto vuelve a aparecer para los usuarios.</p><a class="btn btn-primary" href="#/admin/settings">${icon('sparkles')} Configurar invitación Premium</a></div>
+        </div>` : ''}
         <div class="card">
           <div class="card-head"><div><h3>Sistema</h3><p>Proceso principal</p></div><span class="badge success"><span class="dot"></span>En línea</span></div>
           <div class="card-body">
@@ -733,6 +737,15 @@ function adminPremiumHTML(premium) {
             <label class="label" for="pm-cooldown">Espera entre anuncios (s)</label>
             <input id="pm-cooldown" name="cooldownSeconds" type="number" min="0" max="3600" class="input" value="${Number(premium.cooldownSeconds ?? 5)}" />
           </div>
+        </div>
+        <div class="field premium-promo-settings">
+          <label class="check switch">
+            <input type="checkbox" name="promoEnabled" ${premium.promo?.enabled !== false ? 'checked' : ''} />
+            <span><b>Mostrar invitación flotante a Premium</b><br /><span class="muted">Promociona Premium a usuarios con sub-bots normales, sin cubrir el contenido ni aparecer continuamente.</span></span>
+          </label>
+          <label class="label" for="pm-promo-interval">Mostrar nuevamente cada (minutos)</label>
+          <input id="pm-promo-interval" name="promoIntervalMinutes" type="number" min="1" max="1440" class="input" value="${Number(premium.promo?.intervalMinutes || 30)}" />
+          <div class="hint">Se muestra una vez al entrar y vuelve a aparecer después de este intervalo si el usuario todavía tiene sub-bots sin Premium.</div>
         </div>
         <div class="grid-2-tight">
           <div class="field">

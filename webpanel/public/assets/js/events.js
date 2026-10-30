@@ -194,6 +194,14 @@ export async function onClick(event) {
       await iniciarAnuncioPremium(actionEl)
       return
     }
+    if (action === 'premium-promo-close') {
+      actionEl.closest('[data-premium-promo]')?.remove()
+      try {
+        const clave = `pain-premium-promo:${String(state.user?.id || state.user?.username || 'user')}`
+        localStorage.setItem(clave, String(Date.now()))
+      } catch {}
+      return
+    }
     if (action === 'premium-infinite') {
       await activarPremiumInfinito(actionEl)
       return
