@@ -43,6 +43,7 @@ import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
 import { juegosBloqueadosEn, verificarComandoJuegos, esPluginJuegos } from './lib/Modos/modo-games.js'
 import { COMANDOS_SIN_COMISION, aplicarComisionPareja } from './lib/pareja-comision.js'
 import { registrarComandoGlobal } from './lib/webpanel/runtime-stats.js'
+import { contarMensajesDuplicados, contarMensajesRecibidos } from './lib/worker-metrics.js'
 import { comandosOcultosPremium } from './lib/premium.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
@@ -254,7 +255,31 @@ function pluginsCandidatosComando(texto, conn, m, isOwner, isROwner, cache) {
   )
 }
 
+// Baileys puede entregar varios mensajes en un mismo messages.upsert. No se
+// debe perder toda la ráfaga salvo el último mensaje: se procesa cada ID una
+// sola vez y en el orden recibido. El procesamiento sigue siendo acotado al
+// socket que recibió la actualización, sin crear una cola global que bloquee
+// a todos los sub-bots.
 export async function handler(chatUpdate) {
+  if (!chatUpdate || !Array.isArray(chatUpdate.messages)) return
+  const vistos = new Set()
+  const mensajes = chatUpdate.messages.filter((mensaje) => {
+    if (!mensaje) return false
+    const id = String(mensaje.key?.id || '')
+    if (!id) return true
+    if (vistos.has(id)) return false
+    vistos.add(id)
+    return true
+  })
+  contarMensajesRecibidos(chatUpdate.messages.length, mensajes.length)
+  const duplicados = chatUpdate.messages.length - mensajes.length
+  if (duplicados > 0) contarMensajesDuplicados(duplicados)
+  for (const mensaje of mensajes) {
+    await procesarActualizacion({ ...chatUpdate, messages: [mensaje] })
+  }
+}
+
+async function procesarActualizacion(chatUpdate) {
 if (!chatUpdate) return
 if (chatUpdate.type && chatUpdate.type !== 'notify') {
   const ultimo = chatUpdate.messages?.[chatUpdate.messages.length - 1]

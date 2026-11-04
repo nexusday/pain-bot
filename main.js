@@ -54,6 +54,11 @@ import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
+import {
+  iniciarMetricasWorker,
+  persistirMetrica,
+  registrarMetricasWorker,
+} from './lib/worker-metrics.js'
 import { confirmSessionLease, requestReconnectAll, requestReconnectOne, requestReloadAll } from './lib/process-isolation.js'
 import { ejecutarEnContextoBot } from './lib/premium.js'
 import lodash from 'lodash' 
@@ -1066,6 +1071,7 @@ if (!isSubbotWorker) {
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
   const workerId = process.env.PAIN_WORKER_ID || 'subbot'
+  iniciarMetricasWorker()
   const sesionesIniciando = new Map()
   const sesionesRetiradas = new Set()
   const iniciarSesion = (folder) => {
@@ -1150,7 +1156,20 @@ if (!isSubbotWorker) {
         cacheMensajes: estado.cacheMensajes,
         modoAhorro: estado.modoAhorro,
       },
+      // Métricas operacionales: lag del event loop (ms), CPU %, mensajería y
+      // reconexiones de esta ventana. Las usa el supervisor para balancear
+      // por carga real; el panel puede mostrarlas tal cual.
+      metricas: registrarMetricasWorkerEnseguro(),
     })
+  }
+  function registrarMetricasWorkerEnseguro() {
+    try { return registrarMetricasWorker() } catch { return null }
+  }
+  async function persistirMetricaEnseguro(id, raiz) {
+    try {
+      const muestra = registrarMetricasWorker()
+      if (muestra) await persistirMetrica(id, raiz, muestra)
+    } catch {}
   }
   publishWorkerStatus()
   let ticksEstado = 0
@@ -1159,6 +1178,10 @@ if (!isSubbotWorker) {
       publishWorkerStatus()
     } catch (error) {
       console.error(`Worker ${workerId}: no se pudo publicar el estado de sus sesiones:`, error?.message || error)
+    }
+    // Historial liviano: una línea por minuto en storage/metrics/
+    if (ticksEstado % 6 === 5) {
+      persistirMetricaEnseguro(workerId, __dirname)
     }
     // Higiene de memoria cada ~30s. Antes eran 60s y el heap alcanzaba
     // ~1 GB por worker antes de que la poda hiciera efecto.

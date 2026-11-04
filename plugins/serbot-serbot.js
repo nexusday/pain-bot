@@ -8,6 +8,10 @@ import chalk from "chalk"
 import util from "util"
 import * as ws from "ws"
 import { makeWASocket } from "../lib/simple.js"
+import {
+  contarReconexionTerminada,
+  contarReintentoReconexion,
+} from "../lib/worker-metrics.js"
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from "../lib/socket-estable.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
@@ -60,6 +64,38 @@ const MAX_FALLOS_RECONEXION = 8
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
 const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
+// Las reconexiones independientes de decenas de sesiones provocan oleadas
+// contra WhatsApp y más cierres 428. Se limita la simultaneidad por worker,
+// no por cantidad fija de sub-bots: la cola crece sin bloquear mensajes y se
+// drena conforme terminan las conexiones.
+const MAX_RECONEXIONES_POR_WORKER = Math.min(
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 2, 1),
+  8
+)
+const colaReconexiones = []
+let reconexionesActivas = 0
+
+function ejecutarSiguienteReconexion() {
+  while (reconexionesActivas < MAX_RECONEXIONES_POR_WORKER && colaReconexiones.length) {
+    const trabajo = colaReconexiones.shift()
+    reconexionesActivas++
+    Promise.resolve()
+      .then(trabajo.fn)
+      .then(trabajo.resolve, trabajo.reject)
+      .finally(() => {
+        reconexionesActivas--
+        contarReconexionTerminada()
+        ejecutarSiguienteReconexion()
+      })
+  }
+}
+
+function encolarReconexion(fn) {
+  return new Promise((resolve, reject) => {
+    colaReconexiones.push({ fn, resolve, reject })
+    ejecutarSiguienteReconexion()
+  })
+}
 let versionBaileysCache = null
 const iniciosSubBot = new Map()
 
@@ -1116,9 +1152,10 @@ async function iniciarSubBot(options) {
         const colaLarga = 2 * 60_000 + dispersarMs
         if (!temporizadorReconexion) {
           reconectando = true
+          contarReintentoReconexion(motivo)
           temporizadorReconexion = setTimeout(() => {
             temporizadorReconexion = null
-            recargarHandler(true).catch((error) => {
+            encolarReconexion(() => recargarHandler(true)).catch((error) => {
               console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
               reconectando = false
             })
@@ -1146,6 +1183,7 @@ async function iniciarSubBot(options) {
             : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
       if (esReemplazo) reemplazosConsecutivos++
       else fallosConsecutivos++
+      contarReintentoReconexion(motivo)
       console.log(chalk.bold.magentaBright(
         `\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). ` +
         `${detalle ? `Motivo: ${detalle}. ` : ''}` +
@@ -1153,7 +1191,7 @@ async function iniciarSubBot(options) {
       ))
       temporizadorReconexion = setTimeout(() => {
         temporizadorReconexion = null
-        recargarHandler(true).catch((error) => {
+        encolarReconexion(() => recargarHandler(true)).catch((error) => {
           console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
           reconectando = false
         })
@@ -1185,7 +1223,7 @@ async function iniciarSubBot(options) {
         console.log(chalk.bold.yellow(
           `\n┆ Subbot (+${idCarpetaBot}) ${conexionAtascada ? 'atascado conectando' : 'sin conexión'} (estado ${estadoSocket ?? 'desconocido'}). Reconectando...\n`
         ))
-        recargarHandler(true).catch((e) => {
+        encolarReconexion(() => recargarHandler(true)).catch((e) => {
           console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
           reconectando = false
         })

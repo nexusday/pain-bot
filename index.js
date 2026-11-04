@@ -14,6 +14,7 @@ import {
   subBotsPermitidos
 } from './lib/process-isolation.js'
 import { ARCHIVO_REENLACE_PENDIENTE, sesionEnEmparejamiento } from './lib/subbot-recovery.js'
+import { readSubbotWorkerStatuses } from './lib/subbot-status.js'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { crearCoordinadorSubme } from './lib/subme-coordinator.js'
 import { acquireRuntimeLease } from './lib/runtime-lease.js'
@@ -117,7 +118,8 @@ function listSessions() {
       return statSync(sessionPath).isDirectory() && (
         existsSync(join(sessionPath, 'creds.json')) ||
         existsSync(join(sessionPath, ARCHIVO_REENLACE_PENDIENTE))
-      ) && !sesionEnEmparejamiento(sessionPath)
+      ) && !existsSync(join(sessionPath, ARCHIVO_REENLACE_PENDIENTE)) &&
+        !sesionEnEmparejamiento(sessionPath)
     } catch {
       return false
     }
@@ -129,7 +131,107 @@ function makeTargets() {
   for (const [id, sessions] of assignSessions(listSessions())) {
     targets.set(id, { role: 'subbot', sessions })
   }
+  aplicarMovimientosAdaptativos(targets)
   return targets
+}
+
+// Balanceo adaptativo: los overrides persisten en memoria así las rondas de
+// reconcile respetan la colocación de carga; añadir/quitar sub-bots no las
+// deshace (la sesión solo se mueve si su grupo destino sigue existiendo).
+const movimientosAdaptativos = new Map() // sesión -> groupId destino
+// Sesiones en tránsito (esperando el 'session-removed' del worker de origen).
+const movimientosEnCurso = new Map() // sesión -> { destino, en }
+let proximoBalanceo = 0
+
+const BALANCEO_LAG_MIN_MS = Math.max(50, Number.parseInt(process.env.PAIN_REBALANCE_LAG_MS, 10) || 250)
+const BALANCEO_COOLDOWN_MS = Math.max(60_000, Number.parseInt(process.env.PAIN_REBALANCE_MS, 10) || 10 * 60_000)
+
+function aplicarMovimientosAdaptativos(targets) {
+  for (const [session, destino] of movimientosAdaptativos) {
+    const targetDestino = targets.get(destino)
+    if (!targetDestino) continue
+    for (const [id, target] of targets) {
+      if (id === 'primary' || id === destino) continue
+      const indice = target.sessions.indexOf(session)
+      if (indice >= 0) target.sessions.splice(indice, 1)
+    }
+    if (!targetDestino.sessions.includes(session)) targetDestino.sessions.push(session)
+  }
+}
+
+// Se llama cuando el worker de origen confirma que la sesión ya está cerrada:
+// solo entonces la ferma el worker de destino (nunca una mientras la otra
+// mantiene el socket: evitaría dobles conexiones del mismo número).
+function completaMovimientoAdaptativo(session) {
+  const movimiento = movimientosEnCurso.get(session)
+  if (!movimiento) return
+  movimientosEnCurso.delete(session)
+  const worker = slots.get(movimiento.destino)
+  const target = makeTargets().get(movimiento.destino)
+  if (worker?.child?.connected && target) addSessionsToWorker(worker, target)
+  reconcile()
+}
+
+// Thresholds por carga real (lag del event loop reportado por cada worker),
+// no por cantidad fija de sub-bots: sirve igual con 100, 500 o mil sesiones.
+// Conservador a propósito: MÁXIMO un movimiento por ventana de enfriamiento y
+// solo si el worker más cargado supera el lag mínimo Y triplica al mejor.
+function evaluarBalanceo() {
+  if (stopping || Date.now() < proximoBalanceo) return
+  // Huérfanos (el worker de origen murió antes de confirmar): fuera.
+  const ahora = Date.now()
+  for (const [session, movimiento] of movimientosEnCurso) {
+    if (ahora - movimiento.en > BALANCEO_COOLDOWN_MS) movimientosEnCurso.delete(session)
+  }
+  let estados
+  try {
+    estados = readSubbotWorkerStatuses(__dirname)
+  } catch {
+    return
+  }
+  const salubres = estados.map((estado) => ({
+    id: estado.workerId,
+    lag: Number(estado?.metricas?.lagP99Ms),
+    sesiones: Array.isArray(estado.sessions) ? estado.sessions : [],
+  })).filter((estado) => Number.isFinite(estado.lag))
+  if (salubres.length < 2) return
+  salubres.sort((a, b) => a.lag - b.lag)
+  const mejor = salubres[0]
+  const peor = salubres[salubres.length - 1]
+  if (peor.lag < BALANCEO_LAG_MIN_MS || peor.lag < mejor.lag * 3) return
+  const conectadas = peor.sesiones.filter((sesion) => sesion?.connected && typeof sesion.folder === 'string')
+  for (const sesion of conectadas) {
+    if (!movimientosAdaptativos.has(sesion.folder) &&
+        /^[a-zA-Z0-9_-]+$/.test(sesion.folder) &&
+        !movimientosEnCurso.has(sesion.folder)) {
+      if (moverSesionAdaptativa(peor.id, mejor.id, sesion.folder, peor.lag, mejor.lag)) return
+    }
+  }
+}
+
+function moverSesionAdaptativa(origenId, destinoId, session, lagOrigen, lagDestino) {
+  const origen = slots.get(origenId)
+  const destino = slots.get(destinoId)
+  if (!origen?.child?.connected || !destino?.child?.connected) return false
+  const deseado = makeTargets()
+  const targetOrigen = deseado.get(origenId)
+  const targetDestino = deseado.get(destinoId)
+  if (!targetOrigen || !targetDestino) return false
+  movimientosAdaptativos.set(session, destinoId)
+  movimientosEnCurso.set(session, { destino: destinoId, en: Date.now() })
+  // El 'session-removed' que llega del worker de origen dispara
+  // completaMovimientoAdaptativo: allí se envía al destino.
+  if (!removeSessionFromWorker(origen, targetOrigen, session)) {
+    movimientosAdaptativos.delete(session)
+    movimientosEnCurso.delete(session)
+    return false
+  }
+  proximoBalanceo = Date.now() + BALANCEO_COOLDOWN_MS
+  console.log(
+    `[supervisor] Balanceo por carga: ${session} pasa de ${origenId} a ${destinoId} ` +
+    `(lag p99: ${Math.round(lagOrigen)}ms -> ${Math.round(lagDestino)}ms).`
+  )
+  return true
 }
 
 function fingerprint(target) {
@@ -272,6 +374,7 @@ function startSlot(id, slot) {
     if (slot.child !== child) return
     if (message?.type === 'session-removed' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
       pendingSessionRemovals.delete(message.session)
+      completaMovimientoAdaptativo(message.session)
       const primary = slots.get('primary')?.child
       if (primary) resolveLeaseRequests(primary)
       return
@@ -534,6 +637,9 @@ function reconcile() {
 
   for (const [id, target] of desired) {
     if (id !== 'primary') ensureTarget(id, target)
+  }
+  try { evaluarBalanceo() } catch (error) {
+    console.error('[supervisor] Balanceo por carga omitido:', error?.message || error)
   }
   const primary = slots.get('primary')?.child
   if (primary) resolveLeaseRequests(primary)
