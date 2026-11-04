@@ -73,6 +73,36 @@
 .stats-group .stats-row {
   margin-top: 10px;
 }
+
+/* Tutorial de vinculación: simulación CSS ligera, sin vídeo ni imágenes externas. */
+.link-tutorial { min-height: 360px; }
+.link-tutorial-scene { display:grid; grid-template-columns:minmax(0,1fr) 255px; align-items:center; gap:28px; min-height:345px; padding:8px 12px 2px; overflow:hidden; }
+.link-tutorial-copy { padding:16px 0; }
+.tutorial-eyebrow { color:var(--accent); font-size:10px; font-weight:750; letter-spacing:.13em; }
+.link-tutorial-copy h4 { margin:10px 0 8px; font-size:23px; letter-spacing:-.02em; }
+.link-tutorial-copy p { max-width:430px; color:var(--muted); font-size:13px; line-height:1.7; margin:0; }
+.tutorial-route { display:flex; align-items:center; gap:9px; margin-top:20px; padding:10px 12px; border:1px solid var(--accent-line); border-radius:9px; width:max-content; max-width:100%; color:var(--text-2); font-size:11px; }
+.tutorial-route svg { width:15px; color:var(--accent); flex:none; }
+.tutorial-phone { position:relative; width:220px; height:370px; margin:auto; border:5px solid #26313d; border-radius:29px; background:#111b21; box-shadow:0 20px 45px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.08); overflow:hidden; color:#e9edef; font-family:Arial,sans-serif; animation:tutorial-phone-in .35s ease both; }
+.tutorial-phone-top { height:22px; padding:7px 12px 0; display:flex; justify-content:space-between; font-size:8px; color:#b8c9cf; position:relative; }
+.tutorial-phone-notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:75px; height:14px; border-radius:0 0 10px 10px; background:#26313d; }
+.tutorial-wa-appbar { display:flex; align-items:center; justify-content:space-between; padding:12px 13px; background:#202c33; color:#e9edef; font-size:13px; }
+.tutorial-wa-content { min-height:273px; padding:14px 9px; background:#111b21; }
+.tutorial-wa-title { font-size:15px; font-weight:700; padding:3px 6px 15px; }
+.tutorial-wa-row,.tutorial-wa-device { display:flex; align-items:center; gap:9px; padding:12px 7px; border-radius:9px; position:relative; }
+.tutorial-wa-row b,.tutorial-wa-device b { display:block; font-size:10px; }.tutorial-wa-row small,.tutorial-wa-device small { display:block; color:#91a5ad; font-size:8px; margin-top:4px; }
+.tutorial-wa-focus { background:rgba(0,168,132,.18); outline:1px solid rgba(0,168,132,.55); animation:tutorial-pulse 1.8s ease-in-out infinite; }
+.tutorial-wa-avatar { width:28px; height:28px; display:grid; place-items:center; flex:none; border-radius:50%; background:#64727b; color:#fff; font-size:12px; }.tutorial-wa-avatar.green { background:#00a884; }.tutorial-wa-avatar.blue { background:#3b82f6; }
+.tutorial-wa-chevron { margin-left:auto; color:#8da1a8; font-size:20px; }.tutorial-wa-live { width:7px; height:7px; margin-left:auto; border-radius:50%; background:#00e676; box-shadow:0 0 0 4px rgba(0,230,118,.13); }
+.tutorial-wa-link { display:flex; gap:11px; align-items:center; margin-top:13px; padding:13px 8px; color:#00a884; font-size:10px; }.tutorial-wa-link span { font-size:20px; }.tutorial-wa-hint { margin:18px 7px; color:#8696a0; font-size:8px; line-height:1.55; text-align:center; }
+.tutorial-wa-demo-label { margin:0 7px 10px; padding:6px 7px; border:1px solid rgba(255,193,7,.65); border-radius:5px; background:rgba(255,193,7,.12); color:#ffd666; font-size:7px; font-weight:800; letter-spacing:.04em; text-align:center; }
+.tutorial-wa-code-label { color:#aebac1; font-size:9px; text-align:center; padding:2px 10px 8px; }.tutorial-wa-code { display:block; width:max-content; margin:4px auto 15px; padding:10px 13px; border-bottom:2px solid #00a884; color:#00a884; font-size:20px; font-weight:800; letter-spacing:.16em; }
+.tutorial-wa-bottom { height:42px; display:flex; justify-content:space-around; padding-top:7px; background:#202c33; color:#8696a0; text-align:center; font-size:13px; }.tutorial-wa-bottom small { display:block; font-size:7px; margin-top:3px; }
+.tutorial-progress { display:flex; gap:6px; justify-content:center; padding:8px 0 0; }.tutorial-progress span { width:28px; height:3px; border-radius:9px; background:var(--line); transition:background .2s ease,width .2s ease; }.tutorial-progress span.is-active { width:42px; background:var(--accent); }
+@keyframes tutorial-phone-in { from { opacity:0; transform:translateY(10px) rotate(2deg); } to { opacity:1; transform:none; } }
+@keyframes tutorial-pulse { 50% { box-shadow:0 0 0 4px rgba(0,230,118,.06); } }
+@media (max-width:700px) { .link-tutorial-scene { grid-template-columns:1fr 190px; gap:12px; }.tutorial-phone { transform:scale(.84); transform-origin:center; margin:-28px auto; }.link-tutorial-copy h4 { font-size:18px; } }
+@media (max-width:520px) { .link-tutorial-scene { grid-template-columns:1fr; min-height:0; text-align:center; }.link-tutorial-copy { padding-bottom:0; }.link-tutorial-copy p { margin:auto; }.tutorial-route { margin:14px auto 0; }.tutorial-phone { width:205px; height:340px; transform:none; }.tutorial-wa-content { min-height:244px; }.tutorial-phone { margin:0 auto; } }
 .dashboard-account-group .stats-row .stat:first-child { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-soft) inset; }
 .dashboard-server-group { margin-top: 4px; }
 .dashboard-server-group .stats-row { gap: 8px; }

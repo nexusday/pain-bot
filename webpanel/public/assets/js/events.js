@@ -69,6 +69,7 @@ import {
   resetLinkFlow,
   toggleCommunity,
 } from './handlers-user.js'
+import { openLinkTutorial } from './pages-user.js'
 import {
   actualizarSeleccion,
   alternarSeleccionSesion,
@@ -259,6 +260,10 @@ export async function onClick(event) {
     }
     if (action === 'link-new') {
       resetLinkFlow()
+      return
+    }
+    if (action === 'link-tutorial') {
+      openLinkTutorial()
       return
     }
     if (action === 'link-cancel') {

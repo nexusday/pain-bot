@@ -17,6 +17,7 @@ import {
   initials,
   isLinkRoute,
   loadingPage,
+  openModal,
   roleBadge,
   setPage,
   showToast,
@@ -304,9 +305,81 @@ export async function renderBots() {
 }
 
 /* ── Vincular bot ───────────────────────────────────────────────────────── */
+const LINK_TUTORIAL_STEPS = [
+  {
+    label: 'Prepara tu WhatsApp',
+    title: 'Abre Dispositivos vinculados',
+    text: 'En tu teléfono abre WhatsApp y entra al menú de ajustes. No cierres esta página mientras realizas el proceso.',
+    screen: 'home',
+    detail: 'WhatsApp → Ajustes',
+  },
+  {
+    label: 'Busca la opción',
+    title: 'Entra en Dispositivos vinculados',
+    text: 'Toca Dispositivos vinculados. Ahí verás las sesiones que ya tienes conectadas y el botón para agregar una nueva.',
+    screen: 'settings',
+    detail: 'Ajustes → Dispositivos vinculados',
+  },
+  {
+    label: 'Inicia el vínculo',
+    title: 'Toca “Vincular un dispositivo”',
+    text: 'Pulsa el botón de vincular. Cuando WhatsApp muestre las opciones, elige Vincular con número de teléfono.',
+    screen: 'devices',
+    detail: 'Dispositivos vinculados → Vincular un dispositivo',
+  },
+  {
+    label: 'Confirma',
+    title: 'Escribe el código de 8 caracteres',
+    text: 'Copia el código real que aparece en este panel y escríbelo en WhatsApp. El vínculo se completará automáticamente.',
+    screen: 'code',
+    detail: 'Vincular con número de teléfono → Confirmar',
+  },
+]
+
+function tutorialPhoneHTML(screen) {
+  const rows = screen === 'home'
+    ? `<div class="tutorial-wa-row"><span class="tutorial-wa-avatar">P</span><div><b>Chats</b><small>Tus conversaciones</small></div><span class="tutorial-wa-chevron">›</span></div>
+       <div class="tutorial-wa-row tutorial-wa-focus"><span class="tutorial-wa-avatar green">⚙</span><div><b>Ajustes</b><small>Cuenta, privacidad y más</small></div><span class="tutorial-wa-chevron">›</span></div>`
+    : screen === 'settings'
+      ? `<div class="tutorial-wa-title">Ajustes</div><div class="tutorial-wa-row"><span class="tutorial-wa-avatar green">⌁</span><div><b>Cuenta</b><small>Privacidad y seguridad</small></div></div><div class="tutorial-wa-row tutorial-wa-focus"><span class="tutorial-wa-avatar blue">▣</span><div><b>Dispositivos vinculados</b><small>Conecta WhatsApp en otros dispositivos</small></div><span class="tutorial-wa-chevron">›</span></div>`
+    : screen === 'devices'
+        ? `<div class="tutorial-wa-title">Dispositivos vinculados</div><div class="tutorial-wa-device"><span class="tutorial-wa-avatar green">⌁</span><div><b>Este teléfono</b><small>Activo ahora</small></div><span class="tutorial-wa-live"></span></div><div class="tutorial-wa-link tutorial-wa-focus"><span>＋</span><b>Vincular un dispositivo</b></div><div class="tutorial-wa-hint">Después elige “Vincular con número de teléfono”.</div>`
+        : `<div class="tutorial-wa-title">Vincular con número de teléfono</div><div class="tutorial-wa-demo-label">EJEMPLO — este no es tu código</div><div class="tutorial-wa-code-label">Escribe aquí el código real del panel</div><div class="tutorial-wa-code">1234 5678</div><div class="tutorial-wa-hint">El código real aparece en el recuadro de vinculación. Es temporal y solo puede usarse una vez.</div>`
+  return `<div class="tutorial-phone" aria-label="Simulación de WhatsApp"><div class="tutorial-phone-top"><span class="tutorial-phone-notch"></span><span>9:41</span><span>▴  Wi-Fi  ▰</span></div><div class="tutorial-wa-appbar"><span>‹</span><b>WhatsApp</b><span>⋮</span></div><div class="tutorial-wa-content">${rows}</div><div class="tutorial-wa-bottom"><span>⌂<small>Chats</small></span><span>◌<small>Novedades</small></span><span>♙<small>Comunidades</small></span><span>☎<small>Llamadas</small></span></div></div>`
+}
+
+export function openLinkTutorial() {
+  let paso = 0
+  const pintar = (root) => {
+    const item = LINK_TUTORIAL_STEPS[paso]
+    const view = root.querySelector('[data-tutorial-view]')
+    if (!view) return
+    view.innerHTML = `<div class="link-tutorial-scene"><div class="link-tutorial-copy"><div class="tutorial-eyebrow">PASO ${paso + 1} DE ${LINK_TUTORIAL_STEPS.length} · ${h(item.label)}</div><h4>${h(item.title)}</h4><p>${h(item.text)}</p><div class="tutorial-route"><span>${icon('phone')}</span><b>${h(item.detail)}</b></div></div>${tutorialPhoneHTML(item.screen)}</div><div class="tutorial-progress" aria-label="Progreso del tutorial">${LINK_TUTORIAL_STEPS.map((_, i) => `<span class="${i <= paso ? 'is-active' : ''}"></span>`).join('')}</div>`
+    const back = root.querySelector('[data-tutorial-back]')
+    const next = root.querySelector('[data-tutorial-next]')
+    if (back) back.disabled = paso === 0
+    if (next) next.innerHTML = paso === LINK_TUTORIAL_STEPS.length - 1 ? `${icon('check')} Ya sé cómo vincular` : `Siguiente ${icon('arrowRight')}`
+  }
+  openModal({
+    title: 'Tutorial de vinculación',
+    subtitle: 'Una guía visual rápida para conectar tu número de WhatsApp.',
+    wide: true,
+    body: `<div class="link-tutorial" data-tutorial-view></div>`,
+    footer: `<button class="btn btn-ghost" data-tutorial-back>${icon('chevronRight')} Anterior</button><button class="btn btn-primary" data-tutorial-next>Siguiente ${icon('arrowRight')}</button>`,
+    onMount(root) {
+      pintar(root)
+      root.querySelector('[data-tutorial-back]')?.addEventListener('click', () => { if (paso > 0) { paso--; pintar(root) } })
+      root.querySelector('[data-tutorial-next]')?.addEventListener('click', () => {
+        if (paso < LINK_TUTORIAL_STEPS.length - 1) { paso++; pintar(root) }
+        else { root.querySelector('[data-action="modal-close"]')?.click() }
+      })
+    },
+  })
+}
+
 export function stepsCardHTML() {
   return `<div class="card">
-    <div class="card-head"><div><h3>Cómo vincular</h3><p>Sigue estos pasos en tu teléfono</p></div></div>
+     <div class="card-head"><div><h3>Cómo vincular</h3><p>Sigue estos pasos en tu teléfono</p></div><button class="btn btn-secondary btn-sm" type="button" data-action="link-tutorial">${icon('play')} Ver tutorial</button></div>
     <div class="card-body">
       <ol class="steps">
         <li><span class="step-num">1</span><div><b>Abre WhatsApp</b><span>Ve a <span class="kbd">Ajustes</span> → <span class="kbd">Dispositivos vinculados</span> → <span class="kbd">Vincular un dispositivo</span>.</span></div></li>
