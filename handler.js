@@ -275,7 +275,9 @@ export async function handler(chatUpdate) {
   const duplicados = chatUpdate.messages.length - mensajes.length
   if (duplicados > 0) contarMensajesDuplicados(duplicados)
   for (const mensaje of mensajes) {
-    await procesarActualizacion({ ...chatUpdate, messages: [mensaje] })
+    // `this` es la conexión del socket (bind del caller); sin `.call()`,
+    // `this.pushMessage` dentro de procesarActualizacion sería undefined.
+    await procesarActualizacion.call(this, { ...chatUpdate, messages: [mensaje] })
   }
 }
 
