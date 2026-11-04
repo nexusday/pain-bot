@@ -73,6 +73,11 @@
 .stats-group .stats-row {
   margin-top: 10px;
 }
+.dashboard-account-group .stats-row .stat:first-child { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-soft) inset; }
+.dashboard-server-group { margin-top: 4px; }
+.dashboard-server-group .stats-row { gap: 8px; }
+.dashboard-server-group .stat { padding: 12px 13px; background: var(--bg-soft); }
+.dashboard-server-group .stat-value { font-size: 21px; }
 
 /* Contenedor de badges en el topbar (solo se muestra cuando hay datos) */
 .stat-badge-skeleton-box {

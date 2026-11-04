@@ -105,6 +105,7 @@ export async function renderDashboard() {
   const bots = state.bots
   const total = bots.length
   const connected = bots.filter((bot) => bot.status === 'connected').length
+  const saved = bots.filter((bot) => bot.status === 'linked').length
   const relink = bots.filter((bot) => bot.status === 'relink').length
   const pending = bots.filter((bot) => ['pairing', 'pending'].includes(bot.status)).length
   const premiumActivos = bots.filter((bot) => bot.premium?.active).length
@@ -141,24 +142,25 @@ export async function renderDashboard() {
       </div>
     </div>
     ${mainLinked ? '' : `<div class="notice" style="margin-bottom:16px">${icon('info')}<div>El <b>bot principal</b> todavía no está vinculado. Tus sub-bots funcionan igual: solo falta el número que atiende los comandos del propietario.${isAdmin ? ' Vincúlalo desde <a href="#/admin/principal"><b>Administración → Bot principal</b></a>.' : ' Avisa al administrador del servidor.'}</div></div>`}
-    <div class="stats-group">
-      <div class="stats-group-head"><b>Total del servidor</b><span>Lo que hay ahora mismo en toda la instancia</span></div>
-      <div class="stats-row">
-        ${statCard('Usuarios', usuariosTotal ?? '—', 'users', 'violet', '<span>Cuentas registradas</span>')}
-        ${statCard('Sub-bots', botsTotal ?? '—', 'bot', 'cyan', '<span>Vinculados en el panel</span>')}
-        ${statCard('Conectados', conectadosTotal ?? '—', 'wifi', (conectadosTotal || 0) > 0 ? 'green' : 'muted', '<span>Sesiones en línea</span>')}
-        ${statCard('Guardadas', guardadasTotal ?? '—', 'server', 'amber', `<span>${guardadasCreds ?? '—'} con credenciales</span>`)}
-        ${statCard('Premium activos', premiumActivosServidor ?? '—', 'sparkles', (premiumActivosServidor || 0) > 0 ? 'violet' : 'muted', '<span>Con plan vigente</span>')}
-        ${statCard('Premium guardados', premiumGuardadosServidor ?? '—', 'zap', (premiumGuardadosServidor || 0) > 0 ? 'cyan' : 'muted', '<span>Cambios guardados, sin plan</span>')}
-      </div>
-    </div>
-    <div class="stats-group">
+    <div class="stats-group dashboard-account-group">
       <div class="stats-group-head"><b>Tu cuenta</b><span>Solo los números vinculados a ti</span></div>
       <div class="stats-row">
-        ${statCard('Tus sub-bots', total, 'bot', 'accent', `<span>${total === 1 ? '1 número vinculado' : `${total} números vinculados`}</span>`)}
-        ${statCard('Conectados', connected, 'wifi', connected > 0 ? 'green' : 'muted', '<span>De tu cuenta</span>')}
+        ${statCard('Vinculados', total, 'bot', 'accent', `<span>${total === 1 ? '1 número registrado' : `${total} números registrados`}</span>`)}
+        ${statCard('Conectados ahora', connected, 'wifi', connected > 0 ? 'green' : 'muted', '<span>De tu cuenta</span>')}
+        ${statCard('Guardados', saved, 'server', saved > 0 ? 'cyan' : 'muted', '<span>Desconectados, con sesión</span>')}
         ${statCard('Requieren atención', relink, 'alert', 'amber', '<span>Necesitan re-vincularse</span>')}
         ${statCard('Plazas', slots, 'server', 'cyan', `<span>${maxSubs > 0 ? `${Math.max(0, maxSubs - total)} disponibles` : 'Sin límite configurado'}</span>`)}
+      </div>
+    </div>
+    <div class="stats-group dashboard-server-group">
+      <div class="stats-group-head"><b>Resumen del servidor</b><span>Actividad general de esta instancia</span></div>
+      <div class="stats-row">
+        ${statCard('Usuarios', usuariosTotal ?? '—', 'users', 'violet', '<span>Cuentas registradas</span>')}
+        ${statCard('Vinculados', botsTotal ?? '—', 'bot', 'cyan', '<span>Registros de sub-bots</span>')}
+        ${statCard('Conectados ahora', conectadosTotal ?? '—', 'wifi', (conectadosTotal || 0) > 0 ? 'green' : 'muted', '<span>Sesiones en línea</span>')}
+        ${statCard('Sesiones guardadas', guardadasTotal ?? '—', 'server', 'amber', `<span>${guardadasCreds ?? '—'} con credenciales</span>`)}
+        ${statCard('Premium activos', premiumActivosServidor ?? '—', 'sparkles', (premiumActivosServidor || 0) > 0 ? 'violet' : 'muted', '<span>Con plan vigente</span>')}
+        ${statCard('Premium guardados', premiumGuardadosServidor ?? '—', 'zap', (premiumGuardadosServidor || 0) > 0 ? 'cyan' : 'muted', '<span>Cambios guardados, sin plan</span>')}
       </div>
     </div>
     <div id="dashboard-global-stats">${dashboardGlobalStatsHTML(servidor)}</div>
@@ -269,7 +271,7 @@ export async function renderBots() {
   content(`
     ${anunciosCabeceraHTML()}
     <div class="page-head">
-       <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta.${limite && !limite.unlimited ? ` Cupos: ${limite.used}/${limite.max} · ${limite.remaining} disponibles.` : ' Cupos ilimitados.'} Usa <b>Editar</b> para cambiar el nombre, menú, imagen, privacidad y owners.</p></div>
+       <div><h2>Mis bots</h2><p>${bots.length} ${bots.length === 1 ? 'sub-bot vinculado' : 'sub-bots vinculados'} a tu cuenta. La tabla incluye conectados, guardados y los que requieren re-vincularse.${limite && !limite.unlimited ? ` Cupos: ${limite.used}/${limite.max} · ${limite.remaining} disponibles.` : ' Cupos ilimitados.'}</p></div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="refresh">${icon('refresh')} Actualizar</button>
         <a class="btn btn-primary" href="#/link" ${limiteAlcanzado ? 'aria-disabled="true"' : ''}>${icon('plus')} Vincular bot</a>
@@ -278,7 +280,7 @@ export async function renderBots() {
     ${limiteAlcanzado ? `<div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div>Tu cuenta ya llegó al límite de <b>${limite.max}</b> sub-bot(s). Pide al administrador del servidor que lo amplíe si necesitas más.</div></div>` : ''}
     <div class="card">
       <div class="card-head">
-        <div><h3>Sub-bots</h3><p>Estado actual de cada sesión vinculada</p></div>
+         <div><h3>Sub-bots vinculados</h3><p>Conectados ahora, guardados o pendientes de re-vinculación</p></div>
         <div class="input-icon" style="max-width:290px;width:100%">
           ${icon('search')}
           <input id="bots-search" class="input" placeholder="Buscar por número o nombre…" value="${h(state.botsFilter)}" />

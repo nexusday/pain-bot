@@ -5,7 +5,7 @@ import fs from 'fs'
 import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 import { formatBotUptime } from '../lib/bot-uptime.js'
 import { tr } from '../lib/lang.js'
-import { sesionRequiereVincular, listarRequierenVincular, listarSesionesConCreds } from '../lib/subbot-recovery.js'
+import { listarRequierenVincular, listarSesionesConCreds, sesionEnEmparejamiento } from '../lib/subbot-recovery.js'
 import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -65,6 +65,8 @@ let handler = async (m, { conn, usedPrefix }) => {
       )
     })
 
+    // La lista debe representar sub-bots registrados, no solamente sockets
+    // abiertos. Un socket puede estar caído y el sub-bot seguir vinculado.
     const usuariosUnicos = new Map()
     const idsGruposUnicos = new Set()
     const estadosWorkers = readSubbotWorkerStatuses(DIR_RAIZ)
@@ -80,6 +82,37 @@ let handler = async (m, { conn, usedPrefix }) => {
       }
     }
 
+    const agregarSesion = (numero, info = {}) => {
+      if (!numero || numero.length < 8) return
+      const anterior = usuariosUnicos.get(numero)
+      const estadoEspecial = ['relink', 'pairing'].includes(info.status)
+        ? info.status
+        : ['relink', 'pairing'].includes(anterior?.status)
+          ? anterior.status
+          : null
+      usuariosUnicos.set(numero, {
+        conn: info.conn || anterior?.conn || null,
+        folder: info.folder || anterior?.folder || numero,
+        name: info.name || anterior?.name || '',
+        connected: Boolean(info.connected || anterior?.connected),
+        status: info.connected || anterior?.connected
+          ? 'connected'
+          : estadoEspecial || info.status || anterior?.status || 'saved',
+      })
+    }
+
+    // Primero se cargan todas las sesiones persistidas, incluso las que no
+    // tienen socket activo. Las carpetas archivadas aparecen como relink.
+    for (const folder of carpetasSesion) {
+      agregarSesion(cleanBotNum(folder), {
+        folder,
+        status: sesionEnEmparejamiento(join(raizSubs, folder)) ? 'pairing' : 'saved',
+      })
+    }
+    for (const folder of carpetasRevincular) {
+      agregarSesion(cleanBotNum(folder), { folder, status: 'relink' })
+    }
+
     for (const connSub of conexionesActivas) {
       const candidatos = [
         connSub?.phoneNumber,
@@ -90,11 +123,12 @@ let handler = async (m, { conn, usedPrefix }) => {
       ]
       const numero = candidatos.map(cleanBotNum).find((valor) => valor.length >= 8)
       if (!numero) continue
-      usuariosUnicos.set(numero, {
+      agregarSesion(numero, {
         conn: connSub,
         folder: connSub?.pathAYBot ? path.basename(connSub.pathAYBot) : numero,
         name: connSub.user?.name || connSub.authState?.creds?.me?.name || '',
         connected: true,
+        status: 'connected',
       })
       if (connSub.chats) {
         for (const jidUsuario of Object.keys(connSub.chats)) {
@@ -105,28 +139,22 @@ let handler = async (m, { conn, usedPrefix }) => {
 
     for (const worker of estadosWorkers) {
       for (const session of worker.sessions) {
-        if (!session.connected) continue
         const numero = cleanBotNum(session.number || session.folder)
-        if (numero.length < 8 || usuariosUnicos.has(numero)) continue
-        usuariosUnicos.set(numero, {
+        agregarSesion(numero, {
           conn: null,
           folder: session.folder,
           name: session.name || '',
-          connected: true,
+          connected: session.connected,
+          status: session.connected ? 'connected' : 'saved',
         })
       }
     }
 
     const nombreBot = leerNombreConfig(rutaConfig, global.namebot || 'PAIN BOT')
     const totalSubBots = usuariosUnicos.size
+    const conectadosAhora = [...usuariosUnicos.values()].filter((info) => info.connected).length
+    const guardadasDesconectadas = [...usuariosUnicos.values()].filter((info) => info.status === 'saved').length
     const totalBots = totalSubBots + 1
-    const sesionesActivas = new Set([...usuariosUnicos.values()].map(({ folder }) => folder))
-    const setRevincular = new Set(carpetasRevincular)
-    // Los que requieren vincular NO son "sin socket": ya están diagnosticados,
-    // solo esperan /code o /qr. Mezclarlos ocultaba el diagnóstico.
-    const sinSocketActivo = Math.max(0, carpetasSesion.filter(nombre =>
-      !sesionesActivas.has(nombre) && !setRevincular.has(nombre)
-    ).length)
     const totalGrupos = idsGruposUnicos.size
     const memoriaMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
 
@@ -144,9 +172,19 @@ let handler = async (m, { conn, usedPrefix }) => {
         const connSub = info.conn
         const rutaConfigSubBot = join(raizSubs, info.folder, 'config.json')
         const nombreSubBot = leerNombreConfig(rutaConfigSubBot, `sub-bot ${i}`)
-        const estadoSubBot = info.connected ? 'activo' : 'inactivo'
+        const estadoSubBot = info.status === 'connected'
+          ? 'conectado'
+          : info.status === 'relink'
+            ? 'requiere vincular'
+            : info.status === 'pairing'
+              ? 'vinculando'
+              : 'guardado'
         const nombreUsuario = info.name || 'anónimo'
-        const uptimeSub = connSub ? formatBotUptime(connSub) : 'conectado en worker'
+        const uptimeSub = connSub
+          ? formatBotUptime(connSub)
+          : info.connected
+            ? 'conectado en worker'
+            : 'sin conexión activa'
 
         lineas.push(
           `┊ *${i}.* ${nombreSubBot}\n` +
@@ -174,11 +212,11 @@ let handler = async (m, { conn, usedPrefix }) => {
 ┊ número  ·  \`+${botActual || '—'}\`
 ┊ tipo  ·  \`${tipoActual}\`
 ┊ memoria  ·  \`${memoriaMB} MB\`
-┊ bots activos ·  \`${totalBots}\`
-┊ sub-bots activos ·  \`${totalSubBots}\`
-┊ sesiones guardadas ·  \`${carpetasSesion.length}\`
-┊ sin socket activo ·  \`${sinSocketActivo}\`
-┊ requieren vincular ·  \`${requierenVincular}\`
+ ┊ bots totales ·  \`${totalBots}\`
+ ┊ sub-bots vinculados ·  \`${totalSubBots}\`
+ ┊ conectados ahora ·  \`${conectadosAhora}\`
+ ┊ sesiones guardadas ·  \`${guardadasDesconectadas}\`
+ ┊ requieren vincular ·  \`${requierenVincular}\`
 ┊ grupos  ·  \`${totalGrupos}\`
 ┊ principal  ·  \`+${numPrincipal}\`
 ┊ estado  ·  \`${estadoBotPrincipal}\`
@@ -191,14 +229,15 @@ ${bloqueSubs}
       conn,
       texto,
       texto
-        .replace('sub-bots activos', 'active sub-bots')
-        .replace('bots activos', 'active bots')
-        .replace('sesiones guardadas', 'saved sessions')
-        .replace('sin socket activo', 'without an active socket')
-        .replace('requieren vincular', 'need relinking'),
+         .replace('sub-bots vinculados', 'linked sub-bots')
+         .replace('bots totales', 'total bots')
+         .replace('conectados ahora', 'connected now')
+         .replace('sesiones guardadas', 'saved sessions')
+         .replace('requieren vincular', 'need relinking'),
       texto
-        .replace('sub-bots ativos', 'sub-bots ativos')
-        .replace('bots activos', 'bots ativos')
+        .replace('sub-bots vinculados', 'sub-bots vinculados')
+        .replace('bots totales', 'bots totais')
+        .replace('conectados ahora', 'conectados agora')
         .replace('sesiones guardadas', 'sessões guardadas')
         .replace('sin socket activo', 'sem socket ativo')
         .replace('requieren vincular', 'precisam de novo vínculo')
