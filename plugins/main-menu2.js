@@ -103,6 +103,7 @@ async function reemplazarMenuInteractivo(conn, m, contenido) {
 }
 
 async function resolverImagenMenu(conn, imgPrincipal) {
+  if (!imgPrincipal) return {}
   try {
     const tipo = await conn.getFile(imgPrincipal, true)
     const { res, data: archivo, filename: rutaArchivo, mime } = tipo
@@ -123,17 +124,41 @@ async function enviarMenuInteractivo(conn, m, contexto, categorias, encabezado) 
   return enviado
 }
 
+/**
+ * El menú SIEMPRE sale: si el envío de la imagen falla (ruta muerta, archivo
+ * borrado, "Result is not a buffer"...), se manda el menú como texto puro.
+ * Nunca se deja al usuario con "Hubo un error al mostrar el menú" por una
+ * imagen que no está.
+ */
+async function enviarConImagenFiable(conn, m, imagen, nombreArchivo, texto) {
+  try {
+    if (imagen) {
+      await conn.sendFile(m.chat, imagen, nombreArchivo, texto, m, null, {
+        contextInfo: {
+          ...rcanal.contextInfo,
+          mentionedJid: [m.sender],
+        },
+      })
+      return
+    }
+  } catch (errorImagen) {
+    console.error('[menú] Envió con imagen falló; se manda solo texto:', errorImagen?.message || errorImagen)
+  }
+  await conn.sendMessage(m.chat, {
+    text: texto,
+    contextInfo: {
+      ...rcanal.contextInfo,
+      mentionedJid: [m.sender],
+    },
+  }, { quoted: m })
+}
+
 async function enviarRespuestaCategoria(conn, m, contexto, categorias, categoria) {
   const interactivo = isInteractiveBaileysEnabled() && !esModoIos(conn)
   const leyenda = buildCategoryResponse(categoria, contexto, { interactive: interactivo })
 
   if (!interactivo) {
-    await conn.sendFile(m.chat, categoria.img, 'menu-cat.jpg', leyenda, m, null, {
-      contextInfo: {
-        ...rcanal.contextInfo,
-        mentionedJid: [m.sender],
-      },
-    })
+    await enviarConImagenFiable(conn, m, categoria.img, 'menu-cat.jpg', leyenda)
     return
   }
 
@@ -143,12 +168,7 @@ async function enviarRespuestaCategoria(conn, m, contexto, categorias, categoria
     await reemplazarMenuInteractivo(conn, m, contenido)
   } catch (errorInteractivo) {
     console.error('Categoría interactiva falló:', errorInteractivo)
-    await conn.sendFile(m.chat, categoria.img, 'menu-cat.jpg', leyenda, m, null, {
-      contextInfo: {
-        ...rcanal.contextInfo,
-        mentionedJid: [m.sender],
-      },
-    })
+    await enviarConImagenFiable(conn, m, categoria.img, 'menu-cat.jpg', leyenda)
     try {
       await conn.sendMessageLia(
         m.chat,
@@ -169,12 +189,7 @@ const handler = async (m, { conn, usedPrefix }) => {
 
     if (!isInteractiveBaileysEnabled() || esModoIos(conn)) {
       const texto = buildFullMenuText(m, contexto, categorias)
-      await conn.sendFile(m.chat, contexto.mainImg, 'thumbnail.jpg', texto, m, null, {
-        contextInfo: {
-          ...rcanal.contextInfo,
-          mentionedJid: [m.sender],
-        },
-      })
+      await enviarConImagenFiable(conn, m, contexto.mainImg, 'thumbnail.jpg', texto)
       return
     }
 
@@ -183,12 +198,7 @@ const handler = async (m, { conn, usedPrefix }) => {
     } catch (errorInteractivo) {
       console.error('Menú interactivo (imagen+botón) falló:', errorInteractivo)
 
-      await conn.sendFile(m.chat, contexto.mainImg, 'thumbnail.jpg', encabezado, m, null, {
-        contextInfo: {
-          ...rcanal.contextInfo,
-          mentionedJid: [m.sender],
-        },
-      })
+      await enviarConImagenFiable(conn, m, contexto.mainImg, 'thumbnail.jpg', encabezado)
 
       try {
         await conn.sendMessageLia(
