@@ -1035,18 +1035,35 @@ function agendarRecargaCodigo(nombre) {
   agendarRecargaCodigo._espera = setTimeout(async () => {
     try {
       globalThis.__HOT_EPOCH = Date.now()
-      // ESM no descarga módulos: reimportar todos los plugins con ?update=
-      // dejaba una copia viva por cada cambio y el heap crecía sin bajar.
-      // Los plugins se siguen recargando uno a uno con el watcher de plugins;
-      // handler.js se recarga solo; lib/ requiere reinicio.
-      if (nombre !== 'handler.js') {
-        console.log(chalk.yellow(
-          `[hot] ${nombre} cambió: reinicia el bot para aplicarlo (lib/ no se recarga en caliente).`
-        ))
+      // handler.js y TODO el árbol lib/ se reimporta fresco con el epoch nuevo:
+      // el gráfico de importación del handler ya incluye los módulos de lib/.
+      // Los plugins NO se reimportan en bloque aquí (una copia viva por módulo
+      // por cada cambio llenaba el heap); cada plugin toma el código nuevo
+      // cuando su propio archivo cambia o al reconectar/reiniciar el worker.
+      // El panel web se recarga en su propio arranque: valida el código nuevo
+      // primero y si falla conserva el panel anterior, sin cortar WhatsApp.
+      // Solo el proceso principal hospeda la web; los workers la ignoran.
+      if (nombre.startsWith('lib/webpanel/')) {
+        if (isSubbotWorker) return
+        if (typeof global.reiniciarPanelWeb === 'function') {
+          const ok = await global.reiniciarPanelWeb()
+          if (ok) console.log(chalk.cyan(`[hot] ${nombre}: panel recargado sin cortar WhatsApp.`))
+          else console.log(chalk.yellow(`[hot] ${nombre}: el panel conservó el código anterior (error en el código nuevo).`))
+        }
         return
       }
+      if (nombre === 'handler.js') {
+        await global.reloadHandler(false)
+        console.log(chalk.cyan(`Updated code - '${nombre}'`))
+        return
+      }
+      // Cambio bajo lib/: se aplica al handler SIN reiniciar el proceso.
       await global.reloadHandler(false)
-      console.log(chalk.cyan(`Updated code - '${nombre}'`))
+      console.log(chalk.cyan(
+        `[hot] ${nombre}: código nuevo aplicado al handler y a los sub-bots ` +
+        '(los mensajes siguientes ya usan el código nuevo). ' +
+        'Para cambios profundos de arranque (main/index/config) sí hace falta reiniciar.'
+      ))
     } catch (e) {
       console.error('No se pudo recargar el código:', e?.message || e)
     }
