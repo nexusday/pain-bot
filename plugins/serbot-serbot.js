@@ -70,14 +70,14 @@ const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
 // no por cantidad fija de sub-bots: la cola crece sin bloquear mensajes y se
 // drena conforme terminan las conexiones.
 const MAX_RECONEXIONES_POR_WORKER = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 2, 1),
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 1, 1),
   8
 )
 // Separación mínima entre inicios de reconexión del mismo worker: suaviza la
 // oleada contra WhatsApp y reparte el CPU en el tiempo. Configurable.
 const ESPACIO_RECONEXION_MS = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 1200, 0),
-  10_000
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 5000, 0),
+ 30_000
 )
 const colaReconexiones = []
 let reconexionesActivas = 0
@@ -1262,11 +1262,18 @@ async function iniciarSubBot(options) {
         return
       }
       const esReinicio = motivo === DisconnectReason.restartRequired
+      // 408 (conexión perdida/timeout): con 150+ sub-bots en el mismo servidor
+      // suele llegar en oleadas cuando el proveedor limita sockets. Reintentar
+      // a los 5-20 s mantiene una tormenta permanente y multiplica el CPU.
+      // Se deja una pausa mínima de un minuto y backoff largo.
       // 428 (WhatsApp cerró la conexión): con 150+ sub-bots en el mismo servidor
       // es normal que rechace alguna. Con backoff corto se formaba un bucle
       // (cada sub-bot reconectaba a los 5-20 s y el CPU se disparaba), así que
       // aquí se espera bastante más entre reintentos.
       const esCerradoPorServidor = motivo === DisconnectReason.connectionClosed
+      const esConexionPerdida = motivo === DisconnectReason.connectionLost ||
+        motivo === DisconnectReason.timedOut ||
+        Number(motivo) === 408
       // Tope 90s (antes 5min): con 150 subbots, un tope de 5min + 30s de
       // dispersión dejaba colas de 327s y parecían muertos. 440 (reemplazo)
       // conserva backoff largo para no pelear entre duplicados. 515 es un
@@ -1275,6 +1282,8 @@ async function iniciarSubBot(options) {
         ? 3000 + Math.min(dispersarMs, 5000)
         : esReemplazo
           ? Math.min(60_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 15 * 60_000) + dispersarMs
+          : esConexionPerdida
+            ? Math.min(60_000 * (2 ** Math.min(fallosConsecutivos, 4)), 15 * 60_000) + dispersarMs
           : esCerradoPorServidor
             ? Math.min(20_000 * (2 ** Math.min(fallosConsecutivos, 4)), 5 * 60_000) + dispersarMs
             : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
