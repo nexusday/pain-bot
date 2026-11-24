@@ -2,6 +2,7 @@ import chalk from 'chalk'
 import {
   detectViewOnce,
   extractMediaContent,
+  getCachedViewOnceMedia,
   getCachedViewOnceRaw,
   getMessageKeys,
   isKnownViewOnce,
@@ -260,10 +261,17 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       )
     }
 
-    const bufer = await descargarMediaVerUnaVez(conn, resultado)
+    const mediaCacheada = getCachedViewOnceMedia(m.quoted?.id)
+    const bufer = mediaCacheada?.buffer?.length
+      ? mediaCacheada.buffer
+      : await descargarMediaVerUnaVez(conn, resultado)
     if (!bufer?.length) throw new Error('No se pudo descargar el media')
 
-    registrarDebugSss('DESCARGA OK', { bytes: bufer.length, type: resultado.type, source: resultado.source })
+    registrarDebugSss('DESCARGA OK', {
+      bytes: bufer.length,
+      type: resultado.type,
+      source: mediaCacheada ? 'cache-media' : resultado.source
+    })
 
     const { caption: leyenda, mentionedJid: jidsMencionados } = construirDatosMencion(resultado.mediaMsg, conn)
     const contextInfo = {
@@ -276,10 +284,12 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       contextInfo
     }
 
+    const mimetype = mediaCacheada?.mimetype || resultado.mediaMsg.mimetype
+
     if (resultado.type === 'video') {
       await conn.sendMessage(m.chat, {
         video: bufer,
-        mimetype: resultado.mediaMsg.mimetype || 'video/mp4',
+        mimetype: mimetype || 'video/mp4',
         ...extra
       }, { quoted: m })
       return
@@ -287,7 +297,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
     await conn.sendMessage(m.chat, {
       image: bufer,
-      mimetype: resultado.mediaMsg.mimetype || 'image/jpeg',
+      mimetype: mimetype || 'image/jpeg',
       ...extra
     }, { quoted: m })
   } catch (error) {
