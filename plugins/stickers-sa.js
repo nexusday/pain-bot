@@ -9,9 +9,7 @@ import { esWebPAnimado, resolverMetaSticker, toWebp } from './stickers-sticker.j
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024
 const MAX_VIDEO_SEGUNDOS = 60
 
-const AYUDA = (p) => `*Sticker con sonido*
-
-Responde a un *video con sonido* con *${p}sa*.
+const AYUDA = (p) => `Responde a un *video con sonido* con *${p}sa*.
 También puedes enviar un video y ponerle el texto *${p}sa*.
 
 > Límites del video: ${MAX_VIDEO_SEGUNDOS} s y 25 MB.`
