@@ -15,7 +15,7 @@ test('el contenido nativo anida el audio dentro del sticker', () => {
     { url: 'https://ejemplo/audio.enc', mimetype: 'audio/ogg; codecs=opus', ptt: true }
   )
 
-  const sticker = contenido.audioStickerMessage.message.stickerMessage
+  const sticker = contenido.stickerMessage
   assert.equal(sticker.url, 'https://ejemplo/sticker.enc')
   assert.equal(sticker.isAnimated, true)
   assert.equal(sticker.width, 512)
