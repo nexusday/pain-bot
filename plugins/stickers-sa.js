@@ -9,13 +9,11 @@ import { esWebPAnimado, resolverMetaSticker, toWebp } from './stickers-sticker.j
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024
 const MAX_VIDEO_SEGUNDOS = 60
 
-const AYUDA = (p) => `🎧 *Sticker con sonido*
+const AYUDA = (p) => `*Sticker con sonido*
 
 Responde a un *video con sonido* con *${p}sa*.
 También puedes enviar un video y ponerle el texto *${p}sa*.
 
-> El audio se toma del propio video.
-> Se usan hasta 10 s de audio y 7 s de animación.
 > Límites del video: ${MAX_VIDEO_SEGUNDOS} s y 25 MB.`
 
 function mimeDe(mensaje) {
@@ -89,7 +87,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 
     const { packname, author } = resolverMetaSticker(m, conn)
     const { sticker, audio } = await conLimiteStickerAudio(async () => {
-      // Primero el audio: si el video es mudo se evita convertir el sticker.
+   
       const audioOgg = await extraerAudioDeVideo(datos)
       const webp = await toWebp(datos)
       const stickerFinal = await addExif(webp, packname, author)
@@ -103,8 +101,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         isAnimated: esWebPAnimado(sticker)
       })
     } catch (error) {
-      // Si el protocolo nuevo falla en este servidor, el video original ya
-      // tiene audio: se envía como GIF con sonido en lugar de perder el pedido.
+     
       console.error('[sa] audioStickerMessage falló; se envía el video como GIF:', error)
       await conn.sendMessage(m.chat, {
         video: datos,
