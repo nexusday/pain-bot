@@ -52,6 +52,18 @@ const isNumber = x => typeof x === 'number' && !isNaN(x)
 let cachePlugins = null
 let imprimirMensaje = null
 
+// Un `messages.upsert` puede llegar antes de que Baileys termine de
+// completar `conn.user` (emparejamiento o reconexión). Acceder a
+// `this.user.jid` directamente tumbaba el handler con unhandledRejection.
+function jidDeConexion(conn) {
+  const jid = conn?.user?.jid || conn?.user?.id || ''
+  return jid ? String(jid) : ''
+}
+
+function numeroDeJid(jid) {
+  return String(jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+}
+
 function pareceComandoCrudo(msg) {
   try {
     const texto = String(extraerTextoMensajeCrudo(msg) || '').trim()
@@ -301,6 +313,16 @@ if (chatUpdate.type && chatUpdate.type !== 'notify') {
 let m = chatUpdate.messages[chatUpdate.messages.length - 1]
 if (!m) return
 
+// Un `messages.upsert` puede adelantarse al evento 'open' por unos ms. Sin
+// `user` no hay identidad para responder, aplicar owner ni leer ajustes; se
+// espera un poco (máx. 2 s) en vez de procesar a ciegas o reventar.
+if (!this.user) {
+  for (let intento = 0; intento < 20 && !this.user; intento++) {
+    await new Promise((resolver) => setTimeout(resolver, 100))
+  }
+  if (!this.user) return
+}
+
 
 try {
   if (global.db.data == null) await global.loadDatabase()
@@ -389,7 +411,8 @@ try {
   if (!('nsfw' in chat)) chat.nsfw = false  
   if (!isNumber(chat.expired)) chat.expired = 0  
 
-  let settings = global.db.data.settings[this.user.jid] ||= {}  
+  const jidBotHandler = jidDeConexion(this)
+  let settings = jidBotHandler ? (global.db.data.settings[jidBotHandler] ||= {}) : {}
   if (!('self' in settings)) settings.self = false  
   if (!('autoread' in settings)) settings.autoread = true 
   if (!('autoread' in opts)) opts.autoread = true 
@@ -435,8 +458,10 @@ const numBotPrincipal = String(global.conn?.user?.jid || global.conn?.user?.id |
 const esEsteSubBot = Boolean(numBotActual && numBotPrincipal && numBotActual !== numBotPrincipal)
 
 const todosIdsOwner = [
-  // Número de ESTE bot (principal o subbot)
-  conn.decodeJid(conn.user.id),
+  // Número de ESTE bot (principal o subbot). Si el socket aún no tiene
+  // `user`, simplemente no se añade: los checks de owner darán false en vez
+  // de romper el procesamiento del mensaje.
+  ...(conn.user?.id ? [conn.decodeJid(conn.user.id)] : []),
   // En subbots: el número del principal también cuenta como owner
   ...(esEsteSubBot && global.conn?.user?.id
     ? [conn.decodeJid(global.conn.user.id)]
@@ -1224,11 +1249,17 @@ try {
   console.log(m, m.quoted, e)  
 }  
 
-const ajustesLectura = global.db.data.settings[this.user.jid] || {}
-
-
-const esSubBot = this.user.jid !== global.conn.user.jid
-let debeAutoLeer = !esSubBot
+const jidBotLectura = jidDeConexion(this)
+const numeroBotLectura = numeroDeJid(jidBotLectura)
+const numeroPrincipalLectura = numeroDeJid(jidDeConexion(global.conn))
+const esSubBot = Boolean(
+  numeroBotLectura && numeroPrincipalLectura && numeroBotLectura !== numeroPrincipalLectura
+)
+const ajustesLectura = (jidBotLectura && global.db.data.settings[jidBotLectura]) || {}
+// Sin `user` todavía no se puede decidir el modo; no se marca como leído a
+// ciegas. En cuanto el socket complete el registro, el siguiente mensaje ya
+// usa la configuración real.
+let debeAutoLeer = Boolean(numeroBotLectura) && !esSubBot
 
 if (esSubBot) {
   try {

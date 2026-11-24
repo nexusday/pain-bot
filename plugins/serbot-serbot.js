@@ -84,6 +84,26 @@ let reconexionesActivas = 0
 let ultimoInicioReconexion = 0
 let temporizadorDrenajeReconexiones = null
 
+// Cierre inmediato del socket crudo. `ws.close()` espera el handshake y el
+// socket viejo puede seguir recibiendo frames cifrados que ya no se pueden
+// descifrar (noise-handler → "Unsupported state or unable to authenticate
+// data"). Al quitar el listener de mensajes y terminar la conexión no queda
+// ningún socket zombi escuchando ni gastando CPU.
+function cerrarSocketCrudo(sock) {
+  const ws = sock?.ws
+  if (!ws) return false
+  try { ws.removeAllListeners?.('message') } catch {}
+  try { ws.on?.('error', () => {}) } catch {}
+  try {
+    if (typeof ws.terminate === 'function') ws.terminate()
+    else if (typeof ws.close === 'function') ws.close()
+    else return false
+    return true
+  } catch {
+    return false
+  }
+}
+
 function ejecutarSiguienteReconexion() {
   if (reconexionesActivas >= MAX_RECONEXIONES_POR_WORKER || !colaReconexiones.length) return
   const espera = ESPACIO_RECONEXION_MS
@@ -559,7 +579,7 @@ async function iniciarSubBot(options) {
       socket._painSupervisorHandoff = true
       socket._ignorarCierre = true
       socket.ev?.removeAllListeners?.()
-      try { socket.ws?.close?.() } catch {}
+      cerrarSocketCrudo(socket)
       if (Array.isArray(global.conns)) {
         global.conns = global.conns.filter((conexion) => conexion !== socket)
       }
@@ -574,7 +594,7 @@ async function iniciarSubBot(options) {
     if (socket) {
       socket._ignorarCierre = true
       socket.ev?.removeAllListeners?.()
-      try { socket.ws?.close?.() } catch {}
+      cerrarSocketCrudo(socket)
       if (Array.isArray(global.conns)) {
         global.conns = global.conns.filter((conexion) => conexion !== socket)
       }
@@ -772,7 +792,7 @@ async function iniciarSubBot(options) {
       if (!telefonoEmparejamiento) {
         codigoEmparejamientoEnviado = true
         await replyUser(construirErrorTelefonoEmparejamiento(usedPrefix))
-        try { sock.ws.close() } catch {}
+        cerrarSocketCrudo(sock)
         emparejamientoEnCurso = false
         return false
       }
@@ -830,7 +850,7 @@ async function iniciarSubBot(options) {
         codigoEmparejamientoEnviado = false
         emparejamientoEnCurso = false
         await replyUser(construirErrorCodigoEmparejamiento(usedPrefix, error?.message)).catch(() => {})
-        try { sock.ws.close() } catch {}
+        cerrarSocketCrudo(sock)
         return false
       }
     }
@@ -869,7 +889,7 @@ async function iniciarSubBot(options) {
 
       const terminarSesion = async (loaded) => {
         if (!loaded) {
-          try { sock.ws.close() } catch { }
+          cerrarSocketCrudo(sock)
           sock.ev.removeAllListeners()
           quitarSockDeConns(sock)
           detenerWatchdog()
@@ -932,7 +952,7 @@ async function iniciarSubBot(options) {
             `\n┆ Emparejamiento de (+${idCarpetaBot}) interrumpido antes de registrar la sesión; ` +
             `no se marca como una sesión que requiera volver a vincular.\n`
           ))
-          try { sock.ws.close() } catch {}
+          cerrarSocketCrudo(sock)
           quitarSockDeConns(sock)
           detenerWatchdog()
           return
@@ -962,7 +982,7 @@ async function iniciarSubBot(options) {
             `${detalleDesconexion ? `Motivo: ${detalleDesconexion}. ` : ''}` +
             `Se archivará; sus ajustes quedan guardados y vuelve a vincularla con /code o /qr.\n`
           ))
-          try { sock.ws.close() } catch {}
+          cerrarSocketCrudo(sock)
           quitarSockDeConns(sock)
           detenerWatchdog()
           return
@@ -1093,8 +1113,8 @@ async function iniciarSubBot(options) {
             detenerWatchdog()
             if (temporizadorReconexion) clearTimeout(temporizadorReconexion)
             detenerPrekeys(sock)
-            try { sock.ws.close() } catch (error) {
-              console.error(`No se pudo ceder la sesión ${idCarpetaBot} al supervisor:`, error?.message || error)
+            if (!cerrarSocketCrudo(sock)) {
+              console.error(`No se pudo cerrar la conexión de ${idCarpetaBot} al cederla al supervisor.`)
             }
           }
           
@@ -1120,7 +1140,7 @@ async function iniciarSubBot(options) {
         cierrePropio = true
         reconectando = true
         vistoUsuarioEn = Date.now()
-        try { sock.ws.close() } catch { }
+        cerrarSocketCrudo(sockAnterior)
         sock.ev.removeAllListeners()
         sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
         cierrePropio = false
@@ -1190,7 +1210,7 @@ async function iniciarSubBot(options) {
         } finally {
           intento.limpiarAuxiliares?.()
           sock.ev.removeAllListeners()
-          try { sock.ws?.close?.() } catch {}
+          cerrarSocketCrudo(sock)
           quitarSockDeConns(sock)
         }
       }
@@ -1203,7 +1223,7 @@ async function iniciarSubBot(options) {
         intento.limpiarAuxiliares?.()
         detenerPrekeys(sock)
         sock.ev.removeAllListeners()
-        try { sock.ws?.close?.() } catch {}
+        cerrarSocketCrudo(sock)
         quitarSockDeConns(sock)
       }
 

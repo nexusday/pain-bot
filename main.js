@@ -2,10 +2,32 @@ import './lib/sesion-log.js'
 
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1'
 
+const ERRORES_DESCIFRADO_TRANSITORIOS = [
+  'Unsupported state or unable to authenticate data',
+  'Failed to decrypt message with any known session',
+  'Key used already or never filled',
+  'Bad MAC',
+]
+let ultimoAvisoDescifrado = 0
+
 process.on('unhandledRejection', (reason) => {
   const msg = reason?.message || String(reason || '')
   if (msg.includes('sharp') || msg.includes('android-arm64')) {
     console.error('[sharp] rechazo controlado (imagen):', msg.split('\n')[0])
+    return
+  }
+  // Errores de descifrado de Baileys: el socket recibió frames que ya no
+  // corresponden a su sesión (reconexión, sesión reemplazada o mensaje
+  // reenviado). No son un fallo del bot y no deben llenar el log con stacks.
+  if (ERRORES_DESCIFRADO_TRANSITORIOS.some((texto) => msg.includes(texto))) {
+    const ahora = Date.now()
+    if (ahora - ultimoAvisoDescifrado >= 60_000) {
+      ultimoAvisoDescifrado = ahora
+      console.warn(
+        '[baileys] descifrado fallido (transitorio, se recupera solo):',
+        msg.split('\n')[0]
+      )
+    }
     return
   }
   console.error('unhandledRejection', reason)
