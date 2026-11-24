@@ -59,7 +59,9 @@ const rcanal = {
 // No se usa un código fijo: Baileys genera uno aleatorio por intento. Un
 // código idéntico para todos los usuarios es una señal clarísima de
 // automatización/granja para WhatsApp y facilitaba que tumbaran las cuentas.
-const SOCKET_CONEXION_MAX_MS = 60_000
+// Un WebSocket OPEN todavía puede estar terminando el login bajo carga.
+// No se debe destruir a los 60 s solo porque aún no apareció `user`.
+const SOCKET_CONEXION_MAX_MS = 180_000
 const SOCKET_INACTIVO_MAX_MS = 90_000
 const MAX_FALLOS_RECONEXION = 8
 // Un 408 es transitorio y no autoriza a borrar credenciales, pero repetir
@@ -1352,8 +1354,9 @@ async function iniciarSubBot(options) {
         const estadoSocket = sock?.ws?.socket?.readyState ?? sock?.ws?.readyState
         const socketCerrado = estadoSocket === ws.CLOSED || estadoSocket === ws.CLOSING
         const conexionAtascada = !sock?.user?.id && !sock?.user?.jid &&
+          estadoSocket !== ws.OPEN &&
           ahora - inicioSocketEn >= SOCKET_CONEXION_MAX_MS
-        const conexionPerdida = socketCerrado || (estadoSocket !== ws.CONNECTING &&
+        const conexionPerdida = socketCerrado || (estadoSocket !== ws.OPEN &&
           ahora - vistoUsuarioEn >= SOCKET_INACTIVO_MAX_MS
         )
         if (!conexionAtascada && !conexionPerdida) return
