@@ -93,7 +93,11 @@ let handler = async (m, { conn, usedPrefix }) => {
     const { sticker, audio } = await conLimiteStickerAudio(async () => {
       const audioOgg = await extraerAudioDeVideo(datos)
       console.log(`[sa] audio extraído: ${audioOgg.length} bytes`)
-      const webp = await toWebp(datos, { duracion: 10, maxBytes: 500 * 1024 })
+      const webp = await toWebp(datos, {
+        duracion: 10,
+        maxBytes: 500 * 1024,
+        ajuste: 'cover'
+      })
       const stickerFinal = await addExif(webp, packname, author)
       console.log(`[sa] sticker preparado: ${stickerFinal.length} bytes`)
       return { sticker: stickerFinal, audio: audioOgg }

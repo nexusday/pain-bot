@@ -110,9 +110,12 @@ export function esWebPAnimado(bufer) {
  * Imagen → webp estático.
  * Video/GIF → webp animado (máx 10 s según WhatsApp, peso controlado).
  *
- * `opciones` permite ajustar lado, duración y peso máximo sin cambiar el
- * comportamiento de los comandos existentes:
- *   { lado = 320, duracion = 7, maxBytes = 950 KB }
+ * `opciones` permite ajustar lado, duración, peso máximo y encuadre sin
+ * cambiar el comportamiento de los comandos existentes:
+ *   { lado = 320, duracion = 7, maxBytes = 950 KB, ajuste = 'contain' }
+ *
+ * - contain: muestra todo el contenido y rellena con transparencia.
+ * - cover: llena el cuadrado y recorta el sobrante (sin barras negras).
  */
 async function aWebp(bufer, opciones = {}) {
   const tipo = await fromBuffer(bufer)
@@ -131,6 +134,7 @@ async function aWebp(bufer, opciones = {}) {
   const ladoInicial = Math.min(Math.max(Number(opciones.lado) || 320, 160), 512)
   const duracionMax = Math.min(Math.max(Number(opciones.duracion) || 7, 1), 10)
   const maxBytes = Math.max(100 * 1024, Number(opciones.maxBytes) || 950 * 1024)
+  const ajuste = opciones.ajuste === 'cover' ? 'cover' : 'contain'
 
   const directorioTemp = path.join(process.cwd(), 'tmp')
   await mkdir(directorioTemp, { recursive: true })
@@ -142,9 +146,12 @@ async function aWebp(bufer, opciones = {}) {
 
   const ejecutarFfmpeg = (lado = ladoInicial, duracionSeg = duracionMax) =>
     new Promise((resolver, rechazar) => {
+      const escala = ajuste === 'cover'
+        ? `scale=${lado}:${lado}:force_original_aspect_ratio=increase,crop=${lado}:${lado}`
+        : `scale='min(${lado},iw)':'min(${lado},ih)':force_original_aspect_ratio=decrease,` +
+          `pad=${lado}:${lado}:(ow-iw)/2:(oh-ih)/2:color=white@0.0`
       const vf =
-        `scale='min(${lado},iw)':'min(${lado},ih)':force_original_aspect_ratio=decrease,` +
-        `format=rgba,fps=15,pad=${lado}:${lado}:(ow-iw)/2:(oh-ih)/2:color=white@0.0,` +
+        `${escala},format=rgba,fps=15,` +
         `split[a][b];[a]palettegen=reserve_transparent=on:transparency_color=ffffff[p];[b][p]paletteuse`
 
       const opciones = esEntradaAnimada
