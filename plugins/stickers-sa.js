@@ -6,6 +6,8 @@ import {
 } from '../lib/audio-sticker.js'
 import { esWebPAnimado, resolverMetaSticker, toWebp } from './stickers-sticker.js'
 
+console.log('[sa] plugin cargado')
+
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024
 const MAX_VIDEO_SEGUNDOS = 60
 
@@ -59,10 +61,16 @@ function contexto() {
 }
 
 let handler = async (m, { conn, usedPrefix }) => {
+  console.log(`[sa] comando recibido chat=${m.chat} tipo=${m.mtype || '?'} citado=${m.quoted?.mtype || '-'}`)
+  await conn.sendMessage(m.chat, {
+    react: { text: '⏳', key: m.key }
+  }).catch(() => {})
+
   const candidatos = [m, m.quoted].filter(Boolean)
   const video = candidatos.find((mensaje) => tipoDeMensaje(mensaje) === 'video')
 
   if (!video) {
+    console.log('[sa] no se detectó video en el mensaje ni en el citado')
     return conn.reply(m.chat, AYUDA(usedPrefix), m)
   }
 
@@ -82,24 +90,30 @@ let handler = async (m, { conn, usedPrefix }) => {
     if (datos.length > MAX_VIDEO_BYTES) {
       throw new Error('El video supera el límite de 25 MB.')
     }
+    console.log(`[sa] video descargado: ${datos.length} bytes`)
 
     const { packname, author } = resolverMetaSticker(m, conn)
     const { sticker, audio } = await conLimiteStickerAudio(async () => {
-   
       const audioOgg = await extraerAudioDeVideo(datos)
+      console.log(`[sa] audio extraído: ${audioOgg.length} bytes`)
       const webp = await toWebp(datos)
       const stickerFinal = await addExif(webp, packname, author)
+      console.log(`[sa] sticker preparado: ${stickerFinal.length} bytes`)
       return { sticker: stickerFinal, audio: audioOgg }
     })
 
     try {
+      console.log('[sa] enviando audioStickerMessage nativo...')
       await enviarAudioStickerNativo(conn, m.chat, {
         sticker,
         audio,
         isAnimated: esWebPAnimado(sticker)
       })
+      console.log('[sa] audioStickerMessage enviado')
+      await conn.sendMessage(m.chat, {
+        react: { text: '✅', key: m.key }
+      }).catch(() => {})
     } catch (error) {
-     
       console.error('[sa] audioStickerMessage falló; se envía el video como GIF:', error)
       await conn.sendMessage(m.chat, {
         video: datos,
@@ -107,9 +121,15 @@ let handler = async (m, { conn, usedPrefix }) => {
         mimetype: 'video/mp4',
         contextInfo: contexto()
       }, { quoted: m })
+      await conn.sendMessage(m.chat, {
+        react: { text: '✅', key: m.key }
+      }).catch(() => {})
     }
   } catch (error) {
     console.error('[sa]', error)
+    await conn.sendMessage(m.chat, {
+      react: { text: '❌', key: m.key }
+    }).catch(() => {})
     return conn.reply(
       m.chat,
       `*[❌] No se pudo crear el sticker con sonido.*\n> ${String(error?.message || error).slice(0, 180)}`,
