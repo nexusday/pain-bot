@@ -14,7 +14,7 @@ const MAX_VIDEO_SEGUNDOS = 60
 const AYUDA = (p) => `Responde a un *video con sonido* con *${p}sa*.
 También puedes enviar un video y ponerle el texto *${p}sa*.
 
-> Se usan hasta 30 s de audio.
+> Animación: hasta 10 s. Audio: hasta 30 s.
 > Límites del video: ${MAX_VIDEO_SEGUNDOS} s y 25 MB.`
 
 function mimeDe(mensaje) {
@@ -93,7 +93,7 @@ let handler = async (m, { conn, usedPrefix }) => {
     const { sticker, audio } = await conLimiteStickerAudio(async () => {
       const audioOgg = await extraerAudioDeVideo(datos)
       console.log(`[sa] audio extraído: ${audioOgg.length} bytes`)
-      const webp = await toWebp(datos)
+      const webp = await toWebp(datos, { duracion: 10, maxBytes: 500 * 1024 })
       const stickerFinal = await addExif(webp, packname, author)
       console.log(`[sa] sticker preparado: ${stickerFinal.length} bytes`)
       return { sticker: stickerFinal, audio: audioOgg }

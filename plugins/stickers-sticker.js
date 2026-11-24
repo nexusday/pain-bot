@@ -108,9 +108,13 @@ export function esWebPAnimado(bufer) {
 
 /**
  * Imagen → webp estático.
- * Video/GIF → webp animado (máx ~7s, peso controlado) para WhatsApp.
+ * Video/GIF → webp animado (máx 10 s según WhatsApp, peso controlado).
+ *
+ * `opciones` permite ajustar lado, duración y peso máximo sin cambiar el
+ * comportamiento de los comandos existentes:
+ *   { lado = 320, duracion = 7, maxBytes = 950 KB }
  */
-async function aWebp(bufer) {
+async function aWebp(bufer, opciones = {}) {
   const tipo = await fromBuffer(bufer)
   if (!tipo?.ext) throw '[❌] Archivo no compatible.'
   const { ext, mime } = tipo
@@ -124,6 +128,10 @@ async function aWebp(bufer) {
     /video\//i.test(mime || '') ||
     /gif/i.test(mime || '')
 
+  const ladoInicial = Math.min(Math.max(Number(opciones.lado) || 320, 160), 512)
+  const duracionMax = Math.min(Math.max(Number(opciones.duracion) || 7, 1), 10)
+  const maxBytes = Math.max(100 * 1024, Number(opciones.maxBytes) || 950 * 1024)
+
   const directorioTemp = path.join(process.cwd(), 'tmp')
   await mkdir(directorioTemp, { recursive: true })
 
@@ -132,7 +140,7 @@ async function aWebp(bufer) {
   const salida = path.join(directorioTemp, `${sello}.webp`)
   await writeFile(entrada, bufer)
 
-  const ejecutarFfmpeg = (lado = 320, duracionSeg = 7) =>
+  const ejecutarFfmpeg = (lado = ladoInicial, duracionSeg = duracionMax) =>
     new Promise((resolver, rechazar) => {
       const vf =
         `scale='min(${lado},iw)':'min(${lado},ih)':force_original_aspect_ratio=decrease,` +
@@ -170,10 +178,16 @@ async function aWebp(bufer) {
     })
 
   try {
-    let resultado = await ejecutarFfmpeg(320, 7)
+    let resultado = await ejecutarFfmpeg(ladoInicial, duracionMax)
 
-    if (resultado.length > 950 * 1024) {
-      resultado = await ejecutarFfmpeg(224, esEntradaAnimada ? 5 : 7)
+    // Si pesa demasiado, se reduce el lado manteniendo la duración. Para
+    // stickers con sonido, recortar la animación rompería la sincronización.
+    if (resultado.length > maxBytes) {
+      const ladoMenor = ladoInicial > 240 ? 240 : (ladoInicial > 192 ? 192 : 160)
+      resultado = await ejecutarFfmpeg(ladoMenor, duracionMax)
+    }
+    if (resultado.length > maxBytes && ladoInicial > 160) {
+      resultado = await ejecutarFfmpeg(160, duracionMax)
     }
 
     if (esEntradaAnimada && !esWebPAnimado(resultado)) {
