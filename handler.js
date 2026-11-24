@@ -35,7 +35,6 @@ import { sendMichiBoard } from './lib/michi-board.js'
 import { isInviteOpponent } from './lib/michi-users.js'
 import { ensureRpgUser, awardCommandProgress, isStickerMessage, trackSentSticker, formatLevelUpMessage } from './lib/rpg-level.js'
 import { trackUserMessage } from './lib/msg-activity.js'
-import { haySesionStickerAudio } from './lib/sticker-audio.js'
 import { getStaffOwnerIds } from './lib/staff.js'
 import { estaEnBlackn } from './lib/blackn.js'
 import { idiomaDe, tr } from './lib/lang.js'
@@ -198,8 +197,6 @@ function hayRespuestaPendiente(chatId) {
 
 function mensajeYaLeidoPuedeSoltarse(m) {
   if (!m?.isGroup || m.fromMe) return false
-  // /sa espera el audio como respuesta: no se puede descartar por ser media.
-  if (haySesionStickerAudio(m.chat)) return false
   const texto = String(m.text || '').trim()
   if (global.prefix instanceof RegExp && texto && global.prefix.test(texto)) return false
   if (ORDENES_SUELTAS.has(texto.toLowerCase())) return false
@@ -216,8 +213,6 @@ function esCharlaQueNoFrena(conn, msg) {
   if (!jid.endsWith('@g.us') || msg?.key?.fromMe || msg?.messageStubType) return false
   let chatId = jid
   try { chatId = conn?.decodeJid?.(jid) || jid } catch {}
-  // /sa espera el audio como respuesta: debe llegar a los plugins.
-  if (haySesionStickerAudio(chatId)) return false
   if (global.db?.data?.antiprefijo?.[chatId] === true) return false
   if (elGrupoMiraCadaMensaje(chatId) || hayRespuestaPendiente(chatId)) return false
 
