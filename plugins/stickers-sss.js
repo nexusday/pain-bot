@@ -127,8 +127,29 @@ async function descargarMediaVerUnaVez(conn, payload) {
     registrarDebugSss('download quoted error', { error: error.message })
   }
 
+  // `extractMediaContent` devuelve `image`/`video`/`audio`, pero Baileys
+  // espera el nombre completo del campo protobuf (`imageMessage`, ...).
+  const tipoDescarga =
+    payload.type === 'video' ? 'videoMessage'
+      : payload.type === 'audio' ? 'audioMessage'
+        : 'imageMessage'
+
   if (conn.downloadM) {
-    return conn.downloadM(destinoDescarga, payload.type)
+    try {
+      const bufer = await conn.downloadM(destinoDescarga, tipoDescarga)
+      if (bufer?.length) return bufer
+    } catch (error) {
+      registrarDebugSss('downloadM error', { error: error.message, tipoDescarga })
+    }
+  }
+
+  if (conn.getFile) {
+    try {
+      const archivo = await conn.getFile(destinoDescarga)
+      if (archivo?.data?.length) return archivo.data
+    } catch (error) {
+      registrarDebugSss('getFile error', { error: error.message })
+    }
   }
 
   throw new Error('No hay método de descarga disponible')
