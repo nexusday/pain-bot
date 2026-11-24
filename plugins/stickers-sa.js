@@ -14,7 +14,7 @@ const MAX_VIDEO_SEGUNDOS = 60
 const AYUDA = (p) => `Responde a un *video con sonido* con *${p}sa*.
 También puedes enviar un video y ponerle el texto *${p}sa*.
 
-> Se usan hasta 5 s de audio.
+> Se usan hasta 30 s de audio.
 > Límites del video: ${MAX_VIDEO_SEGUNDOS} s y 25 MB.`
 
 function mimeDe(mensaje) {
@@ -99,12 +99,27 @@ let handler = async (m, { conn, usedPrefix }) => {
       return { sticker: stickerFinal, audio: audioOgg }
     })
 
+    // Contexto del mensaje: cita al comando y aplica el rcanal del bot.
+    const citado = { ...(m.message || {}) }
+    delete citado.senderKeyDistributionMessage
+    delete citado.messageContextInfo
+    const contextInfo = {
+      ...(global.rcanal?.contextInfo || {})
+    }
+    if (m.key?.id && Object.keys(citado).length) {
+      contextInfo.stanzaId = m.key.id
+      contextInfo.participant = m.key?.participant || m.sender
+      contextInfo.remoteJid = m.chat
+      contextInfo.quotedMessage = citado
+    }
+
     try {
       console.log('[sa] enviando sticker con audio embebido (campo 26)...')
       await enviarStickerConAudioNativo(conn, m.chat, {
         sticker,
         audio,
-        isAnimated: esWebPAnimado(sticker)
+        isAnimated: esWebPAnimado(sticker),
+        contextInfo
       })
       console.log('[sa] sticker con audio enviado')
       await conn.sendMessage(m.chat, {

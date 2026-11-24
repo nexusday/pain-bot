@@ -55,7 +55,12 @@ function analizarSticker(bytes) {
 
 test('el contenido nativo anida el audio dentro del sticker', () => {
   const contenido = construirContenidoAudioSticker(
-    { url: 'https://ejemplo/sticker.enc', mimetype: 'image/webp', isAnimated: true },
+    {
+      url: 'https://ejemplo/sticker.enc',
+      mimetype: 'image/webp',
+      isAnimated: true,
+      contextInfo: { stanzaId: 'abc', participant: '521@s.whatsapp.net' }
+    },
     { url: 'https://ejemplo/audio.enc', mimetype: 'audio/ogg; codecs=opus', ptt: true }
   )
 
@@ -67,6 +72,8 @@ test('el contenido nativo anida el audio dentro del sticker', () => {
   assert.equal(sticker.height, 512)
   assert.equal(sticker.audioMessage.url, 'https://ejemplo/audio.enc')
   assert.equal(sticker.audioMessage.ptt, true)
+  assert.equal(sticker.contextInfo.stanzaId, 'abc')
+  assert.equal(sticker.contextInfo.participant, '521@s.whatsapp.net')
 })
 
 test('rechaza contenido incompleto', () => {
