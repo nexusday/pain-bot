@@ -62,6 +62,14 @@ const rcanal = {
 const SOCKET_CONEXION_MAX_MS = 60_000
 const SOCKET_INACTIVO_MAX_MS = 90_000
 const MAX_FALLOS_RECONEXION = 8
+// Un 408 es transitorio y no autoriza a borrar credenciales, pero repetir
+// sockets fallidos sin límite mantiene una tormenta permanente cuando el
+// servidor o la red no responden. La sesión queda archivada y recuperable;
+// solo se pausa su siguiente intento automático.
+const PAUSA_408_RECONEXION_MS = Math.max(
+  5 * 60_000,
+  Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 30 * 60_000
+)
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
 const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
@@ -1274,6 +1282,29 @@ async function iniciarSubBot(options) {
       const esConexionPerdida = motivo === DisconnectReason.connectionLost ||
         motivo === DisconnectReason.timedOut ||
         Number(motivo) === 408
+      const pausa408 =
+        esConexionPerdida && fallosConsecutivos >= 3
+          ? PAUSA_408_RECONEXION_MS + dispersarMs
+          : null
+      if (pausa408 !== null) {
+        console.log(chalk.bold.yellow(
+          `\n┆ Subbot (+${idCarpetaBot}) pausado tras ${fallosConsecutivos} ` +
+          `pérdidas 408 consecutivas; se conserva la sesión y se reintenta ` +
+          `en ${Math.round(pausa408 / 60_000)} min.\n`
+        ))
+        temporizadorReconexion = setTimeout(() => {
+          temporizadorReconexion = null
+          encolarReconexion(
+            () => recargarHandler(true),
+            prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
+          ).catch((error) => {
+            console.error(`Error reconectando subbot pausado ${idCarpetaBot}:`, error?.message || error)
+            reconectando = false
+          })
+        }, pausa408)
+        temporizadorReconexion.unref?.()
+        return
+      }
       // Tope 90s (antes 5min): con 150 subbots, un tope de 5min + 30s de
       // dispersión dejaba colas de 327s y parecían muertos. 440 (reemplazo)
       // conserva backoff largo para no pelear entre duplicados. 515 es un

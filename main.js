@@ -1328,7 +1328,15 @@ if (!isSubbotWorker) {
         sesionesRetiradas.delete(folder)
         if (!sessions.includes(folder)) sessions.push(folder)
       }
-      await Promise.all(added.map(iniciarSesion))
+      // No abrir todas las sesiones añadidas en paralelo: una oleada de
+      // handshakes deja sin respuesta los keepalives de sockets ya vivos y
+      // provoca una cascada de 408. Se conserva el orden premium/FIFO.
+      for (let i = 0; i < added.length; i++) {
+        await iniciarSesion(added[i])
+        if (i + 1 < added.length && pausaEntreLotesMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, pausaEntreLotesMs))
+        }
+      }
       try {
         publishWorkerStatus()
       } catch (error) {
@@ -1357,9 +1365,9 @@ if (!isSubbotWorker) {
     }
     for (const folder of removed) confirmSessionLease(folder)
   })
-  const batchSize = Number.parseInt(process.env.PAIN_SUBBOT_BATCH, 10) || 4
+  const batchSize = Math.max(Number.parseInt(process.env.PAIN_SUBBOT_BATCH, 10) || 1, 1)
   const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
-  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1200
+  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 5000
   if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
   // Premium primero en el arranque: con cientos de sesiones, los sub-bots de
   // pago quedan en línea antes que el resto (mismo criterio en la cola de
