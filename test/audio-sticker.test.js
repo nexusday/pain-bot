@@ -28,16 +28,28 @@ function campos(buffer) {
 }
 
 /**
- * El sticker viaja en `Message.stickerMessage` (26) y el audio dentro de
- * `StickerMessage.audioMessage` (26). El envoltorio 134 no debe usarse.
+ * El sobre 134 contiene un FutureProofMessage con `message` (1), que a su vez
+ * contiene `stickerMessage` (26), y dentro del sticker va `audioMessage` (26).
  */
 function analizarSticker(bytes) {
   const exterior = campos(bytes)
   const envoltorios134 = exterior.filter(([numero]) => numero === 134)
-  const sticker = exterior.find(([numero]) => numero === 26)?.[1]
-  assert.ok(sticker, 'falta Message.stickerMessage')
-  const interior = campos(sticker)
-  const audios = interior.filter(([numero]) => numero === 26)
+  assert.equal(
+    exterior.filter(([numero]) => numero === 26).length,
+    0,
+    'el sticker no debe quedar en el nivel superior'
+  )
+  assert.equal(envoltorios134.length, 1, 'falta audioStickerMessage (134)')
+
+  const sobre = campos(envoltorios134[0][1])
+  const mensajeInterno = sobre.find(([numero]) => numero === 1)?.[1]
+  assert.ok(mensajeInterno, 'falta FutureProofMessage.message')
+
+  const interior = campos(mensajeInterno)
+  const sticker = interior.find(([numero]) => numero === 26)?.[1]
+  assert.ok(sticker, 'falta Message.stickerMessage dentro del sobre')
+
+  const audios = campos(sticker).filter(([numero]) => numero === 26)
   return { envoltorios134, audios }
 }
 
@@ -62,7 +74,7 @@ test('rechaza contenido incompleto', () => {
   assert.throws(() => construirContenidoAudioSticker({}, null))
 })
 
-test('el codificador emite el audio embebido (26) sin envoltorio 134', () => {
+test('el codificador emite el sobre 134 con el audio embebido (26)', () => {
   parchearProtoAudioSticker()
   const contenido = construirContenidoAudioSticker(
     { url: 'https://ejemplo/sticker.enc', mimetype: 'image/webp' },
@@ -70,7 +82,7 @@ test('el codificador emite el audio embebido (26) sin envoltorio 134', () => {
   )
 
   const { envoltorios134, audios } = analizarSticker(proto.Message.encode(contenido).finish())
-  assert.equal(envoltorios134.length, 0, 'no debe usarse el envoltorio 134')
+  assert.equal(envoltorios134.length, 1, 'falta audioStickerMessage (134)')
   assert.equal(audios.length, 1, 'debe haber un StickerMessage.audioMessage')
 })
 
@@ -82,6 +94,6 @@ test('el parche es idempotente y no duplica el audio', () => {
     { url: 'https://ejemplo/audio.enc', mimetype: 'audio/ogg; codecs=opus' }
   )
   const { envoltorios134, audios } = analizarSticker(proto.Message.encode(contenido).finish())
-  assert.equal(envoltorios134.length, 0)
+  assert.equal(envoltorios134.length, 1)
   assert.equal(audios.length, 1)
 })
