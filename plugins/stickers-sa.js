@@ -1,10 +1,12 @@
 import { addExif } from '../lib/sticker.js'
+import { enviarAudioStickerNativo } from '../lib/audio-sticker.js'
 import {
   cancelarSesionStickerAudio,
   construirVideoConAudio,
   crearSesionStickerAudio,
   haySesionStickerAudio,
   mimeAudioDe,
+  prepararAudioSticker,
   tomarSesionStickerAudio
 } from '../lib/sticker-audio.js'
 import { esWebPAnimado, resolverMetaSticker, toWebp } from './stickers-sticker.js'
@@ -20,11 +22,12 @@ const AYUDA = (p) => `🎧 *Sticker con sonido*
 Envía una imagen/video con el texto *${p}sa* respondiendo a un audio.
 
 *Opciones:*
-> ${p}sa — video corto con sonido (como GIF)
+> ${p}sa — sticker con sonido nativo (un solo mensaje)
+> ${p}sa gif — video corto con sonido (compatible con clientes viejos)
 > ${p}sa sticker — sticker + audio separado
 > ${p}sa cancelar — cancela la espera
 
-> Límite: 10 segundos y 8 MB para la imagen.`
+> Límites: audio de hasta 15 s y 6 MB para la imagen.`
 
 function mimeDe(mensaje) {
   return String(mensaje?.msg?.mimetype || mensaje?.mimetype || mensaje?.mediaType || '')
@@ -112,8 +115,30 @@ async function enviarResultado(conn, m, visual, tipoVisual, audio, modo) {
     await enviarStickerConAudio(conn, m, visual, tipoVisual, audio)
     return
   }
-  const video = await construirVideoConAudio(visual, tipoVisual, audio)
-  await enviarVideo(conn, m, video)
+
+  if (modo === 'gif') {
+    const video = await construirVideoConAudio(visual, tipoVisual, audio)
+    await enviarVideo(conn, m, video)
+    return
+  }
+
+  // Protocolo nativo: StickerMessage + AudioMessage dentro de
+  // audioStickerMessage. Si el servidor/cliente no lo acepta, se usa el GIF.
+  const { packname, author } = resolverMetaSticker(m, conn)
+  const webp = tipoVisual === 'sticker' ? visual : await toWebp(visual)
+  const sticker = await addExif(webp, packname, author)
+  try {
+    const audioOgg = await prepararAudioSticker(audio)
+    await enviarAudioStickerNativo(conn, m.chat, {
+      sticker,
+      audio: audioOgg,
+      isAnimated: esWebPAnimado(sticker)
+    })
+  } catch (error) {
+    console.error('[sa] audioStickerMessage nativo falló; se usa GIF:', error)
+    const video = await construirVideoConAudio(visual, tipoVisual, audio)
+    await enviarVideo(conn, m, video)
+  }
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
@@ -128,7 +153,11 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     )
   }
 
-  const modo = ['sticker', 'stiker', 'separado'].includes(opcion) ? 'sticker' : 'video'
+  const modo = ['gif', 'video'].includes(opcion)
+    ? 'gif'
+    : ['sticker', 'stiker', 'separado'].includes(opcion)
+      ? 'sticker'
+      : 'audio'
   const citado = m.quoted || null
   const tipoActual = tipoDeMensaje(m)
   const tipoCitado = tipoDeMensaje(citado)

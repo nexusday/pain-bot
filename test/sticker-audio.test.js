@@ -22,7 +22,7 @@ test('guarda la imagen y la entrega una sola vez', () => {
   const sesion = tomarSesionStickerAudio(chat, sender)
   assert.equal(sesion.buffer.toString(), 'imagen-de-prueba')
   assert.equal(sesion.tipo, 'image')
-  assert.equal(sesion.modo, 'video')
+  assert.equal(sesion.modo, 'audio')
   assert.equal(haySesionStickerAudio(chat), false)
   assert.equal(tomarSesionStickerAudio(chat, sender), null)
 })
