@@ -135,6 +135,10 @@ async function aWebp(bufer, opciones = {}) {
   const duracionMax = Math.min(Math.max(Number(opciones.duracion) || 7, 1), 10)
   const maxBytes = Math.max(100 * 1024, Number(opciones.maxBytes) || 950 * 1024)
   const ajuste = opciones.ajuste === 'cover' ? 'cover' : 'contain'
+  // Menos FPS y un solo hilo mantienen el bot responsivo mientras FFmpeg
+  // trabaja; sin esto el proceso puede acaparar todos los núcleos.
+  const fps = Math.min(Math.max(Number(opciones.fps) || 15, 5), 30)
+  const hilos = Math.min(Math.max(Number(opciones.threads) || 0, 0), 4)
 
   const directorioTemp = path.join(process.cwd(), 'tmp')
   await mkdir(directorioTemp, { recursive: true })
@@ -151,8 +155,12 @@ async function aWebp(bufer, opciones = {}) {
         : `scale='min(${lado},iw)':'min(${lado},ih)':force_original_aspect_ratio=decrease,` +
           `pad=${lado}:${lado}:(ow-iw)/2:(oh-ih)/2:color=white@0.0`
       const vf =
-        `${escala},format=rgba,fps=15,` +
+        `${escala},format=rgba,fps=${fps},` +
         `split[a][b];[a]palettegen=reserve_transparent=on:transparency_color=ffffff[p];[b][p]paletteuse`
+
+      const hilosOpts = hilos
+        ? ['-threads', String(hilos), '-filter_threads', String(hilos)]
+        : []
 
       const opciones = esEntradaAnimada
         ? [
@@ -162,12 +170,14 @@ async function aWebp(bufer, opciones = {}) {
             '-ss', '0',
             '-t', String(duracionSeg),
             '-an',
-            '-vsync', 'cfr'
+            '-vsync', 'cfr',
+            ...hilosOpts
           ]
         : [
             '-vcodec', 'libwebp',
             '-vf', vf,
-            '-frames:v', '1'
+            '-frames:v', '1',
+            ...hilosOpts
           ]
 
       fluent(entrada)

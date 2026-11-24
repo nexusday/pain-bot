@@ -82,13 +82,15 @@ let handler = async (m, { conn, usedPrefix }) => {
       throw new Error('El video supera el límite de 25 MB.')
     }
 
+    const inicioDescarga = Date.now()
     const datos = await descargarVideo(conn, video)
     if (!datos) throw new Error('No se pudo descargar el video.')
     if (datos.length > MAX_VIDEO_BYTES) {
       throw new Error('El video supera el límite de 25 MB.')
     }
-    console.log(`[sa] video descargado: ${datos.length} bytes`)
+    console.log(`[sa] video descargado: ${datos.length} bytes (${Date.now() - inicioDescarga} ms)`)
 
+    const inicioConversion = Date.now()
     const { packname, author } = resolverMetaSticker(m, conn)
     const { sticker, audio } = await conLimiteStickerAudio(async () => {
       const audioOgg = await extraerAudioDeVideo(datos)
@@ -96,12 +98,15 @@ let handler = async (m, { conn, usedPrefix }) => {
       const webp = await toWebp(datos, {
         duracion: 10,
         maxBytes: 500 * 1024,
-        ajuste: 'cover'
+        ajuste: 'cover',
+        fps: 10,
+        threads: 1
       })
       const stickerFinal = await addExif(webp, packname, author)
       console.log(`[sa] sticker preparado: ${stickerFinal.length} bytes`)
       return { sticker: stickerFinal, audio: audioOgg }
     })
+    console.log(`[sa] conversión completada en ${Date.now() - inicioConversion} ms`)
 
     
     const citado = { ...(m.message || {}) }
@@ -118,6 +123,7 @@ let handler = async (m, { conn, usedPrefix }) => {
     }
 
     try {
+      const inicioEnvio = Date.now()
       console.log('[sa] enviando sticker con audio embebido (campo 26)...')
       await enviarStickerConAudioNativo(conn, m.chat, {
         sticker,
@@ -125,7 +131,8 @@ let handler = async (m, { conn, usedPrefix }) => {
         isAnimated: esWebPAnimado(sticker),
         contextInfo
       })
-      console.log('[sa] sticker con audio enviado')
+      console.log(`[sa] sticker con audio enviado (${Date.now() - inicioEnvio} ms)`)
+      console.log(`[sa] total: ${Date.now() - inicioDescarga} ms`)
       await conn.sendMessage(m.chat, {
         react: { text: '✅', key: m.key }
       }).catch(() => {})
