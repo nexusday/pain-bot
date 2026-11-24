@@ -127,6 +127,7 @@ export async function renderDashboard() {
   }
   const usuariosTotal = cuenta(servidor.users)
   const botsTotal = cuenta(servidor.bots)
+  const registrosTotal = cuenta(servidor.botRecords)
   const conectadosTotal = cuenta(servidor.sessionsConnected)
   const guardadasTotal = cuenta(servidor.sessions)
   const guardadasCreds = cuenta(servidor.sessionsSaved)
@@ -157,9 +158,9 @@ export async function renderDashboard() {
       <div class="stats-group-head"><b>Resumen del servidor</b><span>Actividad general de esta instancia</span></div>
       <div class="stats-row">
         ${statCard('Usuarios', usuariosTotal ?? '—', 'users', 'violet', '<span>Cuentas registradas</span>')}
-        ${statCard('Vinculados', botsTotal ?? '—', 'bot', 'cyan', '<span>Registros de sub-bots</span>')}
-        ${statCard('Conectados ahora', conectadosTotal ?? '—', 'wifi', (conectadosTotal || 0) > 0 ? 'green' : 'muted', '<span>Sesiones en línea</span>')}
-        ${statCard('Sesiones guardadas', guardadasTotal ?? '—', 'server', 'amber', `<span>${guardadasCreds ?? '—'} con credenciales</span>`)}
+        ${statCard('Vinculados', botsTotal ?? '—', 'bot', 'cyan', `<span>${registrosTotal ? `${registrosTotal} registros históricos` : 'Números con sesión'}</span>`)}
+        ${statCard('Conectados ahora', conectadosTotal ?? '—', 'wifi', (conectadosTotal || 0) > 0 ? 'green' : 'muted', `<span>${botsTotal ? `de ${botsTotal} con sesión` : 'Sesiones en línea'}</span>`)}
+        ${statCard('Sesiones guardadas', guardadasCreds ?? '—', 'server', 'amber', `<span>${guardadasTotal ?? '—'} registros en disco</span>`)}
         ${statCard('Premium activos', premiumActivosServidor ?? '—', 'sparkles', (premiumActivosServidor || 0) > 0 ? 'violet' : 'muted', '<span>Con plan vigente</span>')}
         ${statCard('Premium guardados', premiumGuardadosServidor ?? '—', 'zap', (premiumGuardadosServidor || 0) > 0 ? 'cyan' : 'muted', '<span>Cambios guardados, sin plan</span>')}
       </div>

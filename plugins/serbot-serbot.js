@@ -12,6 +12,7 @@ import {
   contarReconexionTerminada,
   contarReintentoReconexion,
 } from "../lib/worker-metrics.js"
+import { prioridadDeSesion } from "../lib/subbot-priority.js"
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from "../lib/socket-estable.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
@@ -72,29 +73,102 @@ const MAX_RECONEXIONES_POR_WORKER = Math.min(
   Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 2, 1),
   8
 )
+// Separación mínima entre inicios de reconexión del mismo worker: suaviza la
+// oleada contra WhatsApp y reparte el CPU en el tiempo. Configurable.
+const ESPACIO_RECONEXION_MS = Math.min(
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 1200, 0),
+  10_000
+)
 const colaReconexiones = []
 let reconexionesActivas = 0
+let ultimoInicioReconexion = 0
+let temporizadorDrenajeReconexiones = null
 
 function ejecutarSiguienteReconexion() {
-  while (reconexionesActivas < MAX_RECONEXIONES_POR_WORKER && colaReconexiones.length) {
-    const trabajo = colaReconexiones.shift()
-    reconexionesActivas++
-    Promise.resolve()
-      .then(trabajo.fn)
-      .then(trabajo.resolve, trabajo.reject)
-      .finally(() => {
-        reconexionesActivas--
-        contarReconexionTerminada()
+  if (reconexionesActivas >= MAX_RECONEXIONES_POR_WORKER || !colaReconexiones.length) return
+  const espera = ESPACIO_RECONEXION_MS
+    ? Math.max(0, ultimoInicioReconexion + ESPACIO_RECONEXION_MS - Date.now())
+    : 0
+  if (espera > 0) {
+    if (!temporizadorDrenajeReconexiones) {
+      temporizadorDrenajeReconexiones = setTimeout(() => {
+        temporizadorDrenajeReconexiones = null
         ejecutarSiguienteReconexion()
-      })
+      }, espera)
+      temporizadorDrenajeReconexiones.unref?.()
+    }
+    return
   }
+  const trabajo = colaReconexiones.shift()
+  reconexionesActivas++
+  ultimoInicioReconexion = Date.now()
+  Promise.resolve()
+    .then(trabajo.fn)
+    .then(trabajo.resolve, trabajo.reject)
+    .finally(() => {
+      reconexionesActivas--
+      contarReconexionTerminada()
+      ejecutarSiguienteReconexion()
+    })
 }
 
-function encolarReconexion(fn) {
+/**
+ * prioridad: 1 para sub-bots premium, 0 para el resto. Los premium entran
+ * delante de los normales pero detrás de los premium que ya estaban en cola
+ * (FIFO dentro de cada nivel).
+ */
+function encolarReconexion(fn, prioridad = 0) {
   return new Promise((resolve, reject) => {
-    colaReconexiones.push({ fn, resolve, reject })
+    const trabajo = { fn, resolve, reject, prioridad: prioridad > 0 ? 1 : 0 }
+    if (trabajo.prioridad === 1) {
+      const indice = colaReconexiones.findIndex((entrada) => (entrada.prioridad || 0) === 0)
+      if (indice >= 0) colaReconexiones.splice(indice, 0, trabajo)
+      else colaReconexiones.push(trabajo)
+    } else {
+      colaReconexiones.push(trabajo)
+    }
     ejecutarSiguienteReconexion()
   })
+}
+
+// ── Watchdog compartido ───────────────────────────────────────────────────
+// Antes cada socket creaba su propio setInterval de 15 s: con 200+ sub-bots
+// eso son cientos de timers por worker (churn de libuv y CPU). Ahora hay UN
+// temporizador por worker que revisa las sesiones vencidas y las reparte.
+const tareasWatchdog = new Map()
+let temporizadorWatchdogGlobal = null
+const WATCHDOG_RESOLUCION_MS = 5_000
+
+function registrarWatchdog(fn, cadaMs = 15_000) {
+  const token = { fn, cadaMs }
+  tareasWatchdog.set(token, {
+    fn,
+    cadaMs,
+    // Primer chequeo repartido para que no coincidan todos a la vez.
+    proximo: Date.now() + Math.random() * Math.max(1_000, cadaMs),
+  })
+  if (!temporizadorWatchdogGlobal) {
+    temporizadorWatchdogGlobal = setInterval(() => {
+      const ahora = Date.now()
+      for (const tarea of tareasWatchdog.values()) {
+        if (ahora < tarea.proximo) continue
+        tarea.proximo = ahora + tarea.cadaMs
+        try {
+          tarea.fn()
+        } catch (error) {
+          console.error('watchdog subbot:', error?.message || error)
+        }
+      }
+    }, WATCHDOG_RESOLUCION_MS)
+    temporizadorWatchdogGlobal.unref?.()
+  }
+  return () => {
+    tareasWatchdog.delete(token)
+    if (!tareasWatchdog.size && temporizadorWatchdogGlobal) {
+      clearInterval(temporizadorWatchdogGlobal)
+      temporizadorWatchdogGlobal = null
+    }
+  }
 }
 let versionBaileysCache = null
 const iniciosSubBot = new Map()
@@ -517,7 +591,7 @@ async function iniciarSubBot(options) {
     const version = await obtenerVersionBaileys()
     if (intento.cancelado) return false
     const reintentoMsg = (MessageRetryMap) => { }
-    const cacheReintentoMsg = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
+    const cacheReintentoMsg = new NodeCache({ stdTTL: 90, checkperiod: 0, useClones: false, maxKeys: 300 })
     let estadoConn, saveState, saveCreds
     try {
       const estadoAuth = await useMultiFileAuthState(pathAYBot)
@@ -565,7 +639,7 @@ async function iniciarSubBot(options) {
     let claveMensajeVinculo = null
     let temporizadorVinculo = null
     let vistoUsuarioEn = Date.now()
-    let temporizadorWatchdog = null
+    let cancelarWatchdog = null
     let temporizadorReconexion = null
     let reemplazosConsecutivos = 0
     let fallosConsecutivos = 0
@@ -664,9 +738,9 @@ async function iniciarSubBot(options) {
     }
 
     function detenerWatchdog() {
-      if (temporizadorWatchdog) {
-        clearInterval(temporizadorWatchdog)
-        temporizadorWatchdog = null
+      if (cancelarWatchdog) {
+        cancelarWatchdog()
+        cancelarWatchdog = null
       }
     }
     intento.limpiarAuxiliares = () => {
@@ -1155,7 +1229,10 @@ async function iniciarSubBot(options) {
           contarReintentoReconexion(motivo)
           temporizadorReconexion = setTimeout(() => {
             temporizadorReconexion = null
-            encolarReconexion(() => recargarHandler(true)).catch((error) => {
+            encolarReconexion(
+              () => recargarHandler(true),
+              prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
+            ).catch((error) => {
               console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
               reconectando = false
             })
@@ -1191,7 +1268,10 @@ async function iniciarSubBot(options) {
       ))
       temporizadorReconexion = setTimeout(() => {
         temporizadorReconexion = null
-        encolarReconexion(() => recargarHandler(true)).catch((error) => {
+        encolarReconexion(
+          () => recargarHandler(true),
+          prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
+        ).catch((error) => {
           console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
           reconectando = false
         })
@@ -1199,7 +1279,7 @@ async function iniciarSubBot(options) {
     }
 
     detenerWatchdog()
-    temporizadorWatchdog = setInterval(() => {
+    cancelarWatchdog = registrarWatchdog(() => {
       try {
         const ahora = Date.now()
         if (socketAutenticado()) {
@@ -1223,14 +1303,17 @@ async function iniciarSubBot(options) {
         console.log(chalk.bold.yellow(
           `\n┆ Subbot (+${idCarpetaBot}) ${conexionAtascada ? 'atascado conectando' : 'sin conexión'} (estado ${estadoSocket ?? 'desconocido'}). Reconectando...\n`
         ))
-        encolarReconexion(() => recargarHandler(true)).catch((e) => {
+        encolarReconexion(
+          () => recargarHandler(true),
+          prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
+        ).catch((e) => {
           console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
           reconectando = false
         })
       } catch (error) {
         console.error(`Error en watchdog del subbot ${idCarpetaBot}:`, error?.message || error)
       }
-    }, 15000)
+    }, 15_000)
 
     recargarHandler(false)
     return true

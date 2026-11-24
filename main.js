@@ -59,6 +59,7 @@ import {
   persistirMetrica,
   registrarMetricasWorker,
 } from './lib/worker-metrics.js'
+import { ordenarSesionesPorPrioridad } from './lib/subbot-priority.js'
 import { confirmSessionLease, requestReconnectAll, requestReconnectOne, requestReloadAll } from './lib/process-isolation.js'
 import { ejecutarEnContextoBot } from './lib/premium.js'
 import lodash from 'lodash' 
@@ -221,11 +222,16 @@ if (!isSubbotWorker && global.webPanel?.enabled !== false && process.env.PAIN_WE
 await global.loadDatabase()
 
 if (isSubbotWorker || isManagedPrimary) {
+  // El trabajo real (claims, comandos) usa transacciones directas; esta vista
+  // solo se refresca para lecturas. En workers se espacia más para bajar
+  // contención de SQLite y CPU con cientos de sesiones.
+  const intervaloRefresh = Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) ||
+    (isSubbotWorker ? 8000 : 5000)
   const syncDatabase = setInterval(() => {
     global.db.adapter.refresh(global.db.data).catch((error) => {
       console.error('[db] No se pudo actualizar la vista de otro proceso:', error?.message || error)
     })
-  }, 5000)
+  }, intervaloRefresh)
   syncDatabase.unref?.()
 }
 
@@ -1190,6 +1196,8 @@ if (!isSubbotWorker) {
   }
   publishWorkerStatus()
   let ticksEstado = 0
+  // 15 s: sigue muy por debajo del umbral de estado obsoleto (60 s) y reduce
+  // un tercio el JSON/escritura de estado con cientos de sesiones.
   workerStatusInterval = setInterval(() => {
     try {
       publishWorkerStatus()
@@ -1197,12 +1205,11 @@ if (!isSubbotWorker) {
       console.error(`Worker ${workerId}: no se pudo publicar el estado de sus sesiones:`, error?.message || error)
     }
     // Historial liviano: una línea por minuto en storage/metrics/
-    if (ticksEstado % 6 === 5) {
+    if (ticksEstado % 4 === 3) {
       persistirMetricaEnseguro(workerId, __dirname)
     }
-    // Higiene de memoria cada ~30s. Antes eran 60s y el heap alcanzaba
-    // ~1 GB por worker antes de que la poda hiciera efecto.
-    if (++ticksEstado % 3 === 0) {
+    // Higiene de memoria cada ~30s (2 ticks de 15s).
+    if (++ticksEstado % 2 === 0) {
       import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
         try {
           higieneMemoriaProceso()
@@ -1292,9 +1299,9 @@ if (!isSubbotWorker) {
       return
     }
     if (message?.type === 'add-sessions' && Array.isArray(message.sessions)) {
-      const added = [...new Set(message.sessions)].filter(folder =>
+      const added = ordenarSesionesPorPrioridad(serbotDir, [...new Set(message.sessions)].filter(folder =>
         typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
-      )
+      ))
       for (const folder of added) {
         sesionesRetiradas.delete(folder)
         if (!sessions.includes(folder)) sessions.push(folder)
@@ -1332,7 +1339,10 @@ if (!isSubbotWorker) {
   const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
   const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1200
   if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
-  const initialSessions = [...sessions]
+  // Premium primero en el arranque: con cientos de sesiones, los sub-bots de
+  // pago quedan en línea antes que el resto (mismo criterio en la cola de
+  // reconexiones, así escala sin depender de una cantidad fija).
+  const initialSessions = ordenarSesionesPorPrioridad(serbotDir, [...sessions])
   let started = 0
   let skipped = 0
   let failed = 0

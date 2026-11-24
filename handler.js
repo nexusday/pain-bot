@@ -83,6 +83,8 @@ function pluginsEnCache() {
   const pluginsPorComando = new Map()
   const pluginsConComandoRegex = []
   const pluginsConPrefijoPropio = []
+  const pluginsAntesSesion = []
+  const PLUGINS_CON_BEFORE_SESION = new Set(['xnxx.js', 'hentai.js', 'xvideos.js'])
 
   for (const name in global.plugins) {
     const plugin = global.plugins[name]
@@ -122,6 +124,11 @@ function pluginsEnCache() {
     lista.push(normalizado)
     if (normalizado.customPrefix) pluginsConPrefijoPropio.push(normalizado)
     if (typeof normalizado.all === 'function') conAll.push(normalizado)
+    // Los `handler.before` de sesión solo existen en tres plugins: se indexan
+    // una vez en lugar de recorrer los ~200 plugins por cada mensaje.
+    if (PLUGINS_CON_BEFORE_SESION.has(name) && typeof normalizado.handler?.before === 'function') {
+      pluginsAntesSesion.push(normalizado)
+    }
   }
 
   cachePlugins = {
@@ -132,6 +139,7 @@ function pluginsEnCache() {
     pluginsPorComando,
     pluginsConComandoRegex,
     pluginsConPrefijoPropio,
+    pluginsAntesSesion,
     ordenPlugins: new Map(lista.map((plugin, index) => [plugin, index]))
   }
   return cachePlugins
@@ -562,34 +570,30 @@ let usedPrefix = '.'
 let comandoEjecutado = false
 
 
-const pluginsSesion = ['xnxx.js', 'hentai.js', 'xvideos.js']
-const { lista: pluginsProcesados, conAll, comandos } = pluginsEnCache()
+const { lista: pluginsProcesados, conAll, comandos, pluginsAntesSesion } = pluginsEnCache()
 const comandosOcultos = comandosOcultosPremium()
 
-for (let plugin of pluginsProcesados) {
-  if (plugin.handler && typeof plugin.handler.before === 'function' && pluginsSesion.includes(plugin.name)) {
-    try {
-      await plugin.handler.before.call(this, m, {
-        conn: this,
-        participants,
-        groupMetadata,
-        user,
-        bot,
-        isROwner,
-        isOwner,
-        isRAdmin,
-        isAdmin,
-        isBotAdmin,
-        isPrems,
-        chatUpdate,
-        __dirname: ___dirname,
-        __filename
-      })
-      
-      if (m.commandExecuted) break
-    } catch (e) {
-      console.error(`Error en handler.before de ${plugin.name}:`, e)
-    }
+for (const plugin of pluginsAntesSesion) {
+  try {
+    await plugin.handler.before.call(this, m, {
+      conn: this,
+      participants,
+      groupMetadata,
+      user,
+      bot,
+      isROwner,
+      isOwner,
+      isRAdmin,
+      isAdmin,
+      isBotAdmin,
+      isPrems,
+      chatUpdate,
+      __dirname: ___dirname,
+      __filename
+    })
+    if (m.commandExecuted) break
+  } catch (e) {
+    console.error(`Error en handler.before de ${plugin.name}:`, e)
   }
 }
 
