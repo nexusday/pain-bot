@@ -1,7 +1,7 @@
 import { addExif } from '../lib/sticker.js'
 import {
   conLimiteStickerAudio,
-  enviarAudioStickerNativo,
+  enviarStickerConAudioNativo,
   extraerAudioDeVideo
 } from '../lib/audio-sticker.js'
 import { esWebPAnimado, resolverMetaSticker, toWebp } from './stickers-sticker.js'
@@ -14,6 +14,7 @@ const MAX_VIDEO_SEGUNDOS = 60
 const AYUDA = (p) => `Responde a un *video con sonido* con *${p}sa*.
 También puedes enviar un video y ponerle el texto *${p}sa*.
 
+> Se usan hasta 5 s de audio.
 > Límites del video: ${MAX_VIDEO_SEGUNDOS} s y 25 MB.`
 
 function mimeDe(mensaje) {
@@ -99,18 +100,18 @@ let handler = async (m, { conn, usedPrefix }) => {
     })
 
     try {
-      console.log('[sa] enviando audioStickerMessage nativo...')
-      await enviarAudioStickerNativo(conn, m.chat, {
+      console.log('[sa] enviando sticker con audio embebido (campo 26)...')
+      await enviarStickerConAudioNativo(conn, m.chat, {
         sticker,
         audio,
         isAnimated: esWebPAnimado(sticker)
       })
-      console.log('[sa] audioStickerMessage enviado')
+      console.log('[sa] sticker con audio enviado')
       await conn.sendMessage(m.chat, {
         react: { text: '✅', key: m.key }
       }).catch(() => {})
     } catch (error) {
-      console.error('[sa] audioStickerMessage falló:', error)
+      console.error('[sa] sticker con audio falló:', error)
       await conn.sendMessage(m.chat, {
         react: { text: '❌', key: m.key }
       }).catch(() => {})

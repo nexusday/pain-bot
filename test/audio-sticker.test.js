@@ -1,13 +1,45 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import protobuf from 'protobufjs/minimal.js'
+const { Reader } = protobuf
 import { proto } from '@whiskeysockets/baileys'
 import {
   construirContenidoAudioSticker,
   parchearProtoAudioSticker
 } from '../lib/audio-sticker.js'
 
-const TAG_AUDIO_STICKER = Buffer.from([0xb2, 0x08]) // campo 134, length-delimited
-const TAG_AUDIO_DENTRO_STICKER = Buffer.from([0xd2, 0x01]) // campo 26, length-delimited
+/** Lee los campos de nivel superior de un mensaje protobuf. */
+function campos(buffer) {
+  const reader = Reader.create(buffer)
+  const lista = []
+  while (reader.pos < reader.len) {
+    const tag = reader.uint32()
+    const numero = tag >>> 3
+    const tipo = tag & 7
+    if (tipo === 2) lista.push([numero, reader.bytes()])
+    else if (tipo === 0) {
+      // Los int64 (stickerSentTs/mediaKeyTimestamp) no caben en int32; hay que
+      // consumir el varint completo para no desalinear el resto.
+      reader.uint64()
+      lista.push([numero, null])
+    } else reader.skipType(tipo)
+  }
+  return lista
+}
+
+/**
+ * El sticker viaja en `Message.stickerMessage` (26) y el audio dentro de
+ * `StickerMessage.audioMessage` (26). El envoltorio 134 no debe usarse.
+ */
+function analizarSticker(bytes) {
+  const exterior = campos(bytes)
+  const envoltorios134 = exterior.filter(([numero]) => numero === 134)
+  const sticker = exterior.find(([numero]) => numero === 26)?.[1]
+  assert.ok(sticker, 'falta Message.stickerMessage')
+  const interior = campos(sticker)
+  const audios = interior.filter(([numero]) => numero === 26)
+  return { envoltorios134, audios }
+}
 
 test('el contenido nativo anida el audio dentro del sticker', () => {
   const contenido = construirContenidoAudioSticker(
@@ -15,6 +47,7 @@ test('el contenido nativo anida el audio dentro del sticker', () => {
     { url: 'https://ejemplo/audio.enc', mimetype: 'audio/ogg; codecs=opus', ptt: true }
   )
 
+  assert.equal(contenido.audioStickerMessage, undefined)
   const sticker = contenido.stickerMessage
   assert.equal(sticker.url, 'https://ejemplo/sticker.enc')
   assert.equal(sticker.isAnimated, true)
@@ -29,29 +62,26 @@ test('rechaza contenido incompleto', () => {
   assert.throws(() => construirContenidoAudioSticker({}, null))
 })
 
-test('el codificador emite los campos 134 y 26 del protocolo', () => {
+test('el codificador emite el audio embebido (26) sin envoltorio 134', () => {
   parchearProtoAudioSticker()
   const contenido = construirContenidoAudioSticker(
     { url: 'https://ejemplo/sticker.enc', mimetype: 'image/webp' },
     { url: 'https://ejemplo/audio.enc', mimetype: 'audio/ogg; codecs=opus', ptt: true }
   )
 
-  const bytes = proto.Message.encode(contenido).finish()
-  assert.ok(bytes.includes(TAG_AUDIO_STICKER), 'falta audioStickerMessage (134)')
-  assert.ok(bytes.includes(TAG_AUDIO_DENTRO_STICKER), 'falta StickerMessage.audioMessage (26)')
+  const { envoltorios134, audios } = analizarSticker(proto.Message.encode(contenido).finish())
+  assert.equal(envoltorios134.length, 0, 'no debe usarse el envoltorio 134')
+  assert.equal(audios.length, 1, 'debe haber un StickerMessage.audioMessage')
 })
 
-test('el parche es idempotente y no duplica los campos', () => {
+test('el parche es idempotente y no duplica el audio', () => {
   parchearProtoAudioSticker()
   parchearProtoAudioSticker()
   const contenido = construirContenidoAudioSticker(
     { url: 'https://ejemplo/sticker.enc', mimetype: 'image/webp' },
     { url: 'https://ejemplo/audio.enc', mimetype: 'audio/ogg; codecs=opus' }
   )
-  const bytes = proto.Message.encode(contenido).finish()
-  let apariciones = 0
-  for (let i = 0; i < bytes.length - 1; i++) {
-    if (bytes[i] === TAG_AUDIO_STICKER[0] && bytes[i + 1] === TAG_AUDIO_STICKER[1]) apariciones++
-  }
-  assert.equal(apariciones, 1)
+  const { envoltorios134, audios } = analizarSticker(proto.Message.encode(contenido).finish())
+  assert.equal(envoltorios134.length, 0)
+  assert.equal(audios.length, 1)
 })
