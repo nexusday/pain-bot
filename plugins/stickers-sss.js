@@ -8,11 +8,8 @@ import {
   scoreStoredMessage
 } from '../lib/viewOnce.js'
 
-function prepararMsgMedia(mediaMsg) {
-  if (!mediaMsg) return mediaMsg
-  const copia = JSON.parse(JSON.stringify(mediaMsg))
-  delete copia.viewOnce
-  return copia
+function tieneEnlace(mediaMsg) {
+  return Boolean(mediaMsg?.url || mediaMsg?.directPath)
 }
 
 function cargarCitadoDesdeStore(conn, m) {
@@ -57,8 +54,10 @@ function recolectarFuentesCitadas(m, citado, almacenado) {
 
 async function resolverPayloadVerUnaVez(m, citado, citadoCompleto, almacenado) {
   const intentos = []
+  let primero = null
+  let conEnlace = null
 
-  for (const { label, raw } of recolectarFuentesCitadas(m, citado, almacenado)) {
+  const considerar = (label, raw, quoted) => {
     const media = extractMediaContent(raw)
     const esVO = detectViewOnce(raw, media?.mediaMsg, almacenado, m.quoted?.id)
     intentos.push({
@@ -66,47 +65,36 @@ async function resolverPayloadVerUnaVez(m, citado, citadoCompleto, almacenado) {
       keys: getMessageKeys(raw),
       isViewOnce: esVO,
       mediaType: media?.type || null,
+      hasUrl: tieneEnlace(media?.mediaMsg),
       viewOnceFlag: media?.mediaMsg?.viewOnce ?? null,
       knownViewOnceId: isKnownViewOnce(m.quoted?.id)
     })
+    if (!esVO || !media) return
 
-    if (esVO && media) {
-      return {
-        ...media,
-        source: label,
-        quoted: citado,
-        fullQuoted: citadoCompleto,
-        attempts: intentos
-      }
+    const candidato = {
+      ...media,
+      source: label,
+      quoted,
+      fullQuoted: citadoCompleto,
+      almacenado,
+      attempts: intentos
     }
+    if (!primero) primero = candidato
+    // WhatsApp omite url/directPath en el view-once citado. La copia
+    // guardada por el bot sí conserva el enlace: esa es la que sirve.
+    if (!conEnlace && tieneEnlace(media.mediaMsg)) conEnlace = candidato
+  }
+
+  for (const { label, raw } of recolectarFuentesCitadas(m, citado, almacenado)) {
+    considerar(label, raw, citado)
   }
 
   if (citadoCompleto?.message) {
-    const raw = citadoCompleto.message
-    const media = extractMediaContent(raw)
-    const esVO = detectViewOnce(raw, media?.mediaMsg, almacenado, m.quoted?.id)
-    intentos.push({
-      label: 'getQuotedObj().message',
-      keys: getMessageKeys(raw),
-      isViewOnce: esVO,
-      mediaType: media?.type || null,
-      mtype: citadoCompleto.mtype,
-      viewOnceFlag: media?.mediaMsg?.viewOnce ?? null,
-      knownViewOnceId: isKnownViewOnce(m.quoted?.id)
-    })
-
-    if (esVO && media) {
-      return {
-        ...media,
-        source: 'getQuotedObj().message',
-        quoted: citadoCompleto,
-        fullQuoted: citadoCompleto,
-        attempts: intentos
-      }
-    }
+    considerar('getQuotedObj().message', citadoCompleto.message, citadoCompleto)
   }
 
-  return { attempts: intentos }
+  if (conEnlace) return conEnlace
+  return primero ? { ...primero, sinEnlace: true } : { attempts: intentos }
 }
 
 function registrarDebugSss(etapa, data) {
@@ -115,8 +103,17 @@ function registrarDebugSss(etapa, data) {
 }
 
 async function descargarMediaVerUnaVez(conn, payload) {
-  const destinoDescarga = prepararMsgMedia(payload.mediaMsg)
   const citado = payload.fullQuoted || payload.quoted
+  // Para descargar/derivar claves, Baileys usa `image`/`video`/`audio`.
+  // Para leer el campo del mensaje se usa `imageMessage`/`videoMessage`/...
+  const tipoDescarga =
+    payload.type === 'video' ? 'video'
+      : payload.type === 'audio' ? 'audio'
+        : 'image'
+  const campoDescarga =
+    payload.type === 'video' ? 'videoMessage'
+      : payload.type === 'audio' ? 'audioMessage'
+        : 'imageMessage'
 
   try {
     if (citado?.download) {
@@ -127,32 +124,45 @@ async function descargarMediaVerUnaVez(conn, payload) {
     registrarDebugSss('download quoted error', { error: error.message })
   }
 
-  // `extractMediaContent` devuelve `image`/`video`/`audio`, pero Baileys
-  // espera el nombre completo del campo protobuf (`imageMessage`, ...).
-  const tipoDescarga =
-    payload.type === 'video' ? 'videoMessage'
-      : payload.type === 'audio' ? 'audioMessage'
-        : 'imageMessage'
+  const candidatos = []
+  const vistos = new Set()
+  const agregar = (media) => {
+    if (!media || typeof media !== 'object' || !tieneEnlace(media)) return
+    const clave = `${media.url || ''}|${media.directPath || ''}|${media.fileSha256 || ''}`
+    if (vistos.has(clave)) return
+    vistos.add(clave)
+    candidatos.push(media)
+  }
+
+  agregar(payload.mediaMsg)
+  agregar(payload.almacenado?.message?.[campoDescarga])
+  agregar(extractMediaContent(payload.almacenado?.message)?.mediaMsg)
+  agregar(payload.fullQuoted?.message?.[campoDescarga])
+  agregar(extractMediaContent(payload.fullQuoted?.message)?.mediaMsg)
+  agregar(payload.quoted?.message?.[campoDescarga])
+  agregar(extractMediaContent(payload.quoted?.message)?.mediaMsg)
+
+  registrarDebugSss('DESCARGA CANDIDATOS', {
+    tipoDescarga,
+    candidatos: candidatos.map((media) => ({
+      url: Boolean(media.url),
+      directPath: Boolean(media.directPath),
+      mimetype: media.mimetype || null
+    }))
+  })
 
   if (conn.downloadM) {
-    try {
-      const bufer = await conn.downloadM(destinoDescarga, tipoDescarga)
-      if (bufer?.length) return bufer
-    } catch (error) {
-      registrarDebugSss('downloadM error', { error: error.message, tipoDescarga })
+    for (const media of candidatos) {
+      try {
+        const bufer = await conn.downloadM(media, tipoDescarga)
+        if (bufer?.length) return bufer
+      } catch (error) {
+        registrarDebugSss('downloadM error', { error: error.message, tipoDescarga })
+      }
     }
   }
 
-  if (conn.getFile) {
-    try {
-      const archivo = await conn.getFile(destinoDescarga)
-      if (archivo?.data?.length) return archivo.data
-    } catch (error) {
-      registrarDebugSss('getFile error', { error: error.message })
-    }
-  }
-
-  throw new Error('No hay método de descarga disponible')
+  throw new Error('El enlace del view-once ya expiró o no está disponible')
 }
 
 function construirDatosMencion(rawMsg, conn) {
