@@ -197,6 +197,9 @@ function hayRespuestaPendiente(chatId) {
 
 function mensajeYaLeidoPuedeSoltarse(m) {
   if (!m?.isGroup || m.fromMe) return false
+  // El contenido real de un view-once llega como segundo `messages.upsert`
+  // (respuesta PDO de Baileys rc14) y no tiene texto: no se puede descartar.
+  if (m?.key?.isViewOnce) return false
   const texto = String(m.text || '').trim()
   if (global.prefix instanceof RegExp && texto && global.prefix.test(texto)) return false
   if (ORDENES_SUELTAS.has(texto.toLowerCase())) return false
@@ -213,11 +216,17 @@ function esCharlaQueNoFrena(conn, msg) {
   if (!jid.endsWith('@g.us') || msg?.key?.fromMe || msg?.messageStubType) return false
   let chatId = jid
   try { chatId = conn?.decodeJid?.(jid) || jid } catch {}
+  // Igual que arriba: el view-once real llega como media sin texto y debe
+  // pasar por pushMessage para que se cachee su media. La comprobación por
+  // `key.isViewOnce` es O(1); la búsqueda del envoltorio se deja para el
+  // camino de media sin texto, donde de verdad hace falta.
+  if (msg?.key?.isViewOnce) return false
   if (global.db?.data?.antiprefijo?.[chatId] === true) return false
   if (elGrupoMiraCadaMensaje(chatId) || hayRespuestaPendiente(chatId)) return false
 
   const texto = String(extraerTextoMensajeCrudo(msg) || '').trim()
   if (!texto) {
+    if (isViewOnceCandidate(msg)) return false
     const cuerpo = msg?.message || {}
     const esMedia = cuerpo.imageMessage || cuerpo.videoMessage || cuerpo.stickerMessage || cuerpo.audioMessage || cuerpo.documentMessage
     return Boolean(esMedia)
