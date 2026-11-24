@@ -99,7 +99,7 @@ let handler = async (m, { conn, usedPrefix }) => {
       return { sticker: stickerFinal, audio: audioOgg }
     })
 
-    // Contexto del mensaje: cita al comando y aplica el rcanal del bot.
+    
     const citado = { ...(m.message || {}) }
     delete citado.senderKeyDistributionMessage
     delete citado.messageContextInfo
