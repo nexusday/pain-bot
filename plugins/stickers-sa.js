@@ -56,10 +56,6 @@ async function descargarVideo(conn, mensaje) {
   return null
 }
 
-function contexto() {
-  return { ...(global.rcanal?.contextInfo || {}) }
-}
-
 let handler = async (m, { conn, usedPrefix }) => {
   console.log(`[sa] comando recibido chat=${m.chat} tipo=${m.mtype || '?'} citado=${m.quoted?.mtype || '-'}`)
   await conn.sendMessage(m.chat, {
@@ -114,16 +110,15 @@ let handler = async (m, { conn, usedPrefix }) => {
         react: { text: '✅', key: m.key }
       }).catch(() => {})
     } catch (error) {
-      console.error('[sa] audioStickerMessage falló; se envía el video como GIF:', error)
+      console.error('[sa] audioStickerMessage falló:', error)
       await conn.sendMessage(m.chat, {
-        video: datos,
-        gifPlayback: true,
-        mimetype: 'video/mp4',
-        contextInfo: contexto()
-      }, { quoted: m })
-      await conn.sendMessage(m.chat, {
-        react: { text: '✅', key: m.key }
+        react: { text: '❌', key: m.key }
       }).catch(() => {})
+      return conn.reply(
+        m.chat,
+        `*[❌] No se pudo enviar el sticker con sonido.*\n> ${String(error?.message || error).slice(0, 180)}`,
+        m
+      )
     }
   } catch (error) {
     console.error('[sa]', error)
