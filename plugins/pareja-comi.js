@@ -40,7 +40,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (arg === 'off' || arg === '0') {
       establecerComision(m.sender, 0)
-      await global.db.write()
+      void global.db.flushSoon?.()
       return conn.sendMessage(m.chat, {
         text: `💞 *Comisión desactivada*\n\n> Ya no compartirás tus ganancias con @${String(pareja).split('@')[0]}.`,
         contextInfo: {
@@ -59,7 +59,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     establecerComision(m.sender, pct)
-    await global.db.write()
+    void global.db.flushSoon?.()
     return conn.sendMessage(m.chat, {
       text: `💞 *Comisión activada (${pct}%)*\n\n> De lo que ganes en juegos, el *${pct}%* va para @${String(pareja).split('@')[0]}.\n> Si tu pareja también pone *${usedPrefix}comi*, se comparten mutuamente.`,
       contextInfo: {

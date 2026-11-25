@@ -38,7 +38,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
       if (isModeActive('modoCustom', m.chat)) return avisarModoActivo('𝗠𝗼𝗱𝗼 𝗽𝗲𝗿𝘀𝗼𝗻𝗮𝗹𝗶𝘇𝗮𝗱𝗼', 'modo')
 
       setModeState('modoPsico', m.chat, true)
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       return conn.sendMessage(m.chat, {
         text: `*Modo Psico activado*
@@ -55,7 +55,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
 
     if (accion === 'off') {
       setModeState('modoPsico', m.chat, false)
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       try {
         const { clearPsicoMemory } = await import('../lib/geminiAPI.js')

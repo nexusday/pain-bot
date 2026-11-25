@@ -346,6 +346,9 @@ export async function handler(chatUpdate) {
     const finalizarActividad = iniciarActividadSocket(this, 'mensajes')
     try {
       await procesarActualizacion.call(this, { ...chatUpdate, messages: [mensaje] })
+    } catch (error) {
+      // Un mensaje concreto nunca debe tumbar el socket ni la flota entera.
+      console.error(`[handler] ${mensaje?.key?.remoteJid || '?'}:`, error?.message || error)
     } finally {
       finalizarActividad()
     }
@@ -1371,7 +1374,11 @@ if (debeAutoLeer && !saltarAutoLeer && m.key) {
   }
 }
 
-await handleAIModes(m, this)
+try {
+  await handleAIModes(m, this)
+} catch (error) {
+  console.error('[modos] error:', error?.message || error)
+}
 
 }
 }

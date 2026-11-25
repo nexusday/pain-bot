@@ -20,7 +20,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
 
     if (accion === 'on') {
       global.db.data.cmd18[m.chat] = true
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       return conn.sendMessage(m.chat, {
         text: `🔞 *Comandos +18 activados*\n\n> Los comandos +18 ya pueden usarse en este grupo.\n> *Por:* @${m.sender.split('@')[0]}`,
@@ -33,7 +33,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin }) => {
 
     if (accion === 'off') {
       global.db.data.cmd18[m.chat] = false
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       return conn.sendMessage(m.chat, {
         text: `🔞 *Comandos +18 desactivados*\n\n> Los comandos +18 ya no pueden usarse en este grupo.\n> *Por:* @${m.sender.split('@')[0]}`,

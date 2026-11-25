@@ -31,7 +31,6 @@ async function ejecutarUnion(m, conn, participants, accion, usedPrefix = '.') {
 let handler = async (m, { conn, participants = [], args = [], command, usedPrefix = '.' }) => {
   if (!m.isGroup) return responder(m, conn, 'Estas opciones se usan en grupos.')
   try {
-    await global.db.adapter.refresh?.(global.db.data)
     participants = await prepararIdentidadesPareja(m, conn, participants)
     if (command === 'dma') {
       const tx = await global.db.adapter.claimAndUpdate(global.db.data, `dma:${m.sender}`, DIA_PAREJA,

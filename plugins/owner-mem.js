@@ -1,6 +1,8 @@
 import os from 'node:os'
-import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
+import { snapshotSesiones } from '../lib/session-registry.js'
 import { estadoMemoriaProceso, higieneMemoriaProceso } from '../lib/mem-hygiene.js'
+import { estadisticasAuthStores } from '../lib/auth-store.js'
+import { estadoDiscoProceso } from '../lib/disk-hygiene.js'
 
 const RAIZ = process.cwd()
 
@@ -37,10 +39,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
 
   let workers = []
   try {
-    workers = readSubbotWorkerStatuses(RAIZ)
-      .sort((a, b) => String(a.workerId).localeCompare(String(b.workerId)))
+    workers = [{ workerId: 'primary', sessions: snapshotSesiones() }]
   } catch (error) {
-    console.error('[mem] No se pudieron leer los estados de los workers:', error?.message || error)
+    console.error('[mem] No se pudo leer el estado de las sesiones:', error?.message || error)
   }
 
   const conectados = workers.reduce(
@@ -49,6 +50,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
   )
   const totalSistema = os.totalmem()
   const usadaSistema = Math.max(0, totalSistema - os.freemem())
+  const persistencia = global.db?.estadisticasPersistencia?.() || null
+  const auth = estadisticasAuthStores()
+  const disco = await estadoDiscoProceso().catch(() => null)
   const lineas = [
     '`*˚   ✩    ✦    ✩   ˚*`',
     '',
@@ -61,6 +65,16 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     ...workers.map(lineasWorker),
     `┊ sub-bots  ·  \`${conectados}\` conectados`,
   ]
+  if (persistencia) {
+    lineas.push(
+      `┊ db  ·  flushes \`${persistencia.flushes}\`  ·  entidades \`${persistencia.entidades}\`  ·  ` +
+      `full \`${persistencia.fullScans}\`  ·  último \`${persistencia.ultimoMs} ms\``
+    )
+  }
+  lineas.push(`┊ auth  ·  \`${auth.sesiones}\` sesiones  ·  \`${auth.cambiosPendientes}\` cambios pendientes`)
+  if (disco) {
+    lineas.push(`┊ disco  ·  \`${disco.libreMB}/${disco.totalMB} MB\` libres (${disco.porcentajeLibre}%)`)
+  }
   if (higiene) {
     const liberados = higiene.chats + higiene.metadata + higiene.yt + higiene.sc + higiene.tt + higiene.descargas
     lineas.push(`┊ higiene  ·  \`${liberados}\` liberados${higiene.gc ? '  ·  GC' : ''}`)
@@ -75,7 +89,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
   }, { quoted: m })
 }
 
-handler.command = ['mem', 'memoria', 'ram']
+handler.command = ['mem', 'memoria', 'ram', 'diag', 'diagnostico']
 handler.tags = ['owner']
 handler.help = ['mem [limpiar] - Ver o liberar memoria de los procesos']
 handler.rowner = true

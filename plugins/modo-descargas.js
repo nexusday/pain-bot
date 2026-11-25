@@ -14,7 +14,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (accion === 'on') {
       setModeState('modoDescargas', m.chat, true)
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       return conn.sendMessage(m.chat, {
         text: `ִֶָ☾. *Modo descargas activado*
@@ -32,7 +32,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (accion === 'off') {
       setModeState('modoDescargas', m.chat, false)
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       return conn.sendMessage(m.chat, {
         text: `ִֶָ☾. *Modo descargas desactivado*

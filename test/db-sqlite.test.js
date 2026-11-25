@@ -587,9 +587,11 @@ test('coalesces repeated shared-state refreshes within the configured interval',
     await cooldown(50)
     await reader.refresh(readerState)
     assert.equal(readerState.users.alice.coins, 30)
+    await writer.close()
     await reader.close()
+    await cooldown(50)
   } finally {
-    await fs.rm(directory, { recursive: true, force: true })
+    await fs.rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
 

@@ -1,4 +1,4 @@
-const { useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion, Browsers, proto } = (await import("@whiskeysockets/baileys"))
+const { DisconnectReason, fetchLatestBaileysVersion, Browsers, proto } = (await import("@whiskeysockets/baileys"))
 import qrcode from "qrcode"
 import NodeCache from "node-cache"
 import fs from "fs"
@@ -8,6 +8,8 @@ import chalk from "chalk"
 import util from "util"
 import * as ws from "ws"
 import { makeWASocket } from "../lib/simple.js"
+import { useMemoryAuthState, olvidarAuthStore } from "../lib/auth-store.js"
+import { registrarSesion, actualizarSesion, quitarSesion } from "../lib/session-registry.js"
 import {
   contarReconexionTerminada,
   contarReintentoReconexion,
@@ -33,12 +35,6 @@ import {
 import { fileURLToPath } from "url"
 import { tr } from '../lib/lang.js'
 import { ejecutarEnContextoBot } from '../lib/premium.js'
-import {
-  confirmSessionLease,
-  releaseSessionLease,
-  requestSessionLease
-} from '../lib/process-isolation.js'
-import { adquirirPermisoCompartido } from '../lib/host-admission.js'
 
 
 // Se resuelve en cada uso: un sub-bot premium puede tener su propio canal.
@@ -69,7 +65,7 @@ const MAX_FALLOS_RECONEXION = 10
 // sockets fallidos sin límite mantiene una tormenta permanente cuando el
 // servidor o la red no responden. La sesión queda archivada y recuperable;
 // solo se pausa su siguiente intento automático.
-const MODO_PROCESO_UNICO = process.env.PAIN_SINGLE_PROCESS !== '0'
+const MODO_PROCESO_UNICO = true
 const PAUSA_408_RECONEXION_MS = MODO_PROCESO_UNICO
   ? Math.min(
       Math.max(Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 60_000, 30_000),
@@ -97,35 +93,11 @@ const MAX_RECONEXIONES_POR_WORKER = Math.min(
 )
 // Separación mínima entre inicios de reconexión del mismo worker: suaviza la
 // oleada contra WhatsApp y reparte el CPU en el tiempo. Configurable.
-const ESPACIO_RECONEXION_MS = Math.min(
-  Math.max(
-    MODO_PROCESO_UNICO ? (Number.parseInt(process.env.PAIN_SINGLE_RECONNECT_GAP_MS, 10) || 1000) : (Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 5000),
-      // gap ya resuelto arriba
-    0
-  ),
- 30_000
-)
+const ESPACIO_RECONEXION_MS = Math.min(Math.max(Number.parseInt(process.env.PAIN_SINGLE_RECONNECT_GAP_MS, 10) || 1000, 0), 30_000)
 const colaReconexiones = []
 let reconexionesActivas = 0
 let ultimoInicioReconexion = 0
 let temporizadorDrenajeReconexiones = null
-const CONCURRENCIA_HANDSHAKE = MODO_PROCESO_UNICO
-  ? Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_SINGLE_HANDSHAKE_CONCURRENCY, 10) || 8, 6),
-      16
-    )
-  : Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 2, 1),
-      8
-    )
-const TIMEOUT_HANDSHAKE_ABIERTO_MS = Math.min(
-  Math.max(
-    Number.parseInt(process.env.PAIN_HANDSHAKE_OPEN_TIMEOUT_MS, 10) ||
-      (MODO_PROCESO_UNICO ? 45_000 : 120_000),
-    15_000
-  ),
-  300_000
-)
 const reintentosProgramados = new Map()
 if (MODO_PROCESO_UNICO) {
   console.log(
@@ -434,13 +406,6 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner, participants
   opcionesSubBot.usedPrefix = usedPrefix
   opcionesSubBot.command = command
   opcionesSubBot.fromCommand = true
-  if (process.env.PAIN_ROLE === 'primary') {
-    const leaseGranted = await requestSessionLease(id)
-    if (!leaseGranted) {
-      return conn.reply(m.chat, 'No se pudo reservar esta sesión para vincularla sin conexiones duplicadas. Intenta de nuevo.', m)
-    }
-    opcionesSubBot.supervisorHandoff = true
-  }
   opcionesSubBot.phoneNumber = phoneNumber
   opcionesSubBot.replyJid = replyJid
 
@@ -480,21 +445,22 @@ export function estadoSesionSubBot(pathAYBot) {
   }
 }
 
-export async function retirarSesionDeWorker(pathAYBot, { handoff = false } = {}) {
+export async function retirarSesionDeWorker(pathAYBot, _opciones = {}) {
   const clave = path.resolve(pathAYBot)
   reintentosProgramados.delete(path.basename(clave))
   const intento = iniciosSubBot.get(clave)
   if (intento) {
-    if (handoff) await intento.ceder?.()
-    else intento.cancelar?.()
+    intento.cancelar?.()
+    quitarSesion(path.basename(clave))
     return
   }
   const socket = global.conns?.find((item) =>
     item?.pathAYBot && path.resolve(item.pathAYBot) === clave
   )
   if (!socket) return
-  if (handoff) await socket.cederSesionPain?.()
-  else await socket.cerrarSesionPain?.()
+  await socket.cerrarSesionPain?.()
+  quitarSesion(path.basename(clave))
+  await olvidarAuthStore(clave).catch(() => {})
 }
 
 async function iniciarSubBot(options) {
@@ -508,7 +474,6 @@ async function iniciarSubBot(options) {
     fromCommand = true,
     phoneNumber = null,
     replyJid = null,
-    supervisorHandoff = false,
     esperarConexion = false,
     timeoutConexionMs = 60_000,
     // Vinculación desde el panel web: no hay mensaje/conn de WhatsApp que
@@ -527,6 +492,11 @@ async function iniciarSubBot(options) {
     return esperarConexion ? inicioExistente.conectado : inicioExistente.iniciado
   }
   reintentosProgramados.delete(path.basename(claveInicio))
+  registrarSesion(path.basename(claveInicio), null, {
+    path: pathAYBot,
+    estado: 'iniciando',
+    desde: Date.now()
+  })
   
  
   if (!fromCommand) {
@@ -569,7 +539,6 @@ async function iniciarSubBot(options) {
         if (m && conn) await avisarSesionExistente(conn, m, path.basename(pathAYBot), 'guardada', usedPrefix)
         // Ya está vinculada: un registro viejo de ajustes es basura, se olvida.
         try { olvidarAjustesSesion(pathAYBot, raizReenlace) } catch {}
-        if (supervisorHandoff) releaseSessionLease(path.basename(pathAYBot))
         return
       }
     } catch {}
@@ -577,6 +546,7 @@ async function iniciarSubBot(options) {
 
   if (fromCommand) {
     limpiarCredencialesSubBot(pathAYBot, raizReenlace)
+    void olvidarAuthStore(pathAYBot).catch(() => {})
     // Si la sesión había quedado archivada, recupera config/staff/soporte.
     try {
       if (restaurarAjustesSesion(pathAYBot, raizReenlace)) {
@@ -648,24 +618,6 @@ async function iniciarSubBot(options) {
     else resolverConexion(socket)
   }
 
-  intento.ceder = async () => {
-    intento.cancelado = true
-    reintentosProgramados.delete(path.basename(pathAYBot))
-    intento.limpiarAuxiliares?.()
-    const socket = intento.sock
-    intento.liberarAdmisiones?.()
-    if (socket) {
-      socket._painSupervisorHandoff = true
-      socket._ignorarCierre = true
-      socket.ev?.removeAllListeners?.()
-      cerrarSocketCrudo(socket)
-      if (Array.isArray(global.conns)) {
-        global.conns = global.conns.filter((conexion) => conexion !== socket)
-      }
-    }
-    terminarIntento(null)
-  }
-
   intento.cancelar = () => {
     intento.cancelado = true
     reintentosProgramados.delete(path.basename(pathAYBot))
@@ -693,11 +645,10 @@ async function iniciarSubBot(options) {
     if (intento.cancelado) return false
     const reintentoMsg = (MessageRetryMap) => { }
     const cacheReintentoMsg = new NodeCache({ stdTTL: 90, checkperiod: 0, useClones: false, maxKeys: 300 })
-    let estadoConn, saveState, saveCreds
+    let estadoConn, saveCreds
     try {
-      const estadoAuth = await useMultiFileAuthState(pathAYBot)
+      const estadoAuth = await useMemoryAuthState(pathAYBot)
       estadoConn = estadoAuth.state
-      saveState = estadoAuth.saveState
       saveCreds = estadoAuth.saveCreds
     } catch (error) {
       console.log(chalk.bold.redBright(`\n┆ Error inicializando auth state para ${path.basename(pathAYBot)}: ${error.message}\n`))
@@ -705,12 +656,14 @@ async function iniciarSubBot(options) {
     }
     if (intento.cancelado) return false
 
+    let sock = null
     const opcionesConexion = conSocketEstable({
+      getMessageSocket: () => sock,
       logger: pino({ level: "fatal" }),
       printQRInTerminal: false,
       auth: {
         creds: estadoConn.creds,
-        keys: makeCacheableSignalKeyStore(estadoConn.keys, pino({ level: "silent" }))
+        keys: estadoConn.keys
       },
       msgRetry: reintentoMsg,
       msgRetryCache: cacheReintentoMsg,
@@ -741,76 +694,13 @@ async function iniciarSubBot(options) {
       qrTimeout: 120_000,
     })
 
-    const liberadoresHandshake = new WeakMap()
-    const finalizadoresHandshake = new WeakMap()
-    const raizAdmisiones = path.resolve(path.dirname(pathAYBot))
-    // Por defecto UN handshake a la vez en todo el servidor. Cada handshake
-    // hace criptografía y sincronización inicial; con 100+ sesiones a la vez
-    // se dispara la CPU del contenedor (y al pasar del límite del plan,
-    // WhatsApp corta con 408 y todo reconecta). Subir con
-    // PAIN_SOCKET_HANDSHAKE_CONCURRENCY solo si el plan tiene CPU de sobra.
-    // Con 283 sesiones, un handshake a la vez tardaba horas en ponerlas todas
-    // online. Dos en paralelo caben de sobra en el plan y drenan la cola.
-    const concurrenciaHandshake = CONCURRENCIA_HANDSHAKE
-    // Cuánto puede quedarse un permiso de handshake sin liberarse. Si una
-    // reconexión queda abandonada, caduca y destapa la cola; antes el PID vivo
-    // lo mantenía bloqueado para siempre.
-    const ttlHandshake = Math.min(
-      Math.max(
-        Number.parseInt(process.env.PAIN_HANDSHAKE_LEASE_MS, 10) ||
-          (MODO_PROCESO_UNICO ? 180_000 : 120_000),
-        30_000
-      ),
-      300_000
-    )
-    const liberarHandshake = (socket) => {
-      if (!socket) return
-      const liberar = liberadoresHandshake.get(socket)
-      if (!liberar) return
-      liberadoresHandshake.delete(socket)
-      finalizadoresHandshake.get(socket)?.()
-      finalizadoresHandshake.delete(socket)
-      liberar()
-    }
+    const liberarHandshake = () => {}
     const crearSocketAdmitido = async (opciones = {}) => {
-      if (MODO_PROCESO_UNICO) {
-        // Sin cola de handshake: el límite real lo pone PAIN_START_CONCURRENCY
-        // al arrancar y la cola de reconexión (4 a la vez). Así una sesión
-        // muerta no puede bloquear a las demás.
-        if (intento.cancelado) return null
-        return makeWASocket(opcionesConexion, opciones)
-      }
-      const liberar = await adquirirPermisoCompartido('socket-handshake', {
-        rootDir: raizAdmisiones,
-        slots: concurrenciaHandshake,
-        ttlMs: ttlHandshake,
-        cancelado: () => intento.cancelado,
-      })
-      if (!liberar) return null
-      if (intento.cancelado) {
-        liberar()
-        return null
-      }
-      try {
-        const creado = makeWASocket(opcionesConexion, opciones)
-        const temporizadorApertura = setTimeout(
-          () => liberarHandshake(creado),
-          TIMEOUT_HANDSHAKE_ABIERTO_MS
-        )
-        temporizadorApertura.unref?.()
-        liberadoresHandshake.set(creado, () => {
-          clearTimeout(temporizadorApertura)
-          liberar()
-        })
-        finalizadoresHandshake.set(creado, iniciarActividadSocket(creado, 'handshake'))
-        return creado
-      } catch (error) {
-        liberar()
-        throw error
-      }
+      if (intento.cancelado) return null
+      return makeWASocket(opcionesConexion, opciones)
     }
 
-    let sock = await crearSocketAdmitido()
+    sock = await crearSocketAdmitido()
     if (!sock) return false
     intento.liberarAdmisiones = () => liberarHandshake(sock)
     intento.sock = sock
@@ -1088,6 +978,13 @@ async function iniciarSubBot(options) {
         lastDisconnect?.error?.output?.payload?.message ||
         ''
       ).slice(0, 240)
+      if (connection === 'close') {
+        actualizarSesion(idCarpetaBot, {
+          estado: 'caida',
+          ultimoError: motivo ?? detalleDesconexion ?? null,
+          conn: sock
+        })
+      }
       try {
         const datosFallo = lastDisconnect?.error?.data
         if (datosFallo && typeof datosFallo === 'object') {
@@ -1101,25 +998,9 @@ async function iniciarSubBot(options) {
       if (connection === 'close') {
         liberarHandshake(socketEvento)
         detenerPrekeys(sock)
-        if (sock._painLeaseHandoff) {
-          reintentosProgramados.delete(idCarpetaBot)
-          intento.limpiarAuxiliares?.()
-          quitarSockDeConns(sock)
-          confirmSessionLease(idCarpetaBot)
-          return
-        }
         if (sock._painDeletingSession) {
           reintentosProgramados.delete(idCarpetaBot)
           intento.limpiarAuxiliares?.()
-          return
-        }
-        if (sock._painSupervisorHandoff) {
-          reintentosProgramados.delete(idCarpetaBot)
-          detenerWatchdog()
-          if (temporizadorReconexion) clearTimeout(temporizadorReconexion)
-          if (Array.isArray(global.conns)) global.conns = global.conns.filter((item) => item !== sock)
-          sock.ev.removeAllListeners()
-          releaseSessionLease(idCarpetaBot)
           return
         }
         const esFlujoEmparejamiento = codigoM && !estadoConn.creds.registered
@@ -1162,9 +1043,16 @@ async function iniciarSubBot(options) {
           } catch (error) {
             console.error(`No se pudo marcar el subbot ${idCarpetaBot} para volver a vincular:`, error?.message || error)
           }
+          actualizarSesion(idCarpetaBot, {
+            estado: 'caida',
+            requiereRelink: true,
+            ultimoError: motivo ?? null,
+            conn: sock
+          })
           if (marcaCreada && process.env.PAIN_DELETE_BAD_CREDS === '1') {
             try {
               limpiarCredencialesSubBot(pathAYBot)
+              void olvidarAuthStore(pathAYBot).catch(() => {})
             } catch (error) {
               console.error(`No se pudieron limpiar las credenciales de ${idCarpetaBot}:`, error?.message || error)
             }
@@ -1251,6 +1139,19 @@ async function iniciarSubBot(options) {
         }
         if (!Array.isArray(global.conns)) global.conns = []
         if (!global.conns.includes(sock)) global.conns.push(sock)
+        registrarSesion(idCarpetaBot, sock, {
+          path: pathAYBot,
+          estado: 'abierta',
+          desde: conectadoEstableEn || Date.now(),
+          abiertoDesde: Date.now(),
+          telefono: idCarpetaBot,
+          nombre: sock.user?.name || sock.authState?.creds?.me?.name || '',
+          jid: sock.user?.jid || sock.user?.id || '',
+          lid: sock.user?.lid || '',
+          intentos: 0,
+          ultimoError: null,
+          requiereRelink: false
+        })
         terminarIntento(null, sock)
         if (!sock.vistaUnicaLista) {
           sock.vistaUnicaLista = true
@@ -1303,17 +1204,6 @@ async function iniciarSubBot(options) {
             })
           }
 
-          if (supervisorHandoff && !sock._painSupervisorHandoff) {
-            sock._painSupervisorHandoff = true
-            sock._ignorarCierre = true
-            detenerWatchdog()
-            if (temporizadorReconexion) clearTimeout(temporizadorReconexion)
-            detenerPrekeys(sock)
-            if (!cerrarSocketCrudo(sock)) {
-              console.error(`No se pudo cerrar la conexión de ${idCarpetaBot} al cederla al supervisor.`)
-            }
-          }
-          
         } catch (error) {
           console.error('Error enviando mensaje de bienvenida:', error)
         }
@@ -1391,9 +1281,13 @@ async function iniciarSubBot(options) {
         if (!sock.authState?.creds?.registered) return
         const modulo = global.handlerModule
         if (!modulo?.handler) return
-        // Contexto por mensaje: moneda, canal y menú premium del sub-bot que
-        // atiende, sin afectar a los demás sub-bots del proceso.
-        return ejecutarEnContextoBot(sock, () => modulo.handler.call(sock, chatUpdate))
+        try {
+          // Contexto por mensaje: moneda, canal y menú premium del sub-bot que
+          // atiende, sin afectar a los demás sub-bots del proceso.
+          return await ejecutarEnContextoBot(sock, () => modulo.handler.call(sock, chatUpdate))
+        } catch (error) {
+          console.error(`[subbot ${idCarpetaBot}] error procesando mensaje:`, error?.message || error)
+        }
       }
       sock.connectionUpdate = actualizacionConexion.bind(sock)
       sock.credsUpdate = saveCreds.bind(sock, true)
@@ -1425,20 +1319,9 @@ async function iniciarSubBot(options) {
           sock.ev.removeAllListeners()
           cerrarSocketCrudo(sock)
           quitarSockDeConns(sock)
+          quitarSesion(idCarpetaBot)
+          await olvidarAuthStore(pathAYBot).catch(() => {})
         }
-      }
-      sock.cederSesionPain = async () => {
-        sock._painLeaseHandoff = true
-        sock._painSupervisorHandoff = true
-        sock._ignorarCierre = true
-        reconectando = true
-        intento.cancelado = true
-        intento.limpiarAuxiliares?.()
-        detenerPrekeys(sock)
-        liberarHandshake(sock)
-        sock.ev.removeAllListeners()
-        cerrarSocketCrudo(sock)
-        quitarSockDeConns(sock)
       }
 
       esInit = false

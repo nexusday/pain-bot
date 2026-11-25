@@ -21,7 +21,7 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner, isAdmi
     
     if (accion === 'on') {
       global.db.data.botGroups[m.chat] = true
-      await global.db.write()
+      void global.db.flushSoon?.()
       
       const mensaje = `🌴 𝗕𝗢𝗧 𝗔𝗖𝗧𝗜𝗩𝗔𝗗𝗢\n\n> *Grupo:* ${await conn.getName(m.chat)}\n *Por:* @${m.sender.split('@')[0]}`
       
@@ -37,7 +37,7 @@ let handler = async (m, { conn, usedPrefix, command, args, text, isOwner, isAdmi
       
     } else if (accion === 'off') {
       global.db.data.botGroups[m.chat] = false
-      await global.db.write()
+      void global.db.flushSoon?.()
       
       const mensaje = `🌴 𝗕𝗢𝗧 𝗗𝗘𝗦𝗔𝗖𝗧𝗜𝗩𝗔𝗗𝗢\n\n> *Grupo:* ${await conn.getName(m.chat)}\n *Por:* @${m.sender.split('@')[0]}\n\n> Solo responde a *${usedPrefix}grupo on* para reactivarlo.`
       

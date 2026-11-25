@@ -350,9 +350,27 @@ test('webpanel: máximo de sub-bots por cuenta y por IP', async (t) => {
 
   const usuario = await storeDe(handle).buscarUsuarioPorNombre('admin')
 
+  // Para probar los límites se usa una cuenta normal: el admin tiene el
+  // permiso `admin.users.unlimited_slots` y por diseño no está limitado.
+  const registro = await pedir('/api/auth/register', {
+    method: 'POST',
+    body: { username: 'limitado', email: 'limitado@example.com', password: 'limitado12345' },
+  })
+  let cookieUser = registro.cookie
+  let csrfUser = registro.datos?.csrf
+  if (!cookieUser) {
+    const loginUser = await pedir('/api/auth/login', {
+      method: 'POST',
+      body: { username: 'limitado', password: 'limitado12345' },
+    })
+    cookieUser = loginUser.cookie
+    csrfUser = loginUser.datos.csrf
+  }
+  const usuarioLimitado = await storeDe(handle).buscarUsuarioPorNombre('limitado')
+
   // Una cuenta ya tiene un sub-bot: el segundo debe rebotar.
   await handle.store.upsertBot({
-    userId: usuario.id,
+    userId: usuarioLimitado.id,
     phone: '5215500000001',
     folder: '5215500000001',
     linkedIp: '10.0.0.1',
@@ -360,8 +378,8 @@ test('webpanel: máximo de sub-bots por cuenta y por IP', async (t) => {
 
   const limiteUsuario = await pedir('/api/bots/link', {
     method: 'POST',
-    cookie: cookieAdmin,
-    csrf: csrfAdmin,
+    cookie: cookieUser,
+    csrf: csrfUser,
     headers: ipFalsa.headers,
     body: { phone: '5215500000002' },
   })
@@ -377,7 +395,7 @@ test('webpanel: máximo de sub-bots por cuenta y por IP', async (t) => {
   })
 
   await handle.store.upsertBot({
-    userId: usuario.id,
+    userId: usuarioLimitado.id,
     phone: '5215500000003',
     folder: '5215500000003',
     linkedIp: '10.0.0.1',
@@ -385,8 +403,8 @@ test('webpanel: máximo de sub-bots por cuenta y por IP', async (t) => {
 
   const limiteIp = await pedir('/api/bots/link', {
     method: 'POST',
-    cookie: cookieAdmin,
-    csrf: csrfAdmin,
+    cookie: cookieUser,
+    csrf: csrfUser,
     headers: ipFalsa.headers,
     body: { phone: '5215500000004' },
   })

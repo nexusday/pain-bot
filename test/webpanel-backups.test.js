@@ -16,7 +16,7 @@ import {
   restoreBackup,
   recoverBackup,
 } from '../lib/webpanel/backups.js'
-import { acquireRuntimeLease } from '../lib/runtime-lease.js'
+import { acquireRuntimeLease } from '../lib/single-instance.js'
 import { sqlAll } from '../lib/webpanel/push.js'
 import { startWebPanel } from '../lib/webpanel/server.js'
 

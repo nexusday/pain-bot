@@ -12,7 +12,7 @@ import {
   olvidarAjustesSesion,
   tieneAjustesGuardados
 } from '../lib/subbot-recovery.js'
-import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
+import { snapshotSesiones } from '../lib/session-registry.js'
 
 function dirSerbot() {
   return path.join(process.cwd(), global.bot || 'Serbot')
@@ -75,14 +75,12 @@ function listarSubsConectados() {
     vistos.add(num)
     lista.push({ num, conn: c, online: true })
   }
-  for (const worker of readSubbotWorkerStatuses(process.cwd())) {
-    for (const session of worker.sessions) {
-      if (!session.connected) continue
-      const num = digitos(session.number || session.folder)
-      if (num.length < 8 || vistos.has(num)) continue
-      vistos.add(num)
-      lista.push({ num, conn: null, online: true })
-    }
+  for (const session of snapshotSesiones()) {
+    if (!session.connected) continue
+    const num = digitos(session.number || session.folder)
+    if (num.length < 8 || vistos.has(num)) continue
+    vistos.add(num)
+    lista.push({ num, conn: null, online: true })
   }
   return lista
 }

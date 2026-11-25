@@ -1,5 +1,5 @@
 import ws from 'ws'
-import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
+import { snapshotSesiones } from '../lib/session-registry.js'
 import { enviarMensajeATodosLosSubBots } from '../lib/subme-broadcast.js'
 
 const RAIZ = process.cwd()
@@ -43,11 +43,9 @@ export function listarSubBotsConectados(conn) {
   }
 
   try {
-    for (const worker of readSubbotWorkerStatuses(RAIZ)) {
-      for (const session of worker.sessions) {
-        if (!session.connected) continue
-        agregar(session.number || session.folder)
-      }
+    for (const session of snapshotSesiones()) {
+      if (!session.connected) continue
+      agregar(session.number || session.folder)
     }
   } catch (error) {
     console.error('[subme] No se pudieron leer los estados de los workers:', error?.message || error)

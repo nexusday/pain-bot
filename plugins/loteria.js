@@ -36,7 +36,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner }) =
       try {
         const min = parsearTz(argZona(args))
         establecerTzLoteria(m.chat, min)
-        await global.db.write().catch(() => {})
+        void global.db.flushSoon?.()
         return conn.sendMessage(m.chat, {
           text: `Zona horaria de lotería: *${textoTzLoteria(m.chat)}*\n> Los pozos pausan de noche en esa hora.`,
           contextInfo: { ...rcanal.contextInfo }

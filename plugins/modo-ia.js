@@ -98,7 +98,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       }
       
       setModeState('modoIA', m.chat, true)
-      await global.db.write()
+      void global.db.flushSoon?.()
       
       let texto = `🌀 𝗠𝗼𝗱𝗼 𝗜𝗔 𝗮𝗰𝘁𝗶𝘃𝗮𝗱𝗼.\n> *Por:* @${m.sender.split('@')[0]}`
       
@@ -112,7 +112,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
       
     } else if (accion === 'off') {
       setModeState('modoIA', m.chat, false)
-      await global.db.write()
+      void global.db.flushSoon?.()
       
      
       try {

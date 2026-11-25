@@ -4,7 +4,7 @@ import { normalizeAntiText, sanitizeAntiPalabraWords, ensureAntiPalabraStore } f
 
 async function guardarAntiPalabra() {
   try {
-    if (global.db?.data) await global.db.write()
+    if (global.db?.data) void global.db.flushSoon?.()
   } catch {}
 }
 

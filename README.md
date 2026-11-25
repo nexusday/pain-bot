@@ -411,98 +411,94 @@ Uso personal o educativo. Respeta las [políticas de WhatsApp](https://www.whats
 ---
 
 *Pain Bot — By Sunkovv*
-# Sub-bot process layout
+# Arquitectura de procesos y sesiones
 
-The main bot runs in its own process. Sub-bots are split across several
-supervised workers (5 by default, `PAIN_SUBBOT_WORKERS`).
-`/pri 2` and per-sub-bot worker mode have been removed to keep process count and
-CPU overhead predictable.
+`index.js` levanta **un único** proceso `main.js` que hospeda el bot principal
+y todos los subbots (`global.conns`). Los plugins se cargan **una vez**, no una
+vez por worker. El panel web sigue en un proceso HTTP aparte y solo se comunica
+por RPC.
 
-> **Modo proceso único (por defecto desde esta versión).** `index.js` levanta
-> **un solo** proceso `main.js` que contiene el bot principal y todos los
-> sub-bots (`global.conns`). Los plugins se cargan **una vez**, no una vez por
-> worker, y no hay locks de handshake entre procesos. Se parece a la
-> arquitectura de GataBot-MD. El panel web sigue en un proceso HTTP aparte.
-> Para volver al supervisor clásico de 5 grupos: `PAIN_SINGLE_PROCESS=0`.
-> Variables nuevas: `PAIN_SINGLE_HEAP_MB` (heap del proceso único, 2048 por
-> defecto) y `PAIN_START_CONCURRENCY` (sesiones que arrancan a la vez, 8 por
-> defecto). En modo único `PAIN_SUBBOT_WORKERS` se ignora.
+Ya **no existe** el supervisor clásico de 5 grupos, ni los leases, la admisión
+por ficheros o los estados de worker. La vida de las sesiones vive en un único
+registro (`lib/sessions/registry.js`):
 
-**Los sub-bots esperan al principal.** Si el bot principal no tiene sesión
-registrada (estás emparejando con un código de 8 dígitos), los workers de
-sub-bots no arrancan: no se conecta nada hasta que termines el emparejamiento.
-En cuanto el principal queda vinculado, los sub-bots arrancan solos. Después de
-eso la compuerta ya no interviene: si el principal se desvincula más tarde, los
-sub-bots **siguen conectados y funcionando**. En modo proceso único los
-sub-bots arrancan 3 s después del principal, sin esperar a que termine el
-emparejamiento: son independientes y el panel puede vincularlos igual.
+- Un solo watchdog y una sola cola de arranque/reconexión con espaciado
+  (token-bucket) para no lanzar 300 handshakes a la vez.
+- El estado que ve el panel se publica desde ese registro; ningún comando lee
+  ficheros de estado en el camino de un mensaje.
+- Si el proceso muere por un fallo real, un supervisor mínimo lo reinicia con
+  backoff. Un error de un mensaje o de un plugin ya **no** tumba la flota.
 
-**`/subme <mensaje>`** no lo manda el principal a los sub-bots: **cada sub-bot
-se escribe a sí mismo** el mensaje (en su propio chat "mensajes para ti
-mismo"). Ni el principal les escribe a los sub-bots, ni los sub-bots se
-escriben entre sí, y **el principal no contesta nada** (tampoco una
-confirmación): solo reparte la orden.
+**Los subbots son independientes del principal.** Arrancan 3 s después y el
+panel puede vincularlos aunque el principal esté emparejando.
+
+**`/subme <mensaje>`** no lo manda el principal a los subbots: **cada subbot se
+escribe a sí mismo** el mensaje en su propio chat. El principal solo reparte la
+orden.
 
 **`/modosub <n>`** (también `/modobot`, `/botactivo`, `/onlybot`) elige qué bot
-responde en ese grupo. Como cada sub-bot vive en su propio proceso, el comando
-se resuelve con una **lista global** (principal + sub-bots de todos los
-workers) para que el número que elijas sea el mismo en todos lados:
-
-- La lista que muestra el comando y la que se guarda como "bot activo" son
-  idénticas en cada proceso.
-- **Solo contesta un bot**: el dueño del que elegiste. Los demás se callan
-  (antes todos mandaban la confirmación y cada worker elegía un bot distinto).
-- Si el bot elegido no está en el grupo, no aparece en la lista; si además
-  está desconectado, contesta uno solo (el responsable) avisando de ello.
-- `/modosub all` vuelve a dejar que respondan todos.
+responde en ese grupo. Solo contesta el bot elegido; los demás se callan.
+`/modosub all` vuelve a dejar que respondan todos (y multiplica el trabajo por
+cada bot del grupo: úsalo con criterio).
 
 ---
 
-# Memoria con muchos sub-bots
+# Rendimiento con muchos sub-bots
 
-Con 150+ sub-bots la RAM la consuma el proceso, no el bot. Por eso ahora:
+- **Envío sin red:** la cita "verificada" se arma en local con el `pushName`.
+  La foto de perfil sale solo de una caché (24 h) que se descarga en segundo
+  plano; el envío nunca espera a WhatsApp ni a un HTTP.
+- **Auth en memoria:** cada sesión mantiene credenciales y claves Signal en RAM
+  y las persiste con un diario (`auth-keys.ndjson`) + snapshot
+  (`auth-keys.json`). Ya no se escribe un fichero por clave en cada mensaje.
+- **Base de datos incremental:** solo se serializan los usuarios/chats tocados.
+  Un flush ligero cada 5 s y un escaneo completo de seguridad cada 15 min.
+  Los comandos ya no esperan a un volcado de toda la base.
+- **Cachés compartidas:** metadata de grupos en una caché global y mensajes en
+  un LRU por proceso. Se podan chats y metadata inactivos.
+- **Disco:** se limita el media de anti-delete (512 MB por defecto), se podan
+  logs viejos y se avisa si queda menos del 10 % libre.
+- **Catálogo de personajes:** 52 MB que se liberan tras 10 min sin uso.
 
-- Se podan por proceso los chats inactivos (150 por socket), la metadata de
-  grupos (60 por socket) y el caché de mensajes (4 000 por proceso, 50 por chat).
-- Se quitan las miniaturas (jpeg/png) de los mensajes cacheados: eran el bloque
-  más pesado y ningún comando las usaba.
-- Se libera el modelo de voz (Whisper) tras 5 min sin audio y se ejecuta GC
-  cuando el heap supera 350 MB.
-- Se limita el heap de cada proceso: 2048 MB para el proceso único, o 896 MB
-  por worker y 1 GB para el principal en modo clásico. Si el proceso se pasa,
-  el supervisor lo reinicia solo.
-
-Diagnóstico: `/mem` y `/mem limpiar` (fuerza poda y GC en el proceso actual).
+Diagnóstico: `/mem`, `/diag` y `/mem limpiar` (fuerza poda y GC).
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `PAIN_SINGLE_PROCESS` | `1` | `1` = un proceso (estilo GataBot); `0` = supervisor clásico de grupos |
-| `PAIN_SINGLE_HEAP_MB` | automático (25% RAM, máx 4096) | Tope de heap del proceso único |
+| `PAIN_SINGLE_HEAP_MB` | automático (30% RAM, máx 5120) | Tope de heap del proceso único |
 | `PAIN_START_CONCURRENCY` | `8` | Sesiones que se abren a la vez al arrancar |
-| `PAIN_START_GAP_MS` | `100` | Pausa entre inicios de sesión en modo único |
-| `PAIN_SINGLE_HANDSHAKE_CONCURRENCY` | `8` | Handshakes simultáneos en modo único |
-| `PAIN_HANDSHAKE_OPEN_TIMEOUT_MS` | `45000` | Si un socket no abre, libera su slot (no lo cierra) |
-| `PAIN_RECONNECT_CONCURRENCY` | `4` | Reconexiones simultáneas en modo único |
-| `PAIN_SUBBOT_WORKERS` | `5` | Solo modo clásico (`PAIN_SINGLE_PROCESS=0`) |
-| `PAIN_WORKER_HEAP_MB` | `896` | Tope de heap por worker (modo clásico) |
-| `PAIN_PRIMARY_HEAP_MB` | `1024` | Tope de heap del proceso principal (modo clásico) |
-| `PAIN_MAX_CHATS_SOCKET` | `150` | Chats guardados por socket |
-| `PAIN_MAX_GROUP_META` | `400` | Metadata de grupos en caché por proceso |
-| `PAIN_MAX_MSG_CACHE` | `4000` | Mensajes cacheados por proceso |
+| `PAIN_START_GAP_MS` | `100` | Pausa entre inicios de sesión |
+| `PAIN_RECONNECT_CONCURRENCY` | `4` | Reconexiones simultáneas |
+| `PAIN_SINGLE_RECONNECT_GAP_MS` | `1000` | Separación entre reconexiones |
+| `PAIN_DB_FLUSH_MS` | `1500` | Debounce del guardado incremental |
+| `PAIN_DB_COMMIT_MS` | `5000` | Commit ligero de colecciones pequeñas |
+| `PAIN_DB_FULL_SCAN_MS` | `900000` | Escaneo completo de seguridad (0 = nunca) |
+| `PAIN_DB_MAX_DIRTY` | `20000` | Entidades tocadas antes de pasar a escaneo completo |
+| `PAIN_AUTH_CREDS_MS` | `250` | Debounce de `creds.json` |
+| `PAIN_AUTH_JOURNAL_MS` | `500` | Debounce del diario de claves |
+| `PAIN_AUTH_COMPACT_MS` | `1800000` | Cada cuánto se compacta el diario |
+| `PAIN_QUOTED_AVATAR` | `1` | `0` = cita sin foto (cero red en el envío) |
+| `PAIN_AVATAR_TTL_MS` | `86400000` | Vida de la foto cacheada |
+| `PAIN_AVATAR_QUEUE` | `500` | Descargas de fotos en cola como máximo |
+| `PAIN_ANTIDELETE_MEDIA_MB` | `512` | Tope global de media de anti-delete |
+| `PAIN_DISK_FREE_PERCENT` | `10` | Aviso de disco libre |
+| `PAIN_CATALOG_IDLE_MS` | `600000` | Libera el catálogo tras ese tiempo sin uso |
+| `PAIN_MAX_CHATS_SOCKET` | `200` | Chats guardados por socket |
+| `PAIN_MAX_GROUP_META` | `400` | Metadata de grupos en caché |
+| `PAIN_MAX_MSG_CACHE` | `12000` | Mensajes cacheados por proceso |
 | `PAIN_MAX_MSG_CHAT` | `50` | Mensajes cacheados por chat |
 | `PAIN_GROUP_META_TTL_MS` | `1800000` | Antigüedad máxima de la metadata de un grupo |
-| `PAIN_GC_MIN_MB` | `350` | Heap a partir del cual se fuerza GC |
-| `PAIN_RSS_ALERT_MB` | `1200` | RSS del proceso que activa la poda agresiva |
+| `PAIN_RSS_ALERT_MB` | `1200` | RSS que activa la poda agresiva |
 | `PAIN_STT_IDLE_MS` | `300000` | Tiempo sin audio para descargar el modelo de voz |
 | `PAIN_MAX_IA_CHATS` | `300` | Chats con memoria de IA por proceso |
+| `PAIN_EXIT_ON_UNCAUGHT` | `0` | `1` restaura el reinicio ante cualquier excepción |
 
 ---
 
 ## Panel web
 
-El proceso principal del bot levanta un panel HTTP para registrar cuentas y
-vincular sub-bots desde el navegador. Los workers de sub-bots **nunca** abren
-el puerto: solo escucha el proceso principal.
+El proceso del bot levanta un panel HTTP para registrar cuentas y vincular
+sub-bots desde el navegador. El HTTP vive en un proceso aparte (`worker.js`);
+el proceso de WhatsApp nunca abre el puerto.
 
 - Puerto por defecto: **`10022`** (`global.webPanel.port` o `PAIN_WEB_PORT`).
 - Host: `0.0.0.0`, para que Pterodactyl pueda enrutar la allocation.

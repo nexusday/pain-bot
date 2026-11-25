@@ -6,7 +6,7 @@ import { isMainBotConn, cleanBotNum } from './modo-sub.js'
 import { formatBotUptime } from '../lib/bot-uptime.js'
 import { tr } from '../lib/lang.js'
 import { listarRequierenVincular, listarSesionesConCreds, sesionEnEmparejamiento } from '../lib/subbot-recovery.js'
-import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
+import { snapshotSesiones } from '../lib/session-registry.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -69,7 +69,7 @@ let handler = async (m, { conn, usedPrefix }) => {
     // abiertos. Un socket puede estar caído y el sub-bot seguir vinculado.
     const usuariosUnicos = new Map()
     const idsGruposUnicos = new Set()
-    const estadosWorkers = readSubbotWorkerStatuses(DIR_RAIZ)
+    const estadosWorkers = [{ workerId: 'primary', sessions: snapshotSesiones() }]
     const raizSubs = join(process.cwd(), global.bot || 'Serbot')
     const carpetasSesion = listarSesionesConCreds(raizSubs)
     // Incluye marcas sin creds (carpeta limpiada): si no, son invisibles.

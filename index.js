@@ -4,7 +4,7 @@ import { mkdirSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
-import { acquireRuntimeLease } from './lib/runtime-lease.js'
+import { acquireSingleInstance } from './lib/single-instance.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -28,26 +28,22 @@ try {
 
 await import('./config.js')
 try {
-  acquireRuntimeLease(join(__dirname, 'storage'), 'supervisor')
+  acquireSingleInstance(join(__dirname, 'storage'), 'supervisor')
 } catch (error) {
   console.error(`[supervisor] ${error.message}`)
   process.exit(1)
 }
 
 console.log('Verificando base compartida antes de iniciar los procesos...')
-await new ArchivoSqliteCompartido(
+const verificadorDb = new ArchivoSqliteCompartido(
   join(__dirname, 'storage', 'databases', 'database.sqlite'),
   join(__dirname, 'storage', 'databases', 'database.json')
-).read()
+)
+await verificadorDb.read()
+await verificadorDb.close()
 console.log('Base compartida lista.')
 
-// PAIN_SINGLE_PROCESS=0 vuelve al supervisor clásico (5 grupos de workers).
-// El modo normal es un solo proceso: plugins una vez y todos los sub-bots
-// dentro del mismo event loop, como GataBot-MD.
-if (process.env.PAIN_SINGLE_PROCESS === '0') {
-  console.log('[supervisor] Modo clásico (workers por grupo) activado por PAIN_SINGLE_PROCESS=0.')
-  await import('./supervisor-legacy.js')
-} else {
-  const { startSingleSupervisor } = await import('./lib/supervisor-single.js')
-  await startSingleSupervisor()
-}
+// Un único proceso `main.js` hospeda el bot principal y todos los sub-bots.
+// Los plugins se cargan una vez y no hay coordinación entre procesos.
+const { startSingleSupervisor } = await import('./lib/supervisor-single.js')
+await startSingleSupervisor()

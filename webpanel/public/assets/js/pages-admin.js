@@ -208,11 +208,11 @@ export function adminOverviewHTML(data) {
           </div>
         </div>
         <div class="card">
-          <div class="card-head"><div><h3>Workers de sub-bots</h3><p>${workers.length} proceso(s) reportando</p></div></div>
+          <div class="card-head"><div><h3>Proceso del bot</h3><p>Estado del único proceso que hospeda las sesiones</p></div></div>
           <div class="card-body">${workersList(workers)}</div>
         </div>
         <div class="card">
-          <div class="card-head"><div><h3>Distribución de sesiones</h3><p>Estado actual en disco y workers</p></div></div>
+          <div class="card-head"><div><h3>Distribución de sesiones</h3><p>Estado actual en disco</p></div></div>
           <div class="card-body">
             <div class="system-grid">
               <div class="system-item"><div class="si-label">Conectadas</div><div class="si-value" style="color:#86efac">${sessions.connected ?? 0}</div></div>
@@ -344,13 +344,13 @@ export function adminMainHTML(main) {
 
 export function workersList(workers) {
   if (!workers?.length) {
-    return '<div class="hint">No hay workers de sub-bots reportando. El proceso principal puede atender sesiones en modo standalone.</div>'
+    return '<div class="hint">Sin datos del proceso del bot. Se actualiza cada 30 s.</div>'
   }
   return `<div class="worker-list">${workers.map((worker) => {
     const active = Number(worker.connected) > 0
     return `<div class="worker-row">
       <span class="badge ${active ? 'success' : 'neutral'}"><span class="dot"></span>${active ? 'Activo' : 'Inactivo'}</span>
-      <span class="wr-name">${h(worker.id || 'worker')}</span>
+      <span class="wr-name">${h(worker.id || 'proceso')}</span>
       <span class="wr-meta">${Number(worker.connected) || 0}/${Number(worker.total) || 0} · ${fmtRelative(worker.updatedAt)}</span>
     </div>`
   }).join('')}</div>`
@@ -460,7 +460,7 @@ export function sessionsTable(sessions) {
   return `<div class="table-wrap"><table class="table">
     <thead><tr>
       <th class="check-col"><input type="checkbox" class="row-check" data-session-check-all aria-label="Seleccionar todas las sesiones visibles" /></th>
-      <th>Sesión</th><th>Dueño</th><th>Estado</th><th>Worker</th><th class="right">Acciones</th></tr></thead>
+      <th>Sesión</th><th>Dueño</th><th>Estado</th><th>Proceso</th><th class="right">Acciones</th></tr></thead>
     <tbody>${sessions.map((session) => {
       const phone = session.folder || session.phone
       const search = [phone, session.owner || '', session.label || '', session.status].join(' ').toLowerCase()
@@ -516,7 +516,7 @@ export function adminSessionsHTML(data) {
   </div>
   <div class="card">
     <div class="card-head">
-      <div><h3>Todas las sesiones</h3><p>Detectadas por el supervisor y los workers</p></div>
+      <div><h3>Todas las sesiones</h3><p>Detectadas por el proceso del bot</p></div>
       <div class="input-icon" style="max-width:290px;width:100%">${icon('search')}<input id="admin-sessions-search" class="input" placeholder="Buscar número o dueño…" /></div>
     </div>
     <div class="filter-bar">

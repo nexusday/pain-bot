@@ -1,5 +1,5 @@
 import ws from 'ws'
-import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
+import { snapshotSesiones } from '../lib/session-registry.js'
 import fs from 'fs'
 import { join, basename } from 'path'
 import {
@@ -242,22 +242,21 @@ export function listarBotsEnGrupoGlobal(participants = []) {
     })
   }
 
-  // Sub-bots que viven en otros procesos (grupos de workers).
+  // Sub-bots que no viven en este proceso (el panel corre aparte). En el
+  // proceso del bot esto sale del registro en memoria, sin leer ficheros.
   try {
-    for (const worker of readSubbotWorkerStatuses(process.cwd())) {
-      for (const sesion of worker.sessions || []) {
-        const ids = new Set()
-        if (sesion.number) ids.add(String(sesion.number))
-        if (sesion.jid) ids.add(String(sesion.jid))
-        if (sesion.lid) ids.add(String(sesion.lid))
-        agregar(sesion.number || sesion.folder, {
-          type: 'subbot',
-          name: sesion.name || 'Sub-Bot',
-          conn: null,
-          ids,
-          connected: sesion.connected !== false,
-        })
-      }
+    for (const sesion of snapshotSesiones()) {
+      const ids = new Set()
+      if (sesion.number) ids.add(String(sesion.number))
+      if (sesion.jid) ids.add(String(sesion.jid))
+      if (sesion.lid) ids.add(String(sesion.lid))
+      agregar(sesion.number || sesion.folder, {
+        type: 'subbot',
+        name: sesion.name || 'Sub-Bot',
+        conn: null,
+        ids,
+        connected: sesion.connected !== false,
+      })
     }
   } catch {}
 
@@ -373,13 +372,11 @@ export function listarNumerosBotsConocidos() {
   for (const c of lista) {
     for (const n of numerosIdentidadBot(c)) nums.add(n)
   }
-  // Sub-bots que viven en otros procesos (grupos de workers).
+  // Sub-bots del registro (sin leer ficheros de estado en el camino caliente).
   try {
-    for (const worker of readSubbotWorkerStatuses(process.cwd())) {
-      for (const s of worker.sessions) {
-        const n = limpiarNumBot(s.number) || limpiarNumBot(s.folder)
-        if (n.length >= 6) nums.add(n)
-      }
+    for (const sesion of snapshotSesiones()) {
+      const n = limpiarNumBot(sesion.number) || limpiarNumBot(sesion.folder)
+      if (n.length >= 6) nums.add(n)
     }
   } catch {}
   cacheBotsConocidos = nums

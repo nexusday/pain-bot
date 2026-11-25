@@ -79,7 +79,7 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
 
     if (accion === 'off') {
       setModeState('modoCustom', m.chat, false)
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       try {
         const { clearCustomMemory } = await import('../lib/geminiAPI.js')
@@ -176,7 +176,7 @@ let handler = async (m, { conn, args, text, usedPrefix, command, isAdmin }) => {
         by: m.sender
       })
       setModeState('modoCustom', m.chat, true)
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       try {
         const { clearCustomMemory } = await import('../lib/geminiAPI.js')

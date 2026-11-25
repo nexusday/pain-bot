@@ -46,6 +46,7 @@ try {
 }
 
 import { PROJECT_TMP, cleanupTmpFiles, startTmpCleanupInterval } from './lib/tmp-cleanup.js'
+import { startDiskHygiene } from './lib/disk-hygiene.js'
 import './config.js'
 import './lib/bot-uptime.js'
 import { createRequire } from 'module'
@@ -78,7 +79,7 @@ import {
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
-import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatusAsync } from './lib/subbot-status.js'
+import { removeSubbotWorkerStatus, writeSubbotWorkerStatusAsync } from './lib/subbot-status.js'
 import {
   iniciarMetricasWorker,
   obtenerActividadSocket,
@@ -86,44 +87,35 @@ import {
   registrarMetricasWorker,
 } from './lib/worker-metrics.js'
 import { ordenarSesionesPorPrioridad } from './lib/subbot-priority.js'
-import { confirmSessionLease, requestReconnectAll, requestReconnectOne, requestReloadAll } from './lib/process-isolation.js'
+import { snapshotSesiones, resumenSesiones, obtenerSesion } from './lib/session-registry.js'
 import { ejecutarEnContextoBot } from './lib/premium.js'
 import lodash from 'lodash' 
 import readline from 'readline'
 import NodeCache from 'node-cache'
 import qrcode from 'qrcode-terminal'
 import { EventEmitter } from 'node:events'
-import os from 'node:os'
-import { acquireRuntimeLease } from './lib/runtime-lease.js'
+import { acquireSingleInstance } from './lib/single-instance.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
 const {
   DisconnectReason,
-  useMultiFileAuthState,
   fetchLatestBaileysVersion,
   Browsers,
-  makeCacheableSignalKeyStore,
 } = await import('@whiskeysockets/baileys')
+import { useMemoryAuthState, flushAuthStores, estadisticasAuthStores, olvidarAuthStore } from './lib/auth-store.js'
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 3000
 const ROL_PAIN = process.env.PAIN_ROLE || ''
-// Bajo el supervisor (`PAIN_ROLE=primary|subbot`) la instancia única ya está
-// garantizada por el candado `supervisor`: repetir la comprobación aquí era
-// peligroso. Si quedaba un `primary.lock` huérfano de una salida forzada, su
-// PID podía acabar reutilizado por otro proceso del contenedor y el candado
-// creía que había otro primary vivo. Resultado: `process.exit(1)` en bucle,
-// reinicio cada pocos segundos y CPU al máximo. El candado solo se aplica al
-// arranque manual (sin supervisor), que es el caso en el que hace falta.
-const arranqueManual = ROL_PAIN !== 'primary' && ROL_PAIN !== 'subbot'
-try {
-  acquireRuntimeLease(
-    path.resolve('storage'),
-    ROL_PAIN === 'subbot' ? 'subbot' : 'primary',
-    { unique: arranqueManual }
-  )
-} catch (error) {
-  console.error(`[${ROL_PAIN || 'primary'}] ${error.message}`)
-  process.exit(1)
+// El supervisor ya garantiza una única instancia del bot. El candado solo se
+// adquiere en arranque manual (sin supervisor), donde de verdad hace falta.
+let liberarInstanciaPrincipal = null
+if (!ROL_PAIN) {
+  try {
+    liberarInstanciaPrincipal = acquireSingleInstance(path.resolve('storage'), 'primary')
+  } catch (error) {
+    console.error(`[primary] ${error.message}`)
+    process.exit(1)
+  }
 }
 
 protoType()
@@ -180,6 +172,13 @@ global.db = new Low(new ArchivoSqliteCompartido(
 ))
 
 global.DATABASE = global.db
+// El adaptador guarda solo lo que cambió. Estos atajos permiten a los plugins
+// pedir un guardado diferido (sin bloquear la respuesta) en vez de esperar a
+// que termine un volcado completo.
+global.db.flushSoon = () => global.db.adapter?.flushSoon?.() ?? Promise.resolve()
+global.db.writeCompleto = () => global.db.adapter?.writeCompleto?.(global.db.data) ?? global.db.write()
+global.db.markDirty = (coleccion, id) => global.db.adapter?.marcarEntidad?.(coleccion, id)
+global.db.estadisticasPersistencia = () => global.db.adapter?.estadisticas ?? null
 global.loadDatabase = async function loadDatabase() {
   if (global.db.READ)
     return new Promise((resolve) =>
@@ -237,19 +236,19 @@ global.loadDatabase = async function loadDatabase() {
       : {},
   }
   global.db.chain = lodash.chain(global.db.data) 
+  global.db.adapter?.vincularDatos?.(global.db.data)
 }
 
-const isSubbotWorker = process.env.PAIN_ROLE === 'subbot'
-const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
-// Modo unico: un solo proceso para principal + todos los sub-bots. El
-// supervisor clasico (PAIN_SINGLE_PROCESS=0) sigue disponible como rollback.
-const isSingleBotProcess = !isSubbotWorker && process.env.PAIN_SINGLE_PROCESS !== '0'
-global.__painSingleProcess = isSingleBotProcess
-global.processRole = isSubbotWorker ? 'subbot' : 'primary'
+const isSubbotWorker = false
+const isManagedPrimary = true
+// Un solo proceso: plugins una vez y todos los sub-bots en el mismo event loop.
+// Las ramas del supervisor clásico (`PAIN_SINGLE_PROCESS=0`) se eliminaron.
+const isSingleBotProcess = true
+global.__painSingleProcess = true
+global.processRole = 'primary'
 // Los sub-bots no deben quitarle CPU al bot principal.
-if (isSubbotWorker) {
-  try { os.setPriority(10) } catch {}
-}
+// (En el proceso único todos comparten prioridad; se conserva por si se
+// reutiliza el módulo en un futuro modo por carriles.)
 
 // Si el supervisor desaparece, este proceso no debe quedarse vivo: seguiría
 // manteniendo sockets abiertos y gastando CPU, y cuando arranque el nuevo
@@ -334,6 +333,7 @@ async function guardarCredencialesPrincipales(...args) {
     try {
       const { borrarCredencialesPrincipales } = await import('./lib/main-session.js')
       borrarCredencialesPrincipales()
+      await olvidarAuthStore(global.authFile).catch(() => {})
     } catch {}
     return
   }
@@ -342,7 +342,7 @@ async function guardarCredencialesPrincipales(...args) {
 
 let workerStatusInterval = null
 if (!isSubbotWorker) {
-  const authState = await useMultiFileAuthState(global.authFile)
+  const authState = await useMemoryAuthState(global.authFile)
   state = authState.state
   saveCreds = authState.saveCreds
 }
@@ -359,12 +359,13 @@ if (!isSubbotWorker) {
   cacheReintentoPrincipal = new NodeCache({ stdTTL: 90, checkperiod: 120, useClones: false, maxKeys: 300 })
 
   connectionOptions = conSocketEstable({
+    getMessageSocket: () => global.conn,
     version,
     logger,
     printQRInTerminal: false,
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
+      keys: state.keys,
     },
     browser: Browsers.ubuntu('Chrome'),
     markOnlineOnConnect: true,
@@ -511,18 +512,29 @@ if (!opts['test']) {
       phase ^= character.charCodeAt(0)
       phase = Math.imul(phase, 16777619)
     }
-    // Guardado periódico espaciado: serializar la DB congela el event loop.
-    // Con DB de ~38 MB el escaneo completo pesa; 60s es el equilibrio
-    // (ajustable con PAIN_DB_SAVE_MS, mínimo 30s).
+    // Guardado periódico: el adaptador solo escribe lo que cambió, así que un
+    // volcado cada minuto es barato. El escaneo completo de seguridad lo hace
+    // el propio adaptador cada 15 min (PAIN_DB_FULL_SCAN_MS).
     const intervaloGuardado = Math.max(
       Number.parseInt(
         isSingleBotProcess
-          ? (process.env.PAIN_SINGLE_DB_SAVE_MS || '300000')
+          ? (process.env.PAIN_SINGLE_DB_SAVE_MS || '60000')
           : process.env.PAIN_DB_SAVE_MS,
         10
-      ) || (isSingleBotProcess ? 300_000 : 60_000),
+      ) || (isSingleBotProcess ? 60_000 : 60_000),
       30_000
     )
+    // Commit ligero: guarda los cambios pequeños (modos, ajustes) sin esperar
+    // al volcado periódico ni bloquear ninguna respuesta.
+    const intervaloCommit = Math.min(
+      Math.max(Number.parseInt(process.env.PAIN_DB_COMMIT_MS, 10) || 5000, 1000),
+      intervaloGuardado
+    )
+    const commit = setInterval(() => {
+      if (escribiendoDb || !global.db.data) return
+      void global.db.flushSoon?.()
+    }, intervaloCommit)
+    commit.unref?.()
     const initialDelay = (phase >>> 0) % intervaloGuardado
     const firstSave = setTimeout(() => {
       void guardarDb()
@@ -545,6 +557,7 @@ function mantenerPresenciaPrincipal(sock) {
 }
 
 if (!isSubbotWorker) startTmpCleanupInterval({ verbose: true, intervalMs: 2 * 60_000 })
+if (!isSubbotWorker) startDiskHygiene()
 
 let reconectandoPrincipal = false
 let sinSocketDesde = 0
@@ -747,15 +760,6 @@ async function connectionUpdate(update) {
   }, 4000)
 }
 
-process.on('uncaughtException', (error) => {
-  if (esErrorDeRedBenigno(error)) {
-    console.error(`[net] error de red ignorado: ${resumenError(error)}`)
-    return
-  }
-  console.error('Error no capturado; el supervisor reiniciará el proceso:', error)
-  process.exit(1)
-})
-
 let isInit = true
 let handler = await import('./handler.js')
 global.handlerModule = handler
@@ -835,10 +839,14 @@ global.reloadHandler = async function (restartConn) {
       if (!sub.authState?.creds?.registered) return
       const modulo = global.handlerModule
       if (!modulo?.handler) return
-      // Cada mensaje se atiende dentro del contexto de SU sub-bot: la moneda,
-      // el canal y los textos del menú premium no se mezclan entre sub-bots
-      // que comparten este proceso.
-      return ejecutarEnContextoBot(sub, () => modulo.handler.call(sub, chatUpdate))
+      try {
+        // Cada mensaje se atiende dentro del contexto de SU sub-bot: la moneda,
+        // el canal y los textos del menú premium no se mezclan entre sub-bots
+        // que comparten este proceso.
+        return await ejecutarEnContextoBot(sub, () => modulo.handler.call(sub, chatUpdate))
+      } catch (error) {
+        console.error('[subbot] error procesando mensaje:', error?.message || error)
+      }
     }
     const handlersAnteriores = new Set([sub.handler, sub._upsertVivo])
     for (const handlerAnterior of handlersAnteriores) {
@@ -873,19 +881,21 @@ global.reiniciarPrincipalLimpio = async function reiniciarPrincipalLimpio({ time
   const { borrarCredencialesPrincipales } = await import('./lib/main-session.js')
   borrarCredencialesPrincipales()
   global.__painBloquearCreds = false
+  await olvidarAuthStore(global.authFile).catch(() => {})
 
-  const authState = await useMultiFileAuthState(global.authFile)
+  const authState = await useMemoryAuthState(global.authFile)
   state = authState.state
   saveCreds = authState.saveCreds
 
   const { version } = await fetchLatestBaileysVersion()
   connectionOptions = conSocketEstable({
+    getMessageSocket: () => global.conn,
     version,
     logger,
     printQRInTerminal: false,
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
+      keys: state.keys,
     },
     browser: Browsers.ubuntu('Chrome'),
     markOnlineOnConnect: true,
@@ -1028,28 +1038,14 @@ global.recargarEnCaliente = async function recargarEnCaliente({ plugins = [] } =
 }
 
 /**
- * Pide a los workers de sub-bots que recarguen su codigo en caliente.
- * Sin esto, una actualizacion solo llegaba al proceso principal y los
- * sub-bots seguian con el codigo viejo hasta reiniciar.
+ * Recarga en caliente del único proceso (handler + plugins indicados).
  */
 global.pedirRecargaWorkers = async function pedirRecargaWorkers(plugins = []) {
-  if (isSubbotWorker) return { dispatched: 0, workers: 0, motivo: 'worker' }
-  if (isSingleBotProcess) {
-    try {
-      const resumen = await global.recargarEnCaliente?.({ plugins })
-      return { dispatched: 1, workers: 1, resumen, motivo: null }
-    } catch (error) {
-      console.error('[hot] No se pudo recargar el proceso único:', error?.message || error)
-      return { dispatched: 0, workers: 0, motivo: error?.message || 'error' }
-    }
-  }
-  if (typeof requestReloadAll !== 'function') return { dispatched: 0, workers: 0, motivo: 'sin-ipc' }
   try {
-    const ack = await requestReloadAll({ plugins })
-    if (!ack) return { dispatched: 0, workers: 0, motivo: 'sin-respuesta' }
-    return { dispatched: ack.dispatched ? 1 : 0, workers: ack.workers || 0, motivo: null }
+    const resumen = await global.recargarEnCaliente?.({ plugins })
+    return { dispatched: 1, workers: 1, resumen, motivo: null }
   } catch (error) {
-    console.error('[hot] No se pudo pedir la recarga a los workers:', error?.message || error)
+    console.error('[hot] No se pudo recargar el proceso único:', error?.message || error)
     return { dispatched: 0, workers: 0, motivo: error?.message || 'error' }
   }
 }
@@ -1116,41 +1112,11 @@ async function filesInit() {
 }
 
 /**
- * Cargar 255 plugins consume CPU. Si los 6 procesos lo hacen a la vez, el
- * arranque se come el plan entero (medido: 60-69 s por proceso en paralelo),
- * provoca throttling y con él los 408/428 y las reconexiones. Se serializa
- * entre procesos con la misma admisión por archivos.
+ * Carga de plugins. En el proceso único no hay nada que serializar: se
+ * importan en paralelo con el límite de `filesInit`.
  */
 async function cargarPluginsConTurno() {
-  // En modo unico solo hay un proceso: no hay nada que serializar y un lock
-  // de disco solo puede dejar la carga esperando 3 minutos si quedo huerfano.
-  if (isSingleBotProcess) {
-    await filesInit()
-    return
-  }
-  // Uno a la vez: la compilación de módulos usa varios hilos de V8 y dos
-  // procesos cargando a la vez ya rozaban el 800 % de CPU en el servidor.
-  const concurrencia = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_PLUGIN_LOAD_CONCURRENCY, 10) || 1, 1),
-    4
-  )
-  let liberar = null
-  try {
-    const { adquirirPermisoCompartido } = await import('./lib/host-admission.js')
-    liberar = await adquirirPermisoCompartido('plugin-load', {
-      rootDir: __dirname,
-      slots: concurrencia,
-      ttlMs: 180_000,
-      cancelado: () => false,
-    })
-  } catch (error) {
-    console.error('[boot] No se pudo serializar la carga de plugins:', error?.message || error)
-  }
-  try {
-    await filesInit()
-  } finally {
-    liberar?.()
-  }
+  await filesInit()
 }
 
 function finalizarCargaPlugins() {
@@ -1267,14 +1233,9 @@ watch(join(__dirname, 'lib'), { recursive: true }, (_evento, filename) => {
 
 if (!isSubbotWorker) {
   await global.reloadHandler()
-  if (isSingleBotProcess) {
-    global.conns = []
-    // Se arranca en segundo plano para no bloquear el resto del arranque
-    // (panel, tick de loteria, etc.). Las sesiones se conectan en paralelo.
-    await iniciarGestorSubBots({ unificado: true })
-  }
-} else {
-  await iniciarGestorSubBots({ unificado: false })
+  global.conns = []
+  // Se arranca sin bloquear el resto del arranque (panel, tick de lotería).
+  await iniciarGestorSubBots()
 }
 
 /** Sesiones listas para conectar (mismo criterio que el supervisor). */
@@ -1307,37 +1268,30 @@ function listarSesionesListas(serbotDir) {
   }
 }
 
-async function iniciarGestorSubBots({ unificado = false } = {}) {
+async function iniciarGestorSubBots() {
   if (!Array.isArray(global.conns)) global.conns = []
   const serbotModule = await import('./plugins/serbot-serbot.js')
   const serbotDir = resolve(__dirname, global.bot || 'Serbot')
   const sesionesEnDisco = listarSesionesListas(serbotDir)
-  if (unificado) {
-    try {
-      const totalCarpetas = contarSesionesEnDisco(serbotDir).todas.length
+  try {
+    const totalCarpetas = contarSesionesEnDisco(serbotDir).todas.length
+    console.log(
+      `[subbots] ${sesionesEnDisco.length} sesión(es) con credenciales registradas ` +
+      `de ${totalCarpetas} carpeta(s) con creds.json.`
+    )
+    if (sesionesEnDisco.length < totalCarpetas) {
       console.log(
-        `[subbots] ${sesionesEnDisco.length} sesión(es) con credenciales registradas ` +
-        `de ${totalCarpetas} carpeta(s) con creds.json.`
+        `[subbots] ${totalCarpetas - sesionesEnDisco.length} carpeta(s) sin registrar ` +
+        '(registered:false) se omiten; requieren volver a vincular desde el panel.'
       )
-      if (sesionesEnDisco.length < totalCarpetas) {
-        console.log(
-          `[subbots] ${totalCarpetas - sesionesEnDisco.length} carpeta(s) sin registrar ` +
-          '(registered:false) se omiten; requieren volver a vincular desde el panel.'
-        )
-      }
-    } catch {}
-  }
-  const assignedSessions = unificado
-    ? sesionesEnDisco
-    : JSON.parse(process.env.PAIN_SESSIONS_JSON || '[]')
-  if (!Array.isArray(assignedSessions)) throw new Error('La asignación de sub-bots no es válida')
-  let sessions = [...new Set(assignedSessions)].filter(folder =>
+    }
+  } catch {}
+  let sessions = [...new Set(sesionesEnDisco)].filter(folder =>
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
-  const workerId = unificado ? 'primary' : (process.env.PAIN_WORKER_ID || 'subbot')
+  const workerId = 'primary'
   iniciarMetricasWorker()
   const sesionesIniciando = new Map()
-  const sesionesRetiradas = new Set()
   let muestrasMetricas = 0
   const socketDeSesion = (folder) => {
     const botPath = resolve(serbotDir, folder)
@@ -1352,7 +1306,6 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     return socket?.ws?.isOpen === true || readyState === ws.OPEN
   }
   const iniciarSesion = (folder) => {
-    if (sesionesRetiradas.has(folder)) return Promise.resolve('skipped')
     const existing = sesionesIniciando.get(folder)
     if (existing) return existing
     if (sesionAbierta(folder)) return Promise.resolve('skipped')
@@ -1404,17 +1357,20 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     sesionesIniciando.set(folder, promise)
     return promise
   }
+  let estadoMemoriaCache = { datos: null, at: 0 }
   const publishWorkerStatus = () => {
     const inicioEstado = Date.now()
-    const socketsBySessionPath = new Map()
-    for (const socket of global.conns) {
-      if (socket?.pathAYBot) socketsBySessionPath.set(resolve(socket.pathAYBot), socket)
-    }
-    const estado = estadoMemoriaProceso()
-    const msEstado = Date.now() - inicioEstado
     const metricas = registrarMetricasWorkerEnseguro()
     muestrasMetricas++
-    if (unificado && metricas && muestrasMetricas > 2) {
+    // Recorrer chats/metadata de cientos de sockets es caro: se hace cada
+    // 2 minutos y se reutiliza la última muestra. Las sesiones salen del
+    // registro en memoria, sin leer ficheros.
+    if (!estadoMemoriaCache.datos || Date.now() - estadoMemoriaCache.at >= 120_000) {
+      estadoMemoriaCache = { datos: estadoMemoriaProceso(), at: Date.now() }
+    }
+    const estado = estadoMemoriaCache.datos
+    const msEstado = Date.now() - inicioEstado
+    if (metricas && muestrasMetricas > 2) {
       const lag = Number(metricas.lagP99Ms) || 0
       if (lag > 250) {
         console.warn(
@@ -1424,26 +1380,10 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       }
     }
     const inicioWrite = Date.now()
-    writeSubbotWorkerStatusAsync(__dirname, workerId, sessions.map((folder) => {
-      const socket = socketsBySessionPath.get(join(serbotDir, folder))
-      const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
-      return {
-        folder,
-        number: socket?.phoneNumber || socket?.botNumber ||
-          socket?.user?.jid || socket?.user?.id || folder,
-        name: socket?.user?.name || socket?.authState?.creds?.me?.name || '',
-        // Identidad completa (PN + LID) para que otros procesos puedan saber
-        // si este sub-bot está en un grupo concreto.
-        jid: socket?.user?.jid || socket?.user?.id || '',
-        lid: socket?.user?.lid || '',
-        connected: Boolean(
-          (socket?.user?.jid || socket?.user?.id) &&
-          (socket?.ws?.isOpen === true || readyState === ws.OPEN)
-        ),
-        requiresRelink: existsSync(join(serbotDir, folder, '.needs-relink')),
-        actividad: obtenerActividadSocket(socket, { reset: true }),
-      }
-    }), {
+    writeSubbotWorkerStatusAsync(__dirname, 'primary', snapshotSesiones().map((sesion) => ({
+      ...sesion,
+      actividad: obtenerActividadSocket(obtenerSesion(sesion.folder)?.conn, { reset: true })
+    })), {
       memoria: estado.memoria,
       recursos: {
         sockets: estado.sockets,
@@ -1454,19 +1394,19 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
         cacheMensajes: estado.cacheMensajes,
         modoAhorro: estado.modoAhorro,
       },
-      // Métricas operacionales: lag del event loop (ms), CPU %, mensajería y
-      // reconexiones de esta ventana. Las usa el supervisor para balancear
-      // por carga real; el panel puede mostrarlas tal cual.
       metricas,
+      resumen: resumenSesiones(),
+      persistencia: global.db?.estadisticasPersistencia?.() || null,
+      auth: estadisticasAuthStores(),
     }).then(() => {
       const msWrite = Date.now() - inicioWrite
-      if (unificado && msWrite > 700) {
+      if (msWrite > 700) {
         console.warn(`[salud] estado en disco lento: ${msWrite} ms`)
       }
     }).catch((error) => {
       console.error('[estado] No se pudo escribir el estado:', error?.message || error)
     })
-    if (unificado && msEstado > 500) {
+    if (msEstado > 500) {
       console.warn(`[salud] calcular estado lento: ${msEstado} ms`)
     }
   }
@@ -1481,9 +1421,7 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
   }
   publishWorkerStatus()
   let ticksEstado = 0
-  // 15 s: sigue muy por debajo del umbral de estado obsoleto (60 s) y reduce
-  // un tercio el JSON/escritura de estado con cientos de sesiones.
-  const intervaloEstadoMs = unificado ? 30_000 : 10_000
+  const intervaloEstadoMs = 30_000
   workerStatusInterval = setInterval(() => {
     try {
       publishWorkerStatus()
@@ -1491,208 +1429,58 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       console.error(`Worker ${workerId}: no se pudo publicar el estado de sus sesiones:`, error?.message || error)
     }
     // Historial liviano: una línea por minuto en storage/metrics/
-    if (ticksEstado % 4 === 3) {
+    if (ticksEstado % 2 === 1) {
       persistirMetricaEnseguro(workerId, __dirname)
     }
-    // Higiene de memoria cada ~30s (2 ticks de 15s).
-    if (++ticksEstado % (unificado ? 4 : 2) === 0) {
+    // Higiene de memoria cada 2 min (4 ticks de 30 s).
+    if (++ticksEstado % 4 === 0) {
       import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
         try {
           const inicioHigiene = Date.now()
           higieneMemoriaProceso()
           const msHigiene = Date.now() - inicioHigiene
-          if (unificado && msHigiene > 500) {
+          if (msHigiene > 500) {
             console.warn(`[salud] higiene de memoria lenta: ${msHigiene} ms`)
           }
         } catch {}
       }).catch(() => {})
-      // Archiva sesiones rechazadas: evita que se acumulen carpetas muertas.
       try { purgarReenlacesPendientes(serbotDir) } catch {}
     }
   }, intervaloEstadoMs)
   workerStatusInterval.unref?.()
-  process.on('message', async (message) => {
-    if (message?.type === 'reload-worker') {
-      // Actualización en caliente del worker: se reimportan handler + plugins
-      // sin reiniciar el proceso (las sesiones siguen conectadas).
-      const plugins = Array.isArray(message.plugins)
-        ? message.plugins.filter((p) => typeof p === 'string')
-        : []
-      let resumen = { handler: false, plugins: [] }
-      let error = null
-      try {
-        resumen = (await global.recargarEnCaliente?.({ plugins })) || resumen
-      } catch (e) {
-        error = e?.message || String(e)
-      }
-      try {
-        process.send({
-          type: 'reload-worker-result',
-          requestId: message.requestId,
-          resumen,
-          error
-        }, () => {})
-      } catch {}
-      return
-    }
-    if (message?.type === 'send-private' && typeof message.text === 'string') {
-      // /subme: cada sub-bot de este worker se escribe a sí mismo el mensaje.
-      const { enviarMensajeASuPropioChat } = await import('./lib/subme-broadcast.js')
-      const sockets = (global.conns || []).filter(Boolean)
-      const resultado = await enviarMensajeASuPropioChat(message.text, sockets)
-      try {
-        process.send({
-          type: 'send-private-result',
-          requestId: message.requestId,
-          enviados: resultado.enviados,
-          fallidos: resultado.fallidos,
-        }, () => {})
-      } catch {}
-      return
-    }
-    if (message?.type === 'reconnect-sessions' && Array.isArray(message.sessions)) {
-      const wanted = [...new Set(message.sessions)].filter(folder =>
-        typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
-      )
-      if (!wanted.length) return
-      for (const folder of wanted) {
-        sesionesRetiradas.delete(folder)
-        if (!sessions.includes(folder)) sessions.push(folder)
-      }
-      const socketAbiertoAqui = (folder) => {
-        const digits = String(folder).replace(/\D/g, '')
-        return (global.conns || []).some((c) => {
-          const tieneUsuario = Boolean(c?.user?.id || c?.user?.jid)
-          const abierto = c?.ws?.isOpen === true ||
-            (c?.ws?.socket?.readyState ?? c?.ws?.readyState) === ws.OPEN
-          if (!tieneUsuario || !abierto) return false
-          const jidDigits = String(c?.phoneNumber || c?.botNumber || c?.user?.jid || c?.user?.id || '')
-            .split('@')[0].split(':')[0].replace(/\D/g, '')
-          const pathDigits = c?.pathAYBot
-            ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '')
-            : ''
-          return jidDigits === digits || pathDigits === digits
-        })
-      }
-      for (const folder of wanted) {
-        if (socketAbiertoAqui(folder)) continue
-        try {
-          await serbotModule.retirarSesionDeWorker(join(serbotDir, folder), { handoff: false })
-        } catch {}
-        sesionesRetiradas.delete(folder)
-        await iniciarSesion(folder)
-      }
-      try {
-        publishWorkerStatus()
-      } catch (error) {
-        console.error(`Worker ${workerId}: no se pudo actualizar el estado tras reconectar:`, error?.message || error)
-      }
-      return
-    }
-    if (message?.type === 'add-sessions' && Array.isArray(message.sessions)) {
-      const added = ordenarSesionesPorPrioridad(serbotDir, [...new Set(message.sessions)].filter(folder =>
-        typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
-      ))
-      for (const folder of added) {
-        sesionesRetiradas.delete(folder)
-        if (!sessions.includes(folder)) sessions.push(folder)
-      }
-      // No abrir todas las sesiones añadidas en paralelo: una oleada de
-      // handshakes deja sin respuesta los keepalives de sockets ya vivos y
-      // provoca una cascada de 408. Se conserva el orden premium/FIFO.
-      for (let i = 0; i < added.length; i++) {
-        await iniciarSesion(added[i])
-        if (i + 1 < added.length && pausaEntreLotesMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, pausaEntreLotesMs))
-        }
-      }
-      try {
-        publishWorkerStatus()
-      } catch (error) {
-        console.error(`Worker ${workerId}: no se pudo actualizar el estado tras añadir sesiones:`, error?.message || error)
-      }
-      return
-    }
-    if (message?.type !== 'remove-sessions' || !Array.isArray(message.sessions)) return
-    const removed = new Set(message.sessions.filter(folder =>
-      typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
-    ))
-    if (!removed.size) return
-    for (const folder of removed) sesionesRetiradas.add(folder)
-    const cierres = [...removed].map((folder) =>
-      serbotModule.retirarSesionDeWorker(
-        join(serbotDir, folder),
-        { handoff: message.handoff === true }
-      )
-    )
-    sessions = sessions.filter(folder => !removed.has(folder))
-    await Promise.all(cierres)
-    try {
-      publishWorkerStatus()
-    } catch (error) {
-      console.error(`Worker ${workerId}: no se pudo actualizar el estado tras eliminar sesiones:`, error?.message || error)
-    }
-    for (const folder of removed) confirmSessionLease(folder)
-  })
-  const batchSize = Math.max(Number.parseInt(process.env.PAIN_SUBBOT_BATCH, 10) || 1, 1)
-  const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
-  const pausaEntreLotesMs = unificado
-    ? (Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 100)
-    : (Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1500)
+  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 100
   const concurrenciaArranque = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 8 : 1), 1),
+    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || 8, 1),
     16
   )
   const initialSessions = ordenarSesionesPorPrioridad(serbotDir, [...sessions])
   const arrancarTodas = async () => {
-    if (unificado) {
-      const cola = [...initialSessions]
-      let iniciadas = 0
-      let intentos = 0
-      const trabajador = async () => {
-        while (cola.length) {
-          const folder = cola.shift()
-          const resultado = await iniciarSesion(folder)
-          intentos++
-          if (resultado === 'started') iniciadas++
-          if (intentos % 25 === 0) {
-            console.log(
-              `[subbots] arranque: ${intentos}/${initialSessions.length} intentadas, ` +
-              `${iniciadas} socket(s) creados, ${cola.length} pendientes.`
-            )
-          }
-          if (pausaEntreLotesMs > 0) {
-            await new Promise((resolver) => setTimeout(resolver, pausaEntreLotesMs))
-          }
+    const cola = [...initialSessions]
+    let iniciadas = 0
+    let intentos = 0
+    const trabajador = async () => {
+      while (cola.length) {
+        const folder = cola.shift()
+        const resultado = await iniciarSesion(folder)
+        intentos++
+        if (resultado === 'started') iniciadas++
+        if (intentos % 25 === 0) {
+          console.log(
+            `[subbots] arranque: ${intentos}/${initialSessions.length} intentadas, ` +
+            `${iniciadas} socket(s) creados, ${cola.length} pendientes.`
+          )
+        }
+        if (pausaEntreLotesMs > 0) {
+          await new Promise((resolver) => setTimeout(resolver, pausaEntreLotesMs))
         }
       }
-      await Promise.all(
-        Array.from({ length: Math.min(concurrenciaArranque, cola.length) }, trabajador)
-      )
-      console.log(
-        `Subbots (proceso único) iniciaron ${iniciadas}/${initialSessions.length} ` +
-        `sesión(es) con concurrencia ${concurrenciaArranque}.`
-      )
-      return
     }
-    let started = 0
-    let skipped = 0
-    let failed = 0
-    for (let i = 0; i < initialSessions.length; i += batchSize) {
-      const batch = initialSessions.slice(i, i + batchSize)
-      const results = await Promise.all(batch.map(async (folder) => {
-        return iniciarSesion(folder)
-      }))
-      started += results.filter(result => result === 'started').length
-      skipped += results.filter(result => result === 'skipped').length
-      failed += results.filter(result => result === 'failed').length
-      if (i + batchSize < initialSessions.length) {
-        await new Promise(resolve => setTimeout(resolve, pausaEntreLotesMs))
-      }
-    }
+    await Promise.all(
+      Array.from({ length: Math.min(concurrenciaArranque, cola.length) }, trabajador)
+    )
     console.log(
-      `Worker ${workerId} inició ${started}/${sessions.length} sesión(es); ` +
-      `${skipped} omitida(s), ${failed} con error.`
+      `Subbots (proceso único) iniciaron ${iniciadas}/${initialSessions.length} ` +
+      `sesión(es) con concurrencia ${concurrenciaArranque}.`
     )
   }
 
@@ -1786,48 +1574,91 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     }
   }
 
-  if (unificado) {
-    global.subBotsReconnected = true
-    global.__painReconnectOne = reconectarUnaLocal
-    global.__painReconnectAll = reconectarTodasLocal
-    // Alta de sesiones vinculadas desde el panel y limpieza de sockets de
-    // carpetas que ya no existen. Sustituye al reconcile del supervisor.
-    const escanearSesiones = () => {
-      let disco = []
-      try { disco = listarSesionesListas(serbotDir) } catch { return }
-      const enDisco = new Set(disco)
-      for (const folder of disco) {
-        if (sessions.includes(folder)) continue
-        sessions.push(folder)
-        void iniciarSesion(folder)
+  global.subBotsReconnected = true
+  global.__painReconnectOne = reconectarUnaLocal
+  global.__painReconnectAll = reconectarTodasLocal
+  // Alta de sesiones vinculadas desde el panel y limpieza de sockets de
+  // carpetas que ya no existen. El aviso llega por fs.watch (el panel corre en
+  // otro proceso y escribe en Serbot/); el intervalo de 5 min es solo la red
+  // de seguridad. Antes se leía y parseaba cada creds.json cada 30 s.
+  let arranqueInicialHecho = false
+  const nuevasPendientes = []
+  let drenandoNuevas = false
+  const drenarNuevas = async () => {
+    if (drenandoNuevas) return
+    drenandoNuevas = true
+    try {
+      while (nuevasPendientes.length) {
+        const folder = nuevasPendientes.shift()
+        await iniciarSesion(folder)
+        if (pausaEntreLotesMs > 0) {
+          await new Promise((resolver) => setTimeout(resolver, pausaEntreLotesMs))
+        }
       }
-      for (const folder of [...sessions]) {
-        if (enDisco.has(folder)) continue
-        const botPath = join(serbotDir, folder)
-        // Una vinculación en curso (panel) no debe cancelarse por el escaneo.
-        if (sesionEnEmparejamiento(botPath)) continue
-        sessions = sessions.filter((item) => item !== folder)
-        void serbotModule.retirarSesionDeWorker(botPath, { handoff: false })
-      }
+    } finally {
+      drenandoNuevas = false
     }
-    escanearSesiones()
-    const escaneo = setInterval(escanearSesiones, 30_000)
-    escaneo.unref?.()
-    // Dar unos segundos al principal para que abra su socket antes de la
-    // oleada de sub-bots. El arranque corre en segundo plano.
-    const retrasoArranque = Math.max(
-      Number.parseInt(process.env.PAIN_SUBBOT_START_DELAY_MS, 10) || 3000,
-      0
-    )
-    setTimeout(() => {
-      void arrancarTodas().catch((error) => {
+  }
+  const escanearSesiones = () => {
+    let disco = []
+    try { disco = listarSesionesListas(serbotDir) } catch { return }
+    const enDisco = new Set(disco)
+    for (const folder of disco) {
+      if (sessions.includes(folder)) continue
+      sessions.push(folder)
+      // En el arranque inicial manda `arrancarTodas` para las sesiones ya
+      // conocidas; las que aparezcan durante esos 3 s se encolan aquí y se
+      // arrancan en cuanto termina, sin oleada.
+      nuevasPendientes.push(folder)
+    }
+    for (const folder of [...sessions]) {
+      if (enDisco.has(folder)) continue
+      const botPath = join(serbotDir, folder)
+      // Una vinculación en curso (panel) no debe cancelarse por el escaneo.
+      if (sesionEnEmparejamiento(botPath)) continue
+      sessions = sessions.filter((item) => item !== folder)
+      void serbotModule.retirarSesionDeWorker(botPath, { handoff: false })
+    }
+    if (arranqueInicialHecho) void drenarNuevas()
+  }
+  let escaneoTimer = null
+  const agendarEscaneo = () => {
+    if (escaneoTimer) return
+    escaneoTimer = setTimeout(() => {
+      escaneoTimer = null
+      escanearSesiones()
+    }, 1500)
+    escaneoTimer.unref?.()
+  }
+  escanearSesiones()
+  try {
+    // Solo el nivel raíz: las carpetas nuevas/borradas. Un watch recursivo
+    // emitiría un evento por cada escritura del diario de auth (miles por
+    // minuto) y costaría más que el escaneo que sustituye.
+    const vigilante = watch(serbotDir, { recursive: false }, (_evento, archivo) => {
+      if (!archivo) return agendarEscaneo()
+      agendarEscaneo()
+    })
+    vigilante.on?.('error', () => {})
+  } catch {}
+  const escaneo = setInterval(escanearSesiones, 300_000)
+  escaneo.unref?.()
+  // Dar unos segundos al principal para que abra su socket antes de la
+  // oleada de sub-bots. El arranque corre en segundo plano.
+  const retrasoArranque = Math.max(
+    Number.parseInt(process.env.PAIN_SUBBOT_START_DELAY_MS, 10) || 3000,
+    0
+  )
+  setTimeout(() => {
+    void arrancarTodas()
+      .catch((error) => {
         console.error('[subbots] Error en el arranque:', error?.message || error)
       })
-    }, retrasoArranque).unref?.()
-  } else {
-    if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
-    await arrancarTodas()
-  }
+      .finally(() => {
+        arranqueInicialHecho = true
+        void drenarNuevas()
+      })
+  }, retrasoArranque).unref?.()
   try { purgarReenlacesPendientes(serbotDir) } catch {}
 }
 
@@ -1849,11 +1680,14 @@ function cerrarConexionesDelProceso(signal) {
   }
   // Volcado final: antes se cerraba sin guardar y se perdía hasta 3 min
   // de cambios en memoria (comisiones, msgs, etc.). El supervisor da 10s.
-  const salir = () => process.exit(0)
+  const salir = () => {
+    try { liberarInstanciaPrincipal?.() } catch {}
+    process.exit(0)
+  }
   const volcadoFinal = (async () => {
     try {
       await Promise.race([
-        global.db?.write?.() ?? Promise.resolve(),
+        global.db?.writeCompleto?.() ?? global.db?.write?.() ?? Promise.resolve(),
         new Promise((resolve) => setTimeout(resolve, 8000)),
       ])
     } catch (error) {
@@ -1863,6 +1697,14 @@ function cerrarConexionesDelProceso(signal) {
       await global.db?.adapter?.close?.()
     } catch (error) {
       console.error('[db] No se pudieron cerrar las conexiones SQLite:', error?.message || error)
+    }
+    try {
+      await Promise.race([
+        flushAuthStores({ cerrar: true }),
+        new Promise((resolve) => setTimeout(resolve, 4000)),
+      ])
+    } catch (error) {
+      console.error('[auth] No se pudieron volcar las sesiones:', error?.message || error)
     }
     try {
       await Promise.race([
@@ -1983,445 +1825,21 @@ function contarSesionesEnDisco(serbotDir) {
   }
 }
 
-function contarConectadosManaged() {
-  const vistos = new Set()
-  try {
-    for (const worker of readSubbotWorkerStatuses(__dirname)) {
-      for (const s of worker.sessions || []) {
-        if (s?.connected) vistos.add(String(s.folder))
-      }
-    }
-  } catch {}
-  for (const c of global.conns || []) {
-    try {
-      const tieneUsuario = Boolean(c?.user?.id || c?.user?.jid)
-      const abierto = c?.ws?.isOpen === true ||
-        (c?.ws?.socket?.readyState ?? c?.ws?.readyState) === ws.OPEN
-      if (!tieneUsuario || !abierto) continue
-      const folder = c?.pathAYBot ? String(c.pathAYBot).split(/[\\/]/).pop() : ''
-      if (folder) vistos.add(folder)
-    } catch {}
-  }
-  return vistos
-}
-
+/** Reconciliación manual pedida desde el panel o por /rebot. */
 global.reconnectSubBotsManaged = async function() {
-  if (isSingleBotProcess && typeof global.__painReconnectAll === 'function') {
-    return global.__painReconnectAll()
+  if (typeof global.__painReconnectAll !== 'function') {
+    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0, requierenVincular: 0 }
   }
-  if (reconexionSubBotsPromise) return reconexionSubBotsPromise
-  reconexionSubBotsPromise = (async () => {
-    const serbotDir = global.bot || './Serbot'
-    const { todas, revisables, requierenVincular } = contarSesionesEnDisco(serbotDir)
-    if (!todas.length) {
-      console.log(chalk.yellow('No se encontraron sub-bots para reconectar'))
-      return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0, requierenVincular: 0 }
-    }
-    const antes = contarConectadosManaged()
-    const porReconectar = revisables.filter((f) => !antes.has(String(f)))
-    console.log(chalk.cyan(
-      `\nSesiones registradas: ${todas.length}; ya conectadas: ${antes.size}; ` +
-      `por reconectar: ${porReconectar.length}; requieren vincular: ${requierenVincular}.`
-    ))
-    if (!porReconectar.length) {
-      return {
-        total: todas.length,
-        omitidos: antes.size,
-        conectados: 0,
-        pendientes: 0,
-        fallidos: 0,
-        requierenVincular
-      }
-    }
-    let ack = null
-    try {
-      ack = await requestReconnectAll()
-    } catch (error) {
-      console.error('[rebot all] No se pudo pedir reconexión a los workers:', error?.message || error)
-    }
-    if (!ack?.dispatched) {
-      return {
-        total: todas.length,
-        omitidos: antes.size,
-        conectados: 0,
-        pendientes: porReconectar.length,
-        fallidos: 0,
-        requierenVincular
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, 15_000))
-    const despues = contarConectadosManaged()
-    let conectados = 0
-    for (const f of porReconectar) {
-      if (despues.has(String(f)) && !antes.has(String(f))) conectados++
-    }
-    const omitidos = [...despues].filter((f) => antes.has(String(f))).length || antes.size
-    const pendientes = Math.max(0, porReconectar.length - conectados)
-    console.log(chalk.cyan(
-      `\nRevisión terminada: ${conectados} reconectados, ${omitidos} ya activos, ` +
-      `${pendientes} pendientes y ${requierenVincular} requieren vincular.`
-    ))
-    return {
-      total: todas.length,
-      omitidos,
-      conectados,
-      pendientes,
-      fallidos: 0,
-      requierenVincular
-    }
-  })()
-  try {
-    return await reconexionSubBotsPromise
-  } finally {
-    reconexionSubBotsPromise = null
-  }
+  return global.__painReconnectAll()
 }
 
 global.reconnectSubBotOneManaged = async function(folder) {
-  const clean = String(folder || '').replace(/\D/g, '')
-  if (!clean) return { ok: false, reason: 'invalid' }
-  const serbotDir = global.bot || './Serbot'
-  const raiz = join(serbotDir, clean)
-  let realFolder = clean
-  try {
-    if (existsSync(serbotDir)) {
-      for (const name of readdirSync(serbotDir)) {
-        if (String(name).replace(/\D/g, '') === clean) {
-          realFolder = name
-          break
-        }
-      }
-    }
-  } catch {}
-  if (isSingleBotProcess && typeof global.__painReconnectOne === 'function') {
-    return global.__painReconnectOne(realFolder)
-  }
-  if (sesionEnEmparejamiento(join(serbotDir, realFolder))) {
-    return { ok: false, reason: 'pairing' }
-  }
-  if (necesitaRevinculacion(serbotDir, realFolder) || sesionRequiereVincular(join(serbotDir, realFolder))) {
-    return { ok: false, reason: 'needs-relink' }
-  }
-  const antes = contarConectadosManaged()
-  if (antes.has(String(realFolder))) return { ok: true, already: true }
-  const ack = await requestReconnectOne(realFolder)
-  if (!ack?.dispatched) return { ok: false, reason: 'no-worker' }
-  const limite = Date.now() + 50_000
-  while (Date.now() < limite) {
-    await new Promise((r) => setTimeout(r, 1000))
-    if (contarConectadosManaged().has(String(realFolder))) return { ok: true }
-  }
-  return { ok: false, reason: 'timeout' }
+  if (typeof global.__painReconnectOne !== 'function') return { ok: false, reason: 'no-manager' }
+  return global.__painReconnectOne(String(folder || '').replace(/\D/g, ''))
 }
 
 global.reconnectSubBots = async function() {
-  if (isSubbotWorker) {
-    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
-  }
-  if (isManagedPrimary) {
-    return global.reconnectSubBotsManaged()
-  }
-  if (reconexionSubBotsPromise) return reconexionSubBotsPromise
-
-  reconexionSubBotsPromise = (async () => {
-  if (!global.conns || !Array.isArray(global.conns)) {
-    global.conns = []
-  }
-
-  const serbotDir = global.bot || './Serbot'
-  if (!existsSync(serbotDir)) {
-    console.log(chalk.yellow('No se encontró la carpeta Serbot'))
-    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0 }
-  }
-
-  const sesionesSubBot = readdirSync(serbotDir).filter(folder => {
-    try {
-      const folderPath = join(serbotDir, folder)
-      return statSync(folderPath).isDirectory() && existsSync(join(folderPath, 'creds.json'))
-    } catch (error) {
-      console.error(`No se pudo revisar la sesión ${folder}:`, error?.message || error)
-      return false
-    }
-  })
-  const enSesiones = new Set(sesionesSubBot)
-  let requierenVincular = sesionesSubBot.filter(folder =>
-    sesionRequiereVincular(join(serbotDir, folder))
-  ).length
-  try {
-    for (const folder of readdirSync(serbotDir)) {
-      if (enSesiones.has(folder)) continue
-      try {
-        const folderPath = join(serbotDir, folder)
-        if (!statSync(folderPath).isDirectory()) continue
-        if (existsSync(join(folderPath, 'creds.json'))) continue
-        if (sesionRequiereVincular(folderPath)) requierenVincular++
-      } catch {}
-    }
-  } catch {}
-  const sesionesRevisables = sesionesSubBot.filter(folder =>
-    !sesionRequiereVincular(join(serbotDir, folder)) &&
-    !vinculacionEnCurso(join(serbotDir, folder))
-  )
-
-  if (sesionesSubBot.length === 0) {
-    console.log(chalk.yellow('No se encontraron sub-bots para reconectar'))
-    return { total: 0, omitidos: 0, conectados: 0, pendientes: 0, fallidos: 0, requierenVincular: 0 }
-  }
-
-  if (requierenVincular) {
-    console.warn(`${requierenVincular} sub-bot(s) tienen una sesión rechazada y requieren volver a vincularse.`)
-  }
-
-  if (sesionesRevisables.length === 0) {
-    return {
-      total: sesionesSubBot.length,
-      omitidos: 0,
-      conectados: 0,
-      pendientes: 0,
-      fallidos: 0,
-      requierenVincular
-    }
-  }
-
-  const serbotModule = await import('./plugins/serbot-serbot.js')
-  const CONCURRENCIA_MAXIMA = 5
-  const PAUSA_ENTRE_INTENTOS_MS = 1500
-  let siguiente = 0
-  let conectados = 0
-  let pendientes = 0
-  let fallidos = 0
-
-  const socketSubBotAbierto = (c) => {
-    try {
-      const tieneUsuario = Boolean(c?.user?.id || c?.user?.jid)
-      const socketAbierto = c.ws?.isOpen === true || c.ws?.socket?.readyState === ws.OPEN
-      return tieneUsuario && socketAbierto
-    } catch {
-      return false
-    }
-  }
-
-  const socketDeCarpetaAbierto = (folder) => {
-    const folderDigits = String(folder).replace(/\D/g, '')
-    return global.conns.some(c => {
-      if (!socketSubBotAbierto(c)) return false
-      const jidDigits = String(c?.phoneNumber || c?.botNumber || c?.user?.jid || c?.user?.id || '')
-        .split('@')[0].split(':')[0].replace(/\D/g, '')
-      const pathDigits = c?.pathAYBot
-        ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '')
-        : ''
-      return jidDigits === folderDigits || pathDigits === folderDigits
-    })
-  }
-
-  const socketDeCarpeta = (folder) => {
-    const folderDigits = String(folder).replace(/\D/g, '')
-    return global.conns.find(c => {
-      const jidDigits = String(c?.phoneNumber || c?.botNumber || c?.user?.jid || c?.user?.id || '')
-        .split('@')[0].split(':')[0].replace(/\D/g, '')
-      const pathDigits = c?.pathAYBot
-        ? String(c.pathAYBot).split(/[\\/]/).pop().replace(/\D/g, '')
-        : ''
-      return jidDigits === folderDigits || pathDigits === folderDigits
-    })
-  }
-
-  const esperarSocketAbierto = async (folder, timeoutMs = 60_000) => {
-    const vence = Date.now() + timeoutMs
-    while (Date.now() < vence) {
-      if (socketDeCarpetaAbierto(folder)) return true
-      await new Promise(resolve => setTimeout(resolve, 500))
-    }
-    return socketDeCarpetaAbierto(folder)
-  }
-
-  let omitidos = sesionesRevisables.filter(socketDeCarpetaAbierto).length
-  const subBotFolders = sesionesRevisables.filter(folder => !socketDeCarpetaAbierto(folder))
-  console.log(chalk.cyan(
-    `\nSesiones registradas: ${sesionesSubBot.length}; ya conectadas: ${omitidos}; ` +
-    `por reconectar: ${subBotFolders.length}; requieren vincular: ${requierenVincular}.`
-  ))
-
-  if (subBotFolders.length === 0) {
-    return {
-      total: sesionesSubBot.length,
-      omitidos,
-      conectados: 0,
-      pendientes: 0,
-      fallidos: 0,
-      requierenVincular
-    }
-  }
-
-  async function conectarUno(folder) {
-    const botPath = join(serbotDir, folder)
-    if (socketDeCarpetaAbierto(folder)) {
-      omitidos++
-      return
-    }
-
-    const intentosMaximos = 3
-    const socketExistente = socketDeCarpeta(folder)
-    if (socketExistente) {
-      for (let intento = 1; intento <= intentosMaximos; intento++) {
-        if (socketDeCarpetaAbierto(folder)) {
-          omitidos++
-          return
-        }
-
-        const socketActual = socketDeCarpeta(folder)
-        if (!socketActual || typeof socketActual.reconectarPain !== 'function') {
-          console.warn(`Sub-bot ${folder} no tiene reconectador disponible; se evita crear una conexión duplicada.`)
-          pendientes++
-          return
-        }
-
-        try {
-          const inicio = await socketActual.reconectarPain()
-          if (inicio === false) {
-            pendientes++
-            return
-          }
-          if (await esperarSocketAbierto(folder)) {
-            conectados++
-            return
-          }
-          console.error(`Intento ${intento}/${intentosMaximos}: tiempo agotado esperando el socket existente ${folder}`)
-        } catch (error) {
-          console.error(`Intento ${intento}/${intentosMaximos} reconectando socket existente ${folder}:`, error?.message || error)
-        }
-
-        if (intento < intentosMaximos) {
-          await new Promise(resolve => setTimeout(resolve, 5000 * intento))
-        }
-      }
-      fallidos++
-      return
-    }
-
-    for (let intento = 1; intento <= intentosMaximos; intento++) {
-      if (!existsSync(join(botPath, 'creds.json'))) {
-        console.log(chalk.yellow(`Sesión sin credenciales, se omite ${folder}`))
-        fallidos++
-        return
-      }
-      try {
-        if (!serbotModule.AYBot) throw new Error('AYBot no está disponible')
-        const resultado = await serbotModule.AYBot({
-          pathAYBot: botPath,
-          m: null,
-          conn: global.conn,
-          args: [],
-          usedPrefix: '.',
-          command: 'qr',
-          fromCommand: false,
-          esperarConexion: true,
-          timeoutConexionMs: 60_000
-        })
-        if (resultado && await esperarSocketAbierto(folder, 1000)) {
-          console.log(chalk.green(`Sub-bot ${folder} conectado`))
-          conectados++
-          return
-        }
-        throw new Error(`No se confirmó el socket abierto para ${folder}`)
-      } catch (error) {
-        console.error(`Intento ${intento}/${intentosMaximos} fallido para ${folder}:`, error?.message || error)
-        if (intento < intentosMaximos && existsSync(join(botPath, 'creds.json'))) {
-          await new Promise(resolve => setTimeout(resolve, 5000 * intento))
-        }
-      }
-    }
-    fallidos++
-  }
-
-  async function trabajador() {
-    while (siguiente < subBotFolders.length) {
-      const folder = subBotFolders[siguiente++]
-      await conectarUno(folder)
-      if (siguiente < subBotFolders.length) {
-        await new Promise(resolve => setTimeout(resolve, PAUSA_ENTRE_INTENTOS_MS))
-      }
-    }
-  }
-
-  console.log(chalk.cyan(
-    `Reconectando hasta ${Math.min(CONCURRENCIA_MAXIMA, subBotFolders.length)} sub-bots a la vez.`
-  ))
-  await Promise.all(
-    Array.from(
-      { length: Math.min(CONCURRENCIA_MAXIMA, subBotFolders.length) },
-      () => trabajador()
-    )
-  )
-  console.log(chalk.cyan(
-    `\nRevisión terminada: ${conectados} reconectados, ${omitidos} ya activos, ` +
-    `${pendientes} en reconexión automática y ${fallidos} fallidos.`
-  ))
-  return {
-    total: sesionesSubBot.length,
-    omitidos,
-    conectados,
-    pendientes,
-    fallidos,
-    requierenVincular
-  }
-  })()
-
-  try {
-    return await reconexionSubBotsPromise
-  } finally {
-    reconexionSubBotsPromise = null
-  }
-}
-
-
-const originalConnectionUpdate = connectionUpdate
-connectionUpdate = async function(update) {
-  await originalConnectionUpdate.call(this, update)
-  
- 
-  // Los sub-bots solo se reconectan con el principal YA vinculado: durante el
-  // emparejamiento (cuando pides el código de 8 dígitos) no deben arrancar.
-  const principalVinculado = Boolean(global.conn?.authState?.creds?.registered)
-  if (!isManagedPrimary && update.connection === 'open' && principalVinculado && !global.subBotsReconnected) {
-    global.subBotsReconnected = true
-    console.log(chalk.cyan('\nBot principal vinculado, iniciando reconexión de sub-bots...'))
-    setTimeout(() => {
-      global.reconnectSubBots().catch(console.error)
-    }, 5000)
-  }
-}
-
-
-if (!isSubbotWorker && !isManagedPrimary) setTimeout(() => {
-  if (global.subBotsReconnected) return
-  if (global.conn?.authState?.creds?.registered) {
-    global.subBotsReconnected = true
-    console.log(chalk.cyan('\nIniciando reconexión automática de sub-bots..'))
-    global.reconnectSubBots().catch(console.error)
-  }
-}, 10000)
-
-if (!isSubbotWorker && !isManagedPrimary) setInterval(() => {
-  if (!global.conn?.authState?.creds?.registered) return
-  global.reconnectSubBots().catch((error) => {
-    console.error('[supervisor sub-bots] Error revisando sesiones:', error?.message || error)
-  })
-}, 60_000).unref?.()
-
-// Archivado periódico de sesiones rechazadas desde el principal, por si alguna
-// quedó sin worker asignado que la procese.
-if (!isSubbotWorker) {
-  const serbotDirSweep = resolve(__dirname, global.bot || 'Serbot')
-  const barrerReenlaces = () => {
-    try {
-      purgarReenlacesPendientes(serbotDirSweep)
-    } catch (error) {
-      console.error('[reenlace] No se pudo archivar sesiones:', error?.message || error)
-    }
-  }
-  setTimeout(barrerReenlaces, 20_000).unref?.()
-  setInterval(barrerReenlaces, 60_000).unref?.()
+  return global.reconnectSubBotsManaged()
 }
 
 const publicationTimers = new Map()

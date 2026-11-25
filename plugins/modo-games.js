@@ -14,7 +14,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     if (accion === 'on') {
       establecerJuegos(m.chat, true)
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       return conn.sendMessage(m.chat, {
         text: `🎮 *Juegos activados*\n\n> Todos los comandos del menú de juegos vuelven a funcionar.\n> *Por:* @${m.sender.split('@')[0]}`,
@@ -35,7 +35,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
           delete global.db.data.adivinanzasActivas[m.chat]
         }
       } catch {}
-      await global.db.write()
+      void global.db.flushSoon?.()
 
       return conn.sendMessage(m.chat, {
         text: `🎮 *Juegos desactivados*\n\n> Ningún comando del menú de juegos funcionará aquí.\n> *Por:* @${m.sender.split('@')[0]}`,

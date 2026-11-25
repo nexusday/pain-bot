@@ -118,7 +118,7 @@ export function confirmDeleteBot(phone, label) {
 
 export function reconnectReason(reason) {
   const reasons = {
-    'no-worker': 'El supervisor no tiene un worker disponible para esa sesión.',
+    'no-worker': 'El proceso del bot no tiene esa sesión disponible.',
     relink: 'Ese bot necesita re-vincularse desde la web.',
     pairing: 'La sesión se está vinculando ahora.',
     'no-creds': 'La sesión no tiene credenciales válidas.',
@@ -380,7 +380,7 @@ export async function aplicarCambiosEnCaliente() {
     if (data.cambiosLocalesConservados) lineas.push('Tus cambios locales se guardaron y se reaplicaron.')
     if (data.resumen?.handler) lineas.push('El bot recargó su código.')
     if (data.resumen?.plugins?.length) lineas.push(`${data.resumen.plugins.length} plugin(s) recargados.`)
-    if (data.workers?.workers) lineas.push(`${data.workers.workers} worker(s) de sub-bots recargados.`)
+    if (data.workers?.workers) lineas.push('El proceso del bot también recargó su código.')
     if (data.reinicioPendiente) {
       lineas.push('main.js cambió: hace falta reiniciar el proceso.')
       set(lineas.join(' '))
@@ -416,7 +416,7 @@ export async function handleAdminReload() {
     const data = await api.post('/api/admin/reload', {})
     const workers = data?.workers?.workers
     set(workers
-      ? `Código recargado (${workers} worker(s) de sub-bots también). El panel se recarga solo en un momento.`
+      ? 'Código recargado (el proceso del bot también). El panel se recarga solo en un momento.'
       : 'Código recargado. El panel se recarga solo en un momento.')
     showToast('Código recargado.', 'success')
     esperaPanelYRecarga()
