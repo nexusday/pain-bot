@@ -1,4 +1,4 @@
-const { useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion, Browsers } = (await import("@whiskeysockets/baileys"))
+const { useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore, fetchLatestBaileysVersion, Browsers, proto } = (await import("@whiskeysockets/baileys"))
 import qrcode from "qrcode"
 import NodeCache from "node-cache"
 import fs from "fs"
@@ -11,6 +11,7 @@ import { makeWASocket } from "../lib/simple.js"
 import {
   contarReconexionTerminada,
   contarReintentoReconexion,
+  iniciarActividadSocket,
 } from "../lib/worker-metrics.js"
 import { prioridadDeSesion } from "../lib/subbot-priority.js"
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from "../lib/socket-estable.js"
@@ -37,6 +38,7 @@ import {
   releaseSessionLease,
   requestSessionLease
 } from '../lib/process-isolation.js'
+import { adquirirPermisoCompartido } from '../lib/host-admission.js'
 
 
 // Se resuelve en cada uso: un sub-bot premium puede tener su propio canal.
@@ -568,13 +570,17 @@ async function iniciarSubBot(options) {
     cancelado: false,
     temporizador: null,
     cancelar: null,
-    limpiarAuxiliares: null
+    limpiarAuxiliares: null,
+    liberarAdmisiones: null
   }
   iniciosSubBot.set(claveInicio, intento)
 
   function terminarIntento(error = null, socket = null) {
     if (intento.temporizador) clearTimeout(intento.temporizador)
     intento.temporizador = null
+    // Si falla la instalación del handler después de crear el socket, no
+    // dejamos el slot ocupado hasta que expire su TTL.
+    intento.liberarAdmisiones?.()
     if (reenlaceEnCurso) finalizarVinculacion(pathAYBot)
     if (iniciosSubBot.get(claveInicio) === intento) iniciosSubBot.delete(claveInicio)
     if (error) rechazarConexion(error)
@@ -585,6 +591,7 @@ async function iniciarSubBot(options) {
     intento.cancelado = true
     intento.limpiarAuxiliares?.()
     const socket = intento.sock
+    intento.liberarAdmisiones?.()
     if (socket) {
       socket._painSupervisorHandoff = true
       socket._ignorarCierre = true
@@ -601,6 +608,7 @@ async function iniciarSubBot(options) {
     intento.cancelado = true
     intento.limpiarAuxiliares?.()
     const socket = intento.sock
+    intento.liberarAdmisiones?.()
     if (socket) {
       socket._ignorarCierre = true
       socket.ev?.removeAllListeners?.()
@@ -646,12 +654,67 @@ async function iniciarSubBot(options) {
       browser: Browsers.ubuntu('Chrome'),
       version,
       markOnlineOnConnect: false,
+      // Estas consultas no son necesarias para el handler de sub-bots y se
+      // ejecutaban tres veces por cada socket al abrirse.
+      fireInitQueries: process.env.PAIN_SUBBOT_FIRE_INIT_QUERIES === '1',
+      // Los envíos propios no deben volver a entrar al handler del sub-bot.
+      emitOwnEvents: process.env.PAIN_SUBBOT_EMIT_OWN_EVENTS === '1',
+      // No descargamos RECENT/FULL en cada vinculación. Se conservan los tipos
+      // que aportan mapeos LID/PN y nombres, tal como recomienda Baileys.
+      shouldSyncHistoryMessage: ({ syncType }) => {
+        const tipos = proto?.HistorySync?.HistorySyncType
+        if (!tipos) return true
+        return syncType === tipos.INITIAL_BOOTSTRAP ||
+          syncType === tipos.PUSH_NAME ||
+          syncType === tipos.INITIAL_STATUS_V3
+      },
       // Baileys corta con 408 si pasan keepAlive+5s sin datos; 10s cortaba a todos en cada pausa del hilo.
       keepAliveIntervalMs: 30_000,
       qrTimeout: 120_000,
     })
 
-    let sock = makeWASocket(opcionesConexion)
+    const liberadoresHandshake = new WeakMap()
+    const finalizadoresHandshake = new WeakMap()
+    const raizAdmisiones = path.resolve(path.dirname(pathAYBot))
+    const concurrenciaHandshake = Math.min(
+      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 2, 1),
+      8
+    )
+    const liberarHandshake = (socket) => {
+      if (!socket) return
+      const liberar = liberadoresHandshake.get(socket)
+      if (!liberar) return
+      liberadoresHandshake.delete(socket)
+      finalizadoresHandshake.get(socket)?.()
+      finalizadoresHandshake.delete(socket)
+      liberar()
+    }
+    const crearSocketAdmitido = async (opciones = {}) => {
+      const liberar = await adquirirPermisoCompartido('socket-handshake', {
+        rootDir: raizAdmisiones,
+        slots: concurrenciaHandshake,
+        ttlMs: SOCKET_CONEXION_MAX_MS + 30_000,
+        cancelado: () => intento.cancelado,
+      })
+      if (!liberar) return null
+      if (intento.cancelado) {
+        liberar()
+        return null
+      }
+      try {
+        const creado = makeWASocket(opcionesConexion, opciones)
+        liberadoresHandshake.set(creado, liberar)
+        finalizadoresHandshake.set(creado, iniciarActividadSocket(creado, 'handshake'))
+        return creado
+      } catch (error) {
+        liberar()
+        throw error
+      }
+    }
+
+    let sock = await crearSocketAdmitido()
+    if (!sock) return false
+    intento.liberarAdmisiones = () => liberarHandshake(sock)
     intento.sock = sock
     sock.phoneNumber = path.basename(pathAYBot)
     sock.botNumber = path.basename(pathAYBot)
@@ -723,13 +786,18 @@ async function iniciarSubBot(options) {
       if (resolucionCanalesPendiente) return resolucionCanalesPendiente
 
       resolucionCanalesPendiente = (async () => {
+        const finalizarActividad = iniciarActividadSocket(socket, 'canales')
         try {
           const { resolveCanalConfig } = await import('../lib/newsletter-rcanal.js')
-          await resolveCanalConfig(socket)
-          firmaCanalesResuelta = firmaConfigCanales()
+          const completo = await resolveCanalConfig(socket)
+          // Si el socket se cerró o una consulta falló, no fijamos la firma:
+          // así la siguiente conexión vuelve a intentar los objetivos que no
+          // quedaron en la marca persistente.
+          if (completo !== false) firmaCanalesResuelta = firmaConfigCanales()
         } catch (err) {
           console.error('[canal] Error al resolver config del sub-bot:', err?.message || err)
         } finally {
+          finalizarActividad()
           resolucionCanalesPendiente = null
         }
       })()
@@ -867,6 +935,15 @@ async function iniciarSubBot(options) {
 
     async function actualizacionConexion(update) {
       const { connection, lastDisconnect, isNewLogin, qr } = update
+      const socketEvento = this && typeof this === 'object' ? this : sock
+      // Un socket viejo puede emitir `close` después de que ya se creó su
+      // reemplazo. Nunca debe liberar el permiso del socket nuevo ni volver a
+      // programar una reconexión por una conexión que ya fue descartada.
+      if (socketEvento !== sock &&
+          (connection === 'close' || connection === 'open')) {
+        liberarHandshake(socketEvento)
+        return
+      }
       if (isNewLogin) tuvoNuevoLogin = true
       if (isNewLogin) sock.isInit = false
 
@@ -899,6 +976,7 @@ async function iniciarSubBot(options) {
 
       const terminarSesion = async (loaded) => {
         if (!loaded) {
+          liberarHandshake(sock)
           cerrarSocketCrudo(sock)
           sock.ev.removeAllListeners()
           quitarSockDeConns(sock)
@@ -923,6 +1001,7 @@ async function iniciarSubBot(options) {
       } catch {}
 
       if (connection === 'close') {
+        liberarHandshake(socketEvento)
         detenerPrekeys(sock)
         if (sock._painLeaseHandoff) {
           intento.limpiarAuxiliares?.()
@@ -1014,9 +1093,12 @@ async function iniciarSubBot(options) {
         return
       }
 
-      if (global.db.data == null) loadDatabase()
+      if (global.db?.data == null) await global.loadDatabase?.()
 
       if (connection === 'open') {
+        // La admisión solo cubre el handshake. Las conexiones ya abiertas no
+        // consumen slots y pueden permanecer vivas sin límite fijo.
+        liberarHandshake(socketEvento)
         try {
           limpiarMarcaReenlace(pathAYBot)
           // El vínculo ya se recuperó: los ajustes conservados ya no hacen falta.
@@ -1043,7 +1125,7 @@ async function iniciarSubBot(options) {
         vistoUsuarioEn = Date.now()
         await borrarMensajeVinculo().catch(() => {})
         if (intento.cancelado) return
-        if (!global.db.data?.users) loadDatabase()
+        if (!global.db?.data?.users) await global.loadDatabase?.()
 
         console.log(chalk.bold.cyanBright(`\n🟢 ${sock.user?.name || sock.authState.creds.me.name || 'Sub-Bot'} (+${idCarpetaBot}) conectado exitosamente.`))
         mantenerPrekeys(sock)
@@ -1150,9 +1232,15 @@ async function iniciarSubBot(options) {
         cierrePropio = true
         reconectando = true
         vistoUsuarioEn = Date.now()
+        liberarHandshake(sockAnterior)
         cerrarSocketCrudo(sockAnterior)
         sock.ev.removeAllListeners()
-        sock = makeWASocket(opcionesConexion, { chats: chatsAnteriores })
+        const nuevoSocket = await crearSocketAdmitido({ chats: chatsAnteriores })
+        if (!nuevoSocket) {
+          cierrePropio = false
+          return false
+        }
+        sock = nuevoSocket
         cierrePropio = false
         intento.sock = sock
         sock.phoneNumber = idCarpetaBot
@@ -1215,6 +1303,7 @@ async function iniciarSubBot(options) {
         intento.cancelado = true
         intento.limpiarAuxiliares?.()
         detenerPrekeys(sock)
+        liberarHandshake(sock)
         try {
           await sock.logout?.()
         } finally {
@@ -1232,6 +1321,7 @@ async function iniciarSubBot(options) {
         intento.cancelado = true
         intento.limpiarAuxiliares?.()
         detenerPrekeys(sock)
+        liberarHandshake(sock)
         sock.ev.removeAllListeners()
         cerrarSocketCrudo(sock)
         quitarSockDeConns(sock)

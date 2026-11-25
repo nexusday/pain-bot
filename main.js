@@ -78,6 +78,7 @@ import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
 import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
 import {
   iniciarMetricasWorker,
+  obtenerActividadSocket,
   persistirMetrica,
   registrarMetricasWorker,
 } from './lib/worker-metrics.js'
@@ -1197,6 +1198,7 @@ if (!isSubbotWorker) {
           (socket?.ws?.isOpen === true || readyState === ws.OPEN)
         ),
         requiresRelink: existsSync(join(serbotDir, folder, '.needs-relink')),
+        actividad: obtenerActividadSocket(socket, { reset: true }),
       }
     }), {
       memoria: estado.memoria,

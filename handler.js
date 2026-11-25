@@ -43,7 +43,11 @@ import { cobrarPrestamoSiToca, textoCobro } from './lib/banco-prestamo.js'
 import { juegosBloqueadosEn, verificarComandoJuegos, esPluginJuegos } from './lib/Modos/modo-games.js'
 import { COMANDOS_SIN_COMISION, aplicarComisionPareja } from './lib/pareja-comision.js'
 import { registrarComandoGlobal } from './lib/webpanel/runtime-stats.js'
-import { contarMensajesDuplicados, contarMensajesRecibidos } from './lib/worker-metrics.js'
+import {
+  contarMensajesDuplicados,
+  contarMensajesRecibidos,
+  iniciarActividadSocket,
+} from './lib/worker-metrics.js'
 import { comandosOcultosPremium } from './lib/premium.js'
 
 const { proto } = (await import('@whiskeysockets/baileys')).default
@@ -306,7 +310,12 @@ export async function handler(chatUpdate) {
   for (const mensaje of mensajes) {
     // `this` es la conexión del socket (bind del caller); sin `.call()`,
     // `this.pushMessage` dentro de procesarActualizacion sería undefined.
-    await procesarActualizacion.call(this, { ...chatUpdate, messages: [mensaje] })
+    const finalizarActividad = iniciarActividadSocket(this, 'mensajes')
+    try {
+      await procesarActualizacion.call(this, { ...chatUpdate, messages: [mensaje] })
+    } finally {
+      finalizarActividad()
+    }
   }
 }
 
