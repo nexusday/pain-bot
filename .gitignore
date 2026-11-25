@@ -34,3 +34,6 @@ storage/sticker-ban/
 storage/msgdels/
 package-lock.json
 tmp/
+
+storage/logs/
+storage/metrics/
