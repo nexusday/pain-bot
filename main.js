@@ -1180,7 +1180,7 @@ if (isSubbotWorker) {
   promesaPlugins = cargarPluginsConTurno().then(finalizarCargaPlugins)
 }
 global.__painPluginsListos = promesaPlugins
-if (!isSubbotWorker) await promesaPlugins
+if (!isSubbotWorker && !isSingleBotProcess) await promesaPlugins
 
 global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {
@@ -1364,15 +1364,9 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       return Promise.resolve('skipped')
     }
     if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) {
-      try {
-        purgarSesionReenlace(botPath, serbotDir)
-        console.warn(`Subbots: se archivó ${folder} (requiere volver a vincular); ajustes conservados.`)
-        if (typeof process.send === 'function') {
-          try { process.send({ type: 'remove-session', session: folder }, () => {}) } catch {}
-        }
-      } catch (error) {
-        console.error(`Subbots: no se pudo archivar ${folder}:`, error?.message || error)
-      }
+      // No se archiva ni se borra: se conserva la carpeta para que el panel
+      // pueda revincularla. Solo se omite su conexión automática.
+      console.warn(`Subbots: ${folder} requiere volver a vincular; se conserva en disco y no se conecta.`)
       return Promise.resolve('skipped')
     }
     if (!existsSync(join(botPath, 'creds.json'))) {
@@ -1926,7 +1920,24 @@ let reconexionSubBotsPromise = null
 
 // Archiva (conserva ajustes + borra carpeta) las sesiones marcadas para volver
 // a vincular, avisando al supervisor para que las suelte sin reiniciar workers.
+let ultimoAvisoReenlace = 0
 function purgarReenlacesPendientes(serbotDir) {
+  // Por defecto NUNCA se borra/archiva una carpeta marcada: se conserva para
+  // que el panel pueda revincularla. El archivado automático era lo que hacía
+  // desaparecer sesiones cuando WhatsApp devolvía 401 en masa.
+  if (process.env.PAIN_AUTO_ARCHIVE_RELINK !== '1') {
+    try {
+      const pendientes = listarRequierenVincular(serbotDir)
+      if (pendientes.length && Date.now() - ultimoAvisoReenlace > 60_000) {
+        ultimoAvisoReenlace = Date.now()
+        console.warn(
+          `[reenlace] ${pendientes.length} sesión(es) requieren volver a vincular; ` +
+          'se conservan en disco y no se conectan.'
+        )
+      }
+    } catch {}
+    return
+  }
   let purgadas = []
   try {
     purgadas = purgarSesionesReenlace(serbotDir)

@@ -129,8 +129,7 @@ const TIMEOUT_HANDSHAKE_ABIERTO_MS = Math.min(
 const reintentosProgramados = new Map()
 if (MODO_PROCESO_UNICO) {
   console.log(
-    `[subbots] handshake_concurrency=${CONCURRENCIA_HANDSHAKE}, ` +
-    `handshake_timeout=${Math.round(TIMEOUT_HANDSHAKE_ABIERTO_MS / 1000)}s, ` +
+    `[subbots] handshake=directo (sin cola), ` +
     `reconnect_concurrency=${MAX_RECONEXIONES_POR_WORKER}, ` +
     `reconnect_gap=${ESPACIO_RECONEXION_MS}ms`
   )
@@ -774,6 +773,13 @@ async function iniciarSubBot(options) {
       liberar()
     }
     const crearSocketAdmitido = async (opciones = {}) => {
+      if (MODO_PROCESO_UNICO) {
+        // Sin cola de handshake: el límite real lo pone PAIN_START_CONCURRENCY
+        // al arrancar y la cola de reconexión (4 a la vez). Así una sesión
+        // muerta no puede bloquear a las demás.
+        if (intento.cancelado) return null
+        return makeWASocket(opcionesConexion, opciones)
+      }
       const liberar = await adquirirPermisoCompartido('socket-handshake', {
         rootDir: raizAdmisiones,
         slots: concurrenciaHandshake,
@@ -1156,7 +1162,7 @@ async function iniciarSubBot(options) {
           } catch (error) {
             console.error(`No se pudo marcar el subbot ${idCarpetaBot} para volver a vincular:`, error?.message || error)
           }
-          if (marcaCreada) {
+          if (marcaCreada && process.env.PAIN_DELETE_BAD_CREDS === '1') {
             try {
               limpiarCredencialesSubBot(pathAYBot)
             } catch (error) {
@@ -1166,7 +1172,7 @@ async function iniciarSubBot(options) {
           console.log(chalk.bold.magentaBright(
             `\n┆ Sesión (+${idCarpetaBot}) rechazada por WhatsApp (código ${motivo ?? 'desconocido'}). ` +
             `${detalleDesconexion ? `Motivo: ${detalleDesconexion}. ` : ''}` +
-            `Se archivará; sus ajustes quedan guardados y vuelve a vincularla con /code o /qr.\n`
+            `Se conserva en disco para revincularla desde el panel.\n`
           ))
           cerrarSocketCrudo(sock)
           quitarSockDeConns(sock)
