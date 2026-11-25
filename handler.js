@@ -293,6 +293,14 @@ function pluginsCandidatosComando(texto, conn, m, isOwner, isROwner, cache) {
 // sola vez y en el orden recibido. El procesamiento sigue siendo acotado al
 // socket que recibió la actualización, sin crear una cola global que bloquee
 // a todos los sub-bots.
+function antiguedadMensajeMs(raw) {
+  const ts = typeof raw === 'object' && typeof raw?.toNumber === 'function'
+    ? raw.toNumber()
+    : Number(raw) || 0
+  if (!ts) return 0
+  return Date.now() - (ts > 1e12 ? ts : ts * 1000)
+}
+
 export async function handler(chatUpdate) {
   if (!chatUpdate || !Array.isArray(chatUpdate.messages)) return
   // En los workers los plugins se cargan en segundo plano para no retrasar las
@@ -312,7 +320,17 @@ export async function handler(chatUpdate) {
   contarMensajesRecibidos(chatUpdate.messages.length, mensajes.length)
   const duplicados = chatUpdate.messages.length - mensajes.length
   if (duplicados > 0) contarMensajesDuplicados(duplicados)
+  if (chatUpdate.type === 'notify' && mensajes.length > 2) {
+    console.warn(`[upsert] lote de ${mensajes.length} mensajes; se procesan en serie.`)
+  }
   for (const mensaje of mensajes) {
+    if (chatUpdate.type === 'notify') {
+      const edad = antiguedadMensajeMs(mensaje?.messageTimestamp)
+      if (edad > 5000 && edad < 10 * 60_000) {
+        const chat = String(mensaje?.key?.remoteJid || '?')
+        console.warn(`[lag] ${chat}: el mensaje esperó ${edad} ms antes del handler.`)
+      }
+    }
     // `this` es la conexión del socket (bind del caller); sin `.call()`,
     // `this.pushMessage` dentro de procesarActualizacion sería undefined.
     const finalizarActividad = iniciarActividadSocket(this, 'mensajes')

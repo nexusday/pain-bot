@@ -544,7 +544,7 @@ function mantenerPresenciaPrincipal(sock) {
   temporizadorPresencia = setInterval(avisar, 3 * 60 * 60 * 1000)
 }
 
-if (!isSubbotWorker) startTmpCleanupInterval({ verbose: true })
+if (!isSubbotWorker) startTmpCleanupInterval({ verbose: true, intervalMs: 2 * 60_000 })
 
 let reconectandoPrincipal = false
 let sinSocketDesde = 0
