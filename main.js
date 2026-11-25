@@ -1074,6 +1074,37 @@ function normalizePlugin(plugin) {
 
 global.plugins = {}
 
+// Plugins cuya compilación inicial cuesta segundos (jsdom, internals de
+// Baileys). Se registran como stubs y se importan la primera vez que se usan.
+const PLUGINS_PEREZOSOS = new Map([
+  ['hentai.js', {
+    command: ['hentai', 'hent', 'hentaisearch'],
+    tags: ['nsfw'],
+    help: ['hentai <búsqueda | url>']
+  }],
+  ['sticker-stickerly.js', {
+    command: ['stickerly', 'spack', 'stickly'],
+    tags: ['stickers'],
+    help: ['stickerly <texto>']
+  }]
+])
+
+function crearPluginPerezoso(filename, def) {
+  const ruta = global.__filename(join(pluginFolder, filename))
+  return {
+    command: def.command,
+    tags: def.tags,
+    help: def.help,
+    handler: async function (m, extra) {
+      const module = await import(ruta)
+      const real = module.default || module
+      const fn = typeof real === 'function' ? real : real.handler
+      if (typeof fn !== 'function') throw new Error(`Plugin ${filename} sin handler`)
+      return fn.call(this, m, extra)
+    }
+  }
+}
+
 async function filesInit() {
   const nombres = readdirSync(pluginFolder).filter(pluginFilter)
   // Importar 255 plugins de uno en uno tardaba 40-60 s en el VPS. Los módulos
@@ -1090,6 +1121,11 @@ async function filesInit() {
       const { filename, indice } = cola.shift()
       const inicio = Date.now()
       try {
+        const definicion = PLUGINS_PEREZOSOS.get(filename)
+        if (definicion) {
+          resultados[indice] = crearPluginPerezoso(filename, definicion)
+          continue
+        }
         const file = global.__filename(join(pluginFolder, filename))
         const module = await import(file)
         resultados[indice] = normalizePlugin(module.default || module)
@@ -1687,7 +1723,7 @@ function cerrarConexionesDelProceso(signal) {
   const volcadoFinal = (async () => {
     try {
       await Promise.race([
-        global.db?.writeCompleto?.() ?? global.db?.write?.() ?? Promise.resolve(),
+        global.db?.write?.() ?? Promise.resolve(),
         new Promise((resolve) => setTimeout(resolve, 8000)),
       ])
     } catch (error) {
