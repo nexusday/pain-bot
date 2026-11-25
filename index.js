@@ -22,6 +22,17 @@ import { acquireRuntimeLease } from './lib/runtime-lease.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const mainPath = join(__dirname, 'main.js')
 
+// Caché de compilación de módulos (Node 22.8+). Cada arranque vuelve a leer los
+// 255 plugins en los 6 procesos; con esta caché el parseo se reutiliza entre
+// procesos y reinicios. En versiones antiguas de Node simplemente no hace nada.
+try {
+  const rutaCache = join(__dirname, 'storage', '.compile-cache')
+  mkdirSync(rutaCache, { recursive: true })
+  if (!process.env.NODE_COMPILE_CACHE) process.env.NODE_COMPILE_CACHE = rutaCache
+  const { enableCompileCache } = await import('node:module')
+  enableCompileCache?.(rutaCache)
+} catch {}
+
 try {
   const { default: cfonts } = await import('cfonts')
   cfonts.say('PAIN\nBOT', { font: 'block', align: 'center', gradient: ['cyan', 'blue'] })

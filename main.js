@@ -1054,12 +1054,46 @@ async function filesInit() {
       const module = await import(file)
       global.plugins[filename] = normalizePlugin(module.default || module)
     } catch (e) {
-      conn.logger.error(`Error cargando plugin ${filename}:`, e)
+      // En un worker no hay `conn`: un logger indefinido aquí abortaba la
+      // carga del resto de plugins.
+      const log = conn?.logger || global.conn?.logger || console
+      log.error?.(`Error cargando plugin ${filename}:`, e)
       delete global.plugins[filename]
     }
   }
 }
-await filesInit()
+
+/**
+ * Cargar 255 plugins consume CPU. Si los 6 procesos lo hacen a la vez, el
+ * arranque se come el plan entero (medido: 60-69 s por proceso en paralelo),
+ * provoca throttling y con él los 408/428 y las reconexiones. Se serializa
+ * entre procesos con la misma admisión por archivos.
+ */
+async function cargarPluginsConTurno() {
+  const concurrencia = Math.min(
+    Math.max(Number.parseInt(process.env.PAIN_PLUGIN_LOAD_CONCURRENCY, 10) || 2, 1),
+    4
+  )
+  let liberar = null
+  try {
+    const { adquirirPermisoCompartido } = await import('./lib/host-admission.js')
+    liberar = await adquirirPermisoCompartido('plugin-load', {
+      rootDir: __dirname,
+      slots: concurrencia,
+      ttlMs: 180_000,
+      cancelado: () => false,
+    })
+  } catch (error) {
+    console.error('[boot] No se pudo serializar la carga de plugins:', error?.message || error)
+  }
+  try {
+    await filesInit()
+  } finally {
+    liberar?.()
+  }
+}
+
+await cargarPluginsConTurno()
 global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
 try {
   const desde = Number(global.__painBootAt) || Date.now()
