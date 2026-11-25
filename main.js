@@ -1064,7 +1064,12 @@ async function filesInit() {
   for (const filename of readdirSync(pluginFolder).filter(pluginFilter)) {
     try {
       const file = global.__filename(join(pluginFolder, filename))
+      const inicio = Date.now()
       const module = await import(file)
+      const demora = Date.now() - inicio
+      if (isSingleBotProcess && demora > 1500) {
+        console.log(`[boot] plugin lento: ${filename} (${demora} ms)`)
+      }
       global.plugins[filename] = normalizePlugin(module.default || module)
     } catch (e) {
       // En un worker no hay `conn`: un logger indefinido aquí abortaba la
@@ -1247,7 +1252,16 @@ function listarSesionesListas(serbotDir) {
       try {
         const botPath = join(serbotDir, folder)
         if (!statSync(botPath).isDirectory()) return false
-        if (!existsSync(join(botPath, 'creds.json'))) return false
+        const rutaCreds = join(botPath, 'creds.json')
+        if (!existsSync(rutaCreds)) return false
+        // Una carpeta con creds.json pero registered:false es un intento de
+        // vinculación inconcluso: no debe ocupar un slot de handshake.
+        try {
+          const creds = JSON.parse(readFileSync(rutaCreds, 'utf8'))
+          if (creds?.registered !== true) return false
+        } catch {
+          return false
+        }
         if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) return false
         return !sesionEnEmparejamiento(botPath)
       } catch {
@@ -1264,6 +1278,21 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
   const serbotModule = await import('./plugins/serbot-serbot.js')
   const serbotDir = resolve(__dirname, global.bot || 'Serbot')
   const sesionesEnDisco = listarSesionesListas(serbotDir)
+  if (unificado) {
+    try {
+      const totalCarpetas = contarSesionesEnDisco(serbotDir).todas.length
+      console.log(
+        `[subbots] ${sesionesEnDisco.length} sesión(es) con credenciales registradas ` +
+        `de ${totalCarpetas} carpeta(s) con creds.json.`
+      )
+      if (sesionesEnDisco.length < totalCarpetas) {
+        console.log(
+          `[subbots] ${totalCarpetas - sesionesEnDisco.length} carpeta(s) sin registrar ` +
+          '(registered:false) se omiten; requieren volver a vincular desde el panel.'
+        )
+      }
+    } catch {}
+  }
   const assignedSessions = unificado
     ? sesionesEnDisco
     : JSON.parse(process.env.PAIN_SESSIONS_JSON || '[]')
@@ -1313,6 +1342,15 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     }
     if (!existsSync(join(botPath, 'creds.json'))) {
       console.warn(`Subbots: se omite ${folder}, no tiene creds.json.`)
+      return Promise.resolve('skipped')
+    }
+    try {
+      const creds = JSON.parse(readFileSync(join(botPath, 'creds.json'), 'utf8'))
+      if (creds?.registered !== true) {
+        // Vinculación inconclusa o sesión archivada: no ocupa handshake.
+        return Promise.resolve('skipped')
+      }
+    } catch {
       return Promise.resolve('skipped')
     }
     const promise = serbotModule.AYBot({
@@ -1540,10 +1578,11 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
   })
   const batchSize = Math.max(Number.parseInt(process.env.PAIN_SUBBOT_BATCH, 10) || 1, 1)
   const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
-  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) ||
-    (unificado ? 200 : 1500)
+  const pausaEntreLotesMs = unificado
+    ? (Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 100)
+    : (Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1500)
   const concurrenciaArranque = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 6 : 1), 1),
+    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 8 : 1), 1),
     12
   )
   const initialSessions = ordenarSesionesPorPrioridad(serbotDir, [...sessions])
@@ -1551,11 +1590,19 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     if (unificado) {
       const cola = [...initialSessions]
       let iniciadas = 0
+      let intentos = 0
       const trabajador = async () => {
         while (cola.length) {
           const folder = cola.shift()
           const resultado = await iniciarSesion(folder)
+          intentos++
           if (resultado === 'started') iniciadas++
+          if (intentos % 25 === 0) {
+            console.log(
+              `[subbots] arranque: ${intentos}/${initialSessions.length} intentadas, ` +
+              `${iniciadas} socket(s) creados, ${cola.length} pendientes.`
+            )
+          }
           if (pausaEntreLotesMs > 0) {
             await new Promise((resolver) => setTimeout(resolver, pausaEntreLotesMs))
           }
@@ -1610,6 +1657,12 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     if (necesitaRevinculacion(serbotDir, folder) || sesionRequiereVincular(botPath)) {
       return { ok: false, reason: 'needs-relink' }
     }
+    try {
+      const creds = JSON.parse(readFileSync(join(botPath, 'creds.json'), 'utf8'))
+      if (creds?.registered !== true) return { ok: false, reason: 'needs-relink' }
+    } catch {
+      return { ok: false, reason: 'no-creds' }
+    }
     if (sesionAbierta(folder)) return { ok: true, already: true }
     const estado = serbotModule.estadoSesionSubBot?.(botPath)
     if (estado?.intento) {
@@ -1651,7 +1704,7 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
         Array.from(
           {
             length: Math.min(
-              Math.max(Number(process.env.PAIN_START_CONCURRENCY) || 4, 1),
+              Math.max(Number(process.env.PAIN_START_CONCURRENCY) || 6, 1),
               12,
               cola.length
             ),

@@ -425,7 +425,7 @@ CPU overhead predictable.
 > arquitectura de GataBot-MD. El panel web sigue en un proceso HTTP aparte.
 > Para volver al supervisor clásico de 5 grupos: `PAIN_SINGLE_PROCESS=0`.
 > Variables nuevas: `PAIN_SINGLE_HEAP_MB` (heap del proceso único, 2048 por
-> defecto) y `PAIN_START_CONCURRENCY` (sesiones que arrancan a la vez, 6 por
+> defecto) y `PAIN_START_CONCURRENCY` (sesiones que arrancan a la vez, 8 por
 > defecto). En modo único `PAIN_SUBBOT_WORKERS` se ignora.
 
 **Los sub-bots esperan al principal.** Si el bot principal no tiene sesión
@@ -478,8 +478,10 @@ Diagnóstico: `/mem` y `/mem limpiar` (fuerza poda y GC en el proceso actual).
 |---|---|---|
 | `PAIN_SINGLE_PROCESS` | `1` | `1` = un proceso (estilo GataBot); `0` = supervisor clásico de grupos |
 | `PAIN_SINGLE_HEAP_MB` | `2048` | Tope de heap del proceso único |
-| `PAIN_START_CONCURRENCY` | `6` | Sesiones que se abren a la vez al arrancar |
-| `PAIN_SOCKET_HANDSHAKE_CONCURRENCY` | `6` | Handshakes simultáneos en modo único |
+| `PAIN_START_CONCURRENCY` | `8` | Sesiones que se abren a la vez al arrancar |
+| `PAIN_START_GAP_MS` | `100` | Pausa entre inicios de sesión en modo único |
+| `PAIN_SINGLE_HANDSHAKE_CONCURRENCY` | `8` | Handshakes simultáneos en modo único |
+| `PAIN_HANDSHAKE_OPEN_TIMEOUT_MS` | `45000` | Si un socket no abre, libera su slot (no lo cierra) |
 | `PAIN_RECONNECT_CONCURRENCY` | `4` | Reconexiones simultáneas en modo único |
 | `PAIN_SUBBOT_WORKERS` | `5` | Solo modo clásico (`PAIN_SINGLE_PROCESS=0`) |
 | `PAIN_WORKER_HEAP_MB` | `896` | Tope de heap por worker (modo clásico) |

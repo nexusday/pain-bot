@@ -70,11 +70,15 @@ const MAX_FALLOS_RECONEXION = 10
 // servidor o la red no responden. La sesión queda archivada y recuperable;
 // solo se pausa su siguiente intento automático.
 const MODO_PROCESO_UNICO = process.env.PAIN_SINGLE_PROCESS !== '0'
-const PAUSA_408_RECONEXION_MS = Math.max(
-  MODO_PROCESO_UNICO ? 30_000 : 2 * 60_000,
-  Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) ||
-    (MODO_PROCESO_UNICO ? 60_000 : 5 * 60_000)
-)
+const PAUSA_408_RECONEXION_MS = MODO_PROCESO_UNICO
+  ? Math.min(
+      Math.max(Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 60_000, 30_000),
+      120_000
+    )
+  : Math.max(
+      2 * 60_000,
+      Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 5 * 60_000
+    )
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
 const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
@@ -84,8 +88,9 @@ const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
 // drena conforme terminan las conexiones.
 const MAX_RECONEXIONES_POR_WORKER = Math.min(
   Math.max(
-    Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) ||
-      (MODO_PROCESO_UNICO ? 4 : 1),
+    MODO_PROCESO_UNICO
+      ? Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 4, 4)
+      : (Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 1),
     1
   ),
   12
@@ -94,8 +99,8 @@ const MAX_RECONEXIONES_POR_WORKER = Math.min(
 // oleada contra WhatsApp y reparte el CPU en el tiempo. Configurable.
 const ESPACIO_RECONEXION_MS = Math.min(
   Math.max(
-    Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) ||
-      (MODO_PROCESO_UNICO ? 600 : 5000),
+    MODO_PROCESO_UNICO ? (Number.parseInt(process.env.PAIN_SINGLE_RECONNECT_GAP_MS, 10) || 600) : (Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 5000),
+      // gap ya resuelto arriba
     0
   ),
  30_000
@@ -104,7 +109,32 @@ const colaReconexiones = []
 let reconexionesActivas = 0
 let ultimoInicioReconexion = 0
 let temporizadorDrenajeReconexiones = null
+const CONCURRENCIA_HANDSHAKE = MODO_PROCESO_UNICO
+  ? Math.min(
+      Math.max(Number.parseInt(process.env.PAIN_SINGLE_HANDSHAKE_CONCURRENCY, 10) || 8, 6),
+      16
+    )
+  : Math.min(
+      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 2, 1),
+      8
+    )
+const TIMEOUT_HANDSHAKE_ABIERTO_MS = Math.min(
+  Math.max(
+    Number.parseInt(process.env.PAIN_HANDSHAKE_OPEN_TIMEOUT_MS, 10) ||
+      (MODO_PROCESO_UNICO ? 45_000 : 120_000),
+    15_000
+  ),
+  300_000
+)
 const reintentosProgramados = new Map()
+if (MODO_PROCESO_UNICO) {
+  console.log(
+    `[subbots] handshake_concurrency=${CONCURRENCIA_HANDSHAKE}, ` +
+    `handshake_timeout=${Math.round(TIMEOUT_HANDSHAKE_ABIERTO_MS / 1000)}s, ` +
+    `reconnect_concurrency=${MAX_RECONEXIONES_POR_WORKER}, ` +
+    `reconnect_gap=${ESPACIO_RECONEXION_MS}ms`
+  )
+}
 
 // Cierre inmediato del socket crudo. `ws.close()` espera el handshake y el
 // socket viejo puede seguir recibiendo frames cifrados que ya no se pueden
@@ -717,14 +747,7 @@ async function iniciarSubBot(options) {
     // PAIN_SOCKET_HANDSHAKE_CONCURRENCY solo si el plan tiene CPU de sobra.
     // Con 283 sesiones, un handshake a la vez tardaba horas en ponerlas todas
     // online. Dos en paralelo caben de sobra en el plan y drenan la cola.
-    const concurrenciaHandshake = Math.min(
-      Math.max(
-        Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) ||
-          (MODO_PROCESO_UNICO ? 6 : 2),
-        1
-      ),
-      10
-    )
+    const concurrenciaHandshake = CONCURRENCIA_HANDSHAKE
     // Cuánto puede quedarse un permiso de handshake sin liberarse. Si una
     // reconexión queda abandonada, caduca y destapa la cola; antes el PID vivo
     // lo mantenía bloqueado para siempre.
@@ -759,7 +782,15 @@ async function iniciarSubBot(options) {
       }
       try {
         const creado = makeWASocket(opcionesConexion, opciones)
-        liberadoresHandshake.set(creado, liberar)
+        const temporizadorApertura = setTimeout(
+          () => liberarHandshake(creado),
+          TIMEOUT_HANDSHAKE_ABIERTO_MS
+        )
+        temporizadorApertura.unref?.()
+        liberadoresHandshake.set(creado, () => {
+          clearTimeout(temporizadorApertura)
+          liberar()
+        })
         finalizadoresHandshake.set(creado, iniciarActividadSocket(creado, 'handshake'))
         return creado
       } catch (error) {
