@@ -102,7 +102,15 @@ const {
 } = await import('@whiskeysockets/baileys')
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 3000
-acquireRuntimeLease(path.resolve('storage'),process.env.PAIN_ROLE==='subbot'?'subbot':'primary')
+try {
+  acquireRuntimeLease(
+    path.resolve('storage'),
+    process.env.PAIN_ROLE === 'subbot' ? 'subbot' : 'primary'
+  )
+} catch (error) {
+  console.error(`[${process.env.PAIN_ROLE || 'primary'}] ${error.message}`)
+  process.exit(1)
+}
 
 protoType()
 serialize()

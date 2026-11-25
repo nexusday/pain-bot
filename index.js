@@ -31,7 +31,12 @@ try {
 }
 
 await import('./config.js')
-acquireRuntimeLease(join(__dirname,'storage'),'supervisor')
+try {
+  acquireRuntimeLease(join(__dirname, 'storage'), 'supervisor')
+} catch (error) {
+  console.error(`[supervisor] ${error.message}`)
+  process.exit(1)
+}
 console.log('Verificando base compartida antes de iniciar los procesos...')
 await new ArchivoSqliteCompartido(
   join(__dirname, 'storage', 'databases', 'database.sqlite'),
