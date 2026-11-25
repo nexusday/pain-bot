@@ -1070,8 +1070,10 @@ async function filesInit() {
  * entre procesos con la misma admisión por archivos.
  */
 async function cargarPluginsConTurno() {
+  // Uno a la vez: la compilación de módulos usa varios hilos de V8 y dos
+  // procesos cargando a la vez ya rozaban el 800 % de CPU en el servidor.
   const concurrencia = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_PLUGIN_LOAD_CONCURRENCY, 10) || 2, 1),
+    Math.max(Number.parseInt(process.env.PAIN_PLUGIN_LOAD_CONCURRENCY, 10) || 1, 1),
     4
   )
   let liberar = null
@@ -1093,15 +1095,34 @@ async function cargarPluginsConTurno() {
   }
 }
 
-await cargarPluginsConTurno()
-global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
-try {
-  const desde = Number(global.__painBootAt) || Date.now()
-  console.log(
-    `[boot] ${process.env.PAIN_ROLE || 'primary'} (${process.env.PAIN_WORKER_ID || '-'}) ` +
-    `${Object.keys(global.plugins).length} plugins en ${Date.now() - desde} ms`
-  )
-} catch {}
+function finalizarCargaPlugins() {
+  global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
+  try {
+    const desde = Number(global.__painBootAt) || Date.now()
+    console.log(
+      `[boot] ${process.env.PAIN_ROLE || 'primary'} (${process.env.PAIN_WORKER_ID || '-'}) ` +
+      `${Object.keys(global.plugins).length} plugins en ${Date.now() - desde} ms`
+    )
+  } catch {}
+}
+
+// En los workers la carga va en segundo plano: las sesiones deben empezar a
+// conectar YA. Antes el proceso se pasaba 60-80 s compilando plugins y durante
+// ese tiempo ni siquiera intentaba un handshake; con 283 sesiones eso se veía
+// como "no reconecta ninguna". El handler espera a que termine antes de
+// procesar el primer mensaje.
+let promesaPlugins
+if (isSubbotWorker) {
+  promesaPlugins = cargarPluginsConTurno()
+    .then(finalizarCargaPlugins)
+    .catch((error) => {
+      console.error('[boot] No se pudieron cargar los plugins:', error?.message || error)
+    })
+} else {
+  promesaPlugins = cargarPluginsConTurno().then(finalizarCargaPlugins)
+}
+global.__painPluginsListos = promesaPlugins
+if (!isSubbotWorker) await promesaPlugins
 
 global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {
@@ -1450,7 +1471,9 @@ if (!isSubbotWorker) {
   })
   const batchSize = Math.max(Number.parseInt(process.env.PAIN_SUBBOT_BATCH, 10) || 1, 1)
   const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
-  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 5000
+  // El límite global de handshakes ya evita la tormenta; 5 s extra por sesión
+  // solo alargaban el arranque de 283 sub-bots sin aportar nada.
+  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1500
   if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
   // Premium primero en el arranque: con cientos de sesiones, los sub-bots de
   // pago quedan en línea antes que el resto (mismo criterio en la cola de

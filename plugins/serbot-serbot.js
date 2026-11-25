@@ -680,8 +680,10 @@ async function iniciarSubBot(options) {
     // se dispara la CPU del contenedor (y al pasar del límite del plan,
     // WhatsApp corta con 408 y todo reconecta). Subir con
     // PAIN_SOCKET_HANDSHAKE_CONCURRENCY solo si el plan tiene CPU de sobra.
+    // Con 283 sesiones, un handshake a la vez tardaba horas en ponerlas todas
+    // online. Dos en paralelo caben de sobra en el plan y drenan la cola.
     const concurrenciaHandshake = Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 1, 1),
+      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 2, 1),
       8
     )
     // Cuánto puede quedarse un permiso de handshake sin liberarse. Si una

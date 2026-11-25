@@ -295,6 +295,11 @@ function pluginsCandidatosComando(texto, conn, m, isOwner, isROwner, cache) {
 // a todos los sub-bots.
 export async function handler(chatUpdate) {
   if (!chatUpdate || !Array.isArray(chatUpdate.messages)) return
+  // En los workers los plugins se cargan en segundo plano para no retrasar las
+  // conexiones. El primer mensaje espera aquí a que estén listos.
+  if (global.__painPluginsListos) {
+    try { await global.__painPluginsListos } catch {}
+  }
   const vistos = new Set()
   const mensajes = chatUpdate.messages.filter((mensaje) => {
     if (!mensaje) return false
