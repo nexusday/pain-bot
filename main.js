@@ -104,13 +104,23 @@ const {
 } = await import('@whiskeysockets/baileys')
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 3000
+const ROL_PAIN = process.env.PAIN_ROLE || ''
+// Bajo el supervisor (`PAIN_ROLE=primary|subbot`) la instancia única ya está
+// garantizada por el candado `supervisor`: repetir la comprobación aquí era
+// peligroso. Si quedaba un `primary.lock` huérfano de una salida forzada, su
+// PID podía acabar reutilizado por otro proceso del contenedor y el candado
+// creía que había otro primary vivo. Resultado: `process.exit(1)` en bucle,
+// reinicio cada pocos segundos y CPU al máximo. El candado solo se aplica al
+// arranque manual (sin supervisor), que es el caso en el que hace falta.
+const arranqueManual = ROL_PAIN !== 'primary' && ROL_PAIN !== 'subbot'
 try {
   acquireRuntimeLease(
     path.resolve('storage'),
-    process.env.PAIN_ROLE === 'subbot' ? 'subbot' : 'primary'
+    ROL_PAIN === 'subbot' ? 'subbot' : 'primary',
+    { unique: arranqueManual }
   )
 } catch (error) {
-  console.error(`[${process.env.PAIN_ROLE || 'primary'}] ${error.message}`)
+  console.error(`[${ROL_PAIN || 'primary'}] ${error.message}`)
   process.exit(1)
 }
 
