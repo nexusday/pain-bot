@@ -239,6 +239,9 @@ global.loadDatabase = async function loadDatabase() {
 
 const isSubbotWorker = process.env.PAIN_ROLE === 'subbot'
 const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
+// Modo unico: un solo proceso para principal + todos los sub-bots. El
+// supervisor clasico (PAIN_SINGLE_PROCESS=0) sigue disponible como rollback.
+const isSingleBotProcess = !isSubbotWorker && process.env.PAIN_SINGLE_PROCESS !== '0'
 global.processRole = isSubbotWorker ? 'subbot' : 'primary'
 // Los sub-bots no deben quitarle CPU al bot principal.
 if (isSubbotWorker) {
@@ -289,7 +292,7 @@ if (isSubbotWorker || isManagedPrimary) {
   // solo se refresca para lecturas. En workers se espacia más para bajar
   // contención de SQLite y CPU con cientos de sesiones.
   const intervaloRefresh = Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) ||
-    (isSubbotWorker ? 8000 : 5000)
+    (isSingleBotProcess ? 15000 : isSubbotWorker ? 8000 : 5000)
   const syncDatabase = setInterval(() => {
     global.db.adapter.refresh(global.db.data).catch((error) => {
       console.error('[db] No se pudo actualizar la vista de otro proceso:', error?.message || error)
@@ -503,7 +506,8 @@ if (!opts['test']) {
     // Con DB de ~38 MB el escaneo completo pesa; 60s es el equilibrio
     // (ajustable con PAIN_DB_SAVE_MS, mínimo 30s).
     const intervaloGuardado = Math.max(
-      Number.parseInt(process.env.PAIN_DB_SAVE_MS, 10) || 60_000,
+      Number.parseInt(process.env.PAIN_DB_SAVE_MS, 10) ||
+        (isSingleBotProcess ? 120_000 : 60_000),
       30_000
     )
     const initialDelay = (phase >>> 0) % intervaloGuardado
@@ -1012,6 +1016,15 @@ global.recargarEnCaliente = async function recargarEnCaliente({ plugins = [] } =
  */
 global.pedirRecargaWorkers = async function pedirRecargaWorkers(plugins = []) {
   if (isSubbotWorker) return { dispatched: 0, workers: 0, motivo: 'worker' }
+  if (isSingleBotProcess) {
+    try {
+      const resumen = await global.recargarEnCaliente?.({ plugins })
+      return { dispatched: 1, workers: 1, resumen, motivo: null }
+    } catch (error) {
+      console.error('[hot] No se pudo recargar el proceso único:', error?.message || error)
+      return { dispatched: 0, workers: 0, motivo: error?.message || 'error' }
+    }
+  }
   if (typeof requestReloadAll !== 'function') return { dispatched: 0, workers: 0, motivo: 'sin-ipc' }
   try {
     const ack = await requestReloadAll({ plugins })
@@ -1070,6 +1083,12 @@ async function filesInit() {
  * entre procesos con la misma admisión por archivos.
  */
 async function cargarPluginsConTurno() {
+  // En modo unico solo hay un proceso: no hay nada que serializar y un lock
+  // de disco solo puede dejar la carga esperando 3 minutos si quedo huerfano.
+  if (isSingleBotProcess) {
+    await filesInit()
+    return
+  }
   // Uno a la vez: la compilación de módulos usa varios hilos de V8 y dos
   // procesos cargando a la vez ya rozaban el 800 % de CPU en el servidor.
   const concurrencia = Math.min(
@@ -1209,42 +1228,91 @@ watch(join(__dirname, 'lib'), { recursive: true }, (_evento, filename) => {
 
 if (!isSubbotWorker) {
   await global.reloadHandler()
+  if (isSingleBotProcess) {
+    global.conns = []
+    // Se arranca en segundo plano para no bloquear el resto del arranque
+    // (panel, tick de loteria, etc.). Las sesiones se conectan en paralelo.
+    await iniciarGestorSubBots({ unificado: true })
+  }
 } else {
-  global.conns = []
-  const assignedSessions = JSON.parse(process.env.PAIN_SESSIONS_JSON || '[]')
-  if (!Array.isArray(assignedSessions)) throw new Error('La asignación de sub-bots no es válida')
+  await iniciarGestorSubBots({ unificado: false })
+}
+
+/** Sesiones listas para conectar (mismo criterio que el supervisor). */
+function listarSesionesListas(serbotDir) {
+  try {
+    if (!existsSync(serbotDir)) return []
+    return readdirSync(serbotDir).filter((folder) => {
+      if (!/^[a-zA-Z0-9_-]+$/.test(folder)) return false
+      try {
+        const botPath = join(serbotDir, folder)
+        if (!statSync(botPath).isDirectory()) return false
+        if (!existsSync(join(botPath, 'creds.json'))) return false
+        if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) return false
+        return !sesionEnEmparejamiento(botPath)
+      } catch {
+        return false
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
+async function iniciarGestorSubBots({ unificado = false } = {}) {
+  if (!Array.isArray(global.conns)) global.conns = []
   const serbotModule = await import('./plugins/serbot-serbot.js')
   const serbotDir = resolve(__dirname, global.bot || 'Serbot')
+  const sesionesEnDisco = listarSesionesListas(serbotDir)
+  const assignedSessions = unificado
+    ? sesionesEnDisco
+    : JSON.parse(process.env.PAIN_SESSIONS_JSON || '[]')
+  if (!Array.isArray(assignedSessions)) throw new Error('La asignación de sub-bots no es válida')
   let sessions = [...new Set(assignedSessions)].filter(folder =>
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
-  const workerId = process.env.PAIN_WORKER_ID || 'subbot'
+  const workerId = unificado ? 'primary' : (process.env.PAIN_WORKER_ID || 'subbot')
   iniciarMetricasWorker()
   const sesionesIniciando = new Map()
   const sesionesRetiradas = new Set()
+  const socketDeSesion = (folder) => {
+    const botPath = resolve(serbotDir, folder)
+    return (global.conns || []).find((item) =>
+      item?.pathAYBot && resolve(item.pathAYBot) === botPath
+    ) || null
+  }
+  const sesionAbierta = (folder) => {
+    const socket = socketDeSesion(folder)
+    if (!socket?.user) return false
+    const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
+    return socket?.ws?.isOpen === true || readyState === ws.OPEN
+  }
   const iniciarSesion = (folder) => {
     if (sesionesRetiradas.has(folder)) return Promise.resolve('skipped')
     const existing = sesionesIniciando.get(folder)
     if (existing) return existing
+    if (sesionAbierta(folder)) return Promise.resolve('skipped')
+    const estado = serbotModule.estadoSesionSubBot?.(join(serbotDir, folder))
+    if (estado?.intento || estado?.backoff) return Promise.resolve('skipped')
     const botPath = join(serbotDir, folder)
     if (sesionEnEmparejamiento(botPath)) {
-      console.warn(`Worker subbot: se omite ${folder}, se está vinculando desde el panel web.`)
+      console.warn(`Subbots: se omite ${folder}, se está vinculando desde el panel web.`)
       return Promise.resolve('skipped')
     }
     if (existsSync(join(botPath, ARCHIVO_REENLACE_PENDIENTE))) {
       try {
         purgarSesionReenlace(botPath, serbotDir)
-        console.warn(`Worker subbot: se archivó ${folder} (requiere volver a vincular); ajustes conservados.`)
+        console.warn(`Subbots: se archivó ${folder} (requiere volver a vincular); ajustes conservados.`)
         if (typeof process.send === 'function') {
           try { process.send({ type: 'remove-session', session: folder }, () => {}) } catch {}
         }
       } catch (error) {
-        console.error(`Worker subbot: no se pudo archivar ${folder}:`, error?.message || error)
+        console.error(`Subbots: no se pudo archivar ${folder}:`, error?.message || error)
       }
       return Promise.resolve('skipped')
     }
     if (!existsSync(join(botPath, 'creds.json'))) {
-      console.warn(`Worker subbot: se omite ${folder}, no tiene creds.json.`)
+      console.warn(`Subbots: se omite ${folder}, no tiene creds.json.`)
       return Promise.resolve('skipped')
     }
     const promise = serbotModule.AYBot({
@@ -1324,6 +1392,7 @@ if (!isSubbotWorker) {
   let ticksEstado = 0
   // 15 s: sigue muy por debajo del umbral de estado obsoleto (60 s) y reduce
   // un tercio el JSON/escritura de estado con cientos de sesiones.
+  const intervaloEstadoMs = unificado ? 30_000 : 10_000
   workerStatusInterval = setInterval(() => {
     try {
       publishWorkerStatus()
@@ -1344,7 +1413,7 @@ if (!isSubbotWorker) {
       // Archiva sesiones rechazadas: evita que se acumulen carpetas muertas.
       try { purgarReenlacesPendientes(serbotDir) } catch {}
     }
-  }, 10_000)
+  }, intervaloEstadoMs)
   workerStatusInterval.unref?.()
   process.on('message', async (message) => {
     if (message?.type === 'reload-worker') {
@@ -1471,41 +1540,190 @@ if (!isSubbotWorker) {
   })
   const batchSize = Math.max(Number.parseInt(process.env.PAIN_SUBBOT_BATCH, 10) || 1, 1)
   const retrasoInicial = Number.parseInt(process.env.PAIN_START_DELAY_MS, 10) || 0
-  // El límite global de handshakes ya evita la tormenta; 5 s extra por sesión
-  // solo alargaban el arranque de 283 sub-bots sin aportar nada.
-  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1500
-  if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
-  // Premium primero en el arranque: con cientos de sesiones, los sub-bots de
-  // pago quedan en línea antes que el resto (mismo criterio en la cola de
-  // reconexiones, así escala sin depender de una cantidad fija).
+  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) ||
+    (unificado ? 200 : 1500)
+  const concurrenciaArranque = Math.min(
+    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 6 : 1), 1),
+    12
+  )
   const initialSessions = ordenarSesionesPorPrioridad(serbotDir, [...sessions])
-  let started = 0
-  let skipped = 0
-  let failed = 0
-  for (let i = 0; i < initialSessions.length; i += batchSize) {
-    const batch = initialSessions.slice(i, i + batchSize)
-    const results = await Promise.all(batch.map(async (folder) => {
-      return iniciarSesion(folder)
-    }))
-    started += results.filter(result => result === 'started').length
-    skipped += results.filter(result => result === 'skipped').length
-    failed += results.filter(result => result === 'failed').length
-    if (i + batchSize < initialSessions.length) {
-      await new Promise(resolve => setTimeout(resolve, pausaEntreLotesMs))
+  const arrancarTodas = async () => {
+    if (unificado) {
+      const cola = [...initialSessions]
+      let iniciadas = 0
+      const trabajador = async () => {
+        while (cola.length) {
+          const folder = cola.shift()
+          const resultado = await iniciarSesion(folder)
+          if (resultado === 'started') iniciadas++
+          if (pausaEntreLotesMs > 0) {
+            await new Promise((resolver) => setTimeout(resolver, pausaEntreLotesMs))
+          }
+        }
+      }
+      await Promise.all(
+        Array.from({ length: Math.min(concurrenciaArranque, cola.length) }, trabajador)
+      )
+      console.log(
+        `Subbots (proceso único) iniciaron ${iniciadas}/${initialSessions.length} ` +
+        `sesión(es) con concurrencia ${concurrenciaArranque}.`
+      )
+      return
+    }
+    let started = 0
+    let skipped = 0
+    let failed = 0
+    for (let i = 0; i < initialSessions.length; i += batchSize) {
+      const batch = initialSessions.slice(i, i + batchSize)
+      const results = await Promise.all(batch.map(async (folder) => {
+        return iniciarSesion(folder)
+      }))
+      started += results.filter(result => result === 'started').length
+      skipped += results.filter(result => result === 'skipped').length
+      failed += results.filter(result => result === 'failed').length
+      if (i + batchSize < initialSessions.length) {
+        await new Promise(resolve => setTimeout(resolve, pausaEntreLotesMs))
+      }
+    }
+    console.log(
+      `Worker ${workerId} inició ${started}/${sessions.length} sesión(es); ` +
+      `${skipped} omitida(s), ${failed} con error.`
+    )
+  }
+
+  const esperarAbierta = async (folder, timeoutMs = 50_000) => {
+    const limite = Date.now() + Math.max(5_000, Number(timeoutMs) || 0)
+    while (Date.now() < limite) {
+      if (sesionAbierta(folder)) return true
+      await new Promise((resolver) => setTimeout(resolver, 1000))
+    }
+    return false
+  }
+
+  const reconectarUnaLocal = async (folder) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(String(folder || ''))) {
+      return { ok: false, reason: 'invalid' }
+    }
+    const botPath = join(serbotDir, folder)
+    if (sesionEnEmparejamiento(botPath)) return { ok: false, reason: 'pairing' }
+    if (!existsSync(join(botPath, 'creds.json'))) return { ok: false, reason: 'no-creds' }
+    if (necesitaRevinculacion(serbotDir, folder) || sesionRequiereVincular(botPath)) {
+      return { ok: false, reason: 'needs-relink' }
+    }
+    if (sesionAbierta(folder)) return { ok: true, already: true }
+    const estado = serbotModule.estadoSesionSubBot?.(botPath)
+    if (estado?.intento) {
+      return { ok: true, already: true, pending: true }
+    }
+    // /rebot fuerza: retira un socket viejo/colgado y vuelve a empezar.
+    try { await serbotModule.retirarSesionDeWorker(botPath, { handoff: false }) } catch {}
+    const resultado = await iniciarSesion(folder)
+    if (resultado === 'failed' || resultado === 'skipped') {
+      return { ok: false, reason: resultado }
+    }
+    const abierta = await esperarAbierta(folder)
+    return { ok: abierta, reason: abierta ? null : 'timeout' }
+  }
+
+  let reconexionLocalPromise = null
+  const reconectarTodasLocal = async () => {
+    if (reconexionLocalPromise) return reconexionLocalPromise
+    reconexionLocalPromise = (async () => {
+      const lista = ordenarSesionesPorPrioridad(serbotDir, listarSesionesListas(serbotDir))
+      const pendientes = []
+      let omitidos = 0
+      for (const folder of lista) {
+        if (sesionAbierta(folder)) { omitidos++; continue }
+        const estado = serbotModule.estadoSesionSubBot?.(join(serbotDir, folder))
+        if (estado?.intento || estado?.backoff) { omitidos++; continue }
+        pendientes.push(folder)
+      }
+      const cola = [...pendientes]
+      let conectados = 0
+      const trabajador = async () => {
+        while (cola.length) {
+          const folder = cola.shift()
+          const resultado = await iniciarSesion(folder)
+          if (resultado === 'started' && await esperarAbierta(folder, 45_000)) conectados++
+        }
+      }
+      await Promise.all(
+        Array.from(
+          {
+            length: Math.min(
+              Math.max(Number(process.env.PAIN_START_CONCURRENCY) || 4, 1),
+              12,
+              cola.length
+            ),
+          },
+          trabajador
+        )
+      )
+      return {
+        total: lista.length,
+        omitidos,
+        conectados,
+        pendientes: Math.max(0, pendientes.length - conectados),
+        fallidos: 0,
+        requierenVincular: listarRequierenVincular(serbotDir).length,
+      }
+    })()
+    try {
+      return await reconexionLocalPromise
+    } finally {
+      reconexionLocalPromise = null
     }
   }
-  console.log(
-    `Worker ${workerId} inició ${started}/${sessions.length} sesión(es); ` +
-    `${skipped} omitida(s), ${failed} con error.`
-  )
+
+  if (unificado) {
+    global.subBotsReconnected = true
+    global.__painReconnectOne = reconectarUnaLocal
+    global.__painReconnectAll = reconectarTodasLocal
+    // Alta de sesiones vinculadas desde el panel y limpieza de sockets de
+    // carpetas que ya no existen. Sustituye al reconcile del supervisor.
+    const escanearSesiones = () => {
+      let disco = []
+      try { disco = listarSesionesListas(serbotDir) } catch { return }
+      const enDisco = new Set(disco)
+      for (const folder of disco) {
+        if (sessions.includes(folder)) continue
+        sessions.push(folder)
+        void iniciarSesion(folder)
+      }
+      for (const folder of [...sessions]) {
+        if (enDisco.has(folder)) continue
+        const botPath = join(serbotDir, folder)
+        // Una vinculación en curso (panel) no debe cancelarse por el escaneo.
+        if (sesionEnEmparejamiento(botPath)) continue
+        sessions = sessions.filter((item) => item !== folder)
+        void serbotModule.retirarSesionDeWorker(botPath, { handoff: false })
+      }
+    }
+    escanearSesiones()
+    const escaneo = setInterval(escanearSesiones, 30_000)
+    escaneo.unref?.()
+    // Dar unos segundos al principal para que abra su socket antes de la
+    // oleada de sub-bots. El arranque corre en segundo plano.
+    setTimeout(() => {
+      void arrancarTodas().catch((error) => {
+        console.error('[subbots] Error en el arranque:', error?.message || error)
+      })
+    }, 3000).unref?.()
+  } else {
+    if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
+    await arrancarTodas()
+  }
   try { purgarReenlacesPendientes(serbotDir) } catch {}
 }
 
 function cerrarConexionesDelProceso(signal) {
   console.log(`Proceso ${process.env.PAIN_WORKER_ID || 'primary'} cerrando por ${signal}.`)
-  if (isSubbotWorker) {
+  if (isSubbotWorker || isSingleBotProcess) {
     if (workerStatusInterval) clearInterval(workerStatusInterval)
-    removeSubbotWorkerStatus(__dirname, process.env.PAIN_WORKER_ID || 'subbot')
+    removeSubbotWorkerStatus(
+      __dirname,
+      isSubbotWorker ? (process.env.PAIN_WORKER_ID || 'subbot') : 'primary'
+    )
   }
   const sockets = new Set([global.conn, ...(global.conns || [])])
   for (const socket of sockets) {
@@ -1656,6 +1874,9 @@ function contarConectadosManaged() {
 }
 
 global.reconnectSubBotsManaged = async function() {
+  if (isSingleBotProcess && typeof global.__painReconnectAll === 'function') {
+    return global.__painReconnectAll()
+  }
   if (reconexionSubBotsPromise) return reconexionSubBotsPromise
   reconexionSubBotsPromise = (async () => {
     const serbotDir = global.bot || './Serbot'
@@ -1740,6 +1961,9 @@ global.reconnectSubBotOneManaged = async function(folder) {
       }
     }
   } catch {}
+  if (isSingleBotProcess && typeof global.__painReconnectOne === 'function') {
+    return global.__painReconnectOne(realFolder)
+  }
   if (sesionEnEmparejamiento(join(serbotDir, realFolder))) {
     return { ok: false, reason: 'pairing' }
   }

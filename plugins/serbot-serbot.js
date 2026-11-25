@@ -64,14 +64,16 @@ const rcanal = {
 // Un WebSocket OPEN todavía puede estar terminando el login bajo carga.
 // No se debe destruir a los 60 s solo porque aún no apareció `user`.
 const SOCKET_CONEXION_MAX_MS = 180_000
-const MAX_FALLOS_RECONEXION = 8
+const MAX_FALLOS_RECONEXION = 10
 // Un 408 es transitorio y no autoriza a borrar credenciales, pero repetir
 // sockets fallidos sin límite mantiene una tormenta permanente cuando el
 // servidor o la red no responden. La sesión queda archivada y recuperable;
 // solo se pausa su siguiente intento automático.
+const MODO_PROCESO_UNICO = process.env.PAIN_SINGLE_PROCESS !== '0'
 const PAUSA_408_RECONEXION_MS = Math.max(
-  2 * 60_000,
-  Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 5 * 60_000
+  MODO_PROCESO_UNICO ? 30_000 : 2 * 60_000,
+  Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) ||
+    (MODO_PROCESO_UNICO ? 60_000 : 5 * 60_000)
 )
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
@@ -81,19 +83,28 @@ const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
 // no por cantidad fija de sub-bots: la cola crece sin bloquear mensajes y se
 // drena conforme terminan las conexiones.
 const MAX_RECONEXIONES_POR_WORKER = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 1, 1),
-  8
+  Math.max(
+    Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) ||
+      (MODO_PROCESO_UNICO ? 4 : 1),
+    1
+  ),
+  12
 )
 // Separación mínima entre inicios de reconexión del mismo worker: suaviza la
 // oleada contra WhatsApp y reparte el CPU en el tiempo. Configurable.
 const ESPACIO_RECONEXION_MS = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 5000, 0),
+  Math.max(
+    Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) ||
+      (MODO_PROCESO_UNICO ? 600 : 5000),
+    0
+  ),
  30_000
 )
 const colaReconexiones = []
 let reconexionesActivas = 0
 let ultimoInicioReconexion = 0
 let temporizadorDrenajeReconexiones = null
+const reintentosProgramados = new Map()
 
 // Cierre inmediato del socket crudo. `ws.close()` espera el handshake y el
 // socket viejo puede seguir recibiendo frames cifrados que ya no se pueden
@@ -420,8 +431,29 @@ export {
 }
 export default handler
 
+/** Estado de una sesión para el gestor de sub-bots del proceso único. */
+export function estadoSesionSubBot(pathAYBot) {
+  const clave = path.resolve(pathAYBot)
+  const carpeta = path.basename(clave)
+  const intento = iniciosSubBot.get(clave)
+  const socket = (global.conns || []).find((item) =>
+    item?.pathAYBot && path.resolve(item.pathAYBot) === clave
+  )
+  const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
+  const open = Boolean(
+    socket?.user &&
+    (socket?.ws?.isOpen === true || readyState === 1)
+  )
+  return {
+    intento: Boolean(intento),
+    open,
+    backoff: reintentosProgramados.has(carpeta),
+  }
+}
+
 export async function retirarSesionDeWorker(pathAYBot, { handoff = false } = {}) {
   const clave = path.resolve(pathAYBot)
+  reintentosProgramados.delete(path.basename(clave))
   const intento = iniciosSubBot.get(clave)
   if (intento) {
     if (handoff) await intento.ceder?.()
@@ -465,6 +497,7 @@ async function iniciarSubBot(options) {
   if (inicioExistente) {
     return esperarConexion ? inicioExistente.conectado : inicioExistente.iniciado
   }
+  reintentosProgramados.delete(path.basename(claveInicio))
   
  
   if (!fromCommand) {
@@ -588,6 +621,7 @@ async function iniciarSubBot(options) {
 
   intento.ceder = async () => {
     intento.cancelado = true
+    reintentosProgramados.delete(path.basename(pathAYBot))
     intento.limpiarAuxiliares?.()
     const socket = intento.sock
     intento.liberarAdmisiones?.()
@@ -605,6 +639,7 @@ async function iniciarSubBot(options) {
 
   intento.cancelar = () => {
     intento.cancelado = true
+    reintentosProgramados.delete(path.basename(pathAYBot))
     intento.limpiarAuxiliares?.()
     const socket = intento.sock
     intento.liberarAdmisiones?.()
@@ -683,14 +718,22 @@ async function iniciarSubBot(options) {
     // Con 283 sesiones, un handshake a la vez tardaba horas en ponerlas todas
     // online. Dos en paralelo caben de sobra en el plan y drenan la cola.
     const concurrenciaHandshake = Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 2, 1),
-      8
+      Math.max(
+        Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) ||
+          (MODO_PROCESO_UNICO ? 6 : 2),
+        1
+      ),
+      10
     )
     // Cuánto puede quedarse un permiso de handshake sin liberarse. Si una
     // reconexión queda abandonada, caduca y destapa la cola; antes el PID vivo
     // lo mantenía bloqueado para siempre.
     const ttlHandshake = Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_HANDSHAKE_LEASE_MS, 10) || 120_000, 30_000),
+      Math.max(
+        Number.parseInt(process.env.PAIN_HANDSHAKE_LEASE_MS, 10) ||
+          (MODO_PROCESO_UNICO ? 180_000 : 120_000),
+        30_000
+      ),
       300_000
     )
     const liberarHandshake = (socket) => {
@@ -1017,16 +1060,19 @@ async function iniciarSubBot(options) {
         liberarHandshake(socketEvento)
         detenerPrekeys(sock)
         if (sock._painLeaseHandoff) {
+          reintentosProgramados.delete(idCarpetaBot)
           intento.limpiarAuxiliares?.()
           quitarSockDeConns(sock)
           confirmSessionLease(idCarpetaBot)
           return
         }
         if (sock._painDeletingSession) {
+          reintentosProgramados.delete(idCarpetaBot)
           intento.limpiarAuxiliares?.()
           return
         }
         if (sock._painSupervisorHandoff) {
+          reintentosProgramados.delete(idCarpetaBot)
           detenerWatchdog()
           if (temporizadorReconexion) clearTimeout(temporizadorReconexion)
           if (Array.isArray(global.conns)) global.conns = global.conns.filter((item) => item !== sock)
@@ -1049,6 +1095,7 @@ async function iniciarSubBot(options) {
           (motivo === DisconnectReason.badSession && fallos500Seguidos >= 3)
 
         if (esMotivoSesionFatal(motivo) && !estadoConn.creds.registered) {
+          reintentosProgramados.delete(idCarpetaBot)
           terminarIntento(new Error(`Emparejamiento de sub-bot ${idCarpetaBot} interrumpido`))
           console.log(chalk.bold.yellow(
             `\n┆ Emparejamiento de (+${idCarpetaBot}) interrumpido antes de registrar la sesión; ` +
@@ -1061,6 +1108,7 @@ async function iniciarSubBot(options) {
         }
 
         if (sesionMuertaConfirmada) {
+          reintentosProgramados.delete(idCarpetaBot)
           terminarIntento(new Error(`Sesión de sub-bot ${idCarpetaBot} cerrada con código ${motivo ?? 'desconocido'}`))
           let marcaCreada = false
           try {
@@ -1109,6 +1157,7 @@ async function iniciarSubBot(options) {
       if (global.db?.data == null) await global.loadDatabase?.()
 
       if (connection === 'open') {
+        reintentosProgramados.delete(idCarpetaBot)
         // La admisión solo cubre el handshake. Las conexiones ya abiertas no
         // consumen slots y pueden permanecer vivas sin límite fijo.
         liberarHandshake(socketEvento)
@@ -1376,13 +1425,19 @@ async function iniciarSubBot(options) {
     function reconectarEnCola(motivo = null) {
       if (reconexionEnCola) return Promise.resolve(false)
       reconexionEnCola = true
+      reintentosProgramados.set(idCarpetaBot, Date.now())
       return encolarReconexion(
         () => reconectarUnaVez(),
         prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
       )
+        .then((resultado) => {
+          if (resultado === false) reintentosProgramados.delete(idCarpetaBot)
+          return resultado
+        })
         .catch((error) => {
           console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
           reconectando = false
+          reintentosProgramados.delete(idCarpetaBot)
           return false
         })
         .finally(() => {
@@ -1393,6 +1448,7 @@ async function iniciarSubBot(options) {
     function programarReconexion(motivo, detalle = '') {
       if (temporizadorReconexion) return
       reconectando = true
+      reintentosProgramados.set(idCarpetaBot, Date.now())
       const dispersarMs = (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
       const esReemplazo = motivo === DisconnectReason.connectionReplaced
       if (!esReemplazo && fallosConsecutivos >= MAX_FALLOS_RECONEXION) {

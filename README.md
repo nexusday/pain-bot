@@ -418,12 +418,24 @@ supervised workers (5 by default, `PAIN_SUBBOT_WORKERS`).
 `/pri 2` and per-sub-bot worker mode have been removed to keep process count and
 CPU overhead predictable.
 
+> **Modo proceso único (por defecto desde esta versión).** `index.js` levanta
+> **un solo** proceso `main.js` que contiene el bot principal y todos los
+> sub-bots (`global.conns`). Los plugins se cargan **una vez**, no una vez por
+> worker, y no hay locks de handshake entre procesos. Se parece a la
+> arquitectura de GataBot-MD. El panel web sigue en un proceso HTTP aparte.
+> Para volver al supervisor clásico de 5 grupos: `PAIN_SINGLE_PROCESS=0`.
+> Variables nuevas: `PAIN_SINGLE_HEAP_MB` (heap del proceso único, 2048 por
+> defecto) y `PAIN_START_CONCURRENCY` (sesiones que arrancan a la vez, 6 por
+> defecto). En modo único `PAIN_SUBBOT_WORKERS` se ignora.
+
 **Los sub-bots esperan al principal.** Si el bot principal no tiene sesión
 registrada (estás emparejando con un código de 8 dígitos), los workers de
 sub-bots no arrancan: no se conecta nada hasta que termines el emparejamiento.
 En cuanto el principal queda vinculado, los sub-bots arrancan solos. Después de
 eso la compuerta ya no interviene: si el principal se desvincula más tarde, los
-sub-bots **siguen conectados y funcionando**.
+sub-bots **siguen conectados y funcionando**. En modo proceso único los
+sub-bots arrancan 3 s después del principal, sin esperar a que termine el
+emparejamiento: son independientes y el panel puede vincularlos igual.
 
 **`/subme <mensaje>`** no lo manda el principal a los sub-bots: **cada sub-bot
 se escribe a sí mismo** el mensaje (en su propio chat "mensajes para ti
@@ -456,16 +468,22 @@ Con 150+ sub-bots la RAM la consuma el proceso, no el bot. Por eso ahora:
   más pesado y ningún comando las usaba.
 - Se libera el modelo de voz (Whisper) tras 5 min sin audio y se ejecuta GC
   cuando el heap supera 350 MB.
-- Se limita el heap de cada proceso: 896 MB por worker y 1 GB para el principal.
-  Si un worker se pasa, el supervisor lo reinicia solo.
+- Se limita el heap de cada proceso: 2048 MB para el proceso único, o 896 MB
+  por worker y 1 GB para el principal en modo clásico. Si el proceso se pasa,
+  el supervisor lo reinicia solo.
 
 Diagnóstico: `/mem` y `/mem limpiar` (fuerza poda y GC en el proceso actual).
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `PAIN_SUBBOT_WORKERS` | `5` | Cuántos workers reparten los sub-bots |
-| `PAIN_WORKER_HEAP_MB` | `896` | Tope de heap por worker |
-| `PAIN_PRIMARY_HEAP_MB` | `1024` | Tope de heap del proceso principal |
+| `PAIN_SINGLE_PROCESS` | `1` | `1` = un proceso (estilo GataBot); `0` = supervisor clásico de grupos |
+| `PAIN_SINGLE_HEAP_MB` | `2048` | Tope de heap del proceso único |
+| `PAIN_START_CONCURRENCY` | `6` | Sesiones que se abren a la vez al arrancar |
+| `PAIN_SOCKET_HANDSHAKE_CONCURRENCY` | `6` | Handshakes simultáneos en modo único |
+| `PAIN_RECONNECT_CONCURRENCY` | `4` | Reconexiones simultáneas en modo único |
+| `PAIN_SUBBOT_WORKERS` | `5` | Solo modo clásico (`PAIN_SINGLE_PROCESS=0`) |
+| `PAIN_WORKER_HEAP_MB` | `896` | Tope de heap por worker (modo clásico) |
+| `PAIN_PRIMARY_HEAP_MB` | `1024` | Tope de heap del proceso principal (modo clásico) |
 | `PAIN_MAX_CHATS_SOCKET` | `150` | Chats guardados por socket |
 | `PAIN_MAX_GROUP_META` | `400` | Metadata de grupos en caché por proceso |
 | `PAIN_MAX_MSG_CACHE` | `4000` | Mensajes cacheados por proceso |
