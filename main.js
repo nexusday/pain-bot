@@ -1084,7 +1084,7 @@ async function filesInit() {
   // son independientes: se importan en paralelo y se registran al final para
   // conservar el orden de los archivos.
   const concurrencia = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_PLUGIN_IMPORT_CONCURRENCY, 10) || 8, 1),
+    Math.max(Number.parseInt(process.env.PAIN_PLUGIN_IMPORT_CONCURRENCY, 10) || 12, 1),
     16
   )
   const resultados = new Array(nombres.length)
@@ -1098,8 +1098,8 @@ async function filesInit() {
         const module = await import(file)
         resultados[indice] = normalizePlugin(module.default || module)
         const demora = Date.now() - inicio
-        if (isSingleBotProcess && demora > 1500) {
-          console.log(`[boot] plugin lento: ${filename} (${demora} ms)`)
+        if (isSingleBotProcess && demora > 5000) {
+          console.log(`[boot] plugin muy lento: ${filename} (${demora} ms)`)
         }
       } catch (e) {
         const log = conn?.logger || global.conn?.logger || console
@@ -1646,8 +1646,8 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     ? (Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 100)
     : (Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1500)
   const concurrenciaArranque = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 12 : 1), 1),
-    24
+    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 8 : 1), 1),
+    16
   )
   const initialSessions = ordenarSesionesPorPrioridad(serbotDir, [...sessions])
   const arrancarTodas = async () => {
