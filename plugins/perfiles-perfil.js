@@ -1,6 +1,7 @@
 import fs from 'fs'
 import { join } from 'path'
 import { findGroupParticipant } from '../lib/group-participant.js'
+import { metadataGrupo } from '../lib/group-meta-cache.js'
 import { getRpgSnapshot, formatNumber } from '../lib/rpg-level.js'
 import { ensureMsgStats, getChatMsgCount, getTotalMsgCount } from '../lib/msg-activity.js'
 import { resolveDbUser } from '../lib/michi-users.js'
@@ -125,7 +126,7 @@ let handler = async (m, { conn, usedPrefix, command, participants }) => {
 
   if (m.isGroup) {
     try {
-      const metadatosGrupo = conn.chats[m.chat]?.metadata || await conn.groupMetadata(m.chat).catch(_ => null)
+      const metadatosGrupo = conn.chats[m.chat]?.metadata || await metadataGrupo(conn, m.chat).catch(_ => null)
       if (metadatosGrupo) {
         const participants = metadatosGrupo.participants || []
 

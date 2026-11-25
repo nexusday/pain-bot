@@ -78,7 +78,7 @@ import {
 import { initViewOnceAntiListener } from './lib/viewOnce.js'
 import { Low } from 'lowdb'
 import { ArchivoSqliteCompartido } from './lib/db-sqlite.js'
-import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatus } from './lib/subbot-status.js'
+import { readSubbotWorkerStatuses, removeSubbotWorkerStatus, writeSubbotWorkerStatusAsync } from './lib/subbot-status.js'
 import {
   iniciarMetricasWorker,
   obtenerActividadSocket,
@@ -517,10 +517,10 @@ if (!opts['test']) {
     const intervaloGuardado = Math.max(
       Number.parseInt(
         isSingleBotProcess
-          ? (process.env.PAIN_SINGLE_DB_SAVE_MS || '180000')
+          ? (process.env.PAIN_SINGLE_DB_SAVE_MS || '300000')
           : process.env.PAIN_DB_SAVE_MS,
         10
-      ) || (isSingleBotProcess ? 180_000 : 60_000),
+      ) || (isSingleBotProcess ? 300_000 : 60_000),
       30_000
     )
     const initialDelay = (phase >>> 0) % intervaloGuardado
@@ -1414,7 +1414,7 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       }
     }
     const inicioWrite = Date.now()
-    writeSubbotWorkerStatus(__dirname, workerId, sessions.map((folder) => {
+    writeSubbotWorkerStatusAsync(__dirname, workerId, sessions.map((folder) => {
       const socket = socketsBySessionPath.get(join(serbotDir, folder))
       const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
       return {
@@ -1448,12 +1448,16 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       // reconexiones de esta ventana. Las usa el supervisor para balancear
       // por carga real; el panel puede mostrarlas tal cual.
       metricas,
+    }).then(() => {
+      const msWrite = Date.now() - inicioWrite
+      if (unificado && msWrite > 700) {
+        console.warn(`[salud] estado en disco lento: ${msWrite} ms`)
+      }
+    }).catch((error) => {
+      console.error('[estado] No se pudo escribir el estado:', error?.message || error)
     })
-    const msWrite = Date.now() - inicioWrite
-    if (unificado && (msEstado > 500 || msWrite > 500)) {
-      console.warn(
-        `[salud] publicar estado lento: memoria=${msEstado}ms, escritura=${msWrite}ms`
-      )
+    if (unificado && msEstado > 500) {
+      console.warn(`[salud] calcular estado lento: ${msEstado} ms`)
     }
   }
   function registrarMetricasWorkerEnseguro() {

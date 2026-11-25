@@ -323,7 +323,7 @@ export async function handler(chatUpdate) {
   const duplicados = chatUpdate.messages.length - mensajes.length
   if (duplicados > 0) contarMensajesDuplicados(duplicados)
   const maxEdadMensajeMs = Math.max(
-    Number.parseInt(process.env.PAIN_MAX_MESSAGE_AGE_MS, 10) || 120_000,
+    Number.parseInt(process.env.PAIN_MAX_MESSAGE_AGE_MS, 10) || 60_000,
     10_000
   )
   for (const mensaje of mensajes) {
