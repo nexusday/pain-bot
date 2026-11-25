@@ -1,7 +1,7 @@
 console.log('⧉ Inicializando Pain...')
 
 import { fork } from 'node:child_process'
-import { existsSync, readdirSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import {
@@ -97,6 +97,14 @@ function subBotsPermitidosAhora() {
 const STOP_TIMEOUT_MS = 10_000
 const RESTART_MAX_MS = 30_000
 const STABLE_MS = 60_000
+// Un proceso que muere una y otra vez en segundos no se arregla reiniciándolo
+// cada 2 s: cada arranque reimporta todo el bot y vuelve a abrir conexiones, y
+// eso es justo lo que satura la CPU. Tras varios fallos rápidos se espera más.
+const FALLO_RAPIDO_MS = 15_000
+const FALLOS_RAPIDOS_ANTES_DE_PAUSA = 3
+const PAUSA_TRAS_FALLOS_RAPIDOS_MS = 60_000
+const LOGS_DIR = join(__dirname, 'storage', 'logs')
+const TAIL_LINEAS = 30
 // Generación joven más grande: el GC llegó a ocupar ~20 % del tiempo por la cantidad de objetos pequeños.
 const SEMI_SPACE_MB = Math.min(Math.max(Number.parseInt(process.env.PAIN_SEMI_SPACE_MB, 10) || 16, 16), 128)
 // Tope de heap por proceso: con 150+ subbots un worker descontrolado podía
@@ -258,6 +266,8 @@ function ensureTarget(id, target) {
       fingerprint: wantedFingerprint,
       child: null,
       failures: 0,
+      fallosRapidos: 0,
+      stderrTail: [],
       restartAt: 0,
       startedAt: 0,
       stopping: false,
@@ -336,6 +346,42 @@ function startDelayMs(id) {
   return Number.isInteger(n) ? 4_000 + n * 12_000 : 0
 }
 
+function capturarStderr(slot, stream) {
+  let resto = ''
+  stream.setEncoding('utf8')
+  stream.on('data', (trozo) => {
+    // Se sigue mostrando en la consola del panel; además se guardan las
+    // últimas líneas para poder decir exactamente por qué murió el proceso.
+    process.stderr.write(trozo)
+    resto += trozo
+    const lineas = resto.split(/\r?\n/)
+    resto = lineas.pop() || ''
+    for (const linea of lineas) {
+      if (!linea.trim()) continue
+      slot.stderrTail.push(linea.slice(0, 400))
+      if (slot.stderrTail.length > TAIL_LINEAS) slot.stderrTail.shift()
+    }
+  })
+  stream.on('error', () => {})
+}
+
+function volcarCrash(id, slot) {
+  const lineas = [...(slot.stderrTail || [])]
+  if (!lineas.length) return null
+  try {
+    mkdirSync(join(LOGS_DIR, 'crash'), { recursive: true })
+    const destino = join(LOGS_DIR, 'crash', `${id}-ultimo-error.log`)
+    writeFileSync(
+      destino,
+      `${new Date().toISOString()} — últimas líneas de ${id}\n\n${lineas.join('\n')}\n`,
+      'utf8'
+    )
+    return destino
+  } catch {
+    return null
+  }
+}
+
 function startSlot(id, slot) {
   if (stopping || slot.child || Date.now() < slot.restartAt) return
   // El principal manda la señal cuando termina de vincularse; hasta entonces
@@ -372,9 +418,11 @@ function startSlot(id, slot) {
       PAIN_START_DELAY_MS: String(startDelayMs(id)),
       PAIN_SESSIONS_JSON: JSON.stringify(slot.target.sessions)
     },
-    stdio: ['inherit', 'inherit', 'inherit', 'ipc']
+    stdio: ['inherit', 'inherit', 'pipe', 'ipc']
   })
   slot.child = child
+  slot.stderrTail = []
+  if (child.stderr) capturarStderr(slot, child.stderr)
   child.on('message', (message) => {
     if (slot.child !== child) return
     if (message?.type === 'session-removed' && /^[a-zA-Z0-9_-]+$/.test(message.session || '')) {
@@ -572,11 +620,30 @@ function startSlot(id, slot) {
     }
     const runtime = Date.now() - slot.startedAt
     if (runtime >= STABLE_MS) slot.failures = 0
-    const delay = Math.min(1000 * (2 ** slot.failures++), RESTART_MAX_MS)
+    if (code !== 0) {
+      const archivo = volcarCrash(id, slot)
+      if (slot.stderrTail?.length) {
+        console.error(`[supervisor] Últimas líneas de ${id} antes de salir (código ${code}):`)
+        for (const linea of slot.stderrTail.slice(-12)) console.error(`  ${linea}`)
+      }
+      if (archivo) console.error(`[supervisor] Log del fallo guardado en ${archivo}`)
+    }
+    // Fallos rápidos repetidos: esperar más evita un bucle de arranques que
+    // reimporta todo el bot y reconecta sesiones una y otra vez.
+    if (runtime < FALLO_RAPIDO_MS) slot.fallosRapidos = (slot.fallosRapidos || 0) + 1
+    else slot.fallosRapidos = 0
+    const pausaLarga = slot.fallosRapidos >= FALLOS_RAPIDOS_ANTES_DE_PAUSA
+    const delay = pausaLarga
+      ? PAUSA_TRAS_FALLOS_RAPIDOS_MS
+      : Math.min(1000 * (2 ** slot.failures++), RESTART_MAX_MS)
     slot.restartAt = Date.now() + delay
     console.error(
       `Proceso ${id} terminó (código ${code ?? 'desconocido'}, señal ${signal || 'ninguna'}). ` +
-      `Se reiniciará en ${delay / 1000}s.`
+      `Se reiniciará en ${Math.round(delay / 1000)}s.` +
+      (pausaLarga
+        ? ` Se detectaron ${slot.fallosRapidos} fallos rápidos seguidos: ` +
+          'revisa el error guardado antes de que vuelva a arrancar.'
+        : '')
     )
     slot.restartTimer = setTimeout(() => {
       slot.restartTimer = null

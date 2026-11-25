@@ -1,3 +1,4 @@
+import './lib/crash-guard.js'
 import './lib/sesion-log.js'
 
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1'
@@ -232,6 +233,27 @@ global.processRole = isSubbotWorker ? 'subbot' : 'primary'
 // Los sub-bots no deben quitarle CPU al bot principal.
 if (isSubbotWorker) {
   try { os.setPriority(10) } catch {}
+}
+
+// Si el supervisor desaparece, este proceso no debe quedarse vivo: seguiría
+// manteniendo sockets abiertos y gastando CPU, y cuando arranque el nuevo
+// supervisor sus sesiones chocarían con las viejas (440 "replaced") en bucle.
+if (typeof process.send === 'function') {
+  process.on('disconnect', () => {
+    console.error(
+      `[${process.env.PAIN_ROLE || 'primary'}] Supervisor desconectado: ` +
+      'cerrando para no dejar conexiones huérfanas.'
+    )
+    try {
+      for (const socket of [global.conn, ...(global.conns || [])]) {
+        if (!socket) continue
+        try { socket.ev?.removeAllListeners?.() } catch {}
+        try { socket.ws?.terminate?.() } catch {}
+        try { socket.ws?.close?.() } catch {}
+      }
+    } catch {}
+    setTimeout(() => process.exit(0), 1200).unref?.()
+  })
 }
 
 // El panel web arranca PRIMERO: la web tiene que estar disponible aunque el
