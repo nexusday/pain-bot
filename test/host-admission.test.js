@@ -57,6 +57,57 @@ test('el rate limit compartido separa los comienzos de cada operación', async (
   }
 })
 
+test('un permiso viejo de un proceso vivo caduca y destapa la cola', async () => {
+  const root = carpetaTemporal()
+  try {
+    const directorio = path.join(root, 'runtime-admission', 'fuga')
+    fs.mkdirSync(directorio, { recursive: true })
+    // Socket abandonado: el PID dueño sigue vivo, pero el permiso es viejo.
+    fs.writeFileSync(path.join(directorio, 'slot-0.lock'), JSON.stringify({
+      token: 'viejo',
+      pid: process.pid,
+      host: os.hostname(),
+      startedAt: Date.now() - 10 * 60_000,
+    }))
+
+    const liberar = await adquirirPermisoCompartido('fuga', {
+      rootDir: root,
+      slots: 1,
+      ttlMs: 60_000,
+    })
+    assert.equal(typeof liberar, 'function', 'debe tomar el permiso caducado')
+    liberar()
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('un permiso reciente de un proceso vivo sigue bloqueando', async () => {
+  const root = carpetaTemporal()
+  let liberar = null
+  try {
+    liberar = await adquirirPermisoCompartido('activo', {
+      rootDir: root,
+      slots: 1,
+      ttlMs: 60_000,
+    })
+    // Con el permiso recién tomado no debe poder entrar otra operación: la
+    // espera se cancela a los 400 ms y debe devolver null (no tomarlo).
+    let cancelado = false
+    setTimeout(() => { cancelado = true }, 400)
+    const segundo = await adquirirPermisoCompartido('activo', {
+      rootDir: root,
+      slots: 1,
+      ttlMs: 60_000,
+      cancelado: () => cancelado,
+    })
+    assert.equal(segundo, null)
+  } finally {
+    liberar?.()
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('una espera cancelada no conserva el slot', async () => {
   const root = carpetaTemporal()
   const liberar = await adquirirPermisoCompartido('cancel', { rootDir: root })

@@ -1061,6 +1061,13 @@ async function filesInit() {
 }
 await filesInit()
 global.pluginsEpoch = (global.pluginsEpoch || 0) + 1
+try {
+  const desde = Number(global.__painBootAt) || Date.now()
+  console.log(
+    `[boot] ${process.env.PAIN_ROLE || 'primary'} (${process.env.PAIN_WORKER_ID || '-'}) ` +
+    `${Object.keys(global.plugins).length} plugins en ${Date.now() - desde} ms`
+  )
+} catch {}
 
 global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {

@@ -64,7 +64,6 @@ const rcanal = {
 // Un WebSocket OPEN todavía puede estar terminando el login bajo carga.
 // No se debe destruir a los 60 s solo porque aún no apareció `user`.
 const SOCKET_CONEXION_MAX_MS = 180_000
-const SOCKET_INACTIVO_MAX_MS = 90_000
 const MAX_FALLOS_RECONEXION = 8
 // Un 408 es transitorio y no autoriza a borrar credenciales, pero repetir
 // sockets fallidos sin límite mantiene una tormenta permanente cuando el
@@ -676,9 +675,21 @@ async function iniciarSubBot(options) {
     const liberadoresHandshake = new WeakMap()
     const finalizadoresHandshake = new WeakMap()
     const raizAdmisiones = path.resolve(path.dirname(pathAYBot))
+    // Por defecto UN handshake a la vez en todo el servidor. Cada handshake
+    // hace criptografía y sincronización inicial; con 100+ sesiones a la vez
+    // se dispara la CPU del contenedor (y al pasar del límite del plan,
+    // WhatsApp corta con 408 y todo reconecta). Subir con
+    // PAIN_SOCKET_HANDSHAKE_CONCURRENCY solo si el plan tiene CPU de sobra.
     const concurrenciaHandshake = Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 2, 1),
+      Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 1, 1),
       8
+    )
+    // Cuánto puede quedarse un permiso de handshake sin liberarse. Si una
+    // reconexión queda abandonada, caduca y destapa la cola; antes el PID vivo
+    // lo mantenía bloqueado para siempre.
+    const ttlHandshake = Math.min(
+      Math.max(Number.parseInt(process.env.PAIN_HANDSHAKE_LEASE_MS, 10) || 120_000, 30_000),
+      300_000
     )
     const liberarHandshake = (socket) => {
       if (!socket) return
@@ -693,7 +704,7 @@ async function iniciarSubBot(options) {
       const liberar = await adquirirPermisoCompartido('socket-handshake', {
         rootDir: raizAdmisiones,
         slots: concurrenciaHandshake,
-        ttlMs: SOCKET_CONEXION_MAX_MS + 30_000,
+        ttlMs: ttlHandshake,
         cancelado: () => intento.cancelado,
       })
       if (!liberar) return null
@@ -1222,6 +1233,13 @@ async function iniciarSubBot(options) {
     let cierrePropio = false
     let handler = await import('../handler.js')
     if (intento.cancelado) return false
+    // Un solo intento de reconexión a la vez por sesión. Antes el watchdog, el
+    // temporizador y el panel podían lanzar dos en paralelo: el socket que
+    // perdía la carrera quedaba sin liberar su permiso de handshake y acababa
+    // bloqueando la cola de todo el servidor.
+    let promesaReconexion = null
+    let reconectarUnaVez = null
+    let reconexionEnCola = false
     let recargarHandler = async function (restatConn) {
       if (restatConn) {
         const sockAnterior = sock
@@ -1238,6 +1256,9 @@ async function iniciarSubBot(options) {
         const nuevoSocket = await crearSocketAdmitido({ chats: chatsAnteriores })
         if (!nuevoSocket) {
           cierrePropio = false
+          // Sin socket nuevo no hay intento en curso: el watchdog debe poder
+          // reintentar más adelante en vez de quedarse bloqueado.
+          reconectando = false
           return false
         }
         sock = nuevoSocket
@@ -1265,9 +1286,6 @@ async function iniciarSubBot(options) {
           const indice = global.conns.indexOf(sockAnterior)
           if (indice >= 0) global.conns[indice] = sock
         }
-        setTimeout(() => {
-          if (!temporizadorReconexion && !socketAutenticado()) reconectando = false
-        }, 20000)
       }
 
       if (!esInit) {
@@ -1293,8 +1311,11 @@ async function iniciarSubBot(options) {
       sock.ev.on("creds.update", sock.credsUpdate)
 
       sock.reconectarPain = () => {
-        if (reconectando) return Promise.resolve(false)
-        return recargarHandler(true)
+        // Si ya hay un intento en marcha (watchdog, temporizador o esta misma
+        // llamada), se comparte en vez de abrir otro socket para el mismo
+        // número: dos sockets con las mismas credenciales producen 440.
+        if (promesaReconexion) return Promise.resolve(false)
+        return reconectarUnaVez ? reconectarUnaVez() : Promise.resolve(false)
       }
       sock.cerrarSesionPain = async () => {
         sock._painDeletingSession = true
@@ -1331,6 +1352,42 @@ async function iniciarSubBot(options) {
       return true
     }
 
+    reconectarUnaVez = function () {
+      if (promesaReconexion) return promesaReconexion
+      promesaReconexion = Promise.resolve()
+        .then(() => recargarHandler(true))
+        .catch((error) => {
+          console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
+          reconectando = false
+          return false
+        })
+        .finally(() => {
+          promesaReconexion = null
+        })
+      return promesaReconexion
+    }
+
+    /**
+     * Encola una reconexión con deduplicación. Evita que watchdog,
+     * temporizador y panel encolen dos trabajos para la misma sesión.
+     */
+    function reconectarEnCola(motivo = null) {
+      if (reconexionEnCola) return Promise.resolve(false)
+      reconexionEnCola = true
+      return encolarReconexion(
+        () => reconectarUnaVez(),
+        prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
+      )
+        .catch((error) => {
+          console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
+          reconectando = false
+          return false
+        })
+        .finally(() => {
+          reconexionEnCola = false
+        })
+    }
+
     function programarReconexion(motivo, detalle = '') {
       if (temporizadorReconexion) return
       reconectando = true
@@ -1349,13 +1406,8 @@ async function iniciarSubBot(options) {
           contarReintentoReconexion(motivo)
           temporizadorReconexion = setTimeout(() => {
             temporizadorReconexion = null
-            encolarReconexion(
-              () => recargarHandler(true),
-              prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
-            ).catch((error) => {
-              console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
-              reconectando = false
-            })
+            console.log(`[reconexion] +${idCarpetaBot} reintento largo (${motivo ?? 'sin código'})`)
+            reconectarEnCola(motivo)
           }, colaLarga)
           temporizadorReconexion.unref?.()
         }
@@ -1386,13 +1438,8 @@ async function iniciarSubBot(options) {
         ))
         temporizadorReconexion = setTimeout(() => {
           temporizadorReconexion = null
-          encolarReconexion(
-            () => recargarHandler(true),
-            prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
-          ).catch((error) => {
-            console.error(`Error reconectando subbot pausado ${idCarpetaBot}:`, error?.message || error)
-            reconectando = false
-          })
+          console.log(`[reconexion] +${idCarpetaBot} tras pausa 408`)
+          reconectarEnCola(motivo)
         }, pausa408)
         temporizadorReconexion.unref?.()
         return
@@ -1421,13 +1468,11 @@ async function iniciarSubBot(options) {
       ))
       temporizadorReconexion = setTimeout(() => {
         temporizadorReconexion = null
-        encolarReconexion(
-          () => recargarHandler(true),
-          prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
-        ).catch((error) => {
-          console.error(`Error reconectando subbot ${idCarpetaBot}:`, error?.message || error)
-          reconectando = false
-        })
+        console.log(
+          `[reconexion] +${idCarpetaBot} en cola (motivo=${motivo ?? 'sin código'}, ` +
+          `espera=${Math.round(cola / 1000)}s)`
+        )
+        reconectarEnCola(motivo)
       }, cola)
     }
 
@@ -1440,30 +1485,27 @@ async function iniciarSubBot(options) {
           reconectando = false
           return
         }
-        if (sock._ignorarCierre || emparejamientoEnCurso || reconectando) return
+        if (sock._ignorarCierre || emparejamientoEnCurso) return
         if (!sock.authState?.creds?.registered) return
+        // Si ya hay un intento en curso, encolado o esperando su backoff, el
+        // watchdog no debe abrir otro socket para el mismo número.
+        if (promesaReconexion || reconexionEnCola || temporizadorReconexion) return
         const estadoSocket = sock?.ws?.socket?.readyState ?? sock?.ws?.readyState
         const socketCerrado = estadoSocket === ws.CLOSED || estadoSocket === ws.CLOSING
         const conexionAtascada = !sock?.user?.id && !sock?.user?.jid &&
           estadoSocket !== ws.OPEN &&
           ahora - inicioSocketEn >= SOCKET_CONEXION_MAX_MS
-        const conexionPerdida = socketCerrado || (estadoSocket !== ws.OPEN &&
-          ahora - vistoUsuarioEn >= SOCKET_INACTIVO_MAX_MS
-        )
-        if (!conexionAtascada && !conexionPerdida) return
+        // Solo se reintenta con el socket cerrado o realmente atascado. Antes
+        // también se reintentaba a los 90 s de "inactividad", lo que solapaba
+        // intentos con sockets que todavía estaban conectando.
+        if (!conexionAtascada && !socketCerrado) return
 
         reconectando = true
         vistoUsuarioEn = ahora
         console.log(chalk.bold.yellow(
           `\n┆ Subbot (+${idCarpetaBot}) ${conexionAtascada ? 'atascado conectando' : 'sin conexión'} (estado ${estadoSocket ?? 'desconocido'}). Reconectando...\n`
         ))
-        encolarReconexion(
-          () => recargarHandler(true),
-          prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
-        ).catch((e) => {
-          console.error(`Error reconectando subbot ${idCarpetaBot}:`, e?.message || e)
-          reconectando = false
-        })
+        reconectarEnCola('watchdog')
       } catch (error) {
         console.error(`Error en watchdog del subbot ${idCarpetaBot}:`, error?.message || error)
       }

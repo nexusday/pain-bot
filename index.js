@@ -637,9 +637,13 @@ function startSlot(id, slot) {
       ? PAUSA_TRAS_FALLOS_RAPIDOS_MS
       : Math.min(1000 * (2 ** slot.failures++), RESTART_MAX_MS)
     slot.restartAt = Date.now() + delay
+    const heap = code === 134
+      ? ` Heap agotado: sube PAIN_WORKER_HEAP_MB (actual ${HEAP_WORKER_MB} MB) ` +
+        'o reparte en más workers.'
+      : ''
     console.error(
       `Proceso ${id} terminó (código ${code ?? 'desconocido'}, señal ${signal || 'ninguna'}). ` +
-      `Se reiniciará en ${Math.round(delay / 1000)}s.` +
+      `Se reiniciará en ${Math.round(delay / 1000)}s.${heap}` +
       (pausaLarga
         ? ` Se detectaron ${slot.fallosRapidos} fallos rápidos seguidos: ` +
           'revisa el error guardado antes de que vuelva a arrancar.'
