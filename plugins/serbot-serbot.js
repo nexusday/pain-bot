@@ -1543,9 +1543,15 @@ async function iniciarSubBot(options) {
         : esReemplazo
           ? Math.min(30_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 5 * 60_000) + dispersarMs
           : esConexionPerdida
-            ? Math.min(60_000 * (2 ** Math.min(fallosConsecutivos, 4)), 5 * 60_000) + dispersarMs
+            ? Math.min(
+                (MODO_PROCESO_UNICO ? 15_000 : 60_000) * (2 ** Math.min(fallosConsecutivos, 4)),
+                MODO_PROCESO_UNICO ? 2 * 60_000 : 5 * 60_000
+              ) + dispersarMs
           : esCerradoPorServidor
-            ? Math.min(20_000 * (2 ** Math.min(fallosConsecutivos, 4)), 3 * 60_000) + dispersarMs
+            ? Math.min(
+                (MODO_PROCESO_UNICO ? 15_000 : 20_000) * (2 ** Math.min(fallosConsecutivos, 4)),
+                MODO_PROCESO_UNICO ? 2 * 60_000 : 3 * 60_000
+              ) + dispersarMs
             : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
       if (esReemplazo) reemplazosConsecutivos++
       else fallosConsecutivos++

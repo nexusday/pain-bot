@@ -1,4 +1,5 @@
 import './lib/crash-guard.js'
+import { esErrorDeRedBenigno, resumenError } from './lib/network-errors.js'
 import './lib/sesion-log.js'
 
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1'
@@ -12,6 +13,7 @@ const ERRORES_DESCIFRADO_TRANSITORIOS = [
 let ultimoAvisoDescifrado = 0
 
 process.on('unhandledRejection', (reason) => {
+  if (esErrorDeRedBenigno(reason)) return
   const msg = reason?.message || String(reason || '')
   if (msg.includes('sharp') || msg.includes('android-arm64')) {
     console.error('[sharp] rechazo controlado (imagen):', msg.split('\n')[0])
@@ -242,6 +244,7 @@ const isManagedPrimary = process.env.PAIN_ROLE === 'primary'
 // Modo unico: un solo proceso para principal + todos los sub-bots. El
 // supervisor clasico (PAIN_SINGLE_PROCESS=0) sigue disponible como rollback.
 const isSingleBotProcess = !isSubbotWorker && process.env.PAIN_SINGLE_PROCESS !== '0'
+global.__painSingleProcess = isSingleBotProcess
 global.processRole = isSubbotWorker ? 'subbot' : 'primary'
 // Los sub-bots no deben quitarle CPU al bot principal.
 if (isSubbotWorker) {
@@ -288,17 +291,18 @@ if (!isSubbotWorker && global.webPanel?.enabled !== false && process.env.PAIN_WE
 await global.loadDatabase()
 
 if (isSubbotWorker || isManagedPrimary) {
-  // El trabajo real (claims, comandos) usa transacciones directas; esta vista
-  // solo se refresca para lecturas. En workers se espacia más para bajar
-  // contención de SQLite y CPU con cientos de sesiones.
-  const intervaloRefresh = Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) ||
-    (isSingleBotProcess ? 15000 : isSubbotWorker ? 8000 : 5000)
-  const syncDatabase = setInterval(() => {
-    global.db.adapter.refresh(global.db.data).catch((error) => {
-      console.error('[db] No se pudo actualizar la vista de otro proceso:', error?.message || error)
-    })
-  }, intervaloRefresh)
-  syncDatabase.unref?.()
+  // En proceso unico no hay otra instancia escribiendo la base: refrescar
+  // cada 15 s solo anade latencia a los comandos.
+  if (!isSingleBotProcess) {
+    const intervaloRefresh = Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) ||
+      (isSingleBotProcess ? 15000 : isSubbotWorker ? 8000 : 5000)
+    const syncDatabase = setInterval(() => {
+      global.db.adapter.refresh(global.db.data).catch((error) => {
+        console.error('[db] No se pudo actualizar la vista de otro proceso:', error?.message || error)
+      })
+    }, intervaloRefresh)
+    syncDatabase.unref?.()
+  }
 }
 
 // Un reinicio del proceso principal no puede tener vinculaciones web vivas:
@@ -734,6 +738,10 @@ async function connectionUpdate(update) {
 }
 
 process.on('uncaughtException', (error) => {
+  if (esErrorDeRedBenigno(error)) {
+    console.error(`[net] error de red ignorado: ${resumenError(error)}`)
+    return
+  }
   console.error('Error no capturado; el supervisor reiniciará el proceso:', error)
   process.exit(1)
 })
@@ -1304,6 +1312,7 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
   iniciarMetricasWorker()
   const sesionesIniciando = new Map()
   const sesionesRetiradas = new Set()
+  let muestrasMetricas = 0
   const socketDeSesion = (folder) => {
     const botPath = resolve(serbotDir, folder)
     return (global.conns || []).find((item) =>
@@ -1381,6 +1390,17 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       if (socket?.pathAYBot) socketsBySessionPath.set(resolve(socket.pathAYBot), socket)
     }
     const estado = estadoMemoriaProceso()
+    const metricas = registrarMetricasWorkerEnseguro()
+    muestrasMetricas++
+    if (unificado && metricas && muestrasMetricas > 2) {
+      const lag = Number(metricas.lagP99Ms) || 0
+      if (lag > 250) {
+        console.warn(
+          `[salud] event loop lento: p99=${lag}ms, cpu=${metricas.cpuUsoPercent}%, ` +
+          `rss=${estado.memoria?.rssMB || '?'} MB`
+        )
+      }
+    }
     writeSubbotWorkerStatus(__dirname, workerId, sessions.map((folder) => {
       const socket = socketsBySessionPath.get(join(serbotDir, folder))
       const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
@@ -1414,7 +1434,7 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       // Métricas operacionales: lag del event loop (ms), CPU %, mensajería y
       // reconexiones de esta ventana. Las usa el supervisor para balancear
       // por carga real; el panel puede mostrarlas tal cual.
-      metricas: registrarMetricasWorkerEnseguro(),
+      metricas,
     })
   }
   function registrarMetricasWorkerEnseguro() {
@@ -1757,11 +1777,15 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     escaneo.unref?.()
     // Dar unos segundos al principal para que abra su socket antes de la
     // oleada de sub-bots. El arranque corre en segundo plano.
+    const retrasoArranque = Math.max(
+      Number.parseInt(process.env.PAIN_SUBBOT_START_DELAY_MS, 10) || 3000,
+      0
+    )
     setTimeout(() => {
       void arrancarTodas().catch((error) => {
         console.error('[subbots] Error en el arranque:', error?.message || error)
       })
-    }, 3000).unref?.()
+    }, retrasoArranque).unref?.()
   } else {
     if (retrasoInicial > 0) await new Promise(resolve => setTimeout(resolve, retrasoInicial))
     await arrancarTodas()

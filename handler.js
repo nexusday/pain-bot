@@ -349,7 +349,7 @@ if (!this.user) {
 
 try {
   if (global.db.data == null) await global.loadDatabase()
-  if (pareceComandoCrudo(m)) {
+  if (!global.__painSingleProcess && pareceComandoCrudo(m)) {
     try {
       await global.db.adapter.refresh(global.db.data)
     } catch (error) {
@@ -844,6 +844,7 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
     }
     
     comandoEjecutado = true
+    const inicioComando = Date.now()
     try {
       await plugin.handler.call(this, m, {
         match,
@@ -866,6 +867,10 @@ for (let plugin of pluginsCandidatosComando(m.text, this, m, isOwner, isROwner, 
         args,
         text: args.join(' ').trim()
       })
+      const demoraComando = Date.now() - inicioComando
+      if (demoraComando > 2000) {
+        console.warn(`[cmd] ${command} (${plugin.name}) tardó ${demoraComando} ms`)
+      }
        m.plugin = plugin.name
        m.command = command
        m.args = args
