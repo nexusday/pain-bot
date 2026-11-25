@@ -477,7 +477,7 @@ Diagnóstico: `/mem` y `/mem limpiar` (fuerza poda y GC en el proceso actual).
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `PAIN_SINGLE_PROCESS` | `1` | `1` = un proceso (estilo GataBot); `0` = supervisor clásico de grupos |
-| `PAIN_SINGLE_HEAP_MB` | `2048` | Tope de heap del proceso único |
+| `PAIN_SINGLE_HEAP_MB` | `3072` | Tope de heap del proceso único |
 | `PAIN_START_CONCURRENCY` | `8` | Sesiones que se abren a la vez al arrancar |
 | `PAIN_START_GAP_MS` | `100` | Pausa entre inicios de sesión en modo único |
 | `PAIN_SINGLE_HANDSHAKE_CONCURRENCY` | `8` | Handshakes simultáneos en modo único |

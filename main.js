@@ -490,7 +490,12 @@ if (!opts['test']) {
       if (escribiendoDb || !global.db.data) return
       escribiendoDb = true
       try {
+        const inicioGuardado = Date.now()
         await global.db.write()
+        const demoraGuardado = Date.now() - inicioGuardado
+        if (demoraGuardado > 750) {
+          console.warn(`[db] guardado lento: ${demoraGuardado} ms`)
+        }
         if (opts['autocleartmp']) {
           cleanupTmpFiles({ maxAgeMs: 3 * 60 * 1000 })
         }
@@ -510,8 +515,12 @@ if (!opts['test']) {
     // Con DB de ~38 MB el escaneo completo pesa; 60s es el equilibrio
     // (ajustable con PAIN_DB_SAVE_MS, mínimo 30s).
     const intervaloGuardado = Math.max(
-      Number.parseInt(process.env.PAIN_DB_SAVE_MS, 10) ||
-        (isSingleBotProcess ? 120_000 : 60_000),
+      Number.parseInt(
+        isSingleBotProcess
+          ? (process.env.PAIN_SINGLE_DB_SAVE_MS || '180000')
+          : process.env.PAIN_DB_SAVE_MS,
+        10
+      ) || (isSingleBotProcess ? 180_000 : 60_000),
       30_000
     )
     const initialDelay = (phase >>> 0) % intervaloGuardado
@@ -588,8 +597,9 @@ if (!isSubbotWorker) {
   const cadaTickLoteria = setInterval(tickLoteria, 30_000)
   cadaTickLoteria.unref?.()
 }
-// Higiene de memoria del principal cada 60s (workers la hacen en su tick).
-if (!isSubbotWorker) {
+// Higiene de memoria del principal cada 60s (en modo único la hace el gestor
+// de sub-bots, que ya recorre todos los sockets).
+if (!isSubbotWorker && !isSingleBotProcess) {
   const higienePrincipal = setInterval(() => {
     import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
       try {
@@ -1385,11 +1395,13 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     return promise
   }
   const publishWorkerStatus = () => {
+    const inicioEstado = Date.now()
     const socketsBySessionPath = new Map()
     for (const socket of global.conns) {
       if (socket?.pathAYBot) socketsBySessionPath.set(resolve(socket.pathAYBot), socket)
     }
     const estado = estadoMemoriaProceso()
+    const msEstado = Date.now() - inicioEstado
     const metricas = registrarMetricasWorkerEnseguro()
     muestrasMetricas++
     if (unificado && metricas && muestrasMetricas > 2) {
@@ -1401,6 +1413,7 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
         )
       }
     }
+    const inicioWrite = Date.now()
     writeSubbotWorkerStatus(__dirname, workerId, sessions.map((folder) => {
       const socket = socketsBySessionPath.get(join(serbotDir, folder))
       const readyState = socket?.ws?.socket?.readyState ?? socket?.ws?.readyState
@@ -1436,6 +1449,12 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       // por carga real; el panel puede mostrarlas tal cual.
       metricas,
     })
+    const msWrite = Date.now() - inicioWrite
+    if (unificado && (msEstado > 500 || msWrite > 500)) {
+      console.warn(
+        `[salud] publicar estado lento: memoria=${msEstado}ms, escritura=${msWrite}ms`
+      )
+    }
   }
   function registrarMetricasWorkerEnseguro() {
     try { return registrarMetricasWorker() } catch { return null }
@@ -1465,7 +1484,12 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     if (++ticksEstado % 2 === 0) {
       import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
         try {
+          const inicioHigiene = Date.now()
           higieneMemoriaProceso()
+          const msHigiene = Date.now() - inicioHigiene
+          if (unificado && msHigiene > 500) {
+            console.warn(`[salud] higiene de memoria lenta: ${msHigiene} ms`)
+          }
         } catch {}
       }).catch(() => {})
       // Archiva sesiones rechazadas: evita que se acumulen carpetas muertas.
