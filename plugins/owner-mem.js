@@ -71,7 +71,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
       `full \`${persistencia.fullScans}\`  ·  último \`${persistencia.ultimoMs} ms\``
     )
   }
-  lineas.push(`┊ auth  ·  \`${auth.sesiones}\` sesiones  ·  \`${auth.cambiosPendientes}\` cambios pendientes`)
+  lineas.push(`┊ auth  ·  \`${auth.sesiones}\` sesiones  ·  \`${auth.claves || 0}\` claves  ·  \`${auth.cambiosPendientes}\` cambios`)
   if (disco) {
     lineas.push(`┊ disco  ·  \`${disco.libreMB}/${disco.totalMB} MB\` libres (${disco.porcentajeLibre}%)`)
   }

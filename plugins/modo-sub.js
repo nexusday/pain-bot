@@ -51,6 +51,13 @@ export function numerosIdentidadBot(conn) {
 
 const ARCHIVO_PRINCIPAL = join('storage', 'process-status', 'main-bot.txt')
 let cachePrincipal = { en: 0, conn: null }
+// Listar bots de un grupo se ejecuta en el filtro de CADA mensaje de CADA bot.
+// Se cachea por la lista de participantes (que es la misma referencia mientras
+// no cambie el grupo) para no recorrer 38 sockets/500 participantes cada vez.
+const CACHE_BOTS_MS = 3000
+const cacheBotsParticipantes = new WeakMap()
+const cacheResponsable = new Map()
+let cacheResponsableConns = -1
 
 /**
  * Socket del bot principal. En el worker de sub-bots el principal vive en otro proceso:
@@ -167,6 +174,14 @@ function obtenerNombreVisibleBot(connBot, esPrincipal) {
  * Lista bots (principal + subbots) presentes en el grupo.
  */
 export function listarBotsEnGrupo(participants = []) {
+  if (participants.length) {
+    const cache = cacheBotsParticipantes.get(participants)
+    if (
+      cache &&
+      cache.conns === (global.conns || []).length &&
+      Date.now() - cache.at < CACHE_BOTS_MS
+    ) return cache.bots
+  }
   const bots = []
   const principalConn = obtenerConnPrincipal()
 
@@ -197,6 +212,13 @@ export function listarBotsEnGrupo(participants = []) {
     })
   }
 
+  if (participants.length) {
+    cacheBotsParticipantes.set(participants, {
+      bots,
+      at: Date.now(),
+      conns: (global.conns || []).length
+    })
+  }
   return bots
 }
 
@@ -338,7 +360,9 @@ export function obtenerBotActivoDelGrupo(idChat) {
   if (!datos) return null
   if (!datos.modoSub || typeof datos.modoSub !== 'object') datos.modoSub = {}
   const value = datos.modoSub[idChat]
-  if (!value || value === 'all' || value === true) return null
+  // 'all' es explícito (el usuario lo pidió). Sin valor = un solo responsable.
+  if (value === 'all' || value === true) return 'all'
+  if (!value || value === 'off') return null
   return String(value).replace(/\D/g, '') || null
 }
 
@@ -346,12 +370,19 @@ export function establecerBotActivoDelGrupo(idChat, numeroBotOTodos) {
   const datos = global.db?.data
   if (!datos) return null
   if (!datos.modoSub || typeof datos.modoSub !== 'object') datos.modoSub = {}
-  if (!numeroBotOTodos || numeroBotOTodos === 'all' || numeroBotOTodos === 'off') {
+  if (!numeroBotOTodos || numeroBotOTodos === 'off') {
     delete datos.modoSub[idChat]
+    cacheResponsable.delete(idChat)
     return null
+  }
+  if (numeroBotOTodos === 'all' || numeroBotOTodos === true) {
+    datos.modoSub[idChat] = 'all'
+    cacheResponsable.delete(idChat)
+    return 'all'
   }
   const num = String(numeroBotOTodos).replace(/\D/g, '')
   datos.modoSub[idChat] = num
+  cacheResponsable.delete(idChat)
   return num
 }
 
@@ -528,21 +559,31 @@ export function debeOmitirMensajeGrupoTemprano(conn, msgCrudo) {
   const desdeMi = Boolean(msgCrudo.key.fromMe)
   const partes = conn?.chats?.[idChat]?.metadata?.participants || []
 
-  // Bot único elegido: los demás (incluido fromMe de otro subbot) no ejecutan nada
-  if (activo) {
-    return !esteBotCoincideConActivo(conn, activo, partes)
-  }
-
-  // Modo all: evita duplicar comandos entre bots…
+  // Un mensaje enviado por otro bot Pain no se vuelve a procesar (evita que
+  // un menú/comando se replique entre los bots del mismo grupo).
   if (!desdeMi) {
     const numRemitente = extraerNumRemitenteGrupo(conn, msgCrudo)
     if (numRemitente && esNumeroBotConocido(numRemitente)) {
-      // …pero el responsable debe ver media de otros Pain para poder borrarla
       if (esMensajeMediaAntiCrudo(msgCrudo) && esteBotEsResponsableDelGrupo(conn, idChat, partes)) {
         return false
       }
       return true
     }
+  }
+
+  // Bot único elegido: los demás no ejecutan nada.
+  if (activo && activo !== 'all') {
+    return !esteBotCoincideConActivo(conn, activo, partes)
+  }
+
+  // 'all' explícito: responden todos.
+  if (activo === 'all') return false
+
+  // Sin configuración: un solo bot responsable por grupo. Antes procesaban
+  // todos y un comando como /menu se ejecutaba N veces (una por bot), lo que
+  // multiplicaba CPU, base de datos y respuestas duplicadas.
+  if (partes.length && !esteBotEsResponsableDelGrupo(conn, idChat, partes)) {
+    return true
   }
 
   return false
@@ -555,14 +596,15 @@ export function debeOmitirPorModoSub(conn, idChat, { allowModoSubCommand = false
   if (!idChat || !String(idChat).endsWith('@g.us')) return false
 
   const activo = obtenerBotActivoDelGrupo(idChat)
-  if (!activo) return false
-
   const partes = conn?.chats?.[idChat]?.metadata?.participants || []
-  if (esteBotCoincideConActivo(conn, activo, partes)) return false
-
   if (allowModoSubCommand && esTextoComandoModoSub(text, prefix)) return false
 
-  return true
+  if (activo === 'all') return false
+  if (activo) return !esteBotCoincideConActivo(conn, activo, partes)
+
+  // Sin configuración: solo el responsable del grupo atiende modos/IA.
+  if (partes.length && !esteBotEsResponsableDelGrupo(conn, idChat, partes)) return true
+  return false
 }
 
 function mismoSocketConn(a, b) {
@@ -580,29 +622,63 @@ function mismoSocketConn(a, b) {
  * 2) Si está en all → principal (si está en el grupo), si no el sub con número más bajo
  */
 export function elegirBotResponsableGrupo(idChat, participants = []) {
-  const bots = listarBotsEnGrupo(participants)
-  if (!bots.length) return null
-
-  const activo = obtenerBotActivoDelGrupo(idChat)
-  if (activo) {
-    const elegido = bots.find(b =>
-      b.number === activo ||
-      esteBotCoincideConActivo(b.conn, activo, participants)
-    )
-    if (elegido) return elegido.conn
+  const largoSockets = (global.conns || []).length
+  if (largoSockets !== cacheResponsableConns) {
+    cacheResponsable.clear()
+    cacheResponsableConns = largoSockets
+  }
+  if (cacheResponsable.size > 5000) cacheResponsable.clear()
+  const cacheado = cacheResponsable.get(idChat)
+  if (cacheado && cacheado.participants === participants && Date.now() - cacheado.at < CACHE_BOTS_MS) {
+    return cacheado.conn
   }
 
-  const principal = bots.find(b => b.type === 'principal')
-  if (principal) return principal.conn
+  let bots = listarBotsEnGrupo(participants)
+  if (!bots.length) {
+    // Sin metadata (primer mensaje o podada): al menos elegir entre los
+    // sockets que ya tienen un chat de este grupo en memoria.
+    const vistos = new Set()
+    const candidatos = [obtenerConnPrincipal(), ...(global.conns || [])]
+    for (const c of candidatos) {
+      if (!c?.user || !c.chats?.[idChat]) continue
+      const number = numeroPublicoBot(c, participants)
+      if (!number || vistos.has(number)) continue
+      vistos.add(number)
+      bots.push({
+        type: esConnBotPrincipal(c) ? 'principal' : 'subbot',
+        number,
+        conn: c
+      })
+    }
+  }
 
-  return [...bots].sort((a, b) => String(a.number).localeCompare(String(b.number)))[0]?.conn || null
+  let resultado = null
+  if (bots.length) {
+    const activo = obtenerBotActivoDelGrupo(idChat)
+    if (activo && activo !== 'all') {
+      const elegido = bots.find(b =>
+        b.number === activo ||
+        esteBotCoincideConActivo(b.conn, activo, participants)
+      )
+      if (elegido) resultado = elegido.conn
+    }
+    if (!resultado) {
+      const principal = bots.find(b => b.type === 'principal')
+      resultado = principal?.conn
+        || [...bots].sort((a, b) => String(a.number).localeCompare(String(b.number)))[0]?.conn
+        || null
+    }
+  }
+
+  cacheResponsable.set(idChat, { participants, conn: resultado, at: Date.now() })
+  return resultado
 }
 
 /** ¿Este socket es el que debe aplicar anti-media / borrados en el grupo? */
 export function esteBotEsResponsableDelGrupo(conn, idChat, participants = []) {
   // Con bot elegido, cada proceso decide por sí mismo: ninguno ve los sockets de los demás.
   const activo = obtenerBotActivoDelGrupo(idChat)
-  if (activo) return esteBotCoincideConActivo(conn, activo, participants)
+  if (activo && activo !== 'all') return esteBotCoincideConActivo(conn, activo, participants)
   const responsable = elegirBotResponsableGrupo(idChat, participants)
   if (!responsable) return true
   return mismoSocketConn(conn, responsable)
@@ -638,14 +714,13 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
 
   if (!accion) {
     const activo = obtenerBotActivoDelGrupo(m.chat)
-    // `/modosub` solo consulta el estado. Si ya existe un bot elegido,
-    // la consulta debe responderla únicamente ese bot; no debe comportarse
-    // como modo `all` solo porque no se pasó un argumento.
-    if (activo) {
+    // La consulta la responde un solo bot (el responsable), no todos.
+    if (activo && activo !== 'all') {
       const seleccionado = bots.find((bot) => bot.number === activo)
       if (!seleccionado || !elegirQuienResponde(bots, conn, seleccionado)) return
-    } else if (!elegirQuienResponde(bots, conn)) {
-      return
+    } else {
+      const responsable = elegirBotResponsableGrupo(m.chat, participantesGrupo)
+      if (responsable && !mismoSocketConn(conn, responsable)) return
     }
     let textoMsg = `*Modo Sub / Bot activo*\n\n`
     textoMsg += `Elige qué bot responde en este grupo.\n`
@@ -654,16 +729,18 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
 
     for (const bot of bots) {
       const etiqueta = bot.type === 'principal' ? 'Principal' : 'Sub-Bot'
-      const activoMarca = activo && activo === bot.number ? ' ✅ *ACTIVO*' : ''
+      const activoMarca = activo && activo !== 'all' && activo === bot.number ? ' ✅ *ACTIVO*' : ''
       textoMsg += `*${bot.index}.* ${etiqueta} — ${bot.name}\n`
       textoMsg += `   └ +${bot.number}${activoMarca}\n`
     }
 
-    if (activo) {
+    if (activo === 'all') {
+      textoMsg += `\n> Ahora responden *todos* los bots del grupo.`
+    } else if (activo) {
       const actual = bots.find(b => b.number === activo)
       textoMsg += `\n> Ahora solo responde: *${actual ? `${actual.index} (${actual.name})` : activo}*`
     } else {
-      textoMsg += `\n> Ahora responden *todos* los bots del grupo.`
+      textoMsg += `\n> Ahora responde *un solo bot responsable* (por defecto).`
     }
 
     return conn.sendMessage(m.chat, {
@@ -673,19 +750,17 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
   }
 
   if (['all', 'off', 'todos', 'reset'].includes(accion)) {
-    const activo = obtenerBotActivoDelGrupo(m.chat)
-    const seleccionado = activo ? bots.find((bot) => bot.number === activo) : null
-    if (activo ? (!seleccionado || !elegirQuienResponde(bots, conn, seleccionado)) : !elegirQuienResponde(bots, conn)) return
+    const responsable = elegirBotResponsableGrupo(m.chat, participantesGrupo)
+    if (responsable && !mismoSocketConn(conn, responsable)) return
     establecerBotActivoDelGrupo(m.chat, 'all')
-    await global.db.write?.()
-    return m.reply('✅ Modo Sub desactivado.\n> Todos los bots del grupo pueden responder otra vez.')
+    void global.db.flushSoon?.()
+    return m.reply('✅ Modo Sub activado en *todos*.\n> Todos los bots del grupo pueden responder.')
   }
 
   const indice = parseInt(accion, 10)
   if (!Number.isFinite(indice) || indice < 1 || indice > bots.length) {
-    const activo = obtenerBotActivoDelGrupo(m.chat)
-    const seleccionado = activo ? bots.find((bot) => bot.number === activo) : null
-    if (activo ? (!seleccionado || !elegirQuienResponde(bots, conn, seleccionado)) : !elegirQuienResponde(bots, conn)) return
+    const responsable = elegirBotResponsableGrupo(m.chat, participantesGrupo)
+    if (responsable && !mismoSocketConn(conn, responsable)) return
     return m.reply(`[❗] Número inválido.\n\nUsa *${usedPrefix}modosub* para ver la lista\no *${usedPrefix}modosub 1* / *${usedPrefix}modosub all*`)
   }
 
@@ -695,7 +770,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isOwner, par
   if (!elegirQuienResponde(bots, conn, seleccionado)) return
 
   establecerBotActivoDelGrupo(m.chat, seleccionado.number)
-  await global.db.write?.()
+  void global.db.flushSoon?.()
 
   const etiqueta = seleccionado.type === 'principal' ? 'Bot Principal' : 'Sub-Bot'
   const aviso = seleccionado.connected === false ? '\n> ⚠️ Ese bot no está conectado ahora mismo.' : ''

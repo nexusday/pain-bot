@@ -108,6 +108,34 @@ test('db: bienvenidas se guarda por chat y no reescribe todos los grupos', async
   }
 })
 
+test('db: modo escritor único persiste sin baseline duplicado', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pain-single-'))
+  const sqlite = path.join(dir, 'db.sqlite')
+  const legacy = path.join(dir, 'db.json')
+  try {
+    const adapter = new ArchivoSqliteCompartido(sqlite, legacy, {
+      persistConnections: false,
+      singleWriter: true,
+    })
+    await adapter.write({
+      users: { 'a@s.whatsapp.net': { coins: 1 }, 'b@s.whatsapp.net': { coins: 2 } },
+      chats: {},
+    })
+    const vivos = await adapter.read()
+    vivos.users['a@s.whatsapp.net'].coins = 50
+    await adapter.write(vivos)
+    await adapter.close()
+
+    const reabierto = new ArchivoSqliteCompartido(sqlite, legacy, { persistConnections: false })
+    const datos = await reabierto.read()
+    assert.equal(datos.users['a@s.whatsapp.net'].coins, 50)
+    assert.equal(datos.users['b@s.whatsapp.net'].coins, 2)
+    await reabierto.close()
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('db: propaga el borrado de una entidad', async () => {
   const { dir, sqlite, legacy, adapter } = await preparar()
   try {

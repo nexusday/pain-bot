@@ -464,7 +464,7 @@ Diagnóstico: `/mem`, `/diag` y `/mem limpiar` (fuerza poda y GC).
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `PAIN_SINGLE_HEAP_MB` | automático (30% RAM, máx 5120) | Tope de heap del proceso único |
+| `PAIN_SINGLE_HEAP_MB` | automático (35% RAM, máx 5120) | Tope de heap del proceso único |
 | `PAIN_START_CONCURRENCY` | `8` | Sesiones que se abren a la vez al arrancar |
 | `PAIN_START_GAP_MS` | `100` | Pausa entre inicios de sesión |
 | `PAIN_RECONNECT_CONCURRENCY` | `4` | Reconexiones simultáneas |
