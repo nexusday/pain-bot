@@ -726,10 +726,15 @@ async function iniciarSubBot(options) {
       // No descargamos RECENT/FULL en cada vinculación. Se conservan los tipos
       // que aportan mapeos LID/PN y nombres, tal como recomienda Baileys.
       shouldSyncHistoryMessage: ({ syncType }) => {
+        const modoHistorial = process.env.PAIN_SUBBOT_HISTORY_SYNC || 'names'
+        if (modoHistorial === 'off') return false
+        if (modoHistorial === 'full') return true
         const tipos = proto?.HistorySync?.HistorySyncType
-        if (!tipos) return true
-        return syncType === tipos.INITIAL_BOOTSTRAP ||
-          syncType === tipos.PUSH_NAME ||
+        if (!tipos) return false
+        // Por defecto solo nombres y estados. El INITIAL_BOOTSTRAP de 158
+        // subbots reinyecta miles de mensajes viejos al handler y crea colas
+        // de minutos (visto: 161 s de espera).
+        return syncType === tipos.PUSH_NAME ||
           syncType === tipos.INITIAL_STATUS_V3
       },
       // Baileys corta con 408 si pasan keepAlive+5s sin datos; 10s cortaba a todos en cada pausa del hilo.

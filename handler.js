@@ -293,6 +293,8 @@ function pluginsCandidatosComando(texto, conn, m, isOwner, isROwner, cache) {
 // sola vez y en el orden recibido. El procesamiento sigue siendo acotado al
 // socket que recibió la actualización, sin crear una cola global que bloquee
 // a todos los sub-bots.
+let mensajesViejosDescartados = 0
+
 function antiguedadMensajeMs(raw) {
   const ts = typeof raw === 'object' && typeof raw?.toNumber === 'function'
     ? raw.toNumber()
@@ -320,16 +322,24 @@ export async function handler(chatUpdate) {
   contarMensajesRecibidos(chatUpdate.messages.length, mensajes.length)
   const duplicados = chatUpdate.messages.length - mensajes.length
   if (duplicados > 0) contarMensajesDuplicados(duplicados)
-  if (chatUpdate.type === 'notify' && mensajes.length > 2) {
-    console.warn(`[upsert] lote de ${mensajes.length} mensajes; se procesan en serie.`)
-  }
+  const maxEdadMensajeMs = Math.max(
+    Number.parseInt(process.env.PAIN_MAX_MESSAGE_AGE_MS, 10) || 120_000,
+    10_000
+  )
   for (const mensaje of mensajes) {
-    if (chatUpdate.type === 'notify') {
-      const edad = antiguedadMensajeMs(mensaje?.messageTimestamp)
-      if (edad > 5000 && edad < 10 * 60_000) {
-        const chat = String(mensaje?.key?.remoteJid || '?')
-        console.warn(`[lag] ${chat}: el mensaje esperó ${edad} ms antes del handler.`)
+    const edad = antiguedadMensajeMs(mensaje?.messageTimestamp)
+    if (edad > maxEdadMensajeMs) {
+      if (++mensajesViejosDescartados % 25 === 1) {
+        console.warn(
+          `[lag] descartados ${mensajesViejosDescartados} mensaje(s) viejos ` +
+          `(más de ${Math.round(maxEdadMensajeMs / 1000)} s); evita procesar historial atrasado.`
+        )
       }
+      continue
+    }
+    if (chatUpdate.type === 'notify' && edad > 5000 && edad < maxEdadMensajeMs) {
+      const chat = String(mensaje?.key?.remoteJid || '?')
+      console.warn(`[lag] ${chat}: el mensaje esperó ${edad} ms antes del handler.`)
     }
     // `this` es la conexión del socket (bind del caller); sin `.call()`,
     // `this.pushMessage` dentro de procesarActualizacion sería undefined.
