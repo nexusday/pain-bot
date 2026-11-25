@@ -4,6 +4,7 @@ import fetch from 'node-fetch'
 import fluent from 'fluent-ffmpeg'
 import { fileTypeFromBuffer as fromBuffer } from 'file-type'
 import { addExif } from '../lib/sticker.js'
+import { conLimiteFfmpeg } from '../lib/converter.js'
 
 
 let handler = async (m, { conn, args }) => {
@@ -138,7 +139,7 @@ async function aWebp(bufer, opciones = {}) {
   // Menos FPS y un solo hilo mantienen el bot responsivo mientras FFmpeg
   // trabaja; sin esto el proceso puede acaparar todos los núcleos.
   const fps = Math.min(Math.max(Number(opciones.fps) || 15, 5), 30)
-  const hilos = Math.min(Math.max(Number(opciones.threads) || 0, 0), 4)
+  const hilos = Math.min(Math.max(Number(opciones.threads) || 1, 1), 4)
 
   const directorioTemp = path.join(process.cwd(), 'tmp')
   await mkdir(directorioTemp, { recursive: true })
@@ -149,7 +150,7 @@ async function aWebp(bufer, opciones = {}) {
   await writeFile(entrada, bufer)
 
   const ejecutarFfmpeg = (lado = ladoInicial, duracionSeg = duracionMax) =>
-    new Promise((resolver, rechazar) => {
+    conLimiteFfmpeg(() => new Promise((resolver, rechazar) => {
       const escala = ajuste === 'cover'
         ? `scale=${lado}:${lado}:force_original_aspect_ratio=increase,crop=${lado}:${lado}`
         : `scale='min(${lado},iw)':'min(${lado},ih)':force_original_aspect_ratio=decrease,` +
@@ -192,7 +193,7 @@ async function aWebp(bufer, opciones = {}) {
           }
         })
         .on('error', rechazar)
-    })
+    }))
 
   try {
     let resultado = await ejecutarFfmpeg(ladoInicial, duracionMax)

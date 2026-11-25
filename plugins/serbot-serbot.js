@@ -69,8 +69,8 @@ const MAX_FALLOS_RECONEXION = 8
 // servidor o la red no responden. La sesión queda archivada y recuperable;
 // solo se pausa su siguiente intento automático.
 const PAUSA_408_RECONEXION_MS = Math.max(
-  5 * 60_000,
-  Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 30 * 60_000
+  2 * 60_000,
+  Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 5 * 60_000
 )
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
@@ -1307,18 +1307,19 @@ async function iniciarSubBot(options) {
         temporizadorReconexion.unref?.()
         return
       }
-      // Tope 90s (antes 5min): con 150 subbots, un tope de 5min + 30s de
-      // dispersión dejaba colas de 327s y parecían muertos. 440 (reemplazo)
-      // conserva backoff largo para no pelear entre duplicados. 515 es un
+      // Tope 5 min en todos los casos transitorios. Antes un 428/408 podía
+      // dejar al sub-bot 15 min fuera y un 440 (reemplazo) hasta 15 min; con
+      // 100+ sesiones eso se ve como "el bot no responde". La cola serial y la
+      // dispersión siguen evitando la oleada contra WhatsApp. 515 es un
       // reinicio pedido por el servidor: reintento casi inmediato.
       const cola = esReinicio
         ? 3000 + Math.min(dispersarMs, 5000)
         : esReemplazo
-          ? Math.min(60_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 15 * 60_000) + dispersarMs
+          ? Math.min(30_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 5 * 60_000) + dispersarMs
           : esConexionPerdida
-            ? Math.min(60_000 * (2 ** Math.min(fallosConsecutivos, 4)), 15 * 60_000) + dispersarMs
+            ? Math.min(60_000 * (2 ** Math.min(fallosConsecutivos, 4)), 5 * 60_000) + dispersarMs
           : esCerradoPorServidor
-            ? Math.min(20_000 * (2 ** Math.min(fallosConsecutivos, 4)), 5 * 60_000) + dispersarMs
+            ? Math.min(20_000 * (2 ** Math.min(fallosConsecutivos, 4)), 3 * 60_000) + dispersarMs
             : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
       if (esReemplazo) reemplazosConsecutivos++
       else fallosConsecutivos++
