@@ -1079,23 +1079,39 @@ function normalizePlugin(plugin) {
 global.plugins = {}
 
 async function filesInit() {
-  for (const filename of readdirSync(pluginFolder).filter(pluginFilter)) {
-    try {
-      const file = global.__filename(join(pluginFolder, filename))
+  const nombres = readdirSync(pluginFolder).filter(pluginFilter)
+  // Importar 255 plugins de uno en uno tardaba 40-60 s en el VPS. Los módulos
+  // son independientes: se importan en paralelo y se registran al final para
+  // conservar el orden de los archivos.
+  const concurrencia = Math.min(
+    Math.max(Number.parseInt(process.env.PAIN_PLUGIN_IMPORT_CONCURRENCY, 10) || 8, 1),
+    16
+  )
+  const resultados = new Array(nombres.length)
+  const cola = nombres.map((filename, indice) => ({ filename, indice }))
+  const trabajador = async () => {
+    while (cola.length) {
+      const { filename, indice } = cola.shift()
       const inicio = Date.now()
-      const module = await import(file)
-      const demora = Date.now() - inicio
-      if (isSingleBotProcess && demora > 1500) {
-        console.log(`[boot] plugin lento: ${filename} (${demora} ms)`)
+      try {
+        const file = global.__filename(join(pluginFolder, filename))
+        const module = await import(file)
+        resultados[indice] = normalizePlugin(module.default || module)
+        const demora = Date.now() - inicio
+        if (isSingleBotProcess && demora > 1500) {
+          console.log(`[boot] plugin lento: ${filename} (${demora} ms)`)
+        }
+      } catch (e) {
+        const log = conn?.logger || global.conn?.logger || console
+        log.error?.(`Error cargando plugin ${filename}:`, e)
       }
-      global.plugins[filename] = normalizePlugin(module.default || module)
-    } catch (e) {
-      // En un worker no hay `conn`: un logger indefinido aquí abortaba la
-      // carga del resto de plugins.
-      const log = conn?.logger || global.conn?.logger || console
-      log.error?.(`Error cargando plugin ${filename}:`, e)
-      delete global.plugins[filename]
     }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrencia, cola.length) }, trabajador)
+  )
+  for (let indice = 0; indice < nombres.length; indice++) {
+    if (resultados[indice]) global.plugins[nombres[indice]] = resultados[indice]
   }
 }
 
@@ -1485,7 +1501,7 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
       persistirMetricaEnseguro(workerId, __dirname)
     }
     // Higiene de memoria cada ~30s (2 ticks de 15s).
-    if (++ticksEstado % 2 === 0) {
+    if (++ticksEstado % (unificado ? 4 : 2) === 0) {
       import('./lib/mem-hygiene.js').then(({ higieneMemoriaProceso }) => {
         try {
           const inicioHigiene = Date.now()
@@ -1630,8 +1646,8 @@ async function iniciarGestorSubBots({ unificado = false } = {}) {
     ? (Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 100)
     : (Number.parseInt(process.env.PAIN_SUBBOT_BATCH_DELAY_MS, 10) || 1500)
   const concurrenciaArranque = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 8 : 1), 1),
-    12
+    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || (unificado ? 12 : 1), 1),
+    24
   )
   const initialSessions = ordenarSesionesPorPrioridad(serbotDir, [...sessions])
   const arrancarTodas = async () => {

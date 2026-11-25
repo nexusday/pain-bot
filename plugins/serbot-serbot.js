@@ -89,17 +89,17 @@ const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
 const MAX_RECONEXIONES_POR_WORKER = Math.min(
   Math.max(
     MODO_PROCESO_UNICO
-      ? Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 4, 4)
+      ? Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 6, 6)
       : (Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 1),
     1
   ),
-  12
+  16
 )
 // Separación mínima entre inicios de reconexión del mismo worker: suaviza la
 // oleada contra WhatsApp y reparte el CPU en el tiempo. Configurable.
 const ESPACIO_RECONEXION_MS = Math.min(
   Math.max(
-    MODO_PROCESO_UNICO ? (Number.parseInt(process.env.PAIN_SINGLE_RECONNECT_GAP_MS, 10) || 600) : (Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 5000),
+    MODO_PROCESO_UNICO ? (Number.parseInt(process.env.PAIN_SINGLE_RECONNECT_GAP_MS, 10) || 300) : (Number.parseInt(process.env.PAIN_RECONNECT_GAP_MS, 10) || 5000),
       // gap ya resuelto arriba
     0
   ),
@@ -111,8 +111,8 @@ let ultimoInicioReconexion = 0
 let temporizadorDrenajeReconexiones = null
 const CONCURRENCIA_HANDSHAKE = MODO_PROCESO_UNICO
   ? Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_SINGLE_HANDSHAKE_CONCURRENCY, 10) || 8, 6),
-      16
+      Math.max(Number.parseInt(process.env.PAIN_SINGLE_HANDSHAKE_CONCURRENCY, 10) || 12, 6),
+      24
     )
   : Math.min(
       Math.max(Number.parseInt(process.env.PAIN_SOCKET_HANDSHAKE_CONCURRENCY, 10) || 2, 1),
