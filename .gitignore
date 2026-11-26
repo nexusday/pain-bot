@@ -37,3 +37,4 @@ tmp/
 
 storage/logs/
 storage/metrics/
+storage/servers.json
