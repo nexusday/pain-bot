@@ -474,8 +474,8 @@ Diagnóstico: /mem, /diag y /mem limpiar (fuerza poda y GC).
   El panel agrega las sesiones de todos los carriles.
 - **Tiers (PAIN_TIER):** ree, premium o ip. Cada tier tiene un perfil
   de recursos (memoria, cachés, keepalive, frecuencia de escritura).
-  - ree: 512 MB, cachés reducidas, keepalive 60 s. Optimizado para bajo consumo.
-  - premium: 2048 MB, cachés normales, keepalive 30 s. Hasta 50 conexiones.
+- `free`: 1024 MB, cachés reducidas, keepalive 60 s. Optimizado para bajo consumo.
+- `premium`: 3072 MB, cachés normales, keepalive 30 s. Hasta 50 conexiones.
   - ip: Próximamente. Servidores dedicados con DB aislada.
 | `PAIN_DB_COMMIT_MS` | `5000` | Commit ligero de colecciones peque├▒as |
 | `PAIN_DB_FULL_SCAN_MS` | `0` (nunca) | Escaneo completo de seguridad (0 = nunca) |
