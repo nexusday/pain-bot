@@ -165,7 +165,7 @@ global.db = new Low(new ArchivoSqliteCompartido(
   'storage/databases/database.json',
   {
     persistConnections: true,
-    singleWriter: true,
+    singleWriter: isSingleBotProcess,
     // El refresh por comando del handler queda limitado a esta frecuencia;
     // la vista se mantiene fresca con el sync de fondo cada 5s.
     refreshMinIntervalMs: Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) || 5000,
@@ -240,12 +240,13 @@ global.loadDatabase = async function loadDatabase() {
   global.db.adapter?.vincularDatos?.(global.db.data)
 }
 
-const isSubbotWorker = false
+const isSubbotWorker = process.env.PAIN_ROLE === 'worker' ||
+  process.env.PAIN_ROLE === 'subbot-worker'
 const isManagedPrimary = true
 // Un solo proceso: plugins una vez y todos los sub-bots en el mismo event loop.
 // Las ramas del supervisor clásico (`PAIN_SINGLE_PROCESS=0`) se eliminaron.
-const isSingleBotProcess = true
-global.__painSingleProcess = true
+const isSingleBotProcess = process.env.PAIN_SINGLE_PROCESS !== '0'
+global.__painSingleProcess = isSingleBotProcess
 global.processRole = 'primary'
 // Los sub-bots no deben quitarle CPU al bot principal.
 // (En el proceso único todos comparten prioridad; se conserva por si se
@@ -1313,7 +1314,20 @@ async function iniciarGestorSubBots() {
   if (!Array.isArray(global.conns)) global.conns = []
   const serbotModule = await import('./plugins/serbot-serbot.js')
   const serbotDir = resolve(__dirname, global.bot || 'Serbot')
-  const sesionesEnDisco = listarSesionesListas(serbotDir)
+  // En modo carriles el supervisor asigna un subconjunto de sesiones a cada
+  // proceso. Si viene PAIN_SESSIONS_JSON, se usa esa lista en vez de leer
+  // todas las carpetas del disco (evita que dos carriles abran el mismo bot).
+  let sesionesEnDisco
+  if (process.env.PAIN_SESSIONS_JSON) {
+    try {
+      const asignadas = JSON.parse(process.env.PAIN_SESSIONS_JSON)
+      if (Array.isArray(asignadas)) {
+        sesionesEnDisco = asignadas.filter((f) => typeof f === 'string')
+        console.log(`[subbots] carril ${process.env.PAIN_WORKER_ID || '?'}: ${sesionesEnDisco.length} sesión(es) asignadas por el supervisor.`)
+      }
+    } catch {}
+  }
+  if (!Array.isArray(sesionesEnDisco)) sesionesEnDisco = listarSesionesListas(serbotDir)
   try {
     const totalCarpetas = contarSesionesEnDisco(serbotDir).todas.length
     console.log(
@@ -1641,6 +1655,10 @@ async function iniciarGestorSubBots() {
     }
   }
   const escanearSesiones = () => {
+    // En modo carriles la asignación de sesiones la hace el supervisor al
+    // arrancar. Un worker no debe auto-descubrir sesiones nuevas: si lo
+    // hiciera, todos los carriles abrirían el mismo bot (440).
+    if (!isSingleBotProcess) return
     let disco = []
     try { disco = listarSesionesListas(serbotDir) } catch { return }
     const enDisco = new Set(disco)

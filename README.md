@@ -470,6 +470,7 @@ Diagnóstico: `/mem`, `/diag` y `/mem limpiar` (fuerza poda y GC).
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `PAIN_SINGLE_HEAP_MB` | sin límite (V8 automático) | Solo si quieres fijar un tope de heap |
+| `PAIN_LANES` | `3` | Número de procesos (carriles) que reparten los sub-bots. `1` = un solo proceso (modo clásico). Con 4-6 núcleos, `3` o `4` usan todos los núcleos sin saturar un solo hilo. |
 | `PAIN_START_CONCURRENCY` | `8` | Sesiones que se abren a la vez al arrancar |
 | `PAIN_START_GAP_MS` | `100` | Pausa entre inicios de sesión |
 | `PAIN_RECONNECT_BASE_MS` | `1500` | Espera base antes de reintentar una sesión caída |
