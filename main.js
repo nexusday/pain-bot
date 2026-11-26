@@ -1641,6 +1641,25 @@ async function iniciarGestorSubBots() {
   global.subBotsReconnected = true
   global.__painReconnectOne = reconectarUnaLocal
   global.__painReconnectAll = reconectarTodasLocal
+  // Reasignación en caliente desde el supervisor (cambio de servidor).
+  global.__painAddSession = async (folder) => {
+    if (!folder || !/^[a-zA-Z0-9_-]+$/.test(String(folder))) return { ok: false, reason: 'invalid' }
+    try {
+      const resultado = await iniciarSesion(String(folder))
+      return { ok: resultado !== 'failed', result: resultado }
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) }
+    }
+  }
+  global.__painRemoveSession = async (folder) => {
+    if (!folder) return { ok: false, reason: 'invalid' }
+    try {
+      await serbotModule.retirarSesionDeWorker(join(serbotDir, String(folder)))
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) }
+    }
+  }
   // Alta de sesiones vinculadas desde el panel y limpieza de sockets de
   // carpetas que ya no existen. El aviso llega por fs.watch (el panel corre en
   // otro proceso y escribe en Serbot/); el intervalo de 5 min es solo la red
@@ -1798,8 +1817,20 @@ function cerrarConexionesDelProceso(signal) {
 
 process.once('SIGINT', () => cerrarConexionesDelProceso('SIGINT'))
 process.once('SIGTERM', () => cerrarConexionesDelProceso('SIGTERM'))
-process.on('message', (message) => {
-  if (message?.type === 'shutdown') cerrarConexionesDelProceso('shutdown')
+process.on('message', async (message) => {
+  if (message?.type === 'shutdown') {
+    cerrarConexionesDelProceso('shutdown')
+    return
+  }
+  if (message?.type === 'add-session' && typeof global.__painAddSession === 'function') {
+    const resultado = await global.__painAddSession(message.folder).catch((error) => ({ ok: false, error: error?.message }))
+    try { process.send?.({ type: 'add-session-result', folder: message.folder, resultado }) } catch {}
+    return
+  }
+  if (message?.type === 'remove-session' && typeof global.__painRemoveSession === 'function') {
+    const resultado = await global.__painRemoveSession(message.folder).catch((error) => ({ ok: false, error: error?.message }))
+    try { process.send?.({ type: 'remove-session-result', folder: message.folder, resultado }) } catch {}
+  }
 })
 
 // Compactación del WAL: con 6 procesos escribiendo sin parar el checkpoint

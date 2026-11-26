@@ -427,19 +427,15 @@ export async function onClick(event) {
       return
     }
     if (action === 'server-create') {
-      const name = window.prompt('Nombre del servidor (ej. premium-1):')
-      if (!name) return
-      const tier = (window.prompt('Tier (free / premium / vip):', 'free') || 'free').toLowerCase()
-      const lanes = Number(window.prompt('Carriles (1-16):', '3') || 3)
-      const maxSessions = Number(window.prompt('Máximo de sesiones:', '30') || 30)
-      const heapMb = Number(window.prompt('Heap en MB:', '512') || 512)
-      try {
-        await api.post('/api/admin/servers', { name, tier, lanes, maxSessions, heapMb })
-        showToast('Servidor creado.', 'success')
-        await renderAdmin('servers')
-      } catch (error) {
-        showToast(error.message || 'No se pudo crear el servidor.', 'error')
-      }
+      const { openServerModal } = await import('./handlers-admin.js')
+      openServerModal()
+      return
+    }
+    if (action === 'server-edit') {
+      const { openServerModal } = await import('./handlers-admin.js')
+      const id = Number(actionEl.dataset.id)
+      const servidor = (state.adminServers || []).find((s) => Number(s.id) === id)
+      if (servidor) openServerModal(servidor)
       return
     }
     if (action === 'bot-owner-remove') {
@@ -498,6 +494,12 @@ export async function onSubmit(event) {
   if (id === 'link-form') {
     event.preventDefault()
     await handleStartLink(form)
+    return
+  }
+  if (id === 'server-form') {
+    event.preventDefault()
+    const { handleServerSave } = await import('./handlers-admin.js')
+    await handleServerSave(form)
     return
   }
   if (id === 'password-form') {

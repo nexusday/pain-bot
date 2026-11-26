@@ -575,6 +575,7 @@ export function adminServersHTML(data, info) {
         <td>${s.db_mode === 'isolated' ? 'Aislada' : 'Compartida'}</td>
         <td>${s.status === 'active' ? badge('Activo', 'green') : badge('Inactivo', 'red')}</td>
         <td class="actions">
+          <button class="btn btn-ghost btn-sm" data-action="server-edit" data-id="${s.id}">${icon('settings')} Editar</button>
           <button class="btn btn-ghost btn-sm" data-action="server-toggle" data-id="${s.id}">${s.status === 'active' ? 'Desactivar' : 'Activar'}</button>
           <button class="btn btn-ghost btn-sm danger" data-action="server-delete" data-id="${s.id}" data-name="${h(s.name)}">${icon('trash')}</button>
         </td>

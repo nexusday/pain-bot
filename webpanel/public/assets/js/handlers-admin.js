@@ -774,3 +774,89 @@ export async function handleSettingsLimitsSave(form) {
     setLoading(submit, false)
   }
 }
+
+/* ── Servidores (carriles) ──────────────────────────────────────────────── */
+export function openServerModal(server = null) {
+  const editando = Boolean(server?.id)
+  const tier = server?.tier || 'free'
+  const dbMode = server?.db_mode || 'shared'
+  openModal({
+    title: editando ? `Editar ${server.name}` : 'Crear servidor',
+    subtitle: editando
+      ? 'Cambia los recursos o el estado del carril'
+      : 'Define cuántos procesos y cuánta memoria usará este servidor',
+    body: `<form id="server-form" data-id="${editando ? server.id : ''}">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="field">
+        <label class="label" for="server-name">Nombre</label>
+        <input id="server-name" name="name" class="input" maxlength="60" placeholder="premium-1" value="${h(server?.name || '')}" required />
+        <div class="hint">Solo letras, números, guiones y guiones bajos.</div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="label" for="server-tier">Tier</label>
+          <select id="server-tier" name="tier" class="input">
+            <option value="free" ${tier === 'free' ? 'selected' : ''}>Free (512 MB, cachés reducidas)</option>
+            <option value="premium" ${tier === 'premium' ? 'selected' : ''}>Premium (2 GB, 50 conexiones)</option>
+            <option value="vip" disabled>VIP — próximamente</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="server-dbmode">Base de datos</label>
+          <select id="server-dbmode" name="dbMode" class="input">
+            <option value="shared" ${dbMode === 'shared' ? 'selected' : ''}>Compartida (más datos, algo de contención)</option>
+            <option value="isolated" ${dbMode === 'isolated' ? 'selected' : ''}>Aislada (más rápida, datos separados)</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="label" for="server-lanes">Carriles</label>
+          <input id="server-lanes" name="lanes" class="input" type="number" min="1" max="16" value="${Number(server?.lanes) || 3}" required />
+          <div class="hint">Procesos que se abrirán para este servidor.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="server-max">Máx. sesiones</label>
+          <input id="server-max" name="maxSessions" class="input" type="number" min="1" max="200" value="${Number(server?.max_sessions) || 30}" required />
+          <div class="hint">Límite de sub-bots asignados.</div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="server-heap">Heap por carril (MB)</label>
+        <input id="server-heap" name="heapMb" class="input" type="number" min="256" max="8192" value="${Number(server?.heap_mb) || 512}" required />
+        <div class="hint">Memoria máxima que puede usar cada proceso. Vacío = automático.</div>
+      </div>
+      ${editando ? `<label class="check"><input type="checkbox" name="status" ${server.status === 'active' ? 'checked' : ''} /><span>Servidor activo (los carriles se arrancan al guardar)</span></label>` : ''}
+    </form>`,
+    footer: `<button class="btn btn-ghost" data-action="modal-close">Cancelar</button>
+      <button class="btn btn-primary" id="server-submit" type="submit" form="server-form">${icon('check')} ${editando ? 'Guardar cambios' : 'Crear servidor'}</button>`,
+  })
+}
+
+export async function handleServerSave(form) {
+  const submit = document.getElementById('server-submit')
+  const id = String(form.dataset.id || '').trim()
+  const value = (name) => form.querySelector(`[name="${name}"]`)
+  const body = {
+    name: String(value('name')?.value || '').trim(),
+    tier: value('tier')?.value || 'free',
+    dbMode: value('dbMode')?.value || 'shared',
+    lanes: Number(value('lanes')?.value) || 3,
+    maxSessions: Number(value('maxSessions')?.value) || 30,
+    heapMb: Number(value('heapMb')?.value) || 512,
+  }
+  if (id) body.status = value('status')?.checked ? 'active' : 'inactive'
+  hideFormError(form)
+  setLoading(submit, true, id ? 'Guardando…' : 'Creando…')
+  try {
+    if (id) await api.patch(`/api/admin/servers/${id}`, body)
+    else await api.post('/api/admin/servers', body)
+    closeModal()
+    showToast(id ? 'Servidor actualizado.' : 'Servidor creado.', 'success')
+    const { renderAdmin } = await import('./pages-admin.js')
+    await renderAdmin('servers')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo guardar el servidor.')
+    setLoading(submit, false)
+  }
+}
