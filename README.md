@@ -451,9 +451,14 @@ cada bot del grupo: úsalo con criterio).
 - **Auth en memoria:** cada sesión mantiene credenciales y claves Signal en RAM
   y las persiste con un diario (`auth-keys.ndjson`) + snapshot
   (`auth-keys.json`). Ya no se escribe un fichero por clave en cada mensaje.
+  La compactación del snapshot se hace en un worker thread: ya no bloquea los
+  sockets durante decenas de segundos.
 - **Base de datos incremental:** solo se serializan los usuarios/chats tocados.
-  Un flush ligero cada 5 s y un escaneo completo de seguridad cada 15 min.
-  Los comandos ya no esperan a un volcado de toda la base.
+  Un flush ligero cada 5 s, sin escaneos completos periódicos. Los comandos ya
+  no esperan a un volcado de toda la base.
+- **Reconexión directa:** no hay cola global. Cada sesión caída reintenta en
+  1–3 s con dispersión aleatoria; solo crece el backoff si la sesión se cae
+  repetidamente en menos de 30 s.
 - **Cachés compartidas:** metadata de grupos en una caché global y mensajes en
   un LRU por proceso. Se podan chats y metadata inactivos.
 - **Disco:** se limita el media de anti-delete (512 MB por defecto), se podan
@@ -464,18 +469,19 @@ Diagnóstico: `/mem`, `/diag` y `/mem limpiar` (fuerza poda y GC).
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `PAIN_SINGLE_HEAP_MB` | automático (35% RAM, máx 5120) | Tope de heap del proceso único |
+| `PAIN_SINGLE_HEAP_MB` | sin límite (V8 automático) | Solo si quieres fijar un tope de heap |
 | `PAIN_START_CONCURRENCY` | `8` | Sesiones que se abren a la vez al arrancar |
 | `PAIN_START_GAP_MS` | `100` | Pausa entre inicios de sesión |
-| `PAIN_RECONNECT_CONCURRENCY` | `4` | Reconexiones simultáneas |
-| `PAIN_SINGLE_RECONNECT_GAP_MS` | `1000` | Separación entre reconexiones |
+| `PAIN_RECONNECT_BASE_MS` | `1500` | Espera base antes de reintentar una sesión caída |
+| `PAIN_RECONNECT_MAX_MS` | `30000` | Espera máxima del backoff de reconexión |
 | `PAIN_DB_FLUSH_MS` | `1500` | Debounce del guardado incremental |
 | `PAIN_DB_COMMIT_MS` | `5000` | Commit ligero de colecciones pequeñas |
-| `PAIN_DB_FULL_SCAN_MS` | `900000` | Escaneo completo de seguridad (0 = nunca) |
-| `PAIN_DB_MAX_DIRTY` | `20000` | Entidades tocadas antes de pasar a escaneo completo |
+| `PAIN_DB_FULL_SCAN_MS` | `0` (nunca) | Escaneo completo de seguridad (0 = nunca) |
 | `PAIN_AUTH_CREDS_MS` | `250` | Debounce de `creds.json` |
 | `PAIN_AUTH_JOURNAL_MS` | `500` | Debounce del diario de claves |
-| `PAIN_AUTH_COMPACT_MS` | `1800000` | Cada cuánto se compacta el diario |
+| `PAIN_AUTH_COMPACT_MS` | `7200000` | Cada cuánto se compacta el diario (en un worker) |
+| `PAIN_AUTH_JOURNAL_MB` | `16` | Tamaño del diario que fuerza la compactación |
+| `PAIN_AUTH_WORKERS` | `2` | Hilos de compactación (1–4) |
 | `PAIN_QUOTED_AVATAR` | `1` | `0` = cita sin foto (cero red en el envío) |
 | `PAIN_AVATAR_TTL_MS` | `86400000` | Vida de la foto cacheada |
 | `PAIN_AVATAR_QUEUE` | `500` | Descargas de fotos en cola como máximo |

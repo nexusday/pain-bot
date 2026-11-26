@@ -11,11 +11,9 @@ import { makeWASocket } from "../lib/simple.js"
 import { useMemoryAuthState, olvidarAuthStore } from "../lib/auth-store.js"
 import { registrarSesion, actualizarSesion, quitarSesion } from "../lib/session-registry.js"
 import {
-  contarReconexionTerminada,
   contarReintentoReconexion,
   iniciarActividadSocket,
 } from "../lib/worker-metrics.js"
-import { prioridadDeSesion } from "../lib/subbot-priority.js"
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from "../lib/socket-estable.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
@@ -61,51 +59,21 @@ const rcanal = {
 // No se debe destruir a los 60 s solo porque aún no apareció `user`.
 const SOCKET_CONEXION_MAX_MS = 180_000
 const MAX_FALLOS_RECONEXION = 10
-// Un 408 es transitorio y no autoriza a borrar credenciales, pero repetir
-// sockets fallidos sin límite mantiene una tormenta permanente cuando el
-// servidor o la red no responden. La sesión queda archivada y recuperable;
-// solo se pausa su siguiente intento automático.
-const MODO_PROCESO_UNICO = true
-const PAUSA_408_RECONEXION_MS = MODO_PROCESO_UNICO
-  ? Math.min(
-      Math.max(Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 60_000, 30_000),
-      120_000
-    )
-  : Math.max(
-      2 * 60_000,
-      Number.parseInt(process.env.PAIN_408_PAUSE_MS, 10) || 5 * 60_000
-    )
+// La reconexión NO pasa por una cola global. Cada sesión reintenta en cuanto se
+// cae, con una dispersión aleatoria de milisegundos para que los 150+ sockets
+// no se sincronicen en el mismo instante. La deduplicación es por sesión.
+const RECONEXION_BASE_MS = Math.min(
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_BASE_MS, 10) || 1_500, 0),
+  15_000
+)
+const RECONEXION_MAX_MS = Math.min(
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_MAX_MS, 10) || 30_000, 1_000),
+  120_000
+)
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
-const CONEXION_ESTABLE_MIN_MS = 2 * 60_000
-// Las reconexiones independientes de decenas de sesiones provocan oleadas
-// contra WhatsApp y más cierres 428. Se limita la simultaneidad por worker,
-// no por cantidad fija de sub-bots: la cola crece sin bloquear mensajes y se
-// drena conforme terminan las conexiones.
-const MAX_RECONEXIONES_POR_WORKER = Math.min(
-  Math.max(
-    MODO_PROCESO_UNICO
-      ? Math.max(Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 4, 4)
-      : (Number.parseInt(process.env.PAIN_RECONNECT_CONCURRENCY, 10) || 1),
-    1
-  ),
-  12
-)
-// Separación mínima entre inicios de reconexión del mismo worker: suaviza la
-// oleada contra WhatsApp y reparte el CPU en el tiempo. Configurable.
-const ESPACIO_RECONEXION_MS = Math.min(Math.max(Number.parseInt(process.env.PAIN_SINGLE_RECONNECT_GAP_MS, 10) || 1000, 0), 30_000)
-const colaReconexiones = []
-let reconexionesActivas = 0
-let ultimoInicioReconexion = 0
-let temporizadorDrenajeReconexiones = null
+const CONEXION_ESTABLE_MIN_MS = 30_000
 const reintentosProgramados = new Map()
-if (MODO_PROCESO_UNICO) {
-  console.log(
-    `[subbots] handshake=directo (sin cola), ` +
-    `reconnect_concurrency=${MAX_RECONEXIONES_POR_WORKER}, ` +
-    `reconnect_gap=${ESPACIO_RECONEXION_MS}ms`
-  )
-}
 
 // Cierre inmediato del socket crudo. `ws.close()` espera el handshake y el
 // socket viejo puede seguir recibiendo frames cifrados que ya no se pueden
@@ -125,53 +93,6 @@ function cerrarSocketCrudo(sock) {
   } catch {
     return false
   }
-}
-
-function ejecutarSiguienteReconexion() {
-  if (reconexionesActivas >= MAX_RECONEXIONES_POR_WORKER || !colaReconexiones.length) return
-  const espera = ESPACIO_RECONEXION_MS
-    ? Math.max(0, ultimoInicioReconexion + ESPACIO_RECONEXION_MS - Date.now())
-    : 0
-  if (espera > 0) {
-    if (!temporizadorDrenajeReconexiones) {
-      temporizadorDrenajeReconexiones = setTimeout(() => {
-        temporizadorDrenajeReconexiones = null
-        ejecutarSiguienteReconexion()
-      }, espera)
-      temporizadorDrenajeReconexiones.unref?.()
-    }
-    return
-  }
-  const trabajo = colaReconexiones.shift()
-  reconexionesActivas++
-  ultimoInicioReconexion = Date.now()
-  Promise.resolve()
-    .then(trabajo.fn)
-    .then(trabajo.resolve, trabajo.reject)
-    .finally(() => {
-      reconexionesActivas--
-      contarReconexionTerminada()
-      ejecutarSiguienteReconexion()
-    })
-}
-
-/**
- * prioridad: 1 para sub-bots premium, 0 para el resto. Los premium entran
- * delante de los normales pero detrás de los premium que ya estaban en cola
- * (FIFO dentro de cada nivel).
- */
-function encolarReconexion(fn, prioridad = 0) {
-  return new Promise((resolve, reject) => {
-    const trabajo = { fn, resolve, reject, prioridad: prioridad > 0 ? 1 : 0 }
-    if (trabajo.prioridad === 1) {
-      const indice = colaReconexiones.findIndex((entrada) => (entrada.prioridad || 0) === 0)
-      if (indice >= 0) colaReconexiones.splice(indice, 0, trabajo)
-      else colaReconexiones.push(trabajo)
-    } else {
-      colaReconexiones.push(trabajo)
-    }
-    ejecutarSiguienteReconexion()
-  })
 }
 
 // ── Watchdog compartido ───────────────────────────────────────────────────
@@ -1344,17 +1265,14 @@ async function iniciarSubBot(options) {
     }
 
     /**
-     * Encola una reconexión con deduplicación. Evita que watchdog,
-     * temporizador y panel encolen dos trabajos para la misma sesión.
+     * Reconecta esta sesión YA, sin cola global. La deduplicación es por
+     * sesión: watchdog, temporizador y panel comparten el mismo intento.
      */
-    function reconectarEnCola(motivo = null) {
+    function reconectarSesion(motivo = null) {
       if (reconexionEnCola) return Promise.resolve(false)
       reconexionEnCola = true
       reintentosProgramados.set(idCarpetaBot, Date.now())
-      return encolarReconexion(
-        () => reconectarUnaVez(),
-        prioridadDeSesion(path.dirname(pathAYBot), idCarpetaBot)
-      )
+      return reconectarUnaVez()
         .then((resultado) => {
           if (resultado === false) reintentosProgramados.delete(idCarpetaBot)
           return resultado
@@ -1374,95 +1292,38 @@ async function iniciarSubBot(options) {
       if (temporizadorReconexion) return
       reconectando = true
       reintentosProgramados.set(idCarpetaBot, Date.now())
-      const dispersarMs = (Number(String(idCarpetaBot).slice(-2)) % 30) * 1000
+      const dispersarMs = Math.floor(Math.random() * 2000)
       const esReemplazo = motivo === DisconnectReason.connectionReplaced
-      if (!esReemplazo && fallosConsecutivos >= MAX_FALLOS_RECONEXION) {
-        console.log(chalk.bold.yellow(
-          `\n┆ Subbot (+${idCarpetaBot}) sigue sin conectar tras ${MAX_FALLOS_RECONEXION} intentos ` +
-          `(último código ${motivo ?? 'sin código'}). Se reintenta en 2 min con backoff largo; usa /rebot para forzarlo.\n`
-        ))
-        fallosConsecutivos = 0
-        reemplazosConsecutivos = 0
-        const colaLarga = 2 * 60_000 + dispersarMs
-        if (!temporizadorReconexion) {
-          reconectando = true
-          contarReintentoReconexion(motivo)
-          temporizadorReconexion = setTimeout(() => {
-            temporizadorReconexion = null
-            console.log(`[reconexion] +${idCarpetaBot} reintento largo (${motivo ?? 'sin código'})`)
-            reconectarEnCola(motivo)
-          }, colaLarga)
-          temporizadorReconexion.unref?.()
-        }
-        return
-      }
       const esReinicio = motivo === DisconnectReason.restartRequired
-      // 408 (conexión perdida/timeout): con 150+ sub-bots en el mismo servidor
-      // suele llegar en oleadas cuando el proveedor limita sockets. Reintentar
-      // a los 5-20 s mantiene una tormenta permanente y multiplica el CPU.
-      // Se deja una pausa mínima de un minuto y backoff largo.
-      // 428 (WhatsApp cerró la conexión): con 150+ sub-bots en el mismo servidor
-      // es normal que rechace alguna. Con backoff corto se formaba un bucle
-      // (cada sub-bot reconectaba a los 5-20 s y el CPU se disparaba), así que
-      // aquí se espera bastante más entre reintentos.
-      const esCerradoPorServidor = motivo === DisconnectReason.connectionClosed
-      const esConexionPerdida = motivo === DisconnectReason.connectionLost ||
-        motivo === DisconnectReason.timedOut ||
-        Number(motivo) === 408
-      const pausa408 =
-        esConexionPerdida && fallosConsecutivos >= 3
-          ? PAUSA_408_RECONEXION_MS + dispersarMs
-          : null
-      if (pausa408 !== null) {
-        console.log(chalk.bold.yellow(
-          `\n┆ Subbot (+${idCarpetaBot}) pausado tras ${fallosConsecutivos} ` +
-          `pérdidas 408 consecutivas; se conserva la sesión y se reintenta ` +
-          `en ${Math.round(pausa408 / 60_000)} min.\n`
-        ))
-        temporizadorReconexion = setTimeout(() => {
-          temporizadorReconexion = null
-          console.log(`[reconexion] +${idCarpetaBot} tras pausa 408`)
-          reconectarEnCola(motivo)
-        }, pausa408)
-        temporizadorReconexion.unref?.()
-        return
+      let cola
+      if (esReinicio) {
+        // 515: el servidor pide reiniciar el socket. Reintento casi inmediato.
+        cola = 300 + dispersarMs
+      } else if (esReemplazo) {
+        // 440: otro socket abrió la misma sesión. Reintentar al instante crea
+        // un ping-pong; se espera un poco y crece solo si se repite.
+        reemplazosConsecutivos++
+        cola = Math.min(10_000 * (2 ** Math.min(reemplazosConsecutivos - 1, 3)), 60_000) + dispersarMs
+      } else {
+        fallosConsecutivos++
+        cola = fallosConsecutivos >= MAX_FALLOS_RECONEXION
+          ? 60_000 + dispersarMs
+          : Math.min(
+              RECONEXION_BASE_MS * (2 ** Math.min(fallosConsecutivos - 1, 5)),
+              RECONEXION_MAX_MS
+            ) + dispersarMs
       }
-      // Tope 5 min en todos los casos transitorios. Antes un 428/408 podía
-      // dejar al sub-bot 15 min fuera y un 440 (reemplazo) hasta 15 min; con
-      // 100+ sesiones eso se ve como "el bot no responde". La cola serial y la
-      // dispersión siguen evitando la oleada contra WhatsApp. 515 es un
-      // reinicio pedido por el servidor: reintento casi inmediato.
-      const cola = esReinicio
-        ? 3000 + Math.min(dispersarMs, 5000)
-        : esReemplazo
-          ? Math.min(30_000 * (2 ** Math.min(reemplazosConsecutivos, 4)), 5 * 60_000) + dispersarMs
-          : esConexionPerdida
-            ? Math.min(
-                (MODO_PROCESO_UNICO ? 15_000 : 60_000) * (2 ** Math.min(fallosConsecutivos, 4)),
-                MODO_PROCESO_UNICO ? 2 * 60_000 : 5 * 60_000
-              ) + dispersarMs
-          : esCerradoPorServidor
-            ? Math.min(
-                (MODO_PROCESO_UNICO ? 15_000 : 20_000) * (2 ** Math.min(fallosConsecutivos, 4)),
-                MODO_PROCESO_UNICO ? 2 * 60_000 : 3 * 60_000
-              ) + dispersarMs
-            : Math.min(5000 * (2 ** Math.min(fallosConsecutivos, 5)), 90_000) + dispersarMs
-      if (esReemplazo) reemplazosConsecutivos++
-      else fallosConsecutivos++
       contarReintentoReconexion(motivo)
       console.log(chalk.bold.magentaBright(
         `\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). ` +
         `${detalle ? `Motivo: ${detalle}. ` : ''}` +
-        `${esReemplazo ? 'Reemplazo detectado; ' : ''}reconectando en ${Math.round(cola / 1000)}s...\n`
+        `${esReemplazo ? 'Reemplazo detectado; ' : ''}reintentando en ${Math.round(cola / 1000)}s...\n`
       ))
       temporizadorReconexion = setTimeout(() => {
         temporizadorReconexion = null
-        console.log(
-          `[reconexion] +${idCarpetaBot} en cola (motivo=${motivo ?? 'sin código'}, ` +
-          `espera=${Math.round(cola / 1000)}s)`
-        )
-        reconectarEnCola(motivo)
+        reconectarSesion(motivo)
       }, cola)
+      temporizadorReconexion.unref?.()
     }
 
     detenerWatchdog()
@@ -1476,8 +1337,8 @@ async function iniciarSubBot(options) {
         }
         if (sock._ignorarCierre || emparejamientoEnCurso) return
         if (!sock.authState?.creds?.registered) return
-        // Si ya hay un intento en curso, encolado o esperando su backoff, el
-        // watchdog no debe abrir otro socket para el mismo número.
+        // Si ya hay un intento en curso o esperando su reintento, el watchdog
+        // no debe abrir otro socket para el mismo número.
         if (promesaReconexion || reconexionEnCola || temporizadorReconexion) return
         const estadoSocket = sock?.ws?.socket?.readyState ?? sock?.ws?.readyState
         const socketCerrado = estadoSocket === ws.CLOSED || estadoSocket === ws.CLOSING
@@ -1494,7 +1355,7 @@ async function iniciarSubBot(options) {
         console.log(chalk.bold.yellow(
           `\n┆ Subbot (+${idCarpetaBot}) ${conexionAtascada ? 'atascado conectando' : 'sin conexión'} (estado ${estadoSocket ?? 'desconocido'}). Reconectando...\n`
         ))
-        reconectarEnCola('watchdog')
+        reconectarSesion('watchdog')
       } catch (error) {
         console.error(`Error en watchdog del subbot ${idCarpetaBot}:`, error?.message || error)
       }

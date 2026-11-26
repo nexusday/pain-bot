@@ -514,8 +514,8 @@ if (!opts['test']) {
       phase = Math.imul(phase, 16777619)
     }
     // Guardado periódico: el adaptador solo escribe lo que cambió, así que un
-    // volcado cada minuto es barato. El escaneo completo de seguridad lo hace
-    // el propio adaptador cada 15 min (PAIN_DB_FULL_SCAN_MS).
+    // volcado cada minuto es barato. No hay escaneo completo periódico: con
+    // 150+ sesiones serializaba toda la base y congelaba los sockets.
     const intervaloGuardado = Math.max(
       Number.parseInt(
         isSingleBotProcess

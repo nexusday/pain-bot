@@ -60,6 +60,44 @@ test('auth: migra una clave del formato viejo (un fichero por clave)', async () 
   }
 })
 
+test('auth: reproduce diarios pendientes y descarta los ya incluidos en el snapshot', async () => {
+  const dir = carpetaTemporal()
+  try {
+    fs.writeFileSync(
+      path.join(dir, 'auth-keys.json'),
+      JSON.stringify({ v: 2, keyT: 1000, keys: { preKeys: { 1: { id: 1 } } } }, BufferJSON.replacer),
+      'utf8'
+    )
+    const entrada = (id) => JSON.stringify({ c: 'preKeys', u: [[id, { id }]] }, BufferJSON.replacer) + '\n'
+    // Ya está dentro del snapshot (corte 500 <= keyT 1000): se ignora y borra.
+    fs.writeFileSync(path.join(dir, 'auth-keys.journal-500.ndjson'), entrada(3), 'utf8')
+    // Posterior al snapshot: se reproduce y queda pendiente de compactar.
+    fs.writeFileSync(path.join(dir, 'auth-keys.journal-2000.ndjson'), entrada(2), 'utf8')
+
+    const auth = await useMemoryAuthState(dir)
+    const claves = await auth.state.keys.get('pre-key', [1, 2, 3])
+    assert.deepEqual(claves[1], { id: 1 })
+    assert.deepEqual(claves[2], { id: 2 })
+    assert.equal(claves[3] ?? null, null)
+    assert.equal(fs.existsSync(path.join(dir, 'auth-keys.journal-500.ndjson')), false)
+    assert.equal(fs.existsSync(path.join(dir, 'auth-keys.journal-2000.ndjson')), true)
+
+    await auth.flush()
+    await olvidarAuthStore(dir)
+    const nombres = fs.readdirSync(dir)
+    assert.equal(nombres.some((n) => n.startsWith('auth-keys.journal-')), false)
+
+    const reabierto = await useMemoryAuthState(dir)
+    const despues = await reabierto.state.keys.get('pre-key', [1, 2])
+    assert.deepEqual(despues[1], { id: 1 })
+    assert.deepEqual(despues[2], { id: 2 })
+    await reabierto.close()
+    await olvidarAuthStore(dir)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('auth: borrar una clave la elimina también del snapshot', async () => {
   const dir = carpetaTemporal()
   try {
