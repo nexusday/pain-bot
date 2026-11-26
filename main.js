@@ -165,7 +165,7 @@ global.db = new Low(new ArchivoSqliteCompartido(
   'storage/databases/database.json',
   {
     persistConnections: true,
-    singleWriter: isSingleBotProcess,
+    singleWriter: process.env.PAIN_SINGLE_PROCESS !== '0',
     // El refresh por comando del handler queda limitado a esta frecuencia;
     // la vista se mantiene fresca con el sync de fondo cada 5s.
     refreshMinIntervalMs: Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) || 5000,
