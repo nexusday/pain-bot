@@ -371,7 +371,7 @@ if (!isSubbotWorker) {
     browser: Browsers.ubuntu('Chrome'),
     markOnlineOnConnect: true,
     appStateMacVerification: { patch: false, snapshot: false },
-    msgRetryCache: cacheReintentoPrincipal,
+    msgRetryCounterCache: cacheReintentoPrincipal,
   })
 
   global.conn = makeWASocket(connectionOptions)
@@ -514,15 +514,15 @@ if (!opts['test']) {
       phase = Math.imul(phase, 16777619)
     }
     // Guardado periódico: el adaptador solo escribe lo que cambió, así que un
-    // volcado cada minuto es barato. No hay escaneo completo periódico: con
+    // volcado cada 5 minutos es barato. No hay escaneo completo periódico: con
     // 150+ sesiones serializaba toda la base y congelaba los sockets.
     const intervaloGuardado = Math.max(
       Number.parseInt(
         isSingleBotProcess
-          ? (process.env.PAIN_SINGLE_DB_SAVE_MS || '60000')
+          ? (process.env.PAIN_SINGLE_DB_SAVE_MS || '300000')
           : process.env.PAIN_DB_SAVE_MS,
         10
-      ) || (isSingleBotProcess ? 60_000 : 60_000),
+      ) || (isSingleBotProcess ? 300_000 : 60_000),
       30_000
     )
     // Commit ligero: guarda los cambios pequeños (modos, ajustes) sin esperar
@@ -536,6 +536,10 @@ if (!opts['test']) {
       void global.db.flushSoon?.()
     }, intervaloCommit)
     commit.unref?.()
+    console.log(
+      `[db] guardado periódico cada ${Math.round(intervaloGuardado / 1000)} s; ` +
+      `cambios pequeños cada ${Math.round(intervaloCommit / 1000)} s.`
+    )
     const initialDelay = (phase >>> 0) % intervaloGuardado
     const firstSave = setTimeout(() => {
       void guardarDb()
@@ -901,7 +905,7 @@ global.reiniciarPrincipalLimpio = async function reiniciarPrincipalLimpio({ time
     browser: Browsers.ubuntu('Chrome'),
     markOnlineOnConnect: true,
     appStateMacVerification: { patch: false, snapshot: false },
-    msgRetryCache: cacheReintentoPrincipal,
+    msgRetryCounterCache: cacheReintentoPrincipal,
   })
 
   global.conn = makeWASocket(connectionOptions)
@@ -1683,7 +1687,7 @@ async function iniciarGestorSubBots() {
   // Dar unos segundos al principal para que abra su socket antes de la
   // oleada de sub-bots. El arranque corre en segundo plano.
   const retrasoArranque = Math.max(
-    Number.parseInt(process.env.PAIN_SUBBOT_START_DELAY_MS, 10) || 3000,
+    Number.parseInt(process.env.PAIN_SUBBOT_START_DELAY_MS, 10) || 500,
     0
   )
   setTimeout(() => {

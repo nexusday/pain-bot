@@ -58,21 +58,21 @@ const rcanal = {
 // Un WebSocket OPEN todavía puede estar terminando el login bajo carga.
 // No se debe destruir a los 60 s solo porque aún no apareció `user`.
 const SOCKET_CONEXION_MAX_MS = 180_000
-const MAX_FALLOS_RECONEXION = 10
+const MAX_FALLOS_RECONEXION = 50
 // La reconexión NO pasa por una cola global. Cada sesión reintenta en cuanto se
 // cae, con una dispersión aleatoria de milisegundos para que los 150+ sockets
 // no se sincronicen en el mismo instante. La deduplicación es por sesión.
 const RECONEXION_BASE_MS = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_BASE_MS, 10) || 1_500, 0),
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_BASE_MS, 10) || 0, 0),
   15_000
 )
 const RECONEXION_MAX_MS = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_MAX_MS, 10) || 30_000, 1_000),
+  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_MAX_MS, 10) || 5_000, 1_000),
   120_000
 )
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
-const CONEXION_ESTABLE_MIN_MS = 30_000
+const CONEXION_ESTABLE_MIN_MS = 15_000
 const reintentosProgramados = new Map()
 
 // Cierre inmediato del socket crudo. `ws.close()` espera el handshake y el
@@ -564,7 +564,6 @@ async function iniciarSubBot(options) {
   intento.iniciado = (async () => {
     const version = await obtenerVersionBaileys()
     if (intento.cancelado) return false
-    const reintentoMsg = (MessageRetryMap) => { }
     const cacheReintentoMsg = new NodeCache({ stdTTL: 90, checkperiod: 0, useClones: false, maxKeys: 300 })
     let estadoConn, saveCreds
     try {
@@ -586,8 +585,9 @@ async function iniciarSubBot(options) {
         creds: estadoConn.creds,
         keys: estadoConn.keys
       },
-      msgRetry: reintentoMsg,
-      msgRetryCache: cacheReintentoMsg,
+      // Baileys 7 usa `msgRetryCounterCache`; `msgRetryCache` se ignoraba y
+      // cada socket creaba su propio caché de reintentos.
+      msgRetryCounterCache: cacheReintentoMsg,
       browser: Browsers.ubuntu('Chrome'),
       version,
       markOnlineOnConnect: false,
@@ -610,8 +610,10 @@ async function iniciarSubBot(options) {
         return syncType === tipos.PUSH_NAME ||
           syncType === tipos.INITIAL_STATUS_V3
       },
-      // Baileys corta con 408 si pasan keepAlive+5s sin datos; 10s cortaba a todos en cada pausa del hilo.
-      keepAliveIntervalMs: 30_000,
+      // Baileys corta con 408 si pasan keepAlive+5 s sin datos. 30 s cerraba
+      // TODOS los sockets cuando el proceso se quedaba 35 s guardando la base.
+      // 60 s tolera esa pausa sin que WhatsApp vea la conexión inactiva.
+      keepAliveIntervalMs: 60_000,
       qrTimeout: 120_000,
     })
 
@@ -919,6 +921,9 @@ async function iniciarSubBot(options) {
       if (connection === 'close') {
         liberarHandshake(socketEvento)
         detenerPrekeys(sock)
+        // Un socket cerrado no debe seguir en global.conns: los comandos y el
+        // panel lo tomarían como si estuviera vivo y esperarían su respuesta.
+        quitarSockDeConns(sock)
         if (sock._painDeletingSession) {
           reintentosProgramados.delete(idCarpetaBot)
           intento.limpiarAuxiliares?.()
