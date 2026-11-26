@@ -1687,7 +1687,16 @@ async function iniciarGestorSubBots() {
     0
   )
   setTimeout(() => {
-    void arrancarTodas()
+    void (async () => {
+      // No abrir 38-300 sockets mientras se compilan 255 plugins: WhatsApp
+      // entregaría el historial/cola offline y el handler no podría atenderlo
+      // (quedaba encolado y luego bloqueaba el event loop). El principal ya
+      // está conectado; los subbots esperan a que los plugins estén listos.
+      if (process.env.PAIN_WAIT_PLUGINS !== '0' && global.__painPluginsListos) {
+        try { await global.__painPluginsListos } catch {}
+      }
+      await arrancarTodas()
+    })()
       .catch((error) => {
         console.error('[subbots] Error en el arranque:', error?.message || error)
       })

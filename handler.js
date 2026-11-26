@@ -305,11 +305,6 @@ function antiguedadMensajeMs(raw) {
 
 export async function handler(chatUpdate) {
   if (!chatUpdate || !Array.isArray(chatUpdate.messages)) return
-  // En los workers los plugins se cargan en segundo plano para no retrasar las
-  // conexiones. El primer mensaje espera aquí a que estén listos.
-  if (global.__painPluginsListos) {
-    try { await global.__painPluginsListos } catch {}
-  }
   const vistos = new Set()
   const mensajes = chatUpdate.messages.filter((mensaje) => {
     if (!mensaje) return false
@@ -648,6 +643,14 @@ let usedPrefix = '.'
 
 let comandoEjecutado = false
 
+
+// Los plugins se cargan en segundo plano para no retrasar las conexiones.
+// La espera va AQUÍ, después de los filtros baratos: así los miles de
+// mensajes de historial/charla de un arranque no quedan encolados esperando
+// los 255 plugins ni se procesan de golpe cuando terminan.
+if (global.__painPluginsListos) {
+  try { await global.__painPluginsListos } catch {}
+}
 
 const { lista: pluginsProcesados, conAll, comandos, pluginsAntesSesion } = pluginsEnCache()
 const comandosOcultos = comandosOcultosPremium()
