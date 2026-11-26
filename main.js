@@ -160,9 +160,18 @@ global.prefix = new RegExp(
     ']'
 )
 
+// En modo carriles, cada worker tiene su propia DB para evitar contención
+// de locks entre procesos. En modo único, todos comparten la misma DB.
+const dbDir = isSubbotWorker
+  ? `storage/databases/worker-${process.env.PAIN_WORKER_ID || '0'}`
+  : 'storage/databases'
+const dbPath = `${dbDir}/database.sqlite`
+const dbJsonPath = `${dbDir}/database.json`
+// Crear el directorio si no existe.
+try { mkdirSync(dbDir, { recursive: true }) } catch {}
 global.db = new Low(new ArchivoSqliteCompartido(
-  'storage/databases/database.sqlite',
-  'storage/databases/database.json',
+  dbPath,
+  dbJsonPath,
   {
     persistConnections: true,
     singleWriter: process.env.PAIN_SINGLE_PROCESS !== '0',
@@ -1166,7 +1175,7 @@ function finalizarCargaPlugins() {
   try {
     const desde = Number(global.__painBootAt) || Date.now()
     console.log(
-      `[boot] ${process.env.PAIN_ROLE || 'primary'} (${process.env.PAIN_WORKER_ID || '-'}) ` +
+      `[boot] ${process.env.PAIN_ROLE || 'primary'} (${process.env.PAIN_WORKER_ID || '-'}) tier=${process.env.PAIN_TIER || 'free'} ` +
       `${Object.keys(global.plugins).length} plugins en ${Date.now() - desde} ms`
     )
   } catch {}

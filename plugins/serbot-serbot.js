@@ -613,7 +613,7 @@ async function iniciarSubBot(options) {
       // Baileys corta con 408 si pasan keepAlive+5 s sin datos. 30 s cerraba
       // TODOS los sockets cuando el proceso se quedaba 35 s guardando la base.
       // 60 s tolera esa pausa sin que WhatsApp vea la conexión inactiva.
-      keepAliveIntervalMs: 60_000,
+      keepAliveIntervalMs: Number.parseInt(process.env.PAIN_KEEPALIVE_MS, 10) || 60_000,
       qrTimeout: 120_000,
     })
 
