@@ -395,6 +395,10 @@ export function stepsCardHTML() {
 export function linkFormHTML() {
   const phone = state.linkPrefill?.phone || ''
   const force = Boolean(state.linkPrefill?.force)
+  const servidores = Array.isArray(state.servers) ? state.servers : []
+  const opcionesServidor = servidores.length
+    ? servidores.map((s) => `<option value="${s.id}">${h(s.name)} · ${h(String(s.tier || 'free').toUpperCase())}</option>`).join('')
+    : '<option value="">Servidor automático</option>'
   return `<div class="card pairing-card">
     <div class="pairing-head">
       <div><h3>Vincular un sub-bot</h3><p>Conecta un número de WhatsApp a tu cuenta.</p></div>
@@ -406,6 +410,11 @@ export function linkFormHTML() {
         <label class="label" for="link-phone">Número de WhatsApp</label>
         <div class="input-icon">${icon('phone')}<input id="link-phone" name="phone" class="input" inputmode="numeric" autocomplete="tel" placeholder="5215512345678" value="${h(phone)}" required /></div>
         <div class="hint">Incluye el código de país, sin <b>+</b>, espacios ni guiones. Ejemplo: <span class="mono">5215512345678</span>.</div>
+      </div>
+      <div class="field">
+        <label class="label" for="link-server">Servidor</label>
+        <select id="link-server" name="serverId" class="input">${opcionesServidor}</select>
+        <div class="hint">Elige el servidor donde se ejecutará este sub-bot. Premium permite servidores dedicados.</div>
       </div>
       <label class="check">
         <input type="checkbox" id="link-force" name="force" ${force ? 'checked' : ''} />
@@ -484,7 +493,19 @@ export function pairingCardHTML() {
   </div>`
 }
 
+export async function loadServers() {
+  try {
+    const data = await api.get('/api/servers')
+    state.servers = Array.isArray(data.servers) ? data.servers : []
+  } catch {
+    state.servers = []
+  }
+}
+
 export function renderLinkPage() {
+  if (!Array.isArray(state.servers)) {
+    loadServers().then(() => renderLinkPage()).catch(() => {})
+  }
   setPage('Vincular bot', 'Genera un código y conéctalo desde WhatsApp')
   const active = state.pairing && !['linked', 'expired', 'error', 'cancelled'].includes(state.pairing.status)
   content(`

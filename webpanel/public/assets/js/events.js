@@ -402,6 +402,46 @@ export async function onClick(event) {
       await eliminarSesionesSeleccionadas()
       return
     }
+    if (action === 'server-toggle') {
+      const id = Number(actionEl.dataset.id)
+      try {
+        const data = await api.post(`/api/admin/servers/${id}/toggle`, {})
+        showToast(data.status === 'active' ? 'Servidor activado.' : 'Servidor desactivado.', 'success')
+        await renderAdmin('servers')
+      } catch (error) {
+        showToast(error.message || 'No se pudo cambiar el estado del servidor.', 'error')
+      }
+      return
+    }
+    if (action === 'server-delete') {
+      const id = Number(actionEl.dataset.id)
+      const name = actionEl.dataset.name || ''
+      if (!window.confirm(`¿Eliminar el servidor "${name}"? Los sub-bots asignados pasarán a automático.`)) return
+      try {
+        await api.del(`/api/admin/servers/${id}`)
+        showToast('Servidor eliminado.', 'success')
+        await renderAdmin('servers')
+      } catch (error) {
+        showToast(error.message || 'No se pudo eliminar el servidor.', 'error')
+      }
+      return
+    }
+    if (action === 'server-create') {
+      const name = window.prompt('Nombre del servidor (ej. premium-1):')
+      if (!name) return
+      const tier = (window.prompt('Tier (free / premium / vip):', 'free') || 'free').toLowerCase()
+      const lanes = Number(window.prompt('Carriles (1-16):', '3') || 3)
+      const maxSessions = Number(window.prompt('Máximo de sesiones:', '30') || 30)
+      const heapMb = Number(window.prompt('Heap en MB:', '512') || 512)
+      try {
+        await api.post('/api/admin/servers', { name, tier, lanes, maxSessions, heapMb })
+        showToast('Servidor creado.', 'success')
+        await renderAdmin('servers')
+      } catch (error) {
+        showToast(error.message || 'No se pudo crear el servidor.', 'error')
+      }
+      return
+    }
     if (action === 'bot-owner-remove') {
       await removeBotOwner(actionEl.dataset.phone, actionEl.dataset.ownerNumber)
       return

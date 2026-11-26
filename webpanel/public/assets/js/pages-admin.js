@@ -37,6 +37,7 @@ export function adminTabs(active) {
     ['principal', 'Bot principal', 'bot', 'admin.main'],
     ['users', 'Usuarios', 'users', 'admin.users'],
     ['sessions', 'Sesiones', 'server', 'admin.sessions'],
+    ['servers', 'Servidores', 'server', 'admin.servers'],
     ['pairings', 'Vinculaciones', 'link', 'admin.pairings'],
     ['communities', 'Comunidades', 'globe', 'admin.communities'],
     ['audit', 'Auditoría', 'activity', 'admin.audit'],
@@ -55,6 +56,7 @@ export const ADMIN_META = {
   principal: ['Bot principal', 'Vincula, cambia o retira el número del bot principal'],
   users: ['Usuarios', 'Cuentas registradas en el panel'],
   sessions: ['Sesiones', 'Sub-bots detectados en el servidor'],
+  servers: ['Servidores', 'Carriles y recursos por servidor'],
   pairings: ['Vinculaciones', 'Historial de intentos de vinculación'],
   communities: ['Comunidades', 'Comunidades de WhatsApp para los usuarios del panel'],
   audit: ['Auditoría', 'Actividad reciente del panel'],
@@ -117,6 +119,17 @@ export async function renderAdmin(section) {
       content(adminTabs('sessions') + adminSessionsHTML(data))
       document.getElementById('admin-sessions-search')?.addEventListener('input', aplicarFiltrosSesiones)
       aplicarFiltrosSesiones()
+      return
+    }
+
+    if (section === 'servers') {
+      const [data, info] = await Promise.all([
+        api.get('/api/admin/servers'),
+        api.get('/api/server-info').catch(() => null),
+      ])
+      if (!isCurrentAdminRoute('servers')) return
+      state.adminServers = Array.isArray(data.servers) ? data.servers : []
+      content(adminTabs('servers') + adminServersHTML(data, info?.server))
       return
     }
 
@@ -536,6 +549,49 @@ export function adminSessionsHTML(data) {
       </div>
     </div>
     <div class="card-body tight">${sessionsTable(sessions)}</div>
+  </div>`
+}
+
+export function adminServersHTML(data, info) {
+  const servidores = data.servers || []
+  const recursos = info
+    ? `<div class="stats">
+        ${statCard('CPU', `${info.cpu?.nucleos || '?'} núcleos`, 'cpu', 'accent')}
+        ${statCard('RAM', `${info.memoria?.usadaMB || '?'} / ${info.memoria?.totalMB || '?'} MB`, 'database', 'cyan')}
+        ${statCard('Disco libre', info.disco?.libreGB != null ? `${info.disco.libreGB} GB` : '—', 'server', 'green')}
+        ${statCard('Carga', info.carga?.load1 ?? '—', 'activity', 'amber')}
+      </div>
+      <div class="card"><div class="card-body">
+        <div class="hint">Servidor: <b>${h(info.hostname || '?')}</b> · ${h(info.plataforma || '')} ${h(info.arquitectura || '')} · Node ${h(info.node || '')} · Tier <b>${h(info.tier || 'free')}</b> · ${info.cpu?.usoPorcentaje ?? '?'}% CPU · RAM ${info.memoria?.porcentaje ?? '?'}%</div>
+      </div></div>`
+    : ''
+  const filas = servidores.length
+    ? servidores.map((s) => `<tr>
+        <td><b>${h(s.name)}</b></td>
+        <td>${badge(String(s.tier || 'free').toUpperCase(), s.tier === 'vip' ? 'amber' : s.tier === 'premium' ? 'cyan' : 'accent')}</td>
+        <td>${s.lanes}</td>
+        <td>${s.max_sessions}</td>
+        <td>${s.heap_mb} MB</td>
+        <td>${s.db_mode === 'isolated' ? 'Aislada' : 'Compartida'}</td>
+        <td>${s.status === 'active' ? badge('Activo', 'green') : badge('Inactivo', 'red')}</td>
+        <td class="actions">
+          <button class="btn btn-ghost btn-sm" data-action="server-toggle" data-id="${s.id}">${s.status === 'active' ? 'Desactivar' : 'Activar'}</button>
+          <button class="btn btn-ghost btn-sm danger" data-action="server-delete" data-id="${s.id}" data-name="${h(s.name)}">${icon('trash')}</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="8" class="empty">No hay servidores configurados. Crea uno para repartir los sub-bots.</td></tr>'
+  return `${recursos}
+  <div class="card">
+    <div class="card-head">
+      <div><h3>Servidores (carriles)</h3><p>Reparte los sub-bots entre procesos. Cada servidor puede tener su propia DB.</p></div>
+      <button class="btn btn-primary btn-sm" data-action="server-create">${icon('plus')} Crear servidor</button>
+    </div>
+    <div class="card-body tight">
+      <table class="table">
+        <thead><tr><th>Nombre</th><th>Tier</th><th>Carriles</th><th>Máx. sesiones</th><th>Heap</th><th>DB</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
   </div>`
 }
 

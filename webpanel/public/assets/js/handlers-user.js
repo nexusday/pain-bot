@@ -27,8 +27,10 @@ export async function handleStartLink(form) {
   const submit = form.querySelector('button[type="submit"]')
   const phoneInput = form.querySelector('[name="phone"]')
   const forceInput = form.querySelector('[name="force"]')
+  const serverInput = form.querySelector('[name="serverId"]')
   const phone = String(phoneInput?.value || '').replace(/\D/g, '')
   const force = Boolean(forceInput?.checked)
+  const serverId = serverInput?.value ? Number(serverInput.value) : null
 
   hideFormError(form)
   if (phone.length < 8 || phone.length > 15) {
@@ -38,7 +40,7 @@ export async function handleStartLink(form) {
 
   setLoading(submit, true, 'Generando código…')
   try {
-    const data = await api.post('/api/bots/link', { phone, force })
+    const data = await api.post('/api/bots/link', { phone, force, serverId })
     state.pairing = data.pairing || null
     state.pairingCode = data.code || data.pairing?.code || null
     state.linkPrefill = null
