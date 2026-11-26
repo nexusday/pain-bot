@@ -160,6 +160,13 @@ global.prefix = new RegExp(
     ']'
 )
 
+// Rol del proceso. Debe declararse ANTES de la DB porque la ruta de la DB y
+// el modo singleWriter dependen de esto.
+const isSubbotWorker = process.env.PAIN_ROLE === 'worker' ||
+  process.env.PAIN_ROLE === 'subbot-worker'
+const isManagedPrimary = true
+const isSingleBotProcess = process.env.PAIN_SINGLE_PROCESS !== '0'
+
 // En modo carriles, cada worker tiene su propia DB para evitar contención
 // de locks entre procesos. En modo único, todos comparten la misma DB.
 const dbDir = isSubbotWorker
@@ -249,12 +256,6 @@ global.loadDatabase = async function loadDatabase() {
   global.db.adapter?.vincularDatos?.(global.db.data)
 }
 
-const isSubbotWorker = process.env.PAIN_ROLE === 'worker' ||
-  process.env.PAIN_ROLE === 'subbot-worker'
-const isManagedPrimary = true
-// Un solo proceso: plugins una vez y todos los sub-bots en el mismo event loop.
-// Las ramas del supervisor clásico (`PAIN_SINGLE_PROCESS=0`) se eliminaron.
-const isSingleBotProcess = process.env.PAIN_SINGLE_PROCESS !== '0'
 global.__painSingleProcess = isSingleBotProcess
 global.processRole = 'primary'
 // Los sub-bots no deben quitarle CPU al bot principal.
