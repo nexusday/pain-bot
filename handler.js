@@ -318,9 +318,23 @@ export async function handler(chatUpdate) {
   const duplicados = chatUpdate.messages.length - mensajes.length
   if (duplicados > 0) contarMensajesDuplicados(duplicados)
   const maxEdadMensajeMs = Math.max(
-    Number.parseInt(process.env.PAIN_MAX_MESSAGE_AGE_MS, 10) || 300_000,
+    Number.parseInt(process.env.PAIN_MAX_MESSAGE_AGE_MS, 10) || 10_000,
     10_000
   )
+  // Atajo: si TODOS los mensajes del lote son viejos, se descarta el lote
+  // entero sin iterar ni calcular edades una por una. Con 150 sockets
+  // reconectándose, WhatsApp entrega miles de mensajes viejos y este atajo
+  // evita que el handler se invoque miles de veces por segundo.
+  if (mensajes.length && mensajes.every((m) => antiguedadMensajeMs(m?.messageTimestamp) > maxEdadMensajeMs)) {
+    mensajesViejosDescartados += mensajes.length
+    if (mensajesViejosDescartados % 25 === 1 || mensajesViejosDescartados % 25 === 0) {
+      console.warn(
+        `[lag] descartados ${mensajesViejosDescartados} mensaje(s) viejos ` +
+        `(más de ${Math.round(maxEdadMensajeMs / 1000)} s); evita procesar historial atrasado.`
+      )
+    }
+    return
+  }
   for (const mensaje of mensajes) {
     const edad = antiguedadMensajeMs(mensaje?.messageTimestamp)
     if (edad > maxEdadMensajeMs) {
