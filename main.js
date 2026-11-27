@@ -1375,6 +1375,12 @@ async function iniciarGestorSubBots() {
     return socket?.ws?.isOpen === true || readyState === ws.OPEN
   }
   const iniciarSesion = (folder) => {
+    // En modo carriles cada proceso solo puede abrir SUS sesiones. Si el panel
+    // pide una que pertenece a otro carril, se responde 'not-local' para que
+    // el supervisor la redirija por IPC.
+    if (!isSingleBotProcess && Array.isArray(sessions) && !sessions.includes(folder)) {
+      return Promise.resolve('not-local')
+    }
     const existing = sesionesIniciando.get(folder)
     if (existing) return existing
     if (sesionAbierta(folder)) return Promise.resolve('skipped')
@@ -1565,6 +1571,9 @@ async function iniciarGestorSubBots() {
   const reconectarUnaLocal = async (folder) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(String(folder || ''))) {
       return { ok: false, reason: 'invalid' }
+    }
+    if (!isSingleBotProcess && Array.isArray(sessions) && !sessions.includes(folder)) {
+      return { ok: false, reason: 'not-local' }
     }
     const botPath = join(serbotDir, folder)
     if (sesionEnEmparejamiento(botPath)) return { ok: false, reason: 'pairing' }
@@ -1835,6 +1844,11 @@ process.on('message', async (message) => {
   if (message?.type === 'remove-session' && typeof global.__painRemoveSession === 'function') {
     const resultado = await global.__painRemoveSession(message.folder).catch((error) => ({ ok: false, error: error?.message }))
     try { process.send?.({ type: 'remove-session-result', folder: message.folder, resultado }) } catch {}
+    return
+  }
+  if (message?.type === 'reconnect-bot' && typeof global.__painReconnectOne === 'function') {
+    const resultado = await global.__painReconnectOne(message.folder).catch((error) => ({ ok: false, error: error?.message }))
+    try { process.send?.({ type: 'reconnect-bot-result', folder: message.folder, resultado }) } catch {}
   }
 })
 
