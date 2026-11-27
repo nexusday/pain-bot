@@ -1467,7 +1467,7 @@ async function iniciarGestorSubBots() {
       }
     }
     const inicioWrite = Date.now()
-    writeSubbotWorkerStatusAsync(__dirname, 'primary', snapshotSesiones().map((sesion) => ({
+    writeSubbotWorkerStatusAsync(__dirname, workerId, snapshotSesiones().map((sesion) => ({
       ...sesion,
       actividad: obtenerActividadSocket(obtenerSesion(sesion.folder)?.conn, { reset: true })
     })), {
@@ -1508,7 +1508,10 @@ async function iniciarGestorSubBots() {
   }
   publishWorkerStatus()
   let ticksEstado = 0
-  const intervaloEstadoMs = 30_000
+  // El estado se escribe cada 60 s: con 10 carriles, escribir cada 30 s
+  // generaba 2-3 s de I/O por carril y competía con la DB. El panel tolera
+  // 120 s de antigüedad, así que 60 s es seguro.
+  const intervaloEstadoMs = 60_000
   workerStatusInterval = setInterval(() => {
     try {
       publishWorkerStatus()
