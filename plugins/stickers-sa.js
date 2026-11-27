@@ -100,7 +100,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         maxBytes: 500 * 1024,
         ajuste: 'cover',
         fps: 10,
-        threads: 4
+        threads: 2
       })
       const stickerFinal = await addExif(webp, packname, author)
       console.log(`[sa] sticker preparado: ${stickerFinal.length} bytes`)
