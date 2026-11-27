@@ -99,7 +99,9 @@ export async function renderServers() {
     if (!porServidor.has(clave)) porServidor.set(clave, [])
     porServidor.get(clave).push(bot)
   }
-  const totalBots = servidores.reduce((total, servidor) => total + Number(servidor.botCount || 0), 0)
+  const totalBots = Number.isFinite(Number(datos.totalLive))
+    ? Number(datos.totalLive)
+    : servidores.reduce((total, servidor) => total + Number(servidor.botCount || 0), 0)
   const miServidor = misBots.length
     ? servidorDeBot(servidores, misBots[0].serverId)
     : null

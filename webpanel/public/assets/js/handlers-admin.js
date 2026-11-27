@@ -809,9 +809,10 @@ export function openServerModal(server = null) {
         <div class="field">
           <label class="label" for="server-dbmode">Base de datos</label>
           <select id="server-dbmode" name="dbMode" class="input">
-            <option value="shared" ${dbMode === 'shared' ? 'selected' : ''}>Compartida (más datos, algo de contención)</option>
-            <option value="isolated" ${dbMode === 'isolated' ? 'selected' : ''}>Aislada (más rápida, datos separados)</option>
+            <option value="shared" ${dbMode === 'shared' ? 'selected' : ''}>Compartida (datos globales, puede haber contención con 3+ carriles)</option>
+            <option value="isolated" ${dbMode === 'isolated' ? 'selected' : ''}>Aislada (más rápida y estable, datos separados por servidor)</option>
           </select>
+          <div class="hint">Con 3 o más carriles, la DB compartida puede tardar varios segundos por escritura. Si ves caídas, usa Aislada.</div>
         </div>
       </div>
       <div class="grid-2">

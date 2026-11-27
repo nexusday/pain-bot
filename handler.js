@@ -294,6 +294,12 @@ function pluginsCandidatosComando(texto, conn, m, isOwner, isROwner, cache) {
 // socket que recibió la actualización, sin crear una cola global que bloquee
 // a todos los sub-bots.
 let mensajesViejosDescartados = 0
+let ultimoLogViejos = 0
+let ultimoLogEspera = 0
+// Los logs de lag se escriben como máximo cada 30 s. Antes se escribía uno
+// cada 25 mensajes: con miles de mensajes atrasados, cientos de console.warn
+// síncronos bloqueaban el event loop y tumbaban los sockets.
+const LOG_LAG_MS = 30_000
 
 function antiguedadMensajeMs(raw) {
   const ts = typeof raw === 'object' && typeof raw?.toNumber === 'function'
@@ -327,7 +333,9 @@ export async function handler(chatUpdate) {
   // evita que el handler se invoque miles de veces por segundo.
   if (mensajes.length && mensajes.every((m) => antiguedadMensajeMs(m?.messageTimestamp) > maxEdadMensajeMs)) {
     mensajesViejosDescartados += mensajes.length
-    if (mensajesViejosDescartados % 25 === 1 || mensajesViejosDescartados % 25 === 0) {
+    const ahora = Date.now()
+    if (ahora - ultimoLogViejos >= LOG_LAG_MS) {
+      ultimoLogViejos = ahora
       console.warn(
         `[lag] descartados ${mensajesViejosDescartados} mensaje(s) viejos ` +
         `(más de ${Math.round(maxEdadMensajeMs / 1000)} s); evita procesar historial atrasado.`
@@ -338,7 +346,10 @@ export async function handler(chatUpdate) {
   for (const mensaje of mensajes) {
     const edad = antiguedadMensajeMs(mensaje?.messageTimestamp)
     if (edad > maxEdadMensajeMs) {
-      if (++mensajesViejosDescartados % 25 === 1) {
+      mensajesViejosDescartados++
+      const ahora = Date.now()
+      if (ahora - ultimoLogViejos >= LOG_LAG_MS) {
+        ultimoLogViejos = ahora
         console.warn(
           `[lag] descartados ${mensajesViejosDescartados} mensaje(s) viejos ` +
           `(más de ${Math.round(maxEdadMensajeMs / 1000)} s); evita procesar historial atrasado.`
@@ -347,8 +358,12 @@ export async function handler(chatUpdate) {
       continue
     }
     if (chatUpdate.type === 'notify' && edad > 5000 && edad < maxEdadMensajeMs) {
-      const chat = String(mensaje?.key?.remoteJid || '?')
-      console.warn(`[lag] ${chat}: el mensaje esperó ${edad} ms antes del handler.`)
+      const ahora = Date.now()
+      if (ahora - ultimoLogEspera >= LOG_LAG_MS) {
+        ultimoLogEspera = ahora
+        const chat = String(mensaje?.key?.remoteJid || '?')
+        console.warn(`[lag] ${chat}: el mensaje esperó ${edad} ms antes del handler.`)
+      }
     }
     // `this` es la conexión del socket (bind del caller); sin `.call()`,
     // `this.pushMessage` dentro de procesarActualizacion sería undefined.
