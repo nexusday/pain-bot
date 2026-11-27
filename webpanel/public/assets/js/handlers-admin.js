@@ -792,6 +792,11 @@ export function openServerModal(server = null) {
         <input id="server-name" name="name" class="input" maxlength="60" placeholder="premium-1" value="${h(server?.name || '')}" required />
         <div class="hint">Solo letras, números, guiones y guiones bajos.</div>
       </div>
+      <div class="field">
+        <label class="label" for="server-description">Descripción (visible para los usuarios)</label>
+        <textarea id="server-description" name="description" class="input" rows="3" maxlength="300" placeholder="Servidor dedicado para bots premium. Más memoria y DB aislada.">${h(server?.description || '')}</textarea>
+        <div class="hint">Máximo 300 caracteres. Aparece en la sección Servidores del panel.</div>
+      </div>
       <div class="grid-2">
         <div class="field">
           <label class="label" for="server-tier">Tier</label>
@@ -839,11 +844,12 @@ export async function handleServerSave(form) {
   const value = (name) => form.querySelector(`[name="${name}"]`)
   const body = {
     name: String(value('name')?.value || '').trim(),
+    description: String(value('description')?.value || '').trim().slice(0, 300),
     tier: value('tier')?.value || 'free',
     dbMode: value('dbMode')?.value || 'shared',
     lanes: Number(value('lanes')?.value) || 3,
     maxSessions: Number(value('maxSessions')?.value) || 30,
-    heapMb: Number(value('heapMb')?.value) || 512,
+    heapMb: Number(value('heapMb')?.value) || 1024,
   }
   if (id) body.status = value('status')?.checked ? 'active' : 'inactive'
   hideFormError(form)

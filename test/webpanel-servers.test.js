@@ -97,12 +97,21 @@ test('webpanel: servidores (crear, listar, editar, toggle y borrar)', async (t) 
     method: 'POST',
     cookie: cookieAdmin,
     csrf: csrfAdmin,
-    body: { name: 'free-1', tier: 'free', lanes: 3, maxSessions: 30, heapMb: 512, dbMode: 'shared' },
+    body: {
+      name: 'free-1',
+      description: 'Servidor compartido para bots free.',
+      tier: 'free',
+      lanes: 3,
+      maxSessions: 30,
+      heapMb: 1024,
+      dbMode: 'shared',
+    },
   })
   assert.equal(creado.status, 201)
   assert.equal(creado.datos.server.name, 'free-1')
   assert.equal(creado.datos.server.tier, 'free')
   assert.equal(creado.datos.server.lanes, 3)
+  assert.equal(creado.datos.server.description, 'Servidor compartido para bots free.')
   const id = creado.datos.server.id
 
   // Listar.
@@ -144,6 +153,9 @@ test('webpanel: servidores (crear, listar, editar, toggle y borrar)', async (t) 
   const publicosActivos = await pedir('/api/servers', { cookie: cookieUsuario })
   assert.equal(publicosActivos.datos.servers.length, 1)
   assert.equal(publicosActivos.datos.servers[0].name, 'free-1')
+  assert.equal(publicosActivos.datos.servers[0].description, 'Servidor compartido para bots free.')
+  assert.equal(typeof publicosActivos.datos.servers[0].botCount, 'number')
+  assert.ok(Array.isArray(publicosActivos.datos.myBots))
 
   // Recursos del servidor.
   const info = await pedir('/api/server-info', { cookie: cookieUsuario })

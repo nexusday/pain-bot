@@ -20,6 +20,7 @@ import {
 } from './core.js'
 import { renderAdmin } from './pages-admin.js'
 import { renderPremium } from './pages-premium.js'
+import { renderServers } from './pages-servers.js'
 import {
   renderAccount,
   renderBots,
@@ -92,6 +93,7 @@ export function renderShell() {
           ${navLink('/dashboard', 'grid', 'Dashboard')}
           ${puede('bots.view') ? navLink('/bots', 'bot', 'Mis bots', { badge: state.bots.length || '', badgeId: 'nav-bots-count' }) : ''}
           ${puede('bots.link') ? navLink('/link', 'link', 'Vincular bot') : ''}
+          ${navLink('/servers', 'server', 'Servidores')}
            ${puede('communities.view') ? navLink('/communities', 'globe', 'Comunidades') : ''}
            ${navLink('/comments', 'message', 'Comentarios', { badge: state.commentsUnread ? String(state.commentsUnread) : '', badgeId: 'nav-comments-count' })}
           ${puede('bots.view') ? navLink('/premium', 'sparkles', 'Premium') : ''}
@@ -218,6 +220,8 @@ export async function route() {
         return renderBots()
       case 'link':
         return renderLinkPage()
+      case 'servers':
+        return renderServers()
       case 'communities':
         return renderCommunities()
       case 'comments':

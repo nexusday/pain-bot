@@ -496,7 +496,9 @@ export function pairingCardHTML() {
 export async function loadServers() {
   try {
     const data = await api.get('/api/servers')
-    state.servers = Array.isArray(data.servers) ? data.servers : []
+    // El servidor "automático" no se elige en el formulario: si no se elige
+    // ninguno, el panel asigna el free compartido.
+    state.servers = (Array.isArray(data.servers) ? data.servers : []).filter((s) => s.id !== null && s.id !== undefined)
   } catch {
     state.servers = []
   }

@@ -587,7 +587,7 @@ export function adminServersHTML(data, info) {
     : ''
   const filas = servidores.length
     ? servidores.map((s) => `<tr>
-        <td><b>${h(s.name)}</b></td>
+        <td><b>${h(s.name)}</b>${s.description ? `<div class="tiny muted" style="max-width:260px;white-space:normal">${h(s.description)}</div>` : ''}</td>
         <td>${badge(String(s.tier || 'free').toUpperCase(), s.tier === 'vip' ? 'amber' : s.tier === 'premium' ? 'cyan' : 'accent')}</td>
         <td>${s.lanes}</td>
         <td>${s.max_sessions}</td>
