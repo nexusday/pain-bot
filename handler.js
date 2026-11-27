@@ -524,7 +524,10 @@ const todosIdsOwner = [
   // Número de ESTE bot (principal o subbot). Si el socket aún no tiene
   // `user`, simplemente no se añade: los checks de owner darán false en vez
   // de romper el procesamiento del mensaje.
-  ...(conn.user?.id ? [conn.decodeJid(conn.user.id)] : []),
+  // Solo el bot principal se autoriza a sí mismo como owner; un subbot
+  // (cuenta personal vinculada por QR/código) nunca debe quedar como owner
+  // de sí mismo, o cualquiera que lo vincule heredaría acceso a owner/rowner.
+  ...(!esEsteSubBot && conn.user?.id ? [conn.decodeJid(conn.user.id)] : []),
   // En subbots: el número del principal también cuenta como owner
   ...(esEsteSubBot && global.conn?.user?.id
     ? [conn.decodeJid(global.conn.user.id)]
