@@ -1290,9 +1290,12 @@ watch(join(__dirname, 'lib'), { recursive: true }, (_evento, filename) => {
 if (!isSubbotWorker) {
   await global.reloadHandler()
   global.conns = []
-  // Se arranca sin bloquear el resto del arranque (panel, tick de lotería).
-  await iniciarGestorSubBots()
 }
+// Cada proceso arranca SU subconjunto de sub-bots. El primario recibe una
+// lista vacía del supervisor (solo hace de bot principal + panel); los
+// workers reciben las sesiones que les tocaron. Antes esto solo se ejecutaba
+// en el primario, así que los workers cargaban plugins pero no abrían nada.
+await iniciarGestorSubBots()
 
 /** Sesiones listas para conectar (mismo criterio que el supervisor). */
 function listarSesionesListas(serbotDir) {
@@ -1367,7 +1370,7 @@ async function iniciarGestorSubBots() {
   let sessions = [...new Set(sesionesEnDisco)].filter(folder =>
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
-  const workerId = 'primary'
+  const workerId = process.env.PAIN_WORKER_ID || 'primary'
   iniciarMetricasWorker()
   const sesionesIniciando = new Map()
   let muestrasMetricas = 0
