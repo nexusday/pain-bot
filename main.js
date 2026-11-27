@@ -167,9 +167,13 @@ const isSubbotWorker = process.env.PAIN_ROLE === 'worker' ||
 const isManagedPrimary = true
 const isSingleBotProcess = process.env.PAIN_SINGLE_PROCESS !== '0'
 
-// En modo carriles, cada worker tiene su propia DB para evitar contención
-// de locks entre procesos. En modo único, todos comparten la misma DB.
-const dbDir = isSubbotWorker
+// DB del proceso:
+// - Modo único: una sola DB compartida.
+// - Carril primario: DB compartida (usuarios, chats, panel).
+// - Worker con dbMode=isolated: DB propia en storage/databases/worker-<id>.
+// - Worker con dbMode=shared: usa la DB compartida (con bloqueo WAL).
+const dbAislada = isSubbotWorker && process.env.PAIN_DB_MODE === 'isolated'
+const dbDir = dbAislada
   ? `storage/databases/worker-${process.env.PAIN_WORKER_ID || '0'}`
   : 'storage/databases'
 const dbPath = `${dbDir}/database.sqlite`
@@ -181,7 +185,7 @@ global.db = new Low(new ArchivoSqliteCompartido(
   dbJsonPath,
   {
     persistConnections: true,
-    singleWriter: process.env.PAIN_SINGLE_PROCESS !== '0',
+    singleWriter: isSingleBotProcess || dbAislada,
     // El refresh por comando del handler queda limitado a esta frecuencia;
     // la vista se mantiene fresca con el sync de fondo cada 5s.
     refreshMinIntervalMs: Number.parseInt(process.env.PAIN_DB_REFRESH_MS, 10) || 5000,

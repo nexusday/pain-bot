@@ -554,6 +554,26 @@ export function adminSessionsHTML(data) {
 
 export function adminServersHTML(data, info) {
   const servidores = data.servers || []
+  const arquitectura = `<div class="card" style="margin-bottom:16px"><div class="card-head"><div><h3>Arquitectura de workers</h3><p>Dónde vive cada cosa</p></div></div><div class="card-body">
+    <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <div style="border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px">
+        <div style="font-weight:700">${icon('shield')} Carril principal</div>
+        <div class="tiny muted">Siempre activo. Hospeda el bot principal y el panel web. Usa la DB compartida. No se puede desactivar ni borrar.</div>
+      </div>
+      <div style="border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px">
+        <div style="font-weight:700">${icon('server')} Servidores Free</div>
+        <div class="tiny muted">Comparten la DB global. Recursos moderados (1 GB por carril). Ideales para bots normales.</div>
+      </div>
+      <div style="border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px">
+        <div style="font-weight:700">${icon('sparkles')} Servidores Premium</div>
+        <div class="tiny muted">Cada servidor puede usar DB aislada (sin contención) y más memoria. Exporta/importa su DB desde aquí o desde Premium.</div>
+      </div>
+      <div style="border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px">
+        <div style="font-weight:700">${icon('zap')} VIP</div>
+        <div class="tiny muted">Próximamente: servidores dedicados con DB aislada, prioridad de reconexión y soporte.</div>
+      </div>
+    </div>
+  </div></div>`
   const recursos = info
     ? `<div class="stats">
         ${statCard('CPU', `${info.cpu?.nucleos || '?'} núcleos`, 'cpu', 'accent')}
@@ -581,7 +601,7 @@ export function adminServersHTML(data, info) {
         </td>
       </tr>`).join('')
     : '<tr><td colspan="8" class="empty">No hay servidores configurados. Crea uno para repartir los sub-bots.</td></tr>'
-  return `${recursos}
+  return `${arquitectura}${recursos}
   <div class="card">
     <div class="card-head">
       <div><h3>Servidores (carriles)</h3><p>Reparte los sub-bots entre procesos. Cada servidor puede tener su propia DB.</p></div>

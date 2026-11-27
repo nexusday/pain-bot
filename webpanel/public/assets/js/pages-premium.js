@@ -156,7 +156,49 @@ function formularioEdiciones(bot, plantilla = '') {
   </details>`
 }
 
-function tarjetaBot(bot, reglas, plantilla) {
+/**
+ * Selector de servidor dentro de la tarjeta del bot.
+ * - Free: solo puede quedarse en el servidor compartido.
+ * - Premium: puede elegir entre los servidores activos (free/premium).
+ * - Si el servidor elegido tiene DB aislada, se ofrecen exportar/importar.
+ */
+function seccionServidorPremium(bot, servidores = [], premium = false) {
+  if (!servidores.length) {
+    return `<div class="notice" style="margin-top:12px">${icon('server')}<div><b>Servidores dedicados:</b> el administrador todavía no creó ninguno. Cuando lo haga, aparecerá aquí para que elijas dónde ejecutar tu bot.</div></div>`
+  }
+  const actual = servidores.find((s) => Number(s.id) === Number(bot.serverId)) || null
+  const opciones = servidores.map((s) => {
+    const etiqueta = `${s.name} · ${String(s.tier || 'free').toUpperCase()}${s.dbMode === 'isolated' ? ' · DB aislada' : ''}`
+    return `<option value="${s.id}" ${Number(s.id) === Number(bot.serverId) ? 'selected' : ''}>${h(etiqueta)}</option>`
+  }).join('')
+  const aislada = actual?.dbMode === 'isolated'
+  return `<div class="premium-server" style="margin-top:14px;border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:14px">
+    <div class="flex" style="align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700">${icon('server')} Servidor del bot</div>
+        <div class="tiny muted">${actual ? `Actualmente en <b>${h(actual.name)}</b> (${h(String(actual.tier || 'free').toUpperCase())})` : 'Servidor automático (Free compartido)'}</div>
+      </div>
+      ${premium
+        ? ''
+        : '<span class="badge neutral">Premium requerido para cambiar</span>'}
+    </div>
+    <div class="flex gap-8" style="margin-top:10px;flex-wrap:wrap">
+      <select class="input" data-premium-server-select="${h(bot.phone)}" ${premium ? '' : 'disabled'} style="max-width:320px">${opciones}</select>
+      <button class="btn btn-secondary btn-sm" data-action="premium-server-change" data-phone="${h(bot.phone)}" ${premium ? '' : 'disabled'}>${icon('refresh')} Cambiar servidor</button>
+    </div>
+    ${aislada
+      ? `<div class="flex gap-8" style="margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" data-action="premium-server-export" data-phone="${h(bot.phone)}" data-server="${actual.id}">${icon('download')} Exportar DB aislada</button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer">${icon('upload')} Importar DB
+            <input type="file" accept=".sqlite,.db,.painbackup" data-premium-server-import="${h(bot.phone)}" data-server="${actual.id}" style="display:none" />
+          </label>
+        </div>
+        <div class="hint" style="margin-top:6px">${icon('shieldCheck')} La DB aislada guarda solo los datos de este servidor. Expórtala antes de cambiar o borrar el servidor.</div>`
+      : ''}
+  </div>`
+}
+
+function tarjetaBot(bot, reglas, plantilla, servidores = []) {
   const restante = Number(bot.remainingMs || 0)
   const porcentaje = bot.infinite ? 100 : Math.min(100, Math.round((restante / (reglas.maxHours * MS_HORA)) * 100))
   const premium = Boolean(bot.active)
@@ -195,9 +237,79 @@ function tarjetaBot(bot, reglas, plantilla) {
            : ''}
         ${bot.canGrantDuration && !bot.infinite ? `<span class="premium-duration-inline"><input class="input input-sm premium-days-value" type="number" min="1" max="3650" value="30" aria-label="Días Premium" /><button class="btn btn-secondary" data-action="premium-duration" data-phone="${h(bot.phone)}">${icon('clock')} Activar días</button></span>` : ''}
        </div>
+      ${seccionServidorPremium(bot, servidores, premium)}
       ${formularioEdiciones(bot, plantilla)}
     </div>
   </div>`
+}
+
+export async function cambiarServidorPremium(boton) {
+  const phone = boton.dataset.phone
+  const selector = document.querySelector(`[data-premium-server-select="${CSS.escape(phone)}"]`)
+  const serverId = selector?.value ? Number(selector.value) : null
+  if (!phone || !serverId) return
+  boton.disabled = true
+  try {
+    const data = await api.post(`/api/bots/${encodeURIComponent(phone)}/server`, { serverId })
+    showToast(data.hot
+      ? 'Servidor cambiado. El bot se está moviendo en caliente.'
+      : 'Servidor guardado. Se aplicará al reiniciar el supervisor.', 'success')
+    await renderPremium()
+  } catch (error) {
+    showToast(error.message || 'No se pudo cambiar de servidor.', 'error')
+    boton.disabled = false
+  }
+}
+
+export async function exportarDbServidor(boton) {
+  const serverId = Number(boton.dataset.server)
+  if (!serverId) return
+  boton.disabled = true
+  try {
+    const data = await api.get(`/api/admin/servers/${serverId}/export`)
+    const binario = Uint8Array.from(atob(data.data), (c) => c.charCodeAt(0))
+    const blob = new Blob([binario], { type: 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = data.filename || `pain-server-${serverId}.sqlite`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    showToast('DB exportada.', 'success')
+  } catch (error) {
+    showToast(error.message || 'No se pudo exportar la DB.', 'error')
+  } finally {
+    boton.disabled = false
+  }
+}
+
+export async function importarDbServidor(input) {
+  const serverId = Number(input.dataset.server)
+  const archivo = input.files?.[0]
+  if (!serverId || !archivo) return
+  if (archivo.size > 64 * 1024 * 1024) {
+    showToast('El archivo supera los 64 MB. Exporta una DB más pequeña.', 'error')
+    input.value = ''
+    return
+  }
+  const confirmado = window.confirm('Se reemplazará la DB aislada de este servidor y se reiniciarán sus carriles. ¿Continuar?')
+  if (!confirmado) { input.value = ''; return }
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const lector = new FileReader()
+      lector.onload = () => resolve(String(lector.result || '').split(',')[1] || '')
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo.'))
+      lector.readAsDataURL(archivo)
+    })
+    await api.post(`/api/admin/servers/${serverId}/import`, { data: base64 })
+    showToast('DB importada. Los carriles del servidor se están reiniciando.', 'success')
+  } catch (error) {
+    showToast(error.message || 'No se pudo importar la DB.', 'error')
+  } finally {
+    input.value = ''
+  }
 }
 
 export async function activarPremiumInfinito(boton) {
@@ -355,12 +467,74 @@ export function anunciosPieHTML(pagina = paginaAnuncios()) {
   </div>`
 }
 
+/**
+ * Guía visual del flujo Free → Premium → Servidor dedicado.
+ * Se muestra arriba de la página para que el usuario entienda el orden.
+ */
+function guiaPremiumHTML(bots, datos, servidores) {
+  const tieneBots = bots.length > 0
+  const tienePremium = bots.some((bot) => bot.active)
+  const tieneServidor = Boolean(servidores?.length)
+  const pasos = [
+    {
+      titulo: 'Empieza en Free',
+      desc: 'Vincula tu número. Se ejecuta en el servidor Free compartido, sin costo.',
+      listo: tieneBots,
+      icono: 'bot',
+    },
+    {
+      titulo: 'Mira un anuncio',
+      desc: `Cada anuncio suma ${datos.rules?.adMinutes ?? '?'} min de Premium. Permanece ${datos.rules?.adSeconds ?? '?'} s en el anuncio.`,
+      listo: tienePremium,
+      icono: 'sparkles',
+    },
+    {
+      titulo: 'Activa el Premium',
+      desc: 'Con Premium activo el bot puede salir del servidor Free y usar recursos dedicados.',
+      listo: tienePremium,
+      icono: 'shieldCheck',
+    },
+    {
+      titulo: 'Elige servidor Premium',
+      desc: tieneServidor
+        ? 'Elige abajo el servidor dedicado. El cambio se aplica en caliente, sin reiniciar los demás bots.'
+        : 'El administrador todavía no creó servidores Premium. Vuelve más tarde.',
+      listo: false,
+      icono: 'server',
+    },
+  ]
+  return `<div class="card premium-guide" style="margin-bottom:18px">
+    <div class="card-head">
+      <div><h3>Cómo funciona el Premium</h3><p>Free primero, luego anuncios, luego servidor dedicado. No pierdes nada al cambiar.</p></div>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+        ${pasos.map((paso, indice) => `
+          <div style="border:1px solid var(--border,rgba(255,255,255,.08));border-radius:14px;padding:14px;display:flex;gap:12px;align-items:flex-start;background:${paso.listo ? 'rgba(34,197,94,.08)' : 'transparent'}">
+            <div style="flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:${paso.listo ? 'rgba(34,197,94,.18)' : 'rgba(148,163,184,.12)'};color:${paso.listo ? '#22c55e' : 'inherit'}">${icon(paso.listo ? 'check' : paso.icono)}</div>
+            <div style="min-width:0">
+              <div style="font-weight:700;margin-bottom:2px">${indice + 1}. ${h(paso.titulo)}</div>
+              <div class="tiny muted" style="line-height:1.45">${h(paso.desc)}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="hint" style="margin-top:12px">${icon('shieldCheck')} Tu moneda, menú, canal y horas Premium se guardan aunque cambies de servidor. Solo cambia dónde se ejecuta el socket.</div>
+    </div>
+  </div>`
+}
+
 export async function renderPremium() {
   setPage('Premium', 'Gana horas de sub-bot premium mirando anuncios')
   content(loadingPage('Cargando tu premium…'))
   let datos
+  let servidores = []
   try {
-    datos = await api.get('/api/premium')
+    const [datosPremium, datosServidores] = await Promise.all([
+      api.get('/api/premium'),
+      api.get('/api/servers').catch(() => ({ servers: [] })),
+    ])
+    datos = datosPremium
+    servidores = Array.isArray(datosServidores?.servers) ? datosServidores.servers : []
   } catch (error) {
     content(errorPage(error.message))
     return
@@ -386,6 +560,7 @@ export async function renderPremium() {
     ${datos.enabled !== false && datos.adsAvailable === false
       ? `<div class="notice warn">${icon('alert')}<div>El administrador todavía no configuró los anuncios. Vuelve más tarde.</div></div>`
       : ''}
+    ${guiaPremiumHTML(bots, datos, servidores)}
     <div class="premium-rules">
       <div class="premium-rule">${icon('sparkles')}<div><b>${reglas.adMinutes} min por anuncio</b><span>Hay que permanecer ${reglas.adSeconds} s en el anuncio.</span></div></div>
       <div class="premium-rule">${icon('server')}<div><b>Máximo ${reglas.maxHours} h</b><span>Al llegar al tope el botón se bloquea.</span></div></div>
@@ -394,7 +569,7 @@ export async function renderPremium() {
     </div>
 
     ${bots.length
-      ? `<div class="stack premium-bots">${bots.map((bot) => tarjetaBot(bot, reglas, datos.menuTemplate || '')).join('')}</div>`
+      ? `<div class="stack premium-bots">${bots.map((bot) => tarjetaBot(bot, reglas, datos.menuTemplate || '', servidores)).join('')}</div>`
       : `<div class="card">${`<div class="empty"><div class="empty-icon">${icon('bot')}</div><h4>Sin sub-bots todavía</h4><p>Vincula tu primer número y luego vuelve aquí para desbloquear el premium.</p><a class="btn btn-primary" href="#/link">${icon('plus')} Vincular bot</a></div>`}</div>`}
     ${anunciosPieHTML()}
   `)

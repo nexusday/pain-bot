@@ -14,7 +14,7 @@ import {
   renderAuth,
 } from './auth.js'
 import { closeModal, copyText, h, icon, isAdminRoute, modalRoot, showToast, state } from './core.js'
-import { activarPremiumDias, activarPremiumInfinito, guardarPremiumEdiciones, iniciarAnuncioPremium } from './pages-premium.js'
+import { activarPremiumDias, activarPremiumInfinito, cambiarServidorPremium, exportarDbServidor, guardarPremiumEdiciones, importarDbServidor, iniciarAnuncioPremium } from './pages-premium.js'
 import {
   adminReconnect,
   confirmAdminDeleteSession,
@@ -209,6 +209,14 @@ export async function onClick(event) {
     }
     if (action === 'premium-duration') {
       await activarPremiumDias(actionEl)
+      return
+    }
+    if (action === 'premium-server-change') {
+      await cambiarServidorPremium(actionEl)
+      return
+    }
+    if (action === 'premium-server-export') {
+      await exportarDbServidor(actionEl)
       return
     }
     if (action === 'premium-menu-reset') {
@@ -648,6 +656,10 @@ export function onChange(event) {
   if (target instanceof HTMLInputElement && target.matches('#comment-form input[type="file"]')) {
     const label = document.getElementById('comment-file-name')
     if (label) label.textContent = target.files?.[0]?.name || ''
+    return
+  }
+  if (target instanceof HTMLInputElement && target.matches('[data-premium-server-import]')) {
+    void importarDbServidor(target)
     return
   }
   if (target instanceof HTMLInputElement && target.matches('[data-push-user]')) {
