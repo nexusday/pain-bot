@@ -1332,27 +1332,36 @@ async function iniciarGestorSubBots() {
   // proceso. Si viene PAIN_SESSIONS_JSON, se usa esa lista en vez de leer
   // todas las carpetas del disco (evita que dos carriles abran el mismo bot).
   let sesionesEnDisco
+  let asignadasPorSupervisor = false
   if (process.env.PAIN_SESSIONS_JSON) {
     try {
       const asignadas = JSON.parse(process.env.PAIN_SESSIONS_JSON)
       if (Array.isArray(asignadas)) {
         sesionesEnDisco = asignadas.filter((f) => typeof f === 'string')
-        console.log(`[subbots] carril ${process.env.PAIN_WORKER_ID || '?'}: ${sesionesEnDisco.length} sesión(es) asignadas por el supervisor.`)
+        asignadasPorSupervisor = true
       }
     } catch {}
   }
   if (!Array.isArray(sesionesEnDisco)) sesionesEnDisco = listarSesionesListas(serbotDir)
   try {
     const totalCarpetas = contarSesionesEnDisco(serbotDir).todas.length
-    console.log(
-      `[subbots] ${sesionesEnDisco.length} sesión(es) con credenciales registradas ` +
-      `de ${totalCarpetas} carpeta(s) con creds.json.`
-    )
-    if (sesionesEnDisco.length < totalCarpetas) {
+    if (asignadasPorSupervisor) {
+      // Este carril solo abre su subconjunto; el resto vive en otros carriles.
       console.log(
-        `[subbots] ${totalCarpetas - sesionesEnDisco.length} carpeta(s) sin registrar ` +
-        '(registered:false) se omiten; requieren volver a vincular desde el panel.'
+        `[subbots] carril ${process.env.PAIN_WORKER_ID || '?'}: ${sesionesEnDisco.length} sesión(es) ` +
+        `asignadas por el supervisor (${totalCarpetas} carpetas con creds.json en total).`
       )
+    } else {
+      console.log(
+        `[subbots] ${sesionesEnDisco.length} sesión(es) con credenciales registradas ` +
+        `de ${totalCarpetas} carpeta(s) con creds.json.`
+      )
+      if (sesionesEnDisco.length < totalCarpetas) {
+        console.log(
+          `[subbots] ${totalCarpetas - sesionesEnDisco.length} carpeta(s) sin registrar ` +
+          '(registered:false) se omiten; requieren volver a vincular desde el panel.'
+        )
+      }
     }
   } catch {}
   let sessions = [...new Set(sesionesEnDisco)].filter(folder =>
@@ -1554,8 +1563,9 @@ async function iniciarGestorSubBots() {
       Array.from({ length: Math.min(concurrenciaArranque, cola.length) }, trabajador)
     )
     console.log(
-      `Subbots (proceso único) iniciaron ${iniciadas}/${initialSessions.length} ` +
-      `sesión(es) con concurrencia ${concurrenciaArranque}.`
+      `[subbots] carril ${process.env.PAIN_WORKER_ID || 'primary'}: ` +
+      `${iniciadas}/${initialSessions.length} sesión(es) iniciadas ` +
+      `con concurrencia ${concurrenciaArranque}.`
     )
   }
 

@@ -123,13 +123,14 @@ export async function renderAdmin(section) {
     }
 
     if (section === 'servers') {
-      const [data, info] = await Promise.all([
+      const [data, info, lanes] = await Promise.all([
         api.get('/api/admin/servers'),
         api.get('/api/server-info').catch(() => null),
+        api.get('/api/admin/lanes').catch(() => ({ lanes: [] })),
       ])
       if (!isCurrentAdminRoute('servers')) return
       state.adminServers = Array.isArray(data.servers) ? data.servers : []
-      content(adminTabs('servers') + adminServersHTML(data, info?.server))
+      content(adminTabs('servers') + adminServersHTML(data, info?.server, lanes?.lanes))
       return
     }
 
@@ -552,8 +553,34 @@ export function adminSessionsHTML(data) {
   </div>`
 }
 
-export function adminServersHTML(data, info) {
+export function adminServersHTML(data, info, lanes = []) {
   const servidores = data.servers || []
+  const filasCarriles = (lanes || []).length
+    ? lanes.map((lane) => {
+        const p99 = Number(lane.metricas?.lagP99Ms || 0)
+        const cpu = Number(lane.metricas?.cpuUsoPercent || 0)
+        const rss = Number(lane.memoria?.rssMB || 0)
+        const estado = p99 > 500 ? badge('Lento', 'red') : p99 > 200 ? badge('Carga', 'amber') : badge('OK', 'green')
+        return `<tr>
+          <td><b>${h(lane.workerId)}</b><div class="tiny muted">PID ${lane.pid}</div></td>
+          <td>${lane.sessions}</td>
+          <td>${lane.connected}</td>
+          <td>${p99} ms</td>
+          <td>${cpu}%</td>
+          <td>${rss} MB</td>
+          <td>${estado}</td>
+        </tr>`
+      }).join('')
+    : '<tr><td colspan="7" class="empty">Todavía no hay carriles reportando estado.</td></tr>'
+  const estadoCarriles = `<div class="card" style="margin-bottom:16px">
+    <div class="card-head"><div><h3>Estado de los carriles</h3><p>P99 del event loop, CPU y memoria por proceso</p></div></div>
+    <div class="card-body tight">
+      <table class="table">
+        <thead><tr><th>Carril</th><th>Sesiones</th><th>Conectadas</th><th>P99</th><th>CPU</th><th>RSS</th><th>Salud</th></tr></thead>
+        <tbody>${filasCarriles}</tbody>
+      </table>
+    </div>
+  </div>`
   const arquitectura = `<div class="card" style="margin-bottom:16px"><div class="card-head"><div><h3>Arquitectura de workers</h3><p>Dónde vive cada cosa</p></div></div><div class="card-body">
     <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
       <div style="border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px">
@@ -601,7 +628,7 @@ export function adminServersHTML(data, info) {
         </td>
       </tr>`).join('')
     : '<tr><td colspan="8" class="empty">No hay servidores configurados. Crea uno para repartir los sub-bots.</td></tr>'
-  return `${arquitectura}${recursos}
+  return `${arquitectura}${recursos}${estadoCarriles}
   <div class="card">
     <div class="card-head">
       <div><h3>Servidores (carriles)</h3><p>Reparte los sub-bots entre procesos. Cada servidor puede tener su propia DB.</p></div>
