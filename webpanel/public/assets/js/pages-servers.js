@@ -30,6 +30,11 @@ const TIER_TONE = {
 
 const COLORES_RANKING = ['#f5c542', '#cbd5e1', '#d08a5a']
 const INTERVALO_VIVO_MS = 3_000
+// Último rendimiento conocido por servidor. Si un carril saturado tarda en
+// publicar, la tarjeta conserva el anillo y lo marca "sin datos recientes"
+// en vez de hacerlo desaparecer de golpe. Se descarta tras 5 min sin muestra.
+const RETENCION_RENDIMIENTO_MS = 5 * 60_000
+const ultimoRendimiento = new Map()
 
 function insigniaTier(tier) {
   return `<span class="badge ${TIER_TONE[tier] || 'neutral'}"><span class="dot"></span>${h(TIER_LABEL[tier] || tier || 'Free')}</span>`
@@ -57,28 +62,62 @@ function colorDeScore(score) {
   return '#ef4444'
 }
 
+function estadoLegible(perf) {
+  const label = String(perf?.label || '')
+  const speed = String(perf?.speed || '')
+  if (!speed) return label
+  // Evita el redundante "Lenta · Lento"; para el resto, salud + velocidad.
+  if (label.toLowerCase() === 'lenta' && speed.toLowerCase() === 'lento') return label
+  return `${label} · ${speed}`
+}
+
 function anilloRendimiento(perf) {
   if (!perf) return ''
-  const color = colorDeScore(perf.score)
+  const score = Math.max(0, Math.min(100, Math.round(Number(perf.score) || 0)))
+  const arco = Math.max(3, score)
+  const color = colorDeScore(score)
   const caidas = Number(perf.desconexiones428) || 0
-  return `<div class="pain-perf" style="display:flex;align-items:center;gap:12px;margin:0 0 14px;color:${color}">
-    <div class="pain-perf-ring" style="position:relative;width:62px;height:62px;flex:none" title="Salud del servidor: combina latencia, CPU y bots conectados.">
-      <svg viewBox="0 0 42 42" width="62" height="62" style="transform:rotate(-90deg)">
+  const p99 = Math.round(Number(perf.p99Ms) || 0)
+  const cpu = Math.round(Number(perf.cpuPercent) || 0)
+  const conectados = Number(perf.connected) || 0
+  const total = Number(perf.total) || 0
+  const carriles = Number(perf.lanes) || 0
+  return `<div class="pain-perf${perf.stale ? ' is-stale' : ''}" style="--pain-perf-color:${color}">
+    <div class="pain-perf-ring" title="Salud del servidor: combina latencia, CPU y bots conectados.">
+      <svg viewBox="0 0 42 42" width="62" height="62" class="pain-perf-svg">
         <circle class="pain-perf-track" cx="21" cy="21" r="18" fill="none" stroke="rgba(148,163,184,.18)" stroke-width="4"/>
-        <circle class="pain-perf-value" cx="21" cy="21" r="18" fill="none" stroke="currentColor" stroke-width="4" pathLength="100" stroke-dasharray="${perf.score} 100" stroke-linecap="round"/>
+        <circle class="pain-perf-value" cx="21" cy="21" r="18" fill="none" stroke="currentColor" stroke-width="4" pathLength="100" stroke-dasharray="${arco} 100" stroke-linecap="round"/>
       </svg>
-      <div class="pain-perf-score" style="position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:17px">${perf.score}</div>
+      <div class="pain-perf-score">${score}</div>
     </div>
-    <div style="min-width:0">
-      <div class="pain-perf-title" style="font-weight:700;display:flex;align-items:center;gap:6px">
+    <div class="pain-perf-copy">
+      <div class="pain-perf-title">
         <span class="pain-live-dot" style="background:${color};box-shadow:0 0 0 3px ${color}26"></span>
-        <span class="pain-perf-state">${h(perf.label)} · ${h(perf.speed)}</span>
+        <span class="pain-perf-state">${h(estadoLegible(perf))}</span>
+        <span class="pain-perf-stale">Sin datos recientes</span>
       </div>
-      <div class="pain-perf-detail tiny muted" style="margin-top:3px;line-height:1.45" title="p99: latencia del 1% más lento en los últimos 15 s. CPU: peor carril. 428: cierres pedidos por WhatsApp.">
-        Latencia p99 ${Math.round(Number(perf.p99Ms) || 0)} ms · CPU ${Math.round(Number(perf.cpuPercent) || 0)}% · ${Number(perf.connected) || 0}/${Number(perf.total) || 0} conectados · ${Number(perf.lanes) || 0} carril(es)
+      <div class="pain-perf-metrics">
+        <span class="pain-metric" title="Latencia del 1% más lento en los últimos 15 s.">
+          ${icon('clock')}
+          <span class="pain-metric-body"><span class="pain-metric-label">Latencia p99</span><b class="pain-metric-value pain-perf-p99">${p99} ms</b></span>
+        </span>
+        <span class="pain-metric" title="CPU del carril más cargado.">
+          ${icon('cpu')}
+          <span class="pain-metric-body"><span class="pain-metric-label">CPU</span><b class="pain-metric-value pain-perf-cpu">${cpu}%</b></span>
+        </span>
+        <span class="pain-metric" title="Sesiones conectadas de las asignadas.">
+          ${icon('wifi')}
+          <span class="pain-metric-body"><span class="pain-metric-label">Conectados</span><b class="pain-metric-value pain-perf-connected">${conectados} de ${total}</b></span>
+        </span>
+        <span class="pain-metric" title="Procesos que atienden este servidor.">
+          ${icon('server')}
+          <span class="pain-metric-body"><span class="pain-metric-label">Carriles</span><b class="pain-metric-value pain-perf-lanes">${carriles}</b></span>
+        </span>
       </div>
-      <div class="pain-perf-sub tiny muted" style="margin-top:2px;line-height:1.4">
-        Activo <span class="pain-perf-uptime">${duracionCorta(perf.uptimeSegundos)}</span> · <span class="pain-perf-428" style="color:${caidas > 0 ? '#f59e0b' : 'inherit'}">428: ${caidas}</span> · reintentos: <span class="pain-perf-retries">${Number(perf.reintentos) || 0}</span>
+      <div class="pain-perf-footer">
+        <span class="pain-foot-item">${icon('clock')} Tiempo activo: <b class="pain-perf-uptime">${duracionCorta(perf.uptimeSegundos)}</b></span>
+        <span class="pain-foot-item pain-perf-428" style="color:${caidas > 0 ? '#f0cd7d' : 'inherit'}">${icon('alert')} Caídas 428: <b>${caidas}</b></span>
+        <span class="pain-foot-item">${icon('refresh')} Reintentos: <b class="pain-perf-retries">${Number(perf.reintentos) || 0}</b></span>
       </div>
     </div>
   </div>`
@@ -94,36 +133,40 @@ function actualizarAnillo(slot, perf) {
     slot.innerHTML = anilloRendimiento(perf)
     return
   }
-  const color = colorDeScore(perf.score)
-  nodo.style.color = color
+  nodo.classList.toggle('is-stale', Boolean(perf.stale))
+  const score = Math.max(0, Math.min(100, Math.round(Number(perf.score) || 0)))
+  const arco = Math.max(3, score)
+  const color = colorDeScore(score)
+  nodo.style.setProperty('--pain-perf-color', color)
   const valor = nodo.querySelector('.pain-perf-value')
   if (valor) {
-    valor.setAttribute('stroke-dasharray', `${perf.score} 100`)
+    valor.setAttribute('stroke-dasharray', `${arco} 100`)
     valor.setAttribute('stroke', color)
   }
-  const score = nodo.querySelector('.pain-perf-score')
-  if (score) score.textContent = String(perf.score)
+  const escribir = (selector, texto) => {
+    const elemento = nodo.querySelector(selector)
+    if (elemento) elemento.textContent = String(texto)
+  }
+  escribir('.pain-perf-score', score)
+  escribir('.pain-perf-state', estadoLegible(perf))
+  escribir('.pain-perf-p99', `${Math.round(Number(perf.p99Ms) || 0)} ms`)
+  escribir('.pain-perf-cpu', `${Math.round(Number(perf.cpuPercent) || 0)}%`)
+  escribir('.pain-perf-connected', `${Number(perf.connected) || 0} de ${Number(perf.total) || 0}`)
+  escribir('.pain-perf-lanes', Number(perf.lanes) || 0)
+  escribir('.pain-perf-uptime', duracionCorta(perf.uptimeSegundos))
+  escribir('.pain-perf-retries', Number(perf.reintentos) || 0)
   const punto = nodo.querySelector('.pain-live-dot')
   if (punto) {
     punto.style.background = color
     punto.style.boxShadow = `0 0 0 3px ${color}26`
   }
-  const estado = nodo.querySelector('.pain-perf-state')
-  if (estado) estado.textContent = `${perf.label} · ${perf.speed}`
-  const detalle = nodo.querySelector('.pain-perf-detail')
-  if (detalle) {
-    detalle.textContent = `Latencia p99 ${Math.round(Number(perf.p99Ms) || 0)} ms · CPU ${Math.round(Number(perf.cpuPercent) || 0)}% · ${Number(perf.connected) || 0}/${Number(perf.total) || 0} conectados · ${Number(perf.lanes) || 0} carril(es)`
-  }
-  const uptime = nodo.querySelector('.pain-perf-uptime')
-  if (uptime) uptime.textContent = duracionCorta(perf.uptimeSegundos)
   const caidas = Number(perf.desconexiones428) || 0
   const caidasEl = nodo.querySelector('.pain-perf-428')
   if (caidasEl) {
-    caidasEl.textContent = `428: ${caidas}`
-    caidasEl.style.color = caidas > 0 ? '#f59e0b' : 'inherit'
+    const valorCaidas = caidasEl.querySelector('b')
+    if (valorCaidas) valorCaidas.textContent = String(caidas)
+    caidasEl.style.color = caidas > 0 ? '#f0cd7d' : 'inherit'
   }
-  const reintentos = nodo.querySelector('.pain-perf-retries')
-  if (reintentos) reintentos.textContent = String(Number(perf.reintentos) || 0)
 }
 
 function servidorDeBot(servidores, serverId) {
@@ -161,13 +204,15 @@ function rankingHTML(resumen) {
   const ranking = [...resumen.con]
     .sort((a, b) => b.performance.score - a.performance.score || a.performance.p99Ms - b.performance.p99Ms)
     .slice(0, 3)
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px">
+  return `<div class="pain-rank-list">
     ${ranking.map((servidor, indice) => {
       const color = COLORES_RANKING[indice]
-      return `<div class="pain-rank" style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0" title="Puesto ${indice + 1} por salud del servidor">
+      return `<div class="pain-rank" title="Puesto ${indice + 1} por salud del servidor">
         <span class="pain-rank-icon" style="background:${color}1f;color:${color}">${indice === 0 ? icon('trophy') : `<b style="font-size:11px">${indice + 1}</b>`}</span>
-        <span style="font-weight:650;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" class="grow">${h(servidor.name)}</span>
-        <span class="tiny muted" style="white-space:nowrap">${servidor.performance.score} · ${servidor.performance.p99Ms} ms</span>
+        <div class="pain-rank-main">
+          <div class="pain-rank-name">${h(servidor.name)}</div>
+          <div class="pain-rank-meta tiny muted">Salud <b>${servidor.performance.score}</b> · p99 <b>${Math.round(Number(servidor.performance.p99Ms) || 0)} ms</b></div>
+        </div>
       </div>`
     }).join('')}
   </div>`
@@ -177,7 +222,8 @@ function textoResumen(resumen) {
   if (resumen.saludMedia === null) return 'Recopilando métricas de los carriles…'
   const rapido = resumen.masRapido
   const cargado = resumen.masCargado
-  return `Salud media de los servidores activos · Más rápido: <b>${h(rapido?.name || '—')}</b> (${rapido?.performance?.p99Ms ?? '—'} ms) · Más cargado: <b>${h(cargado?.name || '—')}</b> (${cargado?.performance?.p99Ms ?? '—'} ms)`
+  return `<div>Salud media de los servidores activos: <b>${resumen.saludMedia}/100</b>.</div>
+    <div style="margin-top:2px">Más rápido: <b>${h(rapido?.name || '—')}</b> · ${Math.round(Number(rapido?.performance?.p99Ms) || 0)} ms. Más cargado: <b>${h(cargado?.name || '—')}</b> · ${Math.round(Number(cargado?.performance?.p99Ms) || 0)} ms.</div>`
 }
 
 function insigniasDeServidor(servidor, resumen) {
@@ -208,7 +254,7 @@ function tarjetaServidor(servidor, misBots, insignias = []) {
     : null
   const tonoIcono = servidor.tier === 'premium' ? 'violet' : servidor.tier === 'vip' ? 'amber' : 'green'
   return `<div class="card" data-server-card="${clave}" style="height:100%">
-    <div class="card-head">
+    <div class="card-head pain-server-head">
       <div class="cell-main">
         <div class="row-icon ${tonoIcono}">${icon('server')}</div>
         <div class="grow">
@@ -216,8 +262,8 @@ function tarjetaServidor(servidor, misBots, insignias = []) {
           <div class="cell-sub">${h(servidor.dbMode === 'isolated' ? 'DB aislada' : 'DB compartida')}${servidor.auto ? ' · asignación automática' : ''}</div>
         </div>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-        <span class="pain-perf-badges" data-perf-badges="${clave}" style="display:flex;gap:6px;flex-wrap:wrap">${badges}</span>
+      <div class="pain-server-badges">
+        <span class="pain-perf-badges" data-perf-badges="${clave}">${badges}</span>
         ${insigniaTier(servidor.tier)}
       </div>
     </div>
@@ -284,24 +330,42 @@ function actualizarTarjetas(performance, servidores, resumen) {
   }
 }
 
+function rendimientoEfectivo(performance) {
+  const ahora = Date.now()
+  const efectivo = {}
+  for (const [clave, valor] of Object.entries(performance || {})) {
+    if (!valor) continue
+    ultimoRendimiento.set(clave, { datos: valor, en: ahora })
+    efectivo[clave] = valor
+  }
+  for (const [clave, entrada] of ultimoRendimiento) {
+    if (efectivo[clave]) continue
+    if (ahora - entrada.en > RETENCION_RENDIMIENTO_MS) {
+      ultimoRendimiento.delete(clave)
+      continue
+    }
+    efectivo[clave] = { ...entrada.datos, stale: true }
+  }
+  return efectivo
+}
+
 function actualizarVistaEnVivo(datos) {
-  const performance = datos && typeof datos.performance === 'object' && datos.performance !== null
-    ? datos.performance
-    : {}
+  const performance = rendimientoEfectivo(datos?.performance)
   const servidores = (Array.isArray(datos?.servers) ? datos.servers : [])
     .filter((servidor) => document.querySelector(`[data-perf-slot="${claveServidor(servidor)}"]`))
-  const resumen = resumenRed(servidores.map((servidor) => ({
+  const servidoresConPerf = servidores.map((servidor) => ({
     ...servidor,
     performance: performance[claveServidor(servidor)] || null,
-  })))
+  }))
+  const resumen = resumenRed(servidoresConPerf)
   actualizarResumenRed(resumen)
-  actualizarTarjetas(performance, servidores, resumen)
+  actualizarTarjetas(performance, servidoresConPerf, resumen)
   const actual = document.getElementById('servers-current-perf')
   if (actual) {
     const clave = actual.dataset.currentServer
     const perf = clave ? performance[clave] : null
     actual.innerHTML = perf
-      ? `Salud ${perf.score}/100 · ${h(perf.speed)} · ${Math.round(Number(perf.p99Ms) || 0)} ms`
+      ? `Salud ${perf.score}/100 · ${h(perf.speed)} · ${Math.round(Number(perf.p99Ms) || 0)} ms${perf.stale ? ' · sin datos recientes' : ''}`
       : ''
   }
   return true
@@ -364,6 +428,12 @@ export async function renderServers() {
     ? servidorDeBot(servidores, misBots[0].serverId)
     : null
   const resumen = resumenRed(servidores)
+  ultimoRendimiento.clear()
+  for (const servidor of servidores) {
+    if (servidor.performance) {
+      ultimoRendimiento.set(claveServidor(servidor), { datos: servidor.performance, en: Date.now() })
+    }
+  }
 
   content(`
     <style>
@@ -381,9 +451,9 @@ export async function renderServers() {
     </div>
 
     <div class="card" id="servers-network-card" style="margin-bottom:16px"><div class="card-body">
-      <div class="flex" style="gap:14px;flex-wrap:wrap;align-items:center">
+      <div class="pain-net-head">
         <div class="row-icon" id="servers-network-icon">${icon('activity')}</div>
-        <div class="grow">
+        <div class="pain-net-main">
           <div style="font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             Estado de la red
             <span class="badge success"><span class="pain-live-dot"></span>En vivo</span>
@@ -391,7 +461,7 @@ export async function renderServers() {
           </div>
           <div class="tiny muted" id="servers-network-summary" style="margin-top:3px">Recopilando métricas de los carriles…</div>
         </div>
-        <div class="tiny muted" style="max-width:230px;line-height:1.45">Actualización automática cada 3 s. Se pausa cuando la pestaña está en segundo plano.</div>
+        <div class="pain-net-note tiny muted">Actualización automática cada 3 s. Se pausa cuando la pestaña está en segundo plano.</div>
       </div>
       <div id="servers-network-ranking"></div>
     </div></div>

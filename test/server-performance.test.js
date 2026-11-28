@@ -142,3 +142,19 @@ test('server-performance: calcula la nota con el peor carril y detecta caídas 4
   assert.equal(calcularRendimiento({}), null)
   assert.equal(calcularRendimiento({ lanes: 0 }), null)
 })
+
+test('server-performance: marca la muestra como stale sin borrar el rendimiento', () => {
+  const ahora = Date.now()
+  const base = {
+    p99: [120], cpu: [20], uptime: [600], total: 8, connected: 8, lanes: 1,
+    desconexiones428: 0, reintentos: 0,
+  }
+  const fresca = calcularRendimiento({ ...base, actualizadoEn: [ahora - 5_000] }, { now: ahora })
+  assert.equal(fresca.stale, false)
+  assert.equal(fresca.score, 97)
+
+  const vieja = calcularRendimiento({ ...base, actualizadoEn: [ahora - 40_000] }, { now: ahora })
+  assert.equal(vieja.stale, true, 'la muestra vieja se conserva pero se marca')
+  assert.equal(vieja.score, 97)
+  assert.ok(vieja.actualizadoEn > 0)
+})

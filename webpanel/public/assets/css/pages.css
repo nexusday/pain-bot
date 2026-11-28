@@ -343,6 +343,282 @@
   height: 13px;
 }
 
+/* ── Rendimiento en vivo (Servidores) ───────────────────────────────────── */
+.pain-net-head {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pain-server-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pain-perf-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pain-net-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.pain-net-note {
+  flex: 0 1 230px;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.pain-rank-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pain-rank {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.pain-rank-main {
+  min-width: 0;
+}
+
+.pain-rank-name {
+  font-weight: 650;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pain-rank-meta {
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.pain-perf {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  min-width: 0;
+}
+
+.pain-perf-ring {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  flex: none;
+  color: var(--pain-perf-color, currentColor);
+}
+
+.pain-perf-svg {
+  width: 62px;
+  height: 62px;
+  transform: rotate(-90deg);
+}
+
+.pain-perf-score {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 17px;
+}
+
+.pain-perf-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.pain-perf-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.pain-perf-state {
+  min-width: 0;
+}
+
+.pain-perf-stale {
+  display: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #f0cd7d;
+  background: var(--warn-soft);
+  border: 1px solid rgba(227, 174, 60, 0.24);
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+.pain-perf.is-stale .pain-perf-stale {
+  display: inline-flex;
+}
+
+.pain-perf.is-stale .pain-perf-metrics,
+.pain-perf.is-stale .pain-perf-footer {
+  opacity: 0.55;
+}
+
+.pain-perf-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pain-metric {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.pain-metric svg {
+  width: 13px;
+  height: 13px;
+  color: var(--muted);
+  flex: none;
+}
+
+.pain-metric-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.pain-metric-label {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pain-metric-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pain-perf-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 7px;
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.pain-foot-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pain-foot-item svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+
+.pain-foot-item b {
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .pain-net-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 10px 12px;
+  }
+
+  .pain-net-main {
+    grid-column: 2;
+  }
+
+  .pain-net-note {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .pain-rank-list {
+    grid-template-columns: 1fr;
+  }
+
+  .pain-server-head {
+    flex-wrap: wrap;
+  }
+
+  .pain-server-head .cell-main {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .pain-server-head .cell-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.3;
+  }
+
+  .pain-server-badges {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .pain-perf {
+    gap: 9px;
+    align-items: flex-start;
+  }
+
+  .pain-perf-ring,
+  .pain-perf-svg {
+    width: 54px;
+    height: 54px;
+  }
+
+  .pain-perf-score {
+    font-size: 15px;
+  }
+
+  .pain-metric {
+    padding: 5px 6px;
+  }
+}
+
 .badge.success {
   background: var(--success-soft);
   border-color: rgba(52, 196, 139, 0.26);
