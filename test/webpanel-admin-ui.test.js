@@ -9,7 +9,7 @@ test('webpanel UI: el principal ve todas las secciones y los demás solo sus per
     const { adminTabs, adminSettingsHTML } = await import('../webpanel/public/assets/js/pages-admin.js')
     state.user = { id: 1, isPrincipal: true, permissions: [] }
     const tabs = adminTabs('settings')
-    for (const section of ['overview', 'principal', 'users', 'sessions', 'pairings', 'communities', 'audit', 'roles', 'mail', 'settings','notifications','backups']) {
+    for (const section of ['overview', 'principal', 'users', 'sessions', 'servers', 'nodes', 'pairings', 'communities', 'audit', 'roles', 'mail', 'settings','notifications','backups']) {
       assert.ok(tabs.includes(`href="#/admin/${section}"`), `falta ${section}`)
     }
     const settings = adminSettingsHTML({ canTurnstile: true, canLimits: true }, 'security')

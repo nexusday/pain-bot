@@ -163,7 +163,7 @@ export function setActiveNav(path) {
 /* ── Router ─────────────────────────────────────────────────────────────── */
 const ADMIN_PERMISSIONS = {
   overview: 'admin.overview', principal: 'admin.main', users: 'admin.users',
-  sessions: 'admin.sessions', servers: 'admin.servers', pairings: 'admin.pairings', communities: 'admin.communities',
+  sessions: 'admin.sessions', servers: 'admin.servers', nodes: 'admin.servers', pairings: 'admin.pairings', communities: 'admin.communities',
   audit: 'admin.audit', roles: 'admin.settings.roles', mail: 'admin.settings.mail',
   settings: 'admin.settings',
   notifications: 'admin.notifications', backups: 'admin.backups',
