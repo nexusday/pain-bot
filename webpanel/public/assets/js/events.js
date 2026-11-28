@@ -410,6 +410,11 @@ export async function onClick(event) {
       await eliminarSesionesSeleccionadas()
       return
     }
+    if (action === 'shared-toggle' || action === 'shared-delete' || action === 'shared-leave' || action === 'shared-block') {
+      const { accionShared } = await import('./pages-shared.js')
+      await accionShared(action, Number(actionEl.dataset.id), actionEl.dataset)
+      return
+    }
     if (action === 'server-toggle') {
       const id = Number(actionEl.dataset.id)
       try {
@@ -508,6 +513,18 @@ export async function onSubmit(event) {
     event.preventDefault()
     const { handleServerSave } = await import('./handlers-admin.js')
     await handleServerSave(form)
+    return
+  }
+  if (id === 'shared-publish-form') {
+    event.preventDefault()
+    const { publicarShared } = await import('./pages-shared.js')
+    await publicarShared(form)
+    return
+  }
+  if (form.matches?.('.shared-join-form')) {
+    event.preventDefault()
+    const { unirShared } = await import('./pages-shared.js')
+    await unirShared(form)
     return
   }
   if (id === 'password-form') {

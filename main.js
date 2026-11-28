@@ -1694,6 +1694,49 @@ async function iniciarGestorSubBots() {
       return { ok: false, error: error?.message || String(error) }
     }
   }
+  const socketPorCarpeta = (folder) => (global.conns || []).find(
+    (c) => c?.pathAYBot && path.basename(c.pathAYBot) === String(folder)
+  ) || null
+  global.__painJoinGroup = async (folder, link) => {
+    const socket = socketPorCarpeta(folder)
+    if (!socket) return { ok: false, error: 'not-connected' }
+    const codigo = String(link || '').match(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9]+)/i)?.[1]
+    if (!codigo) return { ok: false, error: 'invalid-link' }
+    try {
+      const jid = await socket.groupAcceptInvite(codigo)
+      if (!jid) return { ok: false, error: 'join-failed' }
+      if (!global.db?.data) await global.loadDatabase?.()
+      if (global.db?.data) {
+        if (!global.db.data.botGroups || typeof global.db.data.botGroups !== 'object') global.db.data.botGroups = {}
+        global.db.data.botGroups[jid] = true
+        if (!global.db.data.chats || typeof global.db.data.chats !== 'object') global.db.data.chats = {}
+        if (!global.db.data.chats[jid] || typeof global.db.data.chats[jid] !== 'object') global.db.data.chats[jid] = {}
+        global.db.data.chats[jid].isBanned = false
+        void global.db.flushSoon?.()
+      }
+      let nombre = ''
+      try {
+        const meta = await socket.groupMetadata(jid)
+        nombre = meta?.subject || ''
+      } catch {}
+      return { ok: true, jid, name: nombre }
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) }
+    }
+  }
+  global.__painLeaveGroup = async (folder, jid) => {
+    const socket = socketPorCarpeta(folder)
+    if (!socket) return { ok: false, error: 'not-connected' }
+    if (!jid) return { ok: false, error: 'invalid-group' }
+    try {
+      await socket.groupLeave(jid)
+      if (global.db?.data?.botGroups) delete global.db.data.botGroups[jid]
+      void global.db?.flushSoon?.()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) }
+    }
+  }
   // Alta de sesiones vinculadas desde el panel y limpieza de sockets de
   // carpetas que ya no existen. El aviso llega por fs.watch (el panel corre en
   // otro proceso y escribe en Serbot/); el intervalo de 5 min es solo la red
@@ -1869,6 +1912,16 @@ process.on('message', async (message) => {
   if (message?.type === 'reconnect-bot' && typeof global.__painReconnectOne === 'function') {
     const resultado = await global.__painReconnectOne(message.folder).catch((error) => ({ ok: false, error: error?.message }))
     try { process.send?.({ type: 'reconnect-bot-result', folder: message.folder, resultado }) } catch {}
+    return
+  }
+  if (message?.type === 'join-group' && typeof global.__painJoinGroup === 'function') {
+    const resultado = await global.__painJoinGroup(message.folder, message.link).catch((error) => ({ ok: false, error: error?.message }))
+    try { process.send?.({ type: 'join-group-result', requestId: message.requestId, resultado }) } catch {}
+    return
+  }
+  if (message?.type === 'leave-group' && typeof global.__painLeaveGroup === 'function') {
+    const resultado = await global.__painLeaveGroup(message.folder, message.jid).catch((error) => ({ ok: false, error: error?.message }))
+    try { process.send?.({ type: 'leave-group-result', requestId: message.requestId, resultado }) } catch {}
   }
 })
 
