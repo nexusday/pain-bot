@@ -1,0 +1,348 @@
+/* Pain Panel — selector visual de servidor (link y premium). */
+
+.server-picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.server-picker-trigger:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-3, #1f232c);
+}
+
+.server-picker-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.server-picker-trigger:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.server-picker-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.server-picker-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.server-picker-icon.accent {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+.server-picker-icon.info {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: rgba(74, 166, 240, .24);
+}
+
+.server-picker-icon.warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: rgba(227, 174, 60, .24);
+}
+
+.server-picker-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.server-picker-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-picker-meta {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-picker-side {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: none;
+}
+
+.server-picker-chevron {
+  color: var(--muted);
+  display: flex;
+  flex: none;
+}
+
+.server-picker-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+.server-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(62vh, 560px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.server-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.server-option-group-title {
+  padding: 2px 2px 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.server-option {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.server-option:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-3, #1f232c);
+}
+
+.server-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.server-option.is-selected {
+  border-color: var(--accent-line);
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface-2);
+  box-shadow: 0 0 0 1px var(--accent-soft) inset;
+}
+
+.server-option.is-full {
+  opacity: .62;
+  cursor: not-allowed;
+}
+
+.server-option-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.server-option-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.server-option-icon.accent {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+.server-option-icon.info {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: rgba(74, 166, 240, .24);
+}
+
+.server-option-icon.warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: rgba(227, 174, 60, .24);
+}
+
+.server-option-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.server-option-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.server-option-title {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.server-option-desc {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.server-option-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.server-option-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.server-option-meta svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+
+.server-option-health {
+  font-weight: 600;
+}
+
+.server-option-health.muted {
+  font-weight: 400;
+}
+
+.server-option-capacity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 1px;
+}
+
+.server-option-capacity .progress {
+  flex: 1;
+  height: 4px;
+  margin: 0;
+  background: rgba(148, 163, 184, .15);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.server-option-capacity .progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.server-option-check {
+  color: var(--muted);
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.server-option.is-selected .server-option-check {
+  color: var(--accent);
+}
+
+.server-option-check svg {
+  width: 16px;
+  height: 16px;
+}
+
+.server-option-empty {
+  padding: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.premium-server-picker {
+  margin-top: 10px;
+  max-width: 420px;
+}
+
+@media (max-width: 560px) {
+  .server-picker-trigger {
+    padding: 10px;
+  }
+
+  .server-picker-name,
+  .server-picker-meta {
+    white-space: normal;
+  }
+
+  .server-picker-side {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .server-option {
+    gap: 9px;
+    padding: 10px;
+  }
+
+  .server-option-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .server-option-icon svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .server-option-check {
+    display: none;
+  }
+}

@@ -28,6 +28,7 @@ import {
   stopPairingPolling,
   updateNavBadges,
 } from './core.js'
+import { bindServerPickers, selectorServidorHTML } from './server-picker.js'
 
 /* ── Bots del usuario ───────────────────────────────────────────────────── */
 export async function loadBots() {
@@ -396,9 +397,6 @@ export function linkFormHTML() {
   const phone = state.linkPrefill?.phone || ''
   const force = Boolean(state.linkPrefill?.force)
   const servidores = Array.isArray(state.servers) ? state.servers : []
-  const opcionesServidor = servidores.length
-    ? servidores.map((s) => `<option value="${s.id}">${h(s.name)} · ${h(String(s.tier || 'free').toUpperCase())}</option>`).join('')
-    : '<option value="">Servidor automático</option>'
   return `<div class="card pairing-card">
     <div class="pairing-head">
       <div><h3>Vincular un sub-bot</h3><p>Conecta un número de WhatsApp a tu cuenta.</p></div>
@@ -412,9 +410,15 @@ export function linkFormHTML() {
         <div class="hint">Incluye el código de país, sin <b>+</b>, espacios ni guiones. Ejemplo: <span class="mono">5215512345678</span>.</div>
       </div>
       <div class="field">
-        <label class="label" for="link-server">Servidor</label>
-        <select id="link-server" name="serverId" class="input">${opcionesServidor}</select>
-        <div class="hint">Elige el servidor donde se ejecutará este sub-bot. Premium permite servidores dedicados.</div>
+        <label class="label" for="link-server-trigger">Servidor</label>
+        ${selectorServidorHTML({
+          inputId: 'link-server',
+          inputName: 'serverId',
+          selectedId: '',
+          servers: servidores,
+          includeAuto: true,
+        })}
+        <div class="hint">Toca para ver capacidad, DB y salud en vivo. Si eliges <b>Automático</b>, el panel asigna el servidor Free con espacio.</div>
       </div>
       <label class="check">
         <input type="checkbox" id="link-force" name="force" ${force ? 'checked' : ''} />
@@ -526,6 +530,7 @@ export function renderLinkPage() {
   phoneInput?.addEventListener('input', () => {
     phoneInput.value = phoneInput.value.replace(/[^\d]/g, '').slice(0, 15)
   })
+  bindServerPickers(state.servers)
 
   if (active) {
     if (state.pollId !== state.pairing.id) startPairingPolling(state.pairing.id)

@@ -24,6 +24,7 @@ import {
   showToast,
   state,
 } from './core.js'
+import { bindServerPickers, selectorServidorHTML } from './server-picker.js'
 
 const ESTADO = {
   datos: null,
@@ -167,10 +168,6 @@ function seccionServidorPremium(bot, servidores = [], premium = false) {
     return `<div class="notice" style="margin-top:12px">${icon('server')}<div><b>Servidores dedicados:</b> el administrador todavía no creó ninguno. Cuando lo haga, aparecerá aquí para que elijas dónde ejecutar tu bot.</div></div>`
   }
   const actual = servidores.find((s) => Number(s.id) === Number(bot.serverId)) || null
-  const opciones = servidores.map((s) => {
-    const etiqueta = `${s.name} · ${String(s.tier || 'free').toUpperCase()}${s.dbMode === 'isolated' ? ' · DB aislada' : ''}`
-    return `<option value="${s.id}" ${Number(s.id) === Number(bot.serverId) ? 'selected' : ''}>${h(etiqueta)}</option>`
-  }).join('')
   const aislada = actual?.dbMode === 'isolated'
   return `<div class="premium-server" style="margin-top:14px;border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:14px">
     <div class="flex" style="align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -182,8 +179,17 @@ function seccionServidorPremium(bot, servidores = [], premium = false) {
         ? ''
         : '<span class="badge neutral">Premium requerido para cambiar</span>'}
     </div>
+    <div class="premium-server-picker">
+      ${selectorServidorHTML({
+        inputId: `premium-server-${bot.phone}`,
+        inputAttrs: `data-premium-server-select="${h(bot.phone)}"`,
+        selectedId: actual ? actual.id : '',
+        servers: servidores,
+        includeAuto: true,
+        disabled: !premium,
+      })}
+    </div>
     <div class="flex gap-8" style="margin-top:10px;flex-wrap:wrap">
-      <select class="input" data-premium-server-select="${h(bot.phone)}" ${premium ? '' : 'disabled'} style="max-width:320px">${opciones}</select>
       <button class="btn btn-secondary btn-sm" data-action="premium-server-change" data-phone="${h(bot.phone)}" ${premium ? '' : 'disabled'}>${icon('refresh')} Cambiar servidor</button>
     </div>
     ${aislada
@@ -246,8 +252,9 @@ function tarjetaBot(bot, reglas, plantilla, servidores = []) {
 export async function cambiarServidorPremium(boton) {
   const phone = boton.dataset.phone
   const selector = document.querySelector(`[data-premium-server-select="${CSS.escape(phone)}"]`)
-  const serverId = selector?.value ? Number(selector.value) : null
-  if (!phone || !serverId) return
+  const valor = selector?.value || ''
+  const serverId = valor ? Number(valor) : null
+  if (!phone) return
   boton.disabled = true
   try {
     const data = await api.post(`/api/bots/${encodeURIComponent(phone)}/server`, { serverId })
@@ -573,6 +580,7 @@ export async function renderPremium() {
       : `<div class="card">${`<div class="empty"><div class="empty-icon">${icon('bot')}</div><h4>Sin sub-bots todavía</h4><p>Vincula tu primer número y luego vuelve aquí para desbloquear el premium.</p><a class="btn btn-primary" href="#/link">${icon('plus')} Vincular bot</a></div>`}</div>`}
     ${anunciosPieHTML()}
   `)
+  bindServerPickers(servidores)
   iniciarVigilancia()
   vigilarAnuncios()
 }
