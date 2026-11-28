@@ -796,13 +796,13 @@ export function openNodeModal(nodo = null) {
 export function mostrarComandoNodo(command) {
   openModal({
     title: 'Conecta la VPS a este nodo',
-    subtitle: 'Ejecuta este comando en la VPS (con el repo clonado y npm install)',
-    body: `<div class="notice">${icon('info')}<div>El agente se conecta <b>desde la VPS hacia el panel</b>, como Wings en Pterodactyl. No abras puertos en la VPS.</div></div>
+    subtitle: 'Un solo comando: descarga el agente y el código, instala y conecta',
+    body: `<div class="notice">${icon('info')}<div>El agente se conecta <b>desde la VPS hacia el panel</b>, como Wings en Pterodactyl. No abras puertos en la VPS y no clones nada a mano.</div></div>
       <div class="field">
         <label class="label">Comando</label>
         <textarea class="input mono" rows="3" readonly>${h(command)}</textarea>
       </div>
-      <div class="hint">Déjalo corriendo con pm2 o systemd. Cuando conecte, el nodo aparecerá en línea con su CPU, RAM y disco.</div>`,
+      <div class="hint">El script descarga el código actual del panel, instala dependencias la primera vez y arranca el agente. Para dejarlo fijo usa pm2 o systemd.</div>`,
     footer: `<button class="btn btn-ghost" data-action="modal-close">Cerrar</button>
       <button class="btn btn-primary" data-action="node-copy-command" data-command="${h(command)}">${icon('copy')} Copiar comando</button>`,
   })

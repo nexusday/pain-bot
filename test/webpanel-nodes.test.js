@@ -95,15 +95,25 @@ test('webpanel: crear, listar, editar y borrar nodos remotos', async (t) => {
   assert.equal(creado.status, 201)
   assert.equal(creado.datos.node.name, 'vip-1')
   assert.match(creado.datos.node.uuid, /^[0-9a-f-]{36}$/i)
-  assert.ok(creado.datos.node.command.includes('NODE_UUID='))
-  assert.ok(creado.datos.node.command.includes('NODE_TOKEN='))
+  assert.ok(creado.datos.node.command.includes('/api/node/install.sh?'))
+  assert.ok(creado.datos.node.command.includes('uuid='))
+  assert.ok(creado.datos.node.command.includes('token='))
   const id = creado.datos.node.id
 
   const lista = await pedir('/api/admin/nodes', { cookie: cookieAdmin })
   assert.equal(lista.status, 200)
   assert.equal(lista.datos.nodes.length, 1)
   assert.equal(lista.datos.nodes[0].online, false)
-  assert.ok(lista.datos.nodes[0].command.includes('NODE_UUID='))
+  assert.ok(lista.datos.nodes[0].command.includes('/api/node/install.sh?'))
+
+  // Instalador de una línea autenticado por uuid/token.
+  const nodoDb = await handle.store.obtenerNodo(id)
+  const instalar = await pedir(`/api/node/install.sh?uuid=${nodoDb.uuid}&token=${nodoDb.token}`)
+  assert.equal(instalar.status, 200)
+  assert.ok(instalar.texto.includes('exec node scripts/node-agent.js'))
+  assert.ok(instalar.texto.includes('PANEL_URL='))
+  const noAutorizado = await pedir(`/api/node/install.sh?uuid=${nodoDb.uuid}&token=incorrecto`)
+  assert.equal(noAutorizado.status, 401)
 
   const editado = await pedir(`/api/admin/nodes/${id}`, {
     method: 'PATCH',

@@ -690,25 +690,20 @@ falta abrir puertos en la VPS ni que el panel conozca su IP.
 **En el panel:**
 
 1. **Administración → Nodos → Añadir nodo**. El panel genera un UUID y un
-   token y te muestra el comando exacto para la VPS.
+   token y te muestra **un solo comando**.
 2. Copia el comando. Se ve así:
 
 ```bash
-PANEL_URL=https://tu-panel.com NODE_UUID=... NODE_TOKEN=... node scripts/node-agent.js
+curl -fsSL "https://tu-panel.com/api/node/install.sh?uuid=...&token=..." | bash
 ```
 
-**En la VPS del nodo:**
+**En la VPS del nodo** solo ejecutas ese comando (con `ffmpeg` instalado en
+el sistema). El script descarga el código actual del panel, instala las
+dependencias la primera vez y arranca el agente. **No hay que clonar el repo
+ni abrir puertos**. Para dejarlo fijo usa `pm2` o `systemd`.
 
-```bash
-git clone <repo> pain-bot && cd pain-bot
-npm install
-# ffmpeg instalado en el sistema
-PANEL_URL=https://tu-panel.com NODE_UUID=... NODE_TOKEN=... node scripts/node-agent.js
-```
-
-Déjalo corriendo con `pm2`, `systemd` o el gestor de tu hosting. El agente
-abre la conexión, reporta CPU/RAM/disco/versión/commit y aparece **en línea**
-en el panel. Si se cae la red, reintenta solo cada 10 s.
+El agente abre la conexión, reporta CPU/RAM/disco/versión/commit y aparece
+**en línea** en el panel. Si se cae la red, reintenta solo cada 10 s.
 
 **Crear un servidor en el nodo:**
 

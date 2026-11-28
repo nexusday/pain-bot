@@ -1140,7 +1140,7 @@ export function adminNodesHTML(data) {
     <div><h3>Nodos remotos</h3><p>VPS que aportan CPU, RAM y disco al panel</p></div>
     <button class="btn btn-primary btn-sm" data-action="node-create">${icon('plus')} Añadir nodo</button>
   </div><div class="card-body">
-    <div class="notice">${icon('info')}<div>1) En la VPS ejecuta <span class="mono">NODE_TOKEN=... NODE_PORT=10010 node scripts/node-agent.js</span>. 2) Añade aquí la URL pública y el token. 3) Crea un servidor VIP y elige ese nodo. El panel sincroniza las sesiones y el nodo arranca los bots con su propia CPU/RAM.</div></div>
+    <div class="notice">${icon('info')}<div>1) Añade el nodo aquí y copia el comando de una línea. 2) Ejecútalo en la VPS: descarga el código del panel, instala dependencias y conecta solo (como Wings). 3) Crea un servidor VIP, elige ese nodo y pulsa <b>Arrancar en nodo</b>. El panel sincroniza las sesiones y el nodo usa su propia CPU/RAM.</div></div>
   </div></div>
   ${tarjetas}`
 }
