@@ -423,7 +423,7 @@ export async function renderServers() {
         <div class="row-icon accent">${icon('info')}</div>
         <div class="grow">
           <div style="font-weight:700">¿Cómo se elige el servidor?</div>
-          <div class="tiny muted">Al vincular un bot eliges el servidor. Si no eliges ninguno, el panel lo asigna automáticamente al servidor Free compartido. Para mover un bot a un servidor Premium necesitas Premium activo (se gana mirando anuncios).</div>
+          <div class="tiny muted">Al vincular un bot eliges el servidor. Si no eliges ninguno, el panel lo asigna automáticamente al servidor Free compartido. Para mover un bot a un servidor Premium necesitas Premium activo (se gana mirando anuncios). El bot principal no es un subbot: tiene su propio carril privado y no aparece en esta lista.</div>
         </div>
         <a class="btn btn-secondary btn-sm" href="#/link">${icon('link')} Vincular bot</a>
       </div>

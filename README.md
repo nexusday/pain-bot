@@ -456,9 +456,9 @@ cada bot del grupo: ├║salo con criterio).
 - **Base de datos incremental:** solo se serializan los usuarios/chats tocados.
   Un flush ligero cada 5 s, sin escaneos completos peri├│dicos. Los comandos ya
   no esperan a un volcado de toda la base.
-- **Reconexi├│n directa:** no hay cola global. Cada sesi├│n ca├¡da reintenta en
-  1ÔÇô3 s con dispersi├│n aleatoria; solo crece el backoff si la sesi├│n se cae
-  repetidamente en menos de 30 s.
+- **Reconexion con backoff:** no hay cola global. Cada sesion caida espera 3 s
+  (15-60 s si WhatsApp devuelve 428/408/503) y la espera crece si se repite.
+  El contador solo se reinicia tras 60 s de conexion estable.
 - **Cach├®s compartidas:** metadata de grupos en una cach├® global y mensajes en
   un LRU por proceso. Se podan chats y metadata inactivos.
 - **Disco:** se limita el media de anti-delete (512 MB por defecto), se podan
@@ -466,6 +466,27 @@ cada bot del grupo: ├║salo con criterio).
 - **Cat├ílogo de personajes:** 52 MB que se liberan tras 10 min sin uso.
 
 Diagnóstico: /mem, /diag y /mem limpiar (fuerza poda y GC).
+
+# Estabilidad y reconexión
+
+- **Backoff sin tormentas:** cada sesión tiene su propio temporizador, sin cola
+  global. La base es 3 s con dispersión; un 428/408/503 espera 15 s y crece
+  hasta 60 s. Tras 10 fallos seguidos se espera un minuto. El contador solo se
+  reinicia cuando la conexión aguantó 60 s, no al abrir y cerrar en segundos.
+- **Carril principal privado:** el carril `primary` es solo para el bot
+  principal y el panel, con **0 subbots**. Los subbots viven en los carriles
+  `server-...-lane-...` o `worker-...`. Si el panel muestra sesiones en
+  `primary`, el supervisor en ejecución es antiguo: hace falta un reinicio
+  completo del bot una vez (no basta "Aplicar cambios").
+- **Auto-recuperación:** cada carril publica métricas cada 3 s. Si el proceso
+  sigue vivo pero deja de publicar más de 120 s, el supervisor lo reinicia
+  (máximo 3 veces por carril cada 30 min) para recuperar el event loop.
+- **Sin pausas periódicas largas:** la higiene de memoria poda unos pocos
+  sockets por pasada y el conteo de mensajes tiene un tope. Ya no se recorren
+  millones de mensajes ni las 648 carpetas cada 2 min dentro del event loop.
+- **Capacidad:** si el presupuesto de RAM/CPU obliga a más de ~35 bots por
+  carril, el supervisor lo avisa en el log. Para más bots hace falta más RAM,
+  CPU o un nodo remoto; ningún backoff puede compensar falta de hardware.
 
 # Carriles y tiers
 

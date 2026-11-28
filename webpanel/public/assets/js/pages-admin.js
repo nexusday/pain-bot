@@ -371,11 +371,17 @@ export function workersList(workers) {
     return '<div class="hint">Sin datos del proceso del bot. Se actualiza cada 30 s.</div>'
   }
   return `<div class="worker-list">${workers.map((worker) => {
-    const active = Number(worker.connected) > 0
+    const esPrincipal = worker.id === 'primary'
+    const total = Number(worker.total) || 0
+    const connected = Number(worker.connected) || 0
+    const active = esPrincipal || connected > 0
+    const meta = esPrincipal
+      ? (total > 0 ? 'Tiene subbots: reinicia el bot completo' : 'Reservado: 0 subbots · bot principal + panel')
+      : `${connected}/${total} · ${fmtRelative(worker.updatedAt)}`
     return `<div class="worker-row">
-      <span class="badge ${active ? 'success' : 'neutral'}"><span class="dot"></span>${active ? 'Activo' : 'Inactivo'}</span>
-      <span class="wr-name">${h(worker.id || 'proceso')}</span>
-      <span class="wr-meta">${Number(worker.connected) || 0}/${Number(worker.total) || 0} · ${fmtRelative(worker.updatedAt)}</span>
+      <span class="badge ${active ? 'success' : 'neutral'}"><span class="dot"></span>${esPrincipal ? 'Principal' : active ? 'Activo' : 'Inactivo'}</span>
+      <span class="wr-name">${esPrincipal ? 'Principal (bot + panel)' : h(worker.id || 'proceso')}</span>
+      <span class="wr-meta">${meta}</span>
     </div>`
   }).join('')}</div>`
 }
@@ -571,8 +577,14 @@ export function adminServersHTML(data, info, lanes = []) {
         const cpu = Number(lane.metricas?.cpuUsoPercent || 0)
         const rss = Number(lane.memoria?.rssMB || 0)
         const estado = p99 > 500 ? badge('Lento', 'red') : p99 > 200 ? badge('Carga', 'amber') : badge('OK', 'green')
+        const esPrincipal = lane.workerId === 'primary'
+        const notaPrincipal = esPrincipal
+          ? (Number(lane.sessions) === 0
+              ? '<div class="tiny muted">Reservado: 0 subbots</div>'
+              : '<div class="tiny muted" style="color:#f0cd7d">Tiene subbots: reinicia el bot completo</div>')
+          : ''
         return `<tr>
-          <td><b>${h(lane.workerId)}</b><div class="tiny muted">PID ${lane.pid}</div></td>
+          <td><b>${esPrincipal ? 'Principal (bot + panel)' : h(lane.workerId)}</b><div class="tiny muted">PID ${lane.pid}</div>${notaPrincipal}</td>
           <td>${lane.sessions}</td>
           <td>${lane.connected}</td>
           <td>${p99} ms</td>
@@ -589,6 +601,7 @@ export function adminServersHTML(data, info, lanes = []) {
         <thead><tr><th>Carril</th><th>Sesiones</th><th>Conectadas</th><th>P99</th><th>CPU</th><th>RSS</th><th>Salud</th></tr></thead>
         <tbody>${filasCarriles}</tbody>
       </table>
+      <div class="hint" style="margin-top:10px">${icon('info')} El carril <b>Principal (bot + panel)</b> está reservado para el bot principal y el panel: debe mostrar <b>0 subbots</b>. Los subbots van en los carriles <b>server-…</b> o <b>worker-…</b>. Si el principal muestra sesiones, reinicia el bot completo una vez para aplicar la separación de carriles.</div>
     </div>
   </div>`
   const arquitectura = `<div class="card" style="margin-bottom:16px"><div class="card-head"><div><h3>Arquitectura de workers</h3><p>Dónde vive cada cosa</p></div></div><div class="card-body">

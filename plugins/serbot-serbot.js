@@ -15,6 +15,7 @@ import {
   iniciarActividadSocket,
 } from "../lib/worker-metrics.js"
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from "../lib/socket-estable.js"
+import { calcularEsperaReconexion } from "../lib/reconnect-backoff.js"
 import { initViewOnceAntiListener } from "../lib/viewOnce.js"
 import { resolvePhoneNumber, extractPhoneFromArgs, getPrivateReplyJid, sendPrivateReply } from "../lib/resolve-phone.js"
 import { esModoIos } from '../lib/menu-modo.js'
@@ -58,21 +59,22 @@ const rcanal = {
 // Un WebSocket OPEN todavía puede estar terminando el login bajo carga.
 // No se debe destruir a los 60 s solo porque aún no apareció `user`.
 const SOCKET_CONEXION_MAX_MS = 180_000
-const MAX_FALLOS_RECONEXION = 50
-// La reconexión NO pasa por una cola global. Cada sesión reintenta en cuanto se
-// cae, con una dispersión aleatoria de milisegundos para que los 150+ sockets
-// no se sincronicen en el mismo instante. La deduplicación es por sesión.
-const RECONEXION_BASE_MS = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_BASE_MS, 10) || 0, 0),
-  15_000
-)
-const RECONEXION_MAX_MS = Math.min(
-  Math.max(Number.parseInt(process.env.PAIN_RECONNECT_MAX_MS, 10) || 5_000, 1_000),
-  120_000
-)
+// La base nunca es 0: reconectar en 1 s tras un 428 provoca tormentas de
+// conexiones que WhatsApp vuelve a cerrar en cadena. El cálculo completo
+// vive en lib/reconnect-backoff.js y se comparte con el bot principal.
+const RECONEXION_OPCIONES = {
+  baseMs: Math.min(
+    Math.max(Number.parseInt(process.env.PAIN_RECONNECT_BASE_MS, 10) || 3_000, 1_000),
+    15_000
+  ),
+  maxMs: Math.min(
+    Math.max(Number.parseInt(process.env.PAIN_RECONNECT_MAX_MS, 10) || 45_000, 5_000),
+    120_000
+  ),
+}
 // Una conexión que aguanta menos de esto se considera inestable: el backoff
 // no se reinicia, así el sub-bot deja de martillear a WhatsApp.
-const CONEXION_ESTABLE_MIN_MS = 15_000
+const CONEXION_ESTABLE_MIN_MS = 60_000
 const reintentosProgramados = new Map()
 
 // Cierre inmediato del socket crudo. `ws.close()` espera el handshake y el
@@ -1297,32 +1299,26 @@ async function iniciarSubBot(options) {
       if (temporizadorReconexion) return
       reconectando = true
       reintentosProgramados.set(idCarpetaBot, Date.now())
-      const dispersarMs = Math.floor(Math.random() * 2000)
-      const esReemplazo = motivo === DisconnectReason.connectionReplaced
-      const esReinicio = motivo === DisconnectReason.restartRequired
-      let cola
-      if (esReinicio) {
-        // 515: el servidor pide reiniciar el socket. Reintento casi inmediato.
-        cola = 300 + dispersarMs
-      } else if (esReemplazo) {
-        // 440: otro socket abrió la misma sesión. Reintentar al instante crea
-        // un ping-pong; se espera un poco y crece solo si se repite.
-        reemplazosConsecutivos++
-        cola = Math.min(10_000 * (2 ** Math.min(reemplazosConsecutivos - 1, 3)), 60_000) + dispersarMs
-      } else {
-        fallosConsecutivos++
-        cola = fallosConsecutivos >= MAX_FALLOS_RECONEXION
-          ? 60_000 + dispersarMs
-          : Math.min(
-              RECONEXION_BASE_MS * (2 ** Math.min(fallosConsecutivos - 1, 5)),
-              RECONEXION_MAX_MS
-            ) + dispersarMs
-      }
+      // 428/408/503 usan una espera mayor y más dispersión para que una
+      // flota de bots no reconecte en bloque y provoque otra ronda de 428.
+      const plan = calcularEsperaReconexion({
+        motivo,
+        fallos: fallosConsecutivos,
+        reemplazos: reemplazosConsecutivos,
+        ...RECONEXION_OPCIONES,
+      })
+      fallosConsecutivos = plan.fallos
+      reemplazosConsecutivos = plan.reemplazos
+      const cola = plan.esperaMs
+      const esReemplazo = plan.tipo === 'replaced'
+      const esLimite = plan.tipo === 'rate'
       contarReintentoReconexion(motivo)
       console.log(chalk.bold.magentaBright(
         `\n┆ Subbot (+${idCarpetaBot}) desconectado (${motivo ?? 'sin código'}). ` +
         `${detalle ? `Motivo: ${detalle}. ` : ''}` +
-        `${esReemplazo ? 'Reemplazo detectado; ' : ''}reintentando en ${Math.round(cola / 1000)}s...\n`
+        `${esReemplazo ? 'Reemplazo detectado; ' : ''}` +
+        `${esLimite ? 'Espera ampliada por límite de WhatsApp; ' : ''}` +
+        `reintentando en ${Math.round(cola / 1000)}s...\n`
       ))
       temporizadorReconexion = setTimeout(() => {
         temporizadorReconexion = null

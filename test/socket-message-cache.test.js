@@ -96,5 +96,17 @@ test('resume chats, mensajes y metadata sin serializar', () => {
     mensajes: 1,
     metadata: 1,
     participantes: 7,
+    mensajesTruncado: false,
   })
+})
+
+test('estadisticasSockets corta el conteo de mensajes para no congelar el event loop', () => {
+  const chat = crearChat('120363000000000001@g.us')
+  for (let i = 0; i < 30_000; i++) {
+    chat.messages[`m${i}`] = { key: { id: `m${i}` }, messageTimestamp: 1 }
+  }
+  const resumen = estadisticasSockets([{ chats: { [chat.id]: chat } }])
+  assert.equal(resumen.mensajes, 25_000)
+  assert.equal(resumen.mensajesTruncado, true)
+  assert.equal(resumen.chats, 1)
 })

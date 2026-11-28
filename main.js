@@ -64,6 +64,7 @@ import pino from 'pino'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
 import { conSocketEstable, mantenerPrekeys, detenerPrekeys } from './lib/socket-estable.js'
+import { calcularEsperaReconexion } from './lib/reconnect-backoff.js'
 import { estadoMemoriaProceso } from './lib/mem-hygiene.js'
 import {
   ARCHIVO_REENLACE_PENDIENTE,
@@ -588,6 +589,8 @@ if (!isSubbotWorker) startDiskHygiene()
 
 let reconectandoPrincipal = false
 let sinSocketDesde = 0
+let fallosPrincipal = 0
+let abiertoPrincipalDesde = 0
 
 function socketPrincipalAbierto(sock) {
   try {
@@ -608,7 +611,9 @@ function vigilarSocketPrincipal() {
     return
   }
   if (!sinSocketDesde) sinSocketDesde = Date.now()
-  if (Date.now() - sinSocketDesde < 3 * 60_000) return
+  // 60 s: si el socket quedó medio abierto (sin close ni mensajes), no tiene
+  // sentido esperar 3 minutos a que el usuario note que el bot no responde.
+  if (Date.now() - sinSocketDesde < 60_000) return
   if (reconectandoPrincipal) return
   sinSocketDesde = Date.now()
   reconectandoPrincipal = true
@@ -694,6 +699,9 @@ async function connectionUpdate(update) {
 
   if (connection === 'open') {
     reconectandoPrincipal = false
+    const duracionPrevia = abiertoPrincipalDesde ? Date.now() - abiertoPrincipalDesde : Infinity
+    if (duracionPrevia > 60_000) fallosPrincipal = 0
+    abiertoPrincipalDesde = Date.now()
     console.log(chalk.yellow('Conectado correctamente.'))
     global.mainBotJid = sock.user?.jid?.split('@')[0] || sock.user?.id?.split('@')[0]
     try {
@@ -776,7 +784,20 @@ async function connectionUpdate(update) {
 
   if (reconectandoPrincipal) return
   reconectandoPrincipal = true
-  sock.logger?.warn?.(`Conexión perdida (${reason ?? 'sin código'}). Reconectando el principal...`)
+  const planPrincipal = calcularEsperaReconexion({
+    motivo: reason,
+    fallos: fallosPrincipal,
+    baseMs: 5_000,
+    maxMs: 60_000,
+  })
+  fallosPrincipal = planPrincipal.fallos
+  const esLimitePrincipal = planPrincipal.tipo === 'rate'
+  const esperaPrincipal = planPrincipal.esperaMs
+  sock.logger?.warn?.(
+    `Conexión perdida (${reason ?? 'sin código'}). ` +
+    `${esLimitePrincipal ? 'WhatsApp limitó la conexión. ' : ''}` +
+    `Reconectando el principal en ${Math.round(esperaPrincipal / 1000)} s...`
+  )
 
   setTimeout(() => {
     reconectandoPrincipal = false
@@ -784,7 +805,7 @@ async function connectionUpdate(update) {
       console.error('Error reconectando el principal:', e?.message || e)
       reconectandoPrincipal = false
     })
-  }, 4000)
+  }, esperaPrincipal)
 }
 
 let isInit = true
@@ -1416,6 +1437,17 @@ async function iniciarGestorSubBots() {
     typeof folder === 'string' && /^[a-zA-Z0-9_-]+$/.test(folder)
   )
   const workerId = process.env.PAIN_WORKER_ID || 'primary'
+  if (workerId === 'primary') {
+    if (!isSingleBotProcess && sessions.length > 0) {
+      console.warn(
+        `[primary] El carril principal recibió ${sessions.length} subbot(s), pero debe tener 0. ` +
+        'El supervisor en ejecución es antiguo o el arranque no aplicó la separación de carriles. ' +
+        'Reinicia el bot completo una vez para que el principal quede solo con el bot principal y el panel.'
+      )
+    } else if (!isSingleBotProcess) {
+      console.log('[primary] Carril principal reservado: 0 subbots (solo bot principal + panel).')
+    }
+  }
   iniciarMetricasWorker()
   const sesionesIniciando = new Map()
   let muestrasMetricas = 0
@@ -1621,9 +1653,12 @@ async function iniciarGestorSubBots() {
   publicarMetricasVivoEnseguro()
   workerLiveInterval = setInterval(publicarMetricasVivoEnseguro, 3_000)
   workerLiveInterval.unref?.()
-  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 100
+  // Arrancar 8 handshakes a la vez en un carril cargado provocaba 428 en
+  // cadena. Cuatro con una pausa corta reparten mejor el trabajo y evitan
+  // que WhatsApp cierre la tanda entera.
+  const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 250
   const concurrenciaArranque = Math.min(
-    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || 8, 1),
+    Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || 4, 1),
     16
   )
   const initialSessions = ordenarSesionesPorPrioridad(serbotDir, [...sessions])
@@ -2046,24 +2081,15 @@ let reconexionSubBotsPromise = null
 
 // Archiva (conserva ajustes + borra carpeta) las sesiones marcadas para volver
 // a vincular, avisando al supervisor para que las suelte sin reiniciar workers.
-let ultimoAvisoReenlace = 0
 function purgarReenlacesPendientes(serbotDir) {
   // Por defecto NUNCA se borra/archiva una carpeta marcada: se conserva para
   // que el panel pueda revincularla. El archivado automático era lo que hacía
   // desaparecer sesiones cuando WhatsApp devolvía 401 en masa.
-  if (process.env.PAIN_AUTO_ARCHIVE_RELINK !== '1') {
-    try {
-      const pendientes = listarRequierenVincular(serbotDir)
-      if (pendientes.length && Date.now() - ultimoAvisoReenlace > 60_000) {
-        ultimoAvisoReenlace = Date.now()
-        console.warn(
-          `[reenlace] ${pendientes.length} sesión(es) requieren volver a vincular; ` +
-          'se conservan en disco y no se conectan.'
-        )
-      }
-    } catch {}
-    return
-  }
+  //
+  // Tampoco se escanean las 648 carpetas cada 2 min desde el event loop del
+  // bot: el panel ya lista el estado de revinculación. Ese escaneo periódico
+  // provocaba pausas que tumbaban los keepalives (408/428 en cadena).
+  if (process.env.PAIN_AUTO_ARCHIVE_RELINK !== '1') return
   let purgadas = []
   try {
     purgadas = purgarSesionesReenlace(serbotDir)
