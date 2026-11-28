@@ -1275,6 +1275,9 @@ watch(pluginFolder, global.reload)
 // (rolling) para los workers y reiniciar el proceso principal cuando se pueda.
 const MODULOS_ARRANQUE = new Set([
   'lib/supervisor-single.js',
+  'lib/supervisor-lanes.js',
+  'lib/reconnect-backoff.js',
+  'lib/worker-live-metrics.js',
   'lib/db-sqlite.js',
   'lib/auth-store.js',
   'lib/auth-compact-pool.js',
@@ -1792,6 +1795,14 @@ async function iniciarGestorSubBots() {
   // Reasignación en caliente desde el supervisor (cambio de servidor).
   global.__painAddSession = async (folder) => {
     if (!folder || !/^[a-zA-Z0-9_-]+$/.test(String(folder))) return { ok: false, reason: 'invalid' }
+    if (workerId === 'primary' && !isSingleBotProcess) {
+      // El principal es solo bot principal + panel. Rechazar aquí evita que
+      // un supervisor antiguo o un mensaje erróneo vuelva a mezclar subbots.
+      console.warn(
+        `[primary] Se rechazó add-session (+${folder}): el carril principal no hospeda subbots.`
+      )
+      return { ok: false, reason: 'primary-reserved' }
+    }
     try {
       const resultado = await iniciarSesion(String(folder))
       return { ok: resultado !== 'failed', result: resultado }
