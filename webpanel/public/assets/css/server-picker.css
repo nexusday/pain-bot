@@ -116,6 +116,8 @@
   gap: 10px;
   max-height: min(62vh, 560px);
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding-right: 2px;
 }
 

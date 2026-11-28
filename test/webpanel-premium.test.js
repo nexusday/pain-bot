@@ -351,7 +351,7 @@ test('premium: el modal obligatorio no se cierra ni se sustituye y bloquea el fo
   const modalRoot = { dataset: {}, innerHTML: '', classList: { add() {}, remove() {} } }
   const app = { inert: false }
   const contexto = vm.createContext({ modalRoot, app, state: {}, h: (s) => s, icon: () => '' })
-  vm.runInContext(fuente.slice(fuente.indexOf('export function openModal'), fuente.indexOf('export function confirmModal')).replaceAll('export function', 'function'), contexto)
+  vm.runInContext(fuente.slice(fuente.indexOf('let modalScrollY'), fuente.indexOf('export function confirmModal')).replaceAll('export function', 'function'), contexto)
   vm.runInContext("openModal({title:'Normal',body:'Prueba'}); closeModal()", contexto)
   assert.equal(modalRoot.innerHTML, '')
   vm.runInContext("openModal({title:'Anuncios',body:'Permite anuncios',dismissible:false})", contexto)

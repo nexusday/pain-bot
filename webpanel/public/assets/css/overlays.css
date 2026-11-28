@@ -66,6 +66,12 @@
 .modal-body {
   padding: 19px 20px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+body.modal-open {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .modal-foot {

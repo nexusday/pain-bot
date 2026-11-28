@@ -403,6 +403,38 @@ export function stopTimers() {
 }
 
 /* ── Toasts / modales ───────────────────────────────────────────────────── */
+let modalScrollY = 0
+let modalScrollbar = 0
+
+function bloquearScrollModal() {
+  if (typeof document === 'undefined' || document.body?.dataset.modalScrollLocked === '1') return
+  modalScrollY = window.scrollY || document.documentElement.scrollTop || 0
+  modalScrollbar = Math.max(0, window.innerWidth - document.documentElement.clientWidth)
+  document.body.dataset.modalScrollLocked = '1'
+  document.body.classList.add('modal-open')
+  document.body.style.position = 'fixed'
+  document.body.style.top = `-${modalScrollY}px`
+  document.body.style.left = '0'
+  document.body.style.right = '0'
+  document.body.style.width = '100%'
+  if (modalScrollbar) document.body.style.paddingRight = `${modalScrollbar}px`
+}
+
+function liberarScrollModal() {
+  if (typeof document === 'undefined' || document.body?.dataset.modalScrollLocked !== '1') return
+  delete document.body.dataset.modalScrollLocked
+  document.body.classList.remove('modal-open')
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.left = ''
+  document.body.style.right = ''
+  document.body.style.width = ''
+  document.body.style.paddingRight = ''
+  const y = modalScrollY
+  modalScrollY = 0
+  window.scrollTo(0, y)
+}
+
 export function openModal({ title, subtitle = '', body, footer = '', wide = false, dismissible = true, onMount }) {
   if (!modalRoot || modalRoot.dataset.dismissible === 'false') return
   if (typeof modalRoot.__onClose === 'function') {
@@ -422,6 +454,7 @@ export function openModal({ title, subtitle = '', body, footer = '', wide = fals
       ${footer ? `<div class="modal-foot">${footer}</div>` : ''}
     </div>`
   modalRoot.classList.add('open')
+  bloquearScrollModal()
   onMount?.(modalRoot)
 }
 
@@ -435,6 +468,7 @@ export function closeModal() {
   modalRoot.innerHTML = ''
   state.turnstileToken = ''
   state.turnstileWidget = null
+  liberarScrollModal()
 }
 
 export function confirmModal({ title, message, confirmLabel = 'Confirmar', danger = true, onConfirm }) {
