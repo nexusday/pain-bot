@@ -1245,6 +1245,30 @@ Object.freeze(global.reload)
 
 watch(pluginFolder, global.reload)
 
+// Módulos que forman parte del arranque del proceso (sockets, DB, supervisor).
+// No están en el gráfico de importación del handler, así que reimportar el
+// handler NO los actualiza. Para ellos solo cabe: reiniciar los carriles
+// (rolling) para los workers y reiniciar el proceso principal cuando se pueda.
+const MODULOS_ARRANQUE = new Set([
+  'lib/supervisor-single.js',
+  'lib/db-sqlite.js',
+  'lib/auth-store.js',
+  'lib/auth-compact-pool.js',
+  'lib/auth-compact-worker.js',
+  'lib/session-registry.js',
+  'lib/single-instance.js',
+  'lib/restore-lock.js',
+  'lib/socket-estable.js',
+  'lib/subbot-recovery.js',
+  'lib/subbot-status.js',
+  'lib/worker-metrics.js',
+  'lib/main-session.js',
+])
+
+function esModuloDeArranque(nombre) {
+  return MODULOS_ARRANQUE.has(String(nombre || '').replace(/\\/g, '/'))
+}
+
 function agendarRecargaCodigo(nombre) {
   clearTimeout(agendarRecargaCodigo._espera)
   agendarRecargaCodigo._espera = setTimeout(async () => {
@@ -1267,6 +1291,20 @@ function agendarRecargaCodigo(nombre) {
         }
         return
       }
+      if (esModuloDeArranque(nombre)) {
+        // Estos módulos no están en el gráfico del handler: reimportarlo no
+        // sirve. Se avisa y se reinician los carriles en rolling para que los
+        // workers tomen el código nuevo; el principal lo hará al reiniciar.
+        console.log(chalk.yellow(
+          `[hot] ${nombre}: pertenece al arranque del proceso (sockets/DB/supervisor). ` +
+          'No se puede recargar en caliente en este proceso; los carriles de sub-bots se ' +
+          'reinician en rolling y el principal aplicará el cambio en el próximo reinicio.'
+        ))
+        if (!isSubbotWorker && typeof process.send === 'function') {
+          try { process.send({ type: 'rolling-restart' }) } catch {}
+        }
+        return
+      }
       if (nombre === 'handler.js') {
         await global.reloadHandler(false)
         console.log(chalk.cyan(`Updated code - '${nombre}'`))
@@ -1275,9 +1313,9 @@ function agendarRecargaCodigo(nombre) {
       // Cambio bajo lib/: se aplica al handler SIN reiniciar el proceso.
       await global.reloadHandler(false)
       console.log(chalk.cyan(
-        `[hot] ${nombre}: código nuevo aplicado al handler y a los sub-bots ` +
-        '(los mensajes siguientes ya usan el código nuevo). ' +
-        'Para cambios profundos de arranque (main/index/config) sí hace falta reiniciar.'
+        `[hot] ${nombre}: aplicado al handler de este proceso (los mensajes siguientes usan el código nuevo). ` +
+        'Los módulos de arranque —main.js, index.js, config.js, supervisor, DB y auth— no se ' +
+        'recargan en caliente: esos necesitan reinicio o rolling de carriles.'
       ))
     } catch (e) {
       console.error('No se pudo recargar el código:', e?.message || e)
