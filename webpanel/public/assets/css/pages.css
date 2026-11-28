@@ -281,6 +281,18 @@
   border-color: rgba(74, 166, 240, 0.24);
 }
 
+.row-icon.accent {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: rgba(232, 69, 60, 0.24);
+}
+
+.row-icon.violet {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.24);
+}
+
 .actions {
   display: flex;
   gap: 6px;

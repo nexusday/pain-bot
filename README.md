@@ -528,6 +528,12 @@ el proceso de WhatsApp nunca abre el puerto.
   lateral plegable (bot├│n de men├║ tambi├®n en escritorio) y dise├▒o adaptable a
   m├│vil y escritorio.
 
+- **Salud por servidor**: cada tarjeta muestra un anillo 0-100 calculado con el
+  peor carril (latencia p99, CPU y bots conectados), además del uptime, las
+  caídas 428 y los reintentos de ese servidor. Incluye ranking de los 3 más
+  sanos y distintivos **Más rápido** / **Más carga**. Las métricas se publican
+  cada 60 s desde cada carril, sin que el panel tenga que consultarlos.
+
 ### Gestionar el bot principal
 
 En **Administraci├│n ÔåÆ Bot principal** el administrador puede:
