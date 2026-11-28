@@ -472,6 +472,13 @@ Diagnóstico: /mem, /diag y /mem limpiar (fuerza poda y GC).
 - **Carriles (PAIN_LANES):** los sub-bots se reparten entre N procesos.
   Cada proceso tiene su propia base de datos SQLite (sin contención de locks).
   El panel agrega las sesiones de todos los carriles.
+- **Presupuesto de carriles por tier:** el supervisor calcula la RAM/CPU
+  reales del contenedor (cgroups) y reparte un presupuesto global:
+  - **VIP primero**: carriles de 4 GB, ~10 bots por carril.
+  - **Premium después**: carriles de 3 GB, ~15 bots por carril.
+  - **Free al final**: carriles de 1 GB, ~20 bots por carril.
+  Así Premium/VIP tienen menos carriles pero más memoria y menos carga;
+  Free ocupa el resto sin reventar la VPS.
 - **Tiers (PAIN_TIER):** ree, premium o ip. Cada tier tiene un perfil
   de recursos (memoria, cachés, keepalive, frecuencia de escritura).
 - `free`: 1024 MB, cachés reducidas, keepalive 60 s. Optimizado para bajo consumo.
