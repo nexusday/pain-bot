@@ -576,7 +576,11 @@ function mantenerPresenciaPrincipal(sock) {
   temporizadorPresencia = setInterval(avisar, 3 * 60 * 60 * 1000)
 }
 
-if (!isSubbotWorker) startTmpCleanupInterval({ verbose: true, intervalMs: 2 * 60_000 })
+if (!isSubbotWorker) {
+  // 30 min de antigüedad mínima: las conversiones en cola pueden tardar y el
+  // limpiador no debe borrar el archivo antes de que FFmpeg lo lea.
+  startTmpCleanupInterval({ verbose: true, intervalMs: 2 * 60_000, maxAgeMs: 30 * 60_000 })
+}
 if (!isSubbotWorker) startDiskHygiene()
 
 let reconectandoPrincipal = false

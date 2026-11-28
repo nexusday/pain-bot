@@ -7,6 +7,7 @@ import { formatBotUptime } from '../lib/bot-uptime.js'
 import { tr } from '../lib/lang.js'
 import { listarRequierenVincular, listarSesionesConCreds, sesionEnEmparejamiento } from '../lib/subbot-recovery.js'
 import { snapshotSesiones } from '../lib/session-registry.js'
+import { readSubbotWorkerStatuses } from '../lib/subbot-status.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -69,7 +70,17 @@ let handler = async (m, { conn, usedPrefix }) => {
     // abiertos. Un socket puede estar caído y el sub-bot seguir vinculado.
     const usuariosUnicos = new Map()
     const idsGruposUnicos = new Set()
-    const estadosWorkers = [{ workerId: 'primary', sessions: snapshotSesiones() }]
+    // En modo carriles las sesiones viven repartidas en varios procesos.
+    // Se leen los snapshots de todos los workers, no solo el registro local.
+    let estadosWorkers = readSubbotWorkerStatuses(process.cwd(), { maxAgeMs: 120_000 })
+    if (!estadosWorkers.length) {
+      estadosWorkers = [{ workerId: process.env.PAIN_WORKER_ID || 'primary', sessions: snapshotSesiones() }]
+    }
+    // Mapa carpeta -> servidor/carril efectivo (lo escribe el supervisor).
+    let asignaciones = {}
+    try {
+      asignaciones = JSON.parse(fs.readFileSync(join(process.cwd(), 'storage', 'assignments.json'), 'utf8'))
+    } catch {}
     const raizSubs = join(process.cwd(), global.bot || 'Serbot')
     const carpetasSesion = listarSesionesConCreds(raizSubs)
     // Incluye marcas sin creds (carpeta limpiada): si no, son invisibles.
@@ -95,6 +106,9 @@ let handler = async (m, { conn, usedPrefix }) => {
         folder: info.folder || anterior?.folder || numero,
         name: info.name || anterior?.name || '',
         connected: Boolean(info.connected || anterior?.connected),
+        worker: info.worker || anterior?.worker || '',
+        serverName: info.serverName || anterior?.serverName || '',
+        tier: info.tier || anterior?.tier || '',
         status: info.connected || anterior?.connected
           ? 'connected'
           : estadoEspecial || info.status || anterior?.status || 'saved',
@@ -140,11 +154,15 @@ let handler = async (m, { conn, usedPrefix }) => {
     for (const worker of estadosWorkers) {
       for (const session of worker.sessions) {
         const numero = cleanBotNum(session.number || session.folder)
+        const asignada = asignaciones[session.folder] || {}
         agregarSesion(numero, {
           conn: null,
           folder: session.folder,
           name: session.name || '',
           connected: session.connected,
+          worker: worker.workerId || '',
+          serverName: asignada.serverName || '',
+          tier: asignada.tier || '',
           status: session.connected ? 'connected' : 'saved',
         })
       }
@@ -157,6 +175,22 @@ let handler = async (m, { conn, usedPrefix }) => {
     const totalBots = totalSubBots + 1
     const totalGrupos = idsGruposUnicos.size
     const memoriaMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+
+    // Resumen por servidor: cuántos bots tiene y cuántos están conectados.
+    const servidoresResumen = new Map()
+    for (const info of usuariosUnicos.values()) {
+      const nombre = info.serverName || 'Automático (Free)'
+      const actual = servidoresResumen.get(nombre) || { total: 0, conectados: 0 }
+      actual.total++
+      if (info.connected) actual.conectados++
+      servidoresResumen.set(nombre, actual)
+    }
+    const bloqueServidores = servidoresResumen.size
+      ? [...servidoresResumen.entries()]
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([nombre, datos]) => `┊ \`${nombre}\` · ${datos.conectados}/${datos.total}`)
+        .join('\n')
+      : '┊ `sin servidores configurados`'
 
     const numPrincipal = cleanBotNum(connBotPrincipal?.user?.jid || connBotPrincipal?.user?.id) || '—'
     const estadoBotPrincipal = connBotPrincipal?.user?.jid ? 'conectado' : 'desconectado'
@@ -186,10 +220,13 @@ let handler = async (m, { conn, usedPrefix }) => {
             ? 'conectado en worker'
             : 'sin conexión activa'
 
+        const servidor = info.serverName
+          ? `\n┊ servidor · \`${info.serverName}\`${info.tier ? ` (${info.tier})` : ''}`
+          : ''
         lineas.push(
           `┊ *${i}.* ${nombreSubBot}\n` +
           `┊ \`+${numeroSubBot}\`  ·  \`${estadoSubBot}\`\n` +
-          `┊ \`${nombreUsuario}\`  ·  \`${uptimeSub}\``
+          `┊ \`${nombreUsuario}\`  ·  \`${uptimeSub}\`${servidor}`
         )
         i++
       }
@@ -221,6 +258,9 @@ let handler = async (m, { conn, usedPrefix }) => {
 ┊ principal  ·  \`+${numPrincipal}\`
 ┊ estado  ·  \`${estadoBotPrincipal}\`
 ┊ uptime  ·  \`${uptimePrincipal}\`
+
+┊ *servidores*
+${bloqueServidores}
 
 ${bloqueSubs}
 ╰─────────`.trim()
