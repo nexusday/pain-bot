@@ -194,7 +194,7 @@ export async function renderServers() {
           <div style="font-weight:700">Estado de la red <span class="badge ${saludMedia >= 85 ? 'success' : saludMedia >= 65 ? 'info' : 'warn'}" style="margin-left:6px">${saludMedia}/100</span></div>
           <div class="tiny muted" style="margin-top:3px">Salud media de los servidores activos · Más rápido: <b>${h(masRapido?.name || '—')}</b> (${masRapido?.performance?.p99Ms ?? '—'} ms) · Más cargado: <b>${h(masCargado?.name || '—')}</b> (${masCargado?.performance?.p99Ms ?? '—'} ms)</div>
         </div>
-        <div class="tiny muted">La salud combina latencia (p99), carga de CPU y bots conectados. Se actualiza cada minuto.</div>
+        <div class="tiny muted">La salud combina latencia (p99), carga de CPU y bots conectados. Datos de la última muestra (cada 60 s).</div>
       </div>
       ${ranking.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px">
         ${ranking.map((servidor, indice) => `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0" title="Puesto ${indice + 1} por salud del servidor">
