@@ -83,9 +83,11 @@ import { removeSubbotWorkerStatus, writeSubbotWorkerStatusAsync } from './lib/su
 import {
   iniciarMetricasWorker,
   obtenerActividadSocket,
+  obtenerMetricasVivo,
   persistirMetrica,
   registrarMetricasWorker,
 } from './lib/worker-metrics.js'
+import { eliminarMetricasVivo, publicarMetricasVivo } from './lib/worker-live-metrics.js'
 import { ordenarSesionesPorPrioridad } from './lib/subbot-priority.js'
 import { snapshotSesiones, resumenSesiones, obtenerSesion } from './lib/session-registry.js'
 import { ejecutarEnContextoBot } from './lib/premium.js'
@@ -357,6 +359,7 @@ async function guardarCredencialesPrincipales(...args) {
 }
 
 let workerStatusInterval = null
+let workerLiveInterval = null
 if (!isSubbotWorker) {
   const authState = await useMemoryAuthState(global.authFile)
   state = authState.state
@@ -1580,6 +1583,44 @@ async function iniciarGestorSubBots() {
     }
   }, intervaloEstadoMs)
   workerStatusInterval.unref?.()
+
+  // ── Métricas en vivo para la página de servidores ──────────────────────
+  // Un JSON pequeño (~300 B) cada 3 s por carril: p99, CPU, uptime, 428 y
+  // sesiones conectadas. El estado completo con sesiones sigue cada 60 s.
+  // Sin sesiones no se escribe nada (el primario del panel queda fuera).
+  let escribiendoMetricasVivo = false
+  let vivoConSesiones = false
+  const publicarMetricasVivoEnseguro = () => {
+    let resumen
+    try { resumen = resumenSesiones() } catch { return }
+    if (!resumen.total) {
+      if (vivoConSesiones) {
+        vivoConSesiones = false
+        void eliminarMetricasVivo(process.cwd(), workerId)
+      }
+      return
+    }
+    if (escribiendoMetricasVivo) return
+    let muestra
+    try { muestra = obtenerMetricasVivo() } catch { return }
+    escribiendoMetricasVivo = true
+    vivoConSesiones = true
+    publicarMetricasVivo(process.cwd(), workerId, {
+      lagP99Ms: muestra.lagP99Ms,
+      lagMediaMs: muestra.lagMediaMs,
+      cpuUsoPercent: muestra.cpuUsoPercent,
+      uptimeSegundos: muestra.uptimeSegundos,
+      desconexiones428: muestra.desconexiones428,
+      reintentosReconexion: muestra.reintentosReconexion,
+      totalSesiones: resumen.total,
+      sesionesConectadas: resumen.abiertas,
+    }).finally(() => {
+      escribiendoMetricasVivo = false
+    })
+  }
+  publicarMetricasVivoEnseguro()
+  workerLiveInterval = setInterval(publicarMetricasVivoEnseguro, 3_000)
+  workerLiveInterval.unref?.()
   const pausaEntreLotesMs = Number.parseInt(process.env.PAIN_START_GAP_MS, 10) || 100
   const concurrenciaArranque = Math.min(
     Math.max(Number.parseInt(process.env.PAIN_START_CONCURRENCY, 10) || 8, 1),
@@ -1877,6 +1918,11 @@ function cerrarConexionesDelProceso(signal) {
   console.log(`Proceso ${process.env.PAIN_WORKER_ID || 'primary'} cerrando por ${signal}.`)
   if (isSubbotWorker || isSingleBotProcess) {
     if (workerStatusInterval) clearInterval(workerStatusInterval)
+    if (workerLiveInterval) clearInterval(workerLiveInterval)
+    void eliminarMetricasVivo(
+      process.cwd(),
+      process.env.PAIN_WORKER_ID || (isSubbotWorker ? 'subbot' : 'primary')
+    )
     removeSubbotWorkerStatus(
       __dirname,
       isSubbotWorker ? (process.env.PAIN_WORKER_ID || 'subbot') : 'primary'

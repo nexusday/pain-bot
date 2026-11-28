@@ -323,6 +323,26 @@
   flex: none;
 }
 
+.badge svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.pain-rank-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.pain-rank-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
 .badge.success {
   background: var(--success-soft);
   border-color: rgba(52, 196, 139, 0.26);

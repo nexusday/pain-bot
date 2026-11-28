@@ -532,7 +532,8 @@ el proceso de WhatsApp nunca abre el puerto.
   peor carril (latencia p99, CPU y bots conectados), además del uptime, las
   caídas 428 y los reintentos de ese servidor. Incluye ranking de los 3 más
   sanos y distintivos **Más rápido** / **Más carga**. Las métricas se publican
-  cada 60 s desde cada carril, sin que el panel tenga que consultarlos.
+  cada 3 s desde cada carril (p99 con ventana de 15 s) y la página las refresca
+  sin recargar; el historial completo sigue cada 60 s.
 
 ### Gestionar el bot principal
 

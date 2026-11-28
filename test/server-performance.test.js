@@ -64,6 +64,33 @@ test('server-performance: agrupa p99, CPU, uptime y 428 por servidor', () => {
   assert.equal(mapa.get('auto').lanes, 1)
 })
 
+test('server-performance: usa los totales en vivo y no cuenta sesiones inexistentes', () => {
+  const mapa = agruparRendimientoPorServidor([
+    {
+      workerId: 'server-4-lane-2',
+      metricas: {
+        lagP99Ms: 250, cpuUsoPercent: 55, uptimeSegundos: 100,
+        totalSesiones: 12, sesionesConectadas: 20,
+        desconexiones428: 1, reintentosReconexion: 2,
+      },
+      sessions: [],
+    },
+    {
+      workerId: 'server-4-lane-3',
+      metricas: {
+        lagP99Ms: 50, cpuUsoPercent: 10, uptimeSegundos: 50,
+        totalSesiones: 3, sesionesConectadas: 1,
+      },
+      sessions: [],
+    },
+  ])
+  const servidor4 = mapa.get('4')
+  assert.equal(servidor4.total, 15)
+  assert.equal(servidor4.connected, 13, 'las conectadas nunca superan el total')
+  assert.equal(servidor4.lanes, 2)
+  assert.equal(servidor4.desconexiones428, 1)
+})
+
 test('server-performance: calcula la nota con el peor carril y detecta caídas 428', () => {
   const servidor1 = calcularRendimiento({
     p99: [120, 900],
