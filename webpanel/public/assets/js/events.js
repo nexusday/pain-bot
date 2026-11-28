@@ -410,6 +410,17 @@ export async function onClick(event) {
       await eliminarSesionesSeleccionadas()
       return
     }
+    if (action === 'node-copy-command') {
+      const comando = actionEl.dataset.command || ''
+      if (!comando) return
+      try {
+        await copyText(comando)
+        showToast('Comando copiado.', 'success')
+      } catch {
+        showToast('No se pudo copiar el comando.', 'error')
+      }
+      return
+    }
     if (action === 'node-create') {
       const { openNodeModal } = await import('./handlers-admin.js')
       await openNodeModal()

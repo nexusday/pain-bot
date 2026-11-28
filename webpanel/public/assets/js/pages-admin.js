@@ -1121,8 +1121,13 @@ export function adminNodesHTML(data) {
                 <div><div class="tiny muted">Commit</div><div style="font-weight:800 mono">${h(salud.commit || '?')}</div></div>
                 <div><div class="tiny muted">Carriles</div><div style="font-weight:800">${(salud.carriles || []).length}</div></div>
               </div>`
-            : `<div class="notice warn">${icon('alert')}<div>No se pudo conectar: ${h(nodo.error || 'sin conexión')}. Revisa que el agente esté corriendo y el puerto abierto.</div></div>`}
-          <div class="flex gap-8" style="flex-wrap:wrap">
+            : `<div class="notice warn">${icon('alert')}<div>Sin conexión. Revisa que el agente siga corriendo en la VPS con el comando de abajo.</div></div>`}
+          <div class="field" style="margin-top:10px">
+            <label class="label">Comando del agente</label>
+            <textarea class="input mono" rows="2" readonly>${h(nodo.command || '')}</textarea>
+          </div>
+          <div class="flex gap-8" style="flex-wrap:wrap;margin-top:10px">
+            <button class="btn btn-ghost btn-sm" data-action="node-copy-command" data-command="${h(nodo.command || '')}">${icon('copy')} Copiar comando</button>
             <button class="btn btn-ghost btn-sm" data-action="node-edit" data-id="${nodo.id}">${icon('settings')} Editar</button>
             <button class="btn btn-ghost btn-sm" data-action="node-stop" data-id="${nodo.id}">${icon('square')} Parar carriles</button>
             <button class="btn btn-ghost btn-sm danger" data-action="node-delete" data-id="${nodo.id}" data-name="${h(nodo.name)}">${icon('trash')} Quitar</button>

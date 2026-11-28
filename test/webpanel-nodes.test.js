@@ -57,7 +57,7 @@ async function panelDePrueba(t) {
 }
 
 test('webpanel: crear, listar, editar y borrar nodos remotos', async (t) => {
-  const { pedir } = await panelDePrueba(t)
+  const { handle, pedir } = await panelDePrueba(t)
 
   const registro = await pedir('/api/auth/register', {
     method: 'POST',
@@ -78,12 +78,11 @@ test('webpanel: crear, listar, editar y borrar nodos remotos', async (t) => {
   const listaUsuario = await pedir('/api/admin/nodes', { cookie: cookieUsuario })
   assert.equal(listaUsuario.status, 403)
 
-  const token = 'token-de-prueba-1234567890'
   const invalido = await pedir('/api/admin/nodes', {
     method: 'POST',
     cookie: cookieAdmin,
     csrf: csrfAdmin,
-    body: { name: 'nodo', url: 'no-es-url', token },
+    body: { name: 'x' },
   })
   assert.equal(invalido.status, 400)
 
@@ -91,17 +90,20 @@ test('webpanel: crear, listar, editar y borrar nodos remotos', async (t) => {
     method: 'POST',
     cookie: cookieAdmin,
     csrf: csrfAdmin,
-    body: { name: 'vip-1', url: 'http://127.0.0.1:1', token },
+    body: { name: 'vip-1', description: 'VPS de pruebas' },
   })
   assert.equal(creado.status, 201)
   assert.equal(creado.datos.node.name, 'vip-1')
+  assert.match(creado.datos.node.uuid, /^[0-9a-f-]{36}$/i)
+  assert.ok(creado.datos.node.command.includes('NODE_UUID='))
+  assert.ok(creado.datos.node.command.includes('NODE_TOKEN='))
   const id = creado.datos.node.id
 
   const lista = await pedir('/api/admin/nodes', { cookie: cookieAdmin })
   assert.equal(lista.status, 200)
   assert.equal(lista.datos.nodes.length, 1)
-  // Sin agente corriendo, el nodo aparece offline con el error controlado.
   assert.equal(lista.datos.nodes[0].online, false)
+  assert.ok(lista.datos.nodes[0].command.includes('NODE_UUID='))
 
   const editado = await pedir(`/api/admin/nodes/${id}`, {
     method: 'PATCH',

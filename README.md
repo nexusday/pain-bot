@@ -681,34 +681,42 @@ borrado se hace **por oleadas de 5** para no saturar el proceso del bot.
 
 Endpoint: `POST /api/admin/sessions/bulk` con `{ phones: [...], batchSize: 5 }`.
 
-### Nodos remotos (VPS para servidores VIP)
+### Nodos remotos (VPS para servidores VIP) — modelo Wings
 
-El panel puede usar una VPS aparte como nodo de bots. Cada nodo ejecuta un
-agente pequeño que reporta CPU, RAM, disco, versión de Node y commit, y
-recibe órdenes de arranque/parada del panel.
+El panel puede usar una VPS aparte como nodo de bots, igual que Pterodactyl:
+el **agente se conecta desde la VPS hacia el panel** por WebSocket. No hace
+falta abrir puertos en la VPS ni que el panel conozca su IP.
+
+**En el panel:**
+
+1. **Administración → Nodos → Añadir nodo**. El panel genera un UUID y un
+   token y te muestra el comando exacto para la VPS.
+2. Copia el comando. Se ve así:
+
+```bash
+PANEL_URL=https://tu-panel.com NODE_UUID=... NODE_TOKEN=... node scripts/node-agent.js
+```
 
 **En la VPS del nodo:**
 
 ```bash
 git clone <repo> pain-bot && cd pain-bot
 npm install
-# ffmpeg debe estar instalado en el sistema
-NODE_TOKEN=un-token-largo NODE_PORT=10010 node scripts/node-agent.js
+# ffmpeg instalado en el sistema
+PANEL_URL=https://tu-panel.com NODE_UUID=... NODE_TOKEN=... node scripts/node-agent.js
 ```
 
-Deja el agente corriendo con `pm2`, `systemd` o el gestor de tu hosting.
-Abre el puerto `10010` en el firewall y usa una URL accesible por el panel
-(por ejemplo `http://IP:10010` o un subdominio con HTTPS).
+Déjalo corriendo con `pm2`, `systemd` o el gestor de tu hosting. El agente
+abre la conexión, reporta CPU/RAM/disco/versión/commit y aparece **en línea**
+en el panel. Si se cae la red, reintenta solo cada 10 s.
 
-**En el panel:**
+**Crear un servidor en el nodo:**
 
-1. **Administración → Nodos → Añadir nodo**: nombre, URL del agente y token.
-2. El panel mostrará CPU, RAM, disco, versión y commit del nodo.
-3. **Servidores → Crear servidor**: elige tier `premium` o `vip`, selecciona
-   el **Nodo de ejecución** y guarda.
-4. En la fila del servidor pulsa **Arrancar en nodo**. El panel sincroniza las
-   sesiones (creds) al nodo y el agente arranca los carriles con la CPU/RAM de
-   esa VPS.
+1. **Servidores → Crear servidor**: tier `premium` o `vip`, selecciona el
+   **Nodo de ejecución** y guarda.
+2. En la fila del servidor pulsa **Arrancar en nodo**. El panel envía por la
+   WebSocket las credenciales de cada bot y la orden de arranque. El agente
+   lanza `main.js` en modo worker con la CPU/RAM de esa VPS.
 
 Los servidores con nodo **no se ejecutan en la VPS del panel**. El supervisor
 local los ignora y el agente remoto es el dueño de esos procesos. Los datos

@@ -774,27 +774,37 @@ export function openNodeModal(nodo = null) {
   const editando = Boolean(nodo?.id)
   openModal({
     title: editando ? `Editar nodo ${nodo.name}` : 'Añadir nodo remoto',
-    subtitle: 'Una VPS con el agente de Pain-Bot',
+    subtitle: 'El panel genera el comando de conexión; no hace falta abrir puertos',
     body: `<form id="node-form" data-id="${editando ? nodo.id : ''}">
       <div class="form-error">${icon('alert')}<span></span></div>
       <div class="field">
         <label class="label" for="node-name">Nombre</label>
         <input id="node-name" name="name" class="input" maxlength="60" placeholder="vip-1" value="${h(nodo?.name || '')}" required />
+        <div class="hint">Solo letras, números, guiones y guiones bajos.</div>
       </div>
       <div class="field">
-        <label class="label" for="node-url">URL pública del agente</label>
-        <input id="node-url" name="url" class="input mono" placeholder="http://IP:10010" value="${h(nodo?.url || '')}" required />
-        <div class="hint">La IP o dominio de la VPS y el puerto donde corre <span class="mono">scripts/node-agent.js</span>.</div>
-      </div>
-      <div class="field">
-        <label class="label" for="node-token">Token</label>
-        <input id="node-token" name="token" class="input mono" type="password" placeholder="el mismo NODE_TOKEN de la VPS" value="" ${editando ? '' : 'required'} />
-        <div class="hint">${editando ? 'Déjalo vacío para conservar el token actual.' : 'Mínimo 16 caracteres. Debe coincidir con NODE_TOKEN en la VPS.'}</div>
+        <label class="label" for="node-description">Descripción</label>
+        <textarea id="node-description" name="description" class="input" rows="2" maxlength="300" placeholder="VPS de alto rendimiento para servidores VIP.">${h(nodo?.description || '')}</textarea>
       </div>
       ${editando ? `<label class="check"><input type="checkbox" name="enabled" ${nodo.enabled ? 'checked' : ''} /><span>Nodo activo</span></label>` : ''}
     </form>`,
     footer: `<button class="btn btn-ghost" data-action="modal-close">Cancelar</button>
-      <button class="btn btn-primary" id="node-submit" type="submit" form="node-form">${icon('check')} ${editando ? 'Guardar' : 'Añadir nodo'}</button>`,
+      <button class="btn btn-primary" id="node-submit" type="submit" form="node-form">${icon('check')} ${editando ? 'Guardar' : 'Generar nodo'}</button>`,
+  })
+}
+
+export function mostrarComandoNodo(command) {
+  openModal({
+    title: 'Conecta la VPS a este nodo',
+    subtitle: 'Ejecuta este comando en la VPS (con el repo clonado y npm install)',
+    body: `<div class="notice">${icon('info')}<div>El agente se conecta <b>desde la VPS hacia el panel</b>, como Wings en Pterodactyl. No abras puertos en la VPS.</div></div>
+      <div class="field">
+        <label class="label">Comando</label>
+        <textarea class="input mono" rows="3" readonly>${h(command)}</textarea>
+      </div>
+      <div class="hint">Déjalo corriendo con pm2 o systemd. Cuando conecte, el nodo aparecerá en línea con su CPU, RAM y disco.</div>`,
+    footer: `<button class="btn btn-ghost" data-action="modal-close">Cerrar</button>
+      <button class="btn btn-primary" data-action="node-copy-command" data-command="${h(command)}">${icon('copy')} Copiar comando</button>`,
   })
 }
 
@@ -803,17 +813,21 @@ export async function handleNodeSave(form) {
   const id = String(form.dataset.id || '').trim()
   const body = {
     name: String(form.querySelector('[name="name"]')?.value || '').trim(),
-    url: String(form.querySelector('[name="url"]')?.value || '').trim(),
-    token: String(form.querySelector('[name="token"]')?.value || '').trim(),
+    description: String(form.querySelector('[name="description"]')?.value || '').trim(),
   }
   if (id) body.enabled = form.querySelector('[name="enabled"]')?.checked ? true : false
   hideFormError(form)
   setLoading(submit, true, 'Guardando…')
   try {
-    if (id) await api.patch(`/api/admin/nodes/${id}`, body)
-    else await api.post('/api/admin/nodes', body)
+    const data = id
+      ? await api.patch(`/api/admin/nodes/${id}`, body)
+      : await api.post('/api/admin/nodes', body)
     closeModal()
-    showToast(id ? 'Nodo actualizado.' : 'Nodo añadido.', 'success')
+    if (!id && data?.node?.command) {
+      mostrarComandoNodo(data.node.command)
+    } else {
+      showToast('Nodo actualizado.', 'success')
+    }
     const { renderAdmin } = await import('./pages-admin.js')
     await renderAdmin('nodes')
   } catch (error) {
