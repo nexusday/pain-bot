@@ -12,8 +12,10 @@ test('webpanel UI: el principal ve todas las secciones y los demás solo sus per
     for (const section of ['overview', 'principal', 'users', 'sessions', 'pairings', 'communities', 'audit', 'roles', 'mail', 'settings','notifications','backups']) {
       assert.ok(tabs.includes(`href="#/admin/${section}"`), `falta ${section}`)
     }
-    const settings = adminSettingsHTML({ canTurnstile: true, canLimits: true })
+    const settings = adminSettingsHTML({ canTurnstile: true, canLimits: true }, 'security')
     assert.ok(settings.includes('settings-turnstile-form'))
+    assert.ok(settings.includes('data-tab="limits"'))
+    assert.ok(adminSettingsHTML({ canTurnstile: true, canLimits: true }, 'maintenance').includes('admin-update'))
     const {backupsHTML,notificationsHTML}=await import('../webpanel/public/assets/js/admin-tools.js')
     assert.equal((backupsHTML().match(/name="currentPassword"/g)||[]).length,2)
     const notices=notificationsHTML({users:[{id:2,username:'<script>test</script>',activeDevices:0,pushStatus:'inactive'}],settings:{enabled:true,promptMinutes:60},history:[],canSettings:true})

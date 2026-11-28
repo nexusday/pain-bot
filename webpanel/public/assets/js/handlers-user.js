@@ -384,10 +384,13 @@ export async function aplicarCambiosEnCaliente() {
     if (data.resumen?.plugins?.length) lineas.push(`${data.resumen.plugins.length} plugin(s) recargados.`)
     if (data.workers?.workers) lineas.push('El proceso del bot también recargó su código.')
     if (data.reinicioPendiente) {
-      lineas.push('main.js cambió: hace falta reiniciar el proceso.')
+      lineas.push('El panel y los plugins ya se actualizaron. Los carriles de sub-bots se reinician en caliente, uno por uno; el bot principal no se corta.')
       set(lineas.join(' '))
-      showToast('Hay que reiniciar el proceso (main.js cambió).', 'warn')
-      confirmarReinicioDelProceso()
+      showToast('Aplicado. Carriles reiniciándose en caliente.', 'success')
+      try {
+        await api.post('/api/admin/rolling-restart', {})
+      } catch {}
+      esperaPanelYRecarga()
       return
     }
     lineas.push('El panel se recarga solo en un momento (sin cortar la web).')

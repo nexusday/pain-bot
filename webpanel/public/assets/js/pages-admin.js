@@ -178,7 +178,7 @@ export async function renderAdmin(section) {
     const data = await api.get('/api/admin/settings')
      if (!isCurrentAdminRoute('settings')) return
     state.adminSettings = data
-    content(adminTabs('settings') + adminSettingsHTML(data))
+    content(adminTabs('settings') + adminSettingsHTML(data, state.settingsTab || 'limits'))
   } catch (error) {
     if (error.status === 403) {
       showToast(error.message || 'Necesitas permisos de administrador.', 'error')
@@ -895,7 +895,7 @@ function adminPremiumHTML(premium) {
   </div>`
 }
 
-export function adminSettingsHTML(data) {
+export function adminSettingsHTML(data, tab = 'limits') {
   const maxSubs = Number(data.maxSubs || 0)
   const maxPorUsuario = Number(data.maxSubsPerUser || 0)
   const maxPorIp = Number(data.maxBotsPerIp || 0)
@@ -905,151 +905,180 @@ export function adminSettingsHTML(data) {
   const esperaSegundos = Number(data.pairCooldownSeconds || 0)
   const duracionCodigo = Number(data.pairCodeSeconds || 90)
   const repo = data.repo || {}
-  return `<div class="grid-2">
-    <div class="stack">
-      <div class="card">
-        <div class="card-head"><div><h3>Límites de sub-bots</h3><p>Se aplican a todo el servidor</p></div></div>
-        <div class="card-body">
-          <form id="settings-form">
-            <fieldset style="border:0;padding:0;margin:0;min-width:0" ${data.canLimits ? '' : 'disabled'}>
-            <div class="form-error">${icon('alert')}<span></span></div>
-            <div class="field">
-              <label class="label" for="settings-max">Máximo de sub-bots del servidor</label>
-              <input id="settings-max" name="maxSubs" type="number" min="0" class="input" value="${maxSubs}" />
-              <div class="hint">Usa <b>0</b> para ilimitado. El valor se guarda en <span class="mono">storage/maxsubs.json</span>.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-max-user">Máximo de sub-bots por cuenta</label>
-              <input id="settings-max-user" name="maxSubsPerUser" type="number" min="0" class="input" value="${maxPorUsuario}" />
-              <div class="hint">Cuántas cuentas puede vincular cada usuario del panel. <b>0</b> = sin límite.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-max-ip">Máximo de cuentas por IP</label>
-              <input id="settings-max-ip" name="maxBotsPerIp" type="number" min="0" class="input" value="${maxPorIp}" />
-              <div class="hint">Cuentas distintas que se pueden vincular desde la misma conexión. <b>0</b> = sin límite.</div>
-            </div>
-            <button class="btn btn-primary" type="submit">${icon('check')} Guardar límites</button>
-            </fieldset>
-          </form>
+
+  const tabs = [
+    ['limits', 'Límites', 'users'],
+    ['pairing', 'Vinculación', 'link'],
+    ['identity', 'Identidad', 'globe'],
+    ['security', 'Seguridad', 'shield'],
+    ['premium', 'Premium', 'sparkles'],
+    ['maintenance', 'Mantenimiento', 'server'],
+  ]
+  const tabBar = `<div class="filter-bar" style="margin-bottom:16px"><div class="filter-chips">${tabs.map(([id, label, iconName]) => `<button class="chip ${tab === id ? 'active' : ''}" data-action="settings-tab" data-tab="${id}">${icon(iconName)}${h(label)}</button>`).join('')}</div></div>`
+
+  const cardLimites = `<div class="card">
+    <div class="card-head"><div><h3>Límites de sub-bots</h3><p>Se aplican a todo el servidor</p></div></div>
+    <div class="card-body">
+      <form id="settings-form">
+        <fieldset style="border:0;padding:0;margin:0;min-width:0" ${data.canLimits ? '' : 'disabled'}>
+        <div class="form-error">${icon('alert')}<span></span></div>
+        <div class="field">
+          <label class="label" for="settings-max">Máximo de sub-bots del servidor</label>
+          <input id="settings-max" name="maxSubs" type="number" min="0" class="input" value="${maxSubs}" />
+          <div class="hint">Usa <b>0</b> para ilimitado. El valor se guarda en <span class="mono">storage/maxsubs.json</span> y se aplica al instante, sin reiniciar.</div>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <div><h3>Intentos de vinculación</h3><p>Para que nadie abuse del panel</p></div>
+        <div class="field">
+          <label class="label" for="settings-max-user">Máximo de sub-bots por cuenta</label>
+          <input id="settings-max-user" name="maxSubsPerUser" type="number" min="0" class="input" value="${maxPorUsuario}" />
+          <div class="hint">Cuántas cuentas puede vincular cada usuario del panel. <b>0</b> = sin límite.</div>
         </div>
-        <div class="card-body">
-          <form id="settings-limits-form">
-            <fieldset style="border:0;padding:0;margin:0;min-width:0" ${data.canLimits ? '' : 'disabled'}>
-            <div class="form-error">${icon('alert')}<span></span></div>
-            <div class="field">
-              <label class="label" for="settings-attempts-hour">Intentos por hora y usuario</label>
-              <input id="settings-attempts-hour" name="maxPairAttemptsPerHour" type="number" min="0" class="input" value="${intentosHora}" />
-              <div class="hint">Códigos que puede pedir un usuario en una hora. <b>0</b> = sin límite.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-attempts-day">Intentos por día y usuario</label>
-              <input id="settings-attempts-day" name="maxPairAttemptsPerDay" type="number" min="0" class="input" value="${intentosDia}" />
-              <div class="hint">Códigos por día. <b>0</b> = sin límite.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-attempts-ip">Intentos por hora y IP</label>
-              <input id="settings-attempts-ip" name="maxPairAttemptsPerIpPerHour" type="number" min="0" class="input" value="${intentosIp}" />
-              <div class="hint">Códigos por hora desde la misma conexión. <b>0</b> = sin límite.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-cooldown">Espera entre códigos del mismo número (segundos)</label>
-              <input id="settings-cooldown" name="pairCooldownSeconds" type="number" min="0" class="input" value="${esperaSegundos}" />
-              <div class="hint">Espera antes de volver a pedir un código para el mismo número. <b>0</b> = sin espera.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-max-login-global">Intentos globales de login</label>
-              <input id="settings-max-login-global" name="maxLoginAttemptsGlobal" type="number" min="0" class="input" value="${data.maxLoginAttemptsGlobal ?? 12}" />
-              <div class="hint">Intentos de login permitidos por conexión dentro de la espera configurada abajo. <b>0</b> = sin límite.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-max-login-user">Intentos por usuario de login</label>
-              <input id="settings-max-login-user" name="maxLoginAttemptsPerUser" type="number" min="0" class="input" value="${data.maxLoginAttemptsPerUser ?? 6}" />
-              <div class="hint">Máximo de intentos por usuario de login. <b>0</b> = sin límite.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-cooldown-login">Espera tras superar los intentos (minutos)</label>
-              <input id="settings-cooldown-login" name="loginCooldownMinutes" type="number" min="0" class="input" value="${data.loginCooldownMinutes != null ? data.loginCooldownMinutes : Math.round((data.loginCooldownMs ?? 300000) / 60000)}" />
-              <div class="hint">Cuánto tiempo hay que esperar después de gastar los intentos. <b>0</b> = sin espera.</div>
-            </div>
-            <div class="field">
-              <label class="label" for="settings-code-ttl">Duración del código (segundos)</label>
-              <input id="settings-code-ttl" name="pairCodeSeconds" type="number" min="5" class="input" value="${duracionCodigo}" />
-              <div class="hint">Cuánto vive el código de 8 dígitos antes de caducar (es la cuenta atrás que ve el usuario).</div>
-            </div>
-            <button class="btn btn-primary" type="submit">${icon('check')} Guardar intentos</button>
-            </fieldset>
-          </form>
+        <div class="field">
+          <label class="label" for="settings-max-ip">Máximo de cuentas por IP</label>
+          <input id="settings-max-ip" name="maxBotsPerIp" type="number" min="0" class="input" value="${maxPorIp}" />
+          <div class="hint">Cuentas distintas que se pueden vincular desde la misma conexión. <b>0</b> = sin límite.</div>
         </div>
-      </div>
-    </div>
-    <div class="stack">
-      <div class="card">
-        <div class="card-head"><div><h3>Identidad del panel</h3><p>Dominio, subdominio y URL pública</p></div></div>
-        <div class="card-body">
-          <div class="field">
-            <label class="label">URL pública</label>
-            <div class="input-group">
-              <input class="input mono" readonly value="${h(data.publicUrl || '')}" />
-              <button class="btn btn-secondary" data-action="copy" data-copy="${h(data.publicUrl || '')}">${icon('copy')}</button>
-            </div>
-          </div>
-          <div class="system-grid">
-            <div class="system-item"><div class="si-label">Subdominio</div><div class="si-value" style="font-size:13px">${h(data.subdomain || '—')}</div></div>
-            <div class="system-item"><div class="si-label">Dominio</div><div class="si-value" style="font-size:13px">${h(data.domain || '—')}</div></div>
-            <div class="system-item"><div class="si-label">Marca</div><div class="si-value" style="font-size:13px">${h(data.brandName || '—')}</div></div>
-            <div class="system-item"><div class="si-label">Plazas</div><div class="si-value" style="font-size:13px">${maxSubs > 0 ? h(maxSubs) : 'Ilimitado'}</div></div>
-          </div>
-          <div class="pairing-alert" style="margin-top:14px">${icon('info')}<div>Para cambiar el subdominio, dominio o puerto, edita <span class="mono">config.js</span> (o las variables <span class="mono">PAIN_WEB_*</span>) y reinicia el bot. Nada está fijo en el código.</div></div>
-        </div>
-      </div>
-      ${data.canTurnstile ? `<div class="card">
-        <div class="card-head">
-          <div><h3>Cloudflare Turnstile</h3><p>Captcha anti-bots en el acceso</p></div>
-          <span class="badge ${data.turnstileEnabled ? 'success' : 'neutral'}"><span class="dot"></span>${data.turnstileEnabled ? 'Activo' : 'Inactivo'}</span>
-        </div>
-        <div class="card-body">
-          <form id="settings-turnstile-form">
-            <div class="form-error">${icon('alert')}<span></span></div>
-            <div class="field">
-              <label class="label" for="turnstile-site">Site key</label>
-              <div class="input-icon">${icon('globe')}<input id="turnstile-site" name="siteKey" class="input mono" value="${h(data.turnstileSiteKey || '')}" placeholder="0x4AAAAAAA…" autocomplete="off" spellcheck="false" /></div>
-            </div>
-            <div class="field">
-              <label class="label" for="turnstile-secret">Secret key</label>
-              <div class="input-icon">
-                ${icon('key')}
-                <input id="turnstile-secret" name="secretKey" class="input mono" type="password" value="${h(data.turnstileSecretKey || '')}" placeholder="0x4AAAAAAA…" autocomplete="off" spellcheck="false" />
-                <button type="button" class="icon-btn sm" data-action="toggle-password" data-input="turnstile-secret" style="position:absolute;right:5px;top:5px;border:0;background:transparent" aria-label="Mostrar u ocultar la clave">${icon('eye')}</button>
-              </div>
-              <div class="hint">Si dejas la clave vacía al guardar, se conserva la actual. Se activa al tener <b>site key</b> y <b>secret key</b>. Créalas en Cloudflare → Turnstile.</div>
-            </div>
-            <button class="btn btn-primary" type="submit">${icon('check')} Guardar Turnstile</button>
-          </form>
-        </div>
-      </div>` : ''}
-      ${data.canPremium ? adminPremiumHTML(data.premium || {}) : ''}
-      <div class="card">
-        <div class="card-head"><div><h3>Mantenimiento</h3><p>Actualizar sin reiniciar el servidor</p></div></div>
-        <div class="card-body">
-          <div class="system-grid">
-            <div class="system-item"><div class="si-label">Rama</div><div class="si-value mono" style="font-size:13px">${h(repo.rama || '—')}</div></div>
-            <div class="system-item"><div class="si-label">Commit</div><div class="si-value mono" style="font-size:13px">${h(repo.corto || '—')}</div></div>
-          </div>
-          <div class="notice" style="margin-top:14px">${icon('info')}<div>Trae el código del remoto y lo aplica <b>sin reiniciar el proceso</b>: los sub-bots no se desconectan, el bot y sus workers recargan sus plugins y el panel se recarga con el código nuevo. Tus cambios locales se guardan antes de actualizar.</div></div>
-          ${puede('admin.update') ? `<div class="flex gap-8" style="margin-top:14px;flex-wrap:wrap">
-            <button class="btn btn-primary" data-action="admin-update">${icon('refresh')} Aplicar cambios</button>
-            <button class="btn btn-secondary" data-action="admin-reload">${icon('rotate')} Recargar código</button>
-          </div>` : '<div class="hint" style="margin-top:12px">No tienes permiso para aplicar actualizaciones.</div>'}
-          <div id="update-result" class="hint" style="margin-top:12px"></div>
-        </div>
-      </div>
+        <button class="btn btn-primary" type="submit">${icon('check')} Guardar límites</button>
+        </fieldset>
+      </form>
     </div>
   </div>`
+
+  const cardIntentos = `<div class="card">
+    <div class="card-head"><div><h3>Intentos de vinculación</h3><p>Para que nadie abuse del panel</p></div></div>
+    <div class="card-body">
+      <form id="settings-limits-form">
+        <fieldset style="border:0;padding:0;margin:0;min-width:0" ${data.canLimits ? '' : 'disabled'}>
+        <div class="form-error">${icon('alert')}<span></span></div>
+        <div class="field">
+          <label class="label" for="settings-attempts-hour">Intentos por hora y usuario</label>
+          <input id="settings-attempts-hour" name="maxPairAttemptsPerHour" type="number" min="0" class="input" value="${intentosHora}" />
+          <div class="hint">Códigos que puede pedir un usuario en una hora. <b>0</b> = sin límite.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="settings-attempts-day">Intentos por día y usuario</label>
+          <input id="settings-attempts-day" name="maxPairAttemptsPerDay" type="number" min="0" class="input" value="${intentosDia}" />
+          <div class="hint">Códigos por día. <b>0</b> = sin límite.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="settings-attempts-ip">Intentos por hora y IP</label>
+          <input id="settings-attempts-ip" name="maxPairAttemptsPerIpPerHour" type="number" min="0" class="input" value="${intentosIp}" />
+          <div class="hint">Códigos por hora desde la misma conexión. <b>0</b> = sin límite.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="settings-cooldown">Espera entre códigos del mismo número (segundos)</label>
+          <input id="settings-cooldown" name="pairCooldownSeconds" type="number" min="0" class="input" value="${esperaSegundos}" />
+          <div class="hint">Espera antes de volver a pedir un código para el mismo número. <b>0</b> = sin espera.</div>
+        </div>
+        <button class="btn btn-primary" type="submit">${icon('check')} Guardar intentos</button>
+        </fieldset>
+      </form>
+    </div>
+  </div>`
+
+  const cardLogin = `<div class="card">
+    <div class="card-head"><div><h3>Acceso al panel</h3><p>Límites de login y códigos</p></div></div>
+    <div class="card-body">
+      <form id="settings-limits-form-login">
+        <fieldset style="border:0;padding:0;margin:0;min-width:0" ${data.canLimits ? '' : 'disabled'}>
+        <div class="form-error">${icon('alert')}<span></span></div>
+        <div class="field">
+          <label class="label" for="settings-max-login-global">Intentos globales de login</label>
+          <input id="settings-max-login-global" name="maxLoginAttemptsGlobal" type="number" min="0" class="input" value="${data.maxLoginAttemptsGlobal ?? 12}" />
+          <div class="hint">Intentos de login permitidos por conexión dentro de la espera configurada. <b>0</b> = sin límite.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="settings-max-login-user">Intentos por usuario de login</label>
+          <input id="settings-max-login-user" name="maxLoginAttemptsPerUser" type="number" min="0" class="input" value="${data.maxLoginAttemptsPerUser ?? 6}" />
+          <div class="hint">Máximo de intentos por usuario. <b>0</b> = sin límite.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="settings-cooldown-login">Espera tras superar los intentos (minutos)</label>
+          <input id="settings-cooldown-login" name="loginCooldownMinutes" type="number" min="0" class="input" value="${data.loginCooldownMinutes != null ? data.loginCooldownMinutes : Math.round((data.loginCooldownMs ?? 300000) / 60000)}" />
+          <div class="hint">Cuánto tiempo hay que esperar después de gastar los intentos. <b>0</b> = sin espera.</div>
+        </div>
+        <div class="field">
+          <label class="label" for="settings-code-ttl">Duración del código (segundos)</label>
+          <input id="settings-code-ttl" name="pairCodeSeconds" type="number" min="5" class="input" value="${duracionCodigo}" />
+          <div class="hint">Cuánto vive el código de 8 dígitos antes de caducar.</div>
+        </div>
+        <button class="btn btn-primary" type="submit">${icon('check')} Guardar acceso</button>
+        </fieldset>
+      </form>
+    </div>
+  </div>`
+
+  const cardIdentidad = `<div class="card">
+    <div class="card-head"><div><h3>Identidad del panel</h3><p>Dominio, subdominio y URL pública</p></div></div>
+    <div class="card-body">
+      <div class="field">
+        <label class="label">URL pública</label>
+        <div class="input-group">
+          <input class="input mono" readonly value="${h(data.publicUrl || '')}" />
+          <button class="btn btn-secondary" data-action="copy" data-copy="${h(data.publicUrl || '')}">${icon('copy')}</button>
+        </div>
+      </div>
+      <div class="system-grid">
+        <div class="system-item"><div class="si-label">Subdominio</div><div class="si-value" style="font-size:13px">${h(data.subdomain || '—')}</div></div>
+        <div class="system-item"><div class="si-label">Dominio</div><div class="si-value" style="font-size:13px">${h(data.domain || '—')}</div></div>
+        <div class="system-item"><div class="si-label">Marca</div><div class="si-value" style="font-size:13px">${h(data.brandName || '—')}</div></div>
+        <div class="system-item"><div class="si-label">Plazas</div><div class="si-value" style="font-size:13px">${maxSubs > 0 ? h(maxSubs) : 'Ilimitado'}</div></div>
+      </div>
+      <div class="pairing-alert" style="margin-top:14px">${icon('info')}<div>El subdominio, dominio y puerto se leen de <span class="mono">config.js</span> o de las variables <span class="mono">PAIN_WEB_*</span>. Cambiarlos requiere reiniciar el panel web; el bot y los sub-bots no se ven afectados.</div></div>
+    </div>
+  </div>`
+
+  const cardTurnstile = data.canTurnstile ? `<div class="card">
+    <div class="card-head">
+      <div><h3>Cloudflare Turnstile</h3><p>Captcha anti-bots en el acceso</p></div>
+      <span class="badge ${data.turnstileEnabled ? 'success' : 'neutral'}"><span class="dot"></span>${data.turnstileEnabled ? 'Activo' : 'Inactivo'}</span>
+    </div>
+    <div class="card-body">
+      <form id="settings-turnstile-form">
+        <div class="form-error">${icon('alert')}<span></span></div>
+        <div class="field">
+          <label class="label" for="turnstile-site">Site key</label>
+          <div class="input-icon">${icon('globe')}<input id="turnstile-site" name="siteKey" class="input mono" value="${h(data.turnstileSiteKey || '')}" placeholder="0x4AAAAAAA…" autocomplete="off" spellcheck="false" /></div>
+        </div>
+        <div class="field">
+          <label class="label" for="turnstile-secret">Secret key</label>
+          <div class="input-icon">
+            ${icon('key')}
+            <input id="turnstile-secret" name="secretKey" class="input mono" type="password" value="${h(data.turnstileSecretKey || '')}" placeholder="0x4AAAAAAA…" autocomplete="off" spellcheck="false" />
+            <button type="button" class="icon-btn sm" data-action="toggle-password" data-input="turnstile-secret" style="position:absolute;right:5px;top:5px;border:0;background:transparent" aria-label="Mostrar u ocultar la clave">${icon('eye')}</button>
+          </div>
+          <div class="hint">Si dejas la clave vacía al guardar, se conserva la actual. Se activa al tener <b>site key</b> y <b>secret key</b>. Créalas en Cloudflare → Turnstile.</div>
+        </div>
+        <button class="btn btn-primary" type="submit">${icon('check')} Guardar Turnstile</button>
+      </form>
+    </div>
+  </div>` : ''
+
+  const cardMantenimiento = `<div class="card">
+    <div class="card-head"><div><h3>Mantenimiento</h3><p>Actualizar sin reiniciar el servidor</p></div></div>
+    <div class="card-body">
+      <div class="system-grid">
+        <div class="system-item"><div class="si-label">Rama</div><div class="si-value mono" style="font-size:13px">${h(repo.rama || '—')}</div></div>
+        <div class="system-item"><div class="si-label">Commit</div><div class="si-value mono" style="font-size:13px">${h(repo.corto || '—')}</div></div>
+      </div>
+      <div class="notice" style="margin-top:14px">${icon('info')}<div>Trae el código del remoto y lo aplica <b>sin reiniciar el proceso</b>: los sub-bots no se desconectan, el bot y sus workers recargan sus plugins y el panel se recarga con el código nuevo. Tus cambios locales se guardan antes de actualizar.</div></div>
+      ${puede('admin.update') ? `<div class="flex gap-8" style="margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-primary" data-action="admin-update">${icon('refresh')} Aplicar cambios</button>
+        <button class="btn btn-secondary" data-action="admin-reload">${icon('rotate')} Recargar código</button>
+      </div>` : '<div class="hint" style="margin-top:12px">No tienes permiso para aplicar actualizaciones.</div>'}
+      <div id="update-result" class="hint" style="margin-top:12px"></div>
+    </div>
+  </div>`
+
+  const contenido = {
+    limits: `<div class="grid-2">${cardLimites}${cardIntentos}</div>`,
+    pairing: `<div class="grid-2">${cardLogin}<div class="card"><div class="card-head"><div><h3>Buenas prácticas</h3><p>Para que el emparejamiento no falle</p></div></div><div class="card-body"><div class="notice">${icon('shieldCheck')}<div>Usa números reales, espera entre códigos, no vincules cientos de cuentas desde la misma IP en minutos y evita re-vincular si el bot sigue conectado. El panel y los sub-bots no se reinician al guardar estos límites.</div></div></div></div></div>`,
+    identity: cardIdentidad,
+    security: cardTurnstile || `<div class="card"><div class="card-body"><div class="notice">${icon('info')}<div>El captcha no está disponible en esta instalación.</div></div></div></div>`,
+    premium: data.canPremium ? adminPremiumHTML(data.premium || {}) : `<div class="card"><div class="card-body"><div class="notice">${icon('info')}<div>El módulo premium no está disponible para tu rol.</div></div></div></div>`,
+    maintenance: cardMantenimiento,
+  }
+
+  return `${tabBar}${contenido[tab] || contenido.limits}`
 }
 
 /* ── Roles y permisos ───────────────────────────────────────────────────── */

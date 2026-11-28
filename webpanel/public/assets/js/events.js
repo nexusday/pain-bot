@@ -410,6 +410,16 @@ export async function onClick(event) {
       await eliminarSesionesSeleccionadas()
       return
     }
+    if (action === 'settings-tab') {
+      state.settingsTab = actionEl.dataset.tab || 'limits'
+      await renderAdmin('settings')
+      return
+    }
+    if (action === 'shared-page') {
+      const { cambiarPaginaShared } = await import('./pages-shared.js')
+      await cambiarPaginaShared(actionEl.dataset.dir)
+      return
+    }
     if (action === 'shared-toggle' || action === 'shared-delete' || action === 'shared-leave' || action === 'shared-block') {
       const { accionShared } = await import('./pages-shared.js')
       await accionShared(action, Number(actionEl.dataset.id), actionEl.dataset)
@@ -597,7 +607,7 @@ export async function onSubmit(event) {
     await handleSettingsSave(form)
     return
   }
-  if (id === 'settings-limits-form') {
+  if (id === 'settings-limits-form' || id === 'settings-limits-form-login') {
     event.preventDefault()
     await handleSettingsLimitsSave(form)
     return

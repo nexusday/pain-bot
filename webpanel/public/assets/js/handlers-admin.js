@@ -728,46 +728,40 @@ export function openMailTest() {
 }
 
 export async function handleSettingsLimitsSave(form) {
-  const numero = (selector) => {
-    const valor = Number(form.querySelector(selector)?.value || 0)
-    return Number.isFinite(valor) && valor >= 0 ? valor : NaN
+  // Ajustes ahora está separado en pestañas: cada formulario envía solo los
+  // campos que realmente tiene (vinculación o acceso), sin sobrescribir el otro.
+  const campos = {
+    maxPairAttemptsPerHour: '[name="maxPairAttemptsPerHour"]',
+    maxPairAttemptsPerDay: '[name="maxPairAttemptsPerDay"]',
+    maxPairAttemptsPerIpPerHour: '[name="maxPairAttemptsPerIpPerHour"]',
+    pairCooldownSeconds: '[name="pairCooldownSeconds"]',
+    pairCodeSeconds: '[name="pairCodeSeconds"]',
+    maxLoginAttemptsGlobal: '[name="maxLoginAttemptsGlobal"]',
+    maxLoginAttemptsPerUser: '[name="maxLoginAttemptsPerUser"]',
+    loginCooldownMinutes: '[name="loginCooldownMinutes"]',
   }
-  const porHora = numero('[name="maxPairAttemptsPerHour"]')
-  const porDia = numero('[name="maxPairAttemptsPerDay"]')
-  const porIp = numero('[name="maxPairAttemptsPerIpPerHour"]')
-  const espera = numero('[name="pairCooldownSeconds"]')
-  const duracion = numero('[name="pairCodeSeconds"]')
-  // Límites del login: intentos globales, por usuario y espera tras superarlos.
-  const loginGlobal = numero('[name="maxLoginAttemptsGlobal"]')
-  const loginUsuario = numero('[name="maxLoginAttemptsPerUser"]')
-  const loginEspera = numero('[name="loginCooldownMinutes"]')
-  const submit = form.querySelector('button[type="submit"]')
+  const payload = {}
   hideFormError(form)
-  if ([porHora, porDia, porIp, espera, duracion].some((valor) => Number.isNaN(valor))) {
-    showFormError(form, 'Todos los valores deben ser 0 o un número mayor.')
-    return
+  for (const [clave, selector] of Object.entries(campos)) {
+    const elemento = form.querySelector(selector)
+    if (!elemento) continue
+    const valor = Number(elemento.value || 0)
+    if (!Number.isFinite(valor) || valor < 0) {
+      showFormError(form, 'Todos los valores deben ser 0 o un número mayor.')
+      return
+    }
+    payload[clave] = valor
   }
-  if ([loginGlobal, loginUsuario, loginEspera].some((valor) => Number.isNaN(valor))) {
-    showFormError(form, 'Los intentos de login deben ser 0 (sin límite) o un número mayor, y la espera en minutos.')
-    return
-  }
-  if (duracion < 15) {
+  if (payload.pairCodeSeconds !== undefined && payload.pairCodeSeconds < 15) {
     showFormError(form, 'La duración del código debe ser de 15 segundos o más.')
     return
   }
+  if (!Object.keys(payload).length) return
+  const submit = form.querySelector('button[type="submit"]')
   setLoading(submit, true, 'Guardando…')
   try {
-    await api.patch('/api/admin/settings', {
-      maxPairAttemptsPerHour: porHora,
-      maxPairAttemptsPerDay: porDia,
-      maxPairAttemptsPerIpPerHour: porIp,
-      pairCooldownSeconds: espera,
-      pairCodeSeconds: duracion,
-      maxLoginAttemptsGlobal: loginGlobal,
-      maxLoginAttemptsPerUser: loginUsuario,
-      loginCooldownMinutes: loginEspera,
-    })
-    showToast('Límites de intentos actualizados.', 'success')
+    await api.patch('/api/admin/settings', payload)
+    showToast('Ajustes guardados. Se aplican al instante, sin reiniciar.', 'success')
     await renderAdmin('settings')
   } catch (error) {
     showFormError(form, error.message || 'No se pudieron guardar los límites.')

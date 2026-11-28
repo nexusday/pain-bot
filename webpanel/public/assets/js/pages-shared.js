@@ -114,8 +114,10 @@ function tarjetaPublica(shared) {
   </div>`
 }
 
+const POR_PAGINA = 6
+
 export async function renderShared() {
-  setPage('Subbots compartidos', 'Comparte tu sub-bot o pide uno para tu grupo')
+  setPage('Bots para grupos', 'Presta un sub-bot o pide uno para tu grupo')
   content(loadingPage('Cargando subbots compartidos…'))
   let datos
   let mine
@@ -136,10 +138,14 @@ export async function renderShared() {
   const shared = Array.isArray(datos.shared) ? datos.shared : []
   const mios = Array.isArray(mine.bots) ? mine.bots : []
   const joins = Array.isArray(mine.joins) ? mine.joins : []
+  const totalPaginas = Math.max(1, Math.ceil(shared.length / POR_PAGINA))
+  const paginaActual = Math.min(Math.max(0, Number(state.sharedPage) || 0), totalPaginas - 1)
+  state.sharedPage = paginaActual
+  const visibles = shared.slice(paginaActual * POR_PAGINA, paginaActual * POR_PAGINA + POR_PAGINA)
 
   content(`
     <div class="page-head">
-      <div><h2>Subbots compartidos</h2><p>Presta tu sub-bot para grupos de otros usuarios o pide uno para tu grupo. Los límites dependen de tu servidor.</p></div>
+      <div><h2>Bots para grupos</h2><p>Presta uno de tus sub-bots para ayudar en grupos de otras personas, o pide uno prestado para tu propio grupo.</p></div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="refresh">${icon('refresh')} Actualizar</button>
         <a class="btn btn-secondary" href="#/servers">${icon('server')} Servidores</a>
@@ -147,14 +153,20 @@ export async function renderShared() {
     </div>
 
     <div class="card" style="margin-bottom:16px"><div class="card-body">
-      <div class="flex" style="gap:12px;flex-wrap:wrap">
-        <div class="row-icon accent">${icon('info')}</div>
+      <div class="flex" style="gap:12px;flex-wrap:wrap;align-items:flex-start">
+        <div class="row-icon accent">${icon('users')}</div>
         <div class="grow">
-          <div style="font-weight:700">Cómo funciona</div>
-          <div class="tiny muted">1) Publicas un sub-bot tuyo y eliges cuántos grupos puede atender. 2) Otro usuario pega el enlace de su grupo. 3) El sub-bot se une, queda activo para ese grupo y tú lo ves aquí con el nombre y el enlace. Puedes sacarlo o bloquear al solicitante. Límites: Free compartido 3 · Free aislado 4 · Premium compartido 5 · Premium aislado 6.</div>
+          <div style="font-weight:700;margin-bottom:6px">¿Cómo funciona?</div>
+          <div class="tiny muted" style="line-height:1.6">
+            <b>Si compartes:</b> eliges un sub-bot tuyo, cuántos grupos puede atender y cuántas solicitudes acepta por IP. Verás el nombre y el enlace de cada grupo, quién lo pidió, y podrás sacar el bot o bloquear a esa persona.<br/>
+            <b>Si pides:</b> pegas el enlace de tu grupo. El bot se une, queda activo solo en ese grupo y consume una de las plazas del dueño.<br/>
+            <b>Límites por servidor:</b> Free compartido 3 · Free aislado 4 · Premium compartido 5 · Premium aislado 6.
+          </div>
         </div>
       </div>
     </div></div>
+
+    <div class="notice warn" style="margin-bottom:16px">${icon('alert')}<div><b>Importante:</b> no nos hacemos responsables de bloqueos, restricciones o baneos por usar el bot para spam en varios grupos. Solo garantizamos medidas de seguridad (límites por IP, por grupos y por actividad) para reducir que WhatsApp detecte el comportamiento demasiado rápido. Usa el bot con moderación y respeta las normas de cada grupo.</div></div>
 
     <div class="grid-2" style="align-items:start">
       <div>
@@ -168,15 +180,26 @@ export async function renderShared() {
         </div>
       </div>
       <div class="card">
-        <div class="card-head"><div><h3>Subbots disponibles</h3><p>Pide uno para tu grupo</p></div></div>
+        <div class="card-head"><div><h3>Bots disponibles</h3><p>${shared.length} publicación(es) · pide uno para tu grupo</p></div></div>
         <div class="card-body">
-          ${shared.length
-            ? `<div class="stack" style="display:grid;gap:14px">${shared.map(tarjetaPublica).join('')}</div>`
-            : '<div class="empty"><div class="empty-icon">' + icon('globe') + '</div><h4>No hay subbots publicados</h4><p>Cuando alguien comparta el suyo aparecerá aquí.</p></div>'}
+          ${visibles.length
+            ? `<div class="stack" style="display:grid;gap:14px">${visibles.map(tarjetaPublica).join('')}</div>
+               ${totalPaginas > 1 ? `<div class="flex" style="justify-content:space-between;align-items:center;margin-top:16px;gap:10px;flex-wrap:wrap">
+                 <button class="btn btn-ghost btn-sm" data-action="shared-page" data-dir="prev" ${paginaActual === 0 ? 'disabled' : ''}>${icon('chevronLeft')} Anterior</button>
+                 <span class="tiny muted">Página ${paginaActual + 1} de ${totalPaginas}</span>
+                 <button class="btn btn-ghost btn-sm" data-action="shared-page" data-dir="next" ${paginaActual >= totalPaginas - 1 ? 'disabled' : ''}>Siguiente ${icon('chevronRight')}</button>
+               </div>` : ''}`
+            : '<div class="empty"><div class="empty-icon">' + icon('users') + '</div><h4>No hay bots publicados</h4><p>Cuando alguien comparta el suyo aparecerá aquí.</p></div>'}
         </div>
       </div>
     </div>
   `)
+}
+
+export async function cambiarPaginaShared(direccion) {
+  const actual = Math.max(0, Number(state.sharedPage) || 0)
+  state.sharedPage = direccion === 'prev' ? Math.max(0, actual - 1) : actual + 1
+  await renderShared()
 }
 
 export async function publicarShared(form) {
