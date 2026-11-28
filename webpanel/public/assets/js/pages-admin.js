@@ -38,6 +38,7 @@ export function adminTabs(active) {
     ['users', 'Usuarios', 'users', 'admin.users'],
     ['sessions', 'Sesiones', 'server', 'admin.sessions'],
     ['servers', 'Servidores', 'server', 'admin.servers'],
+    ['nodes', 'Nodos', 'globe', 'admin.servers'],
     ['pairings', 'Vinculaciones', 'link', 'admin.pairings'],
     ['communities', 'Comunidades', 'globe', 'admin.communities'],
     ['audit', 'Auditoría', 'activity', 'admin.audit'],
@@ -57,6 +58,7 @@ export const ADMIN_META = {
   users: ['Usuarios', 'Cuentas registradas en el panel'],
   sessions: ['Sesiones', 'Sub-bots detectados en el servidor'],
   servers: ['Servidores', 'Carriles y recursos por servidor'],
+  nodes: ['Nodos', 'VPS remotas que aportan CPU, RAM y disco'],
   pairings: ['Vinculaciones', 'Historial de intentos de vinculación'],
   communities: ['Comunidades', 'Comunidades de WhatsApp para los usuarios del panel'],
   audit: ['Auditoría', 'Actividad reciente del panel'],
@@ -119,6 +121,14 @@ export async function renderAdmin(section) {
       content(adminTabs('sessions') + adminSessionsHTML(data))
       document.getElementById('admin-sessions-search')?.addEventListener('input', aplicarFiltrosSesiones)
       aplicarFiltrosSesiones()
+      return
+    }
+
+    if (section === 'nodes') {
+      const data = await api.get('/api/admin/nodes')
+      if (!isCurrentAdminRoute('nodes')) return
+      state.adminNodes = Array.isArray(data.nodes) ? data.nodes : []
+      content(adminTabs('nodes') + adminNodesHTML(data))
       return
     }
 
@@ -620,14 +630,16 @@ export function adminServersHTML(data, info, lanes = []) {
         <td>${s.max_sessions}</td>
         <td>${s.heap_mb} MB</td>
         <td>${s.db_mode === 'isolated' ? 'Aislada' : 'Compartida'}</td>
+        <td>${s.node_id ? `${icon('globe')} ${h(s.node_name || `nodo ${s.node_id}`)}` : 'Local'}</td>
         <td>${s.status === 'active' ? badge('Activo', 'green') : badge('Inactivo', 'red')}</td>
         <td class="actions">
           <button class="btn btn-ghost btn-sm" data-action="server-edit" data-id="${s.id}">${icon('settings')} Editar</button>
+          ${s.node_id ? `<button class="btn btn-ghost btn-sm" data-action="server-node-start" data-id="${s.id}" data-node="${s.node_id}">${icon('play')} Arrancar en nodo</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-action="server-toggle" data-id="${s.id}">${s.status === 'active' ? 'Desactivar' : 'Activar'}</button>
           <button class="btn btn-ghost btn-sm danger" data-action="server-delete" data-id="${s.id}" data-name="${h(s.name)}">${icon('trash')}</button>
         </td>
       </tr>`).join('')
-    : '<tr><td colspan="8" class="empty">No hay servidores configurados. Crea uno para repartir los sub-bots.</td></tr>'
+    : '<tr><td colspan="9" class="empty">No hay servidores configurados. Crea uno para repartir los sub-bots.</td></tr>'
   return `${arquitectura}${recursos}${estadoCarriles}
   <div class="card">
     <div class="card-head">
@@ -636,7 +648,7 @@ export function adminServersHTML(data, info, lanes = []) {
     </div>
     <div class="card-body tight">
       <table class="table">
-        <thead><tr><th>Nombre</th><th>Tier</th><th>Carriles</th><th>Máx. sesiones</th><th>Heap</th><th>DB</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Tier</th><th>Carriles</th><th>Máx. sesiones</th><th>Heap</th><th>DB</th><th>Nodo</th><th>Estado</th><th></th></tr></thead>
         <tbody>${filas}</tbody>
       </table>
     </div>
@@ -1079,6 +1091,53 @@ export function adminSettingsHTML(data, tab = 'limits') {
   }
 
   return `${tabBar}${contenido[tab] || contenido.limits}`
+}
+
+export function adminNodesHTML(data) {
+  const nodos = data.nodes || []
+  const tarjetas = nodos.length
+    ? nodos.map((nodo) => {
+      const salud = nodo.health || {}
+      const memoria = salud.memoria || {}
+      const disco = salud.disco || {}
+      return `<div class="card" style="margin-bottom:14px">
+        <div class="card-head">
+          <div class="cell-main">
+            <div class="row-icon ${nodo.online ? 'accent' : 'muted'}">${icon('server')}</div>
+            <div class="grow">
+              <div class="cell-title">${h(nodo.name)}</div>
+              <div class="cell-sub">${h(nodo.url)}</div>
+            </div>
+          </div>
+          ${nodo.online ? badge('En línea', 'green') : badge('Sin conexión', 'red')}
+        </div>
+        <div class="card-body">
+          ${nodo.online
+            ? `<div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px">
+                <div><div class="tiny muted">CPU</div><div style="font-weight:800">${salud.cpu?.nucleos || '?'} núcleos</div></div>
+                <div><div class="tiny muted">RAM</div><div style="font-weight:800">${memoria.usadaMB || '?'} / ${memoria.totalMB || '?'} MB</div></div>
+                <div><div class="tiny muted">Disco libre</div><div style="font-weight:800">${disco.libreGB != null ? `${disco.libreGB} GB` : '—'}</div></div>
+                <div><div class="tiny muted">Node</div><div style="font-weight:800">${h(salud.version || '?')}</div></div>
+                <div><div class="tiny muted">Commit</div><div style="font-weight:800 mono">${h(salud.commit || '?')}</div></div>
+                <div><div class="tiny muted">Carriles</div><div style="font-weight:800">${(salud.carriles || []).length}</div></div>
+              </div>`
+            : `<div class="notice warn">${icon('alert')}<div>No se pudo conectar: ${h(nodo.error || 'sin conexión')}. Revisa que el agente esté corriendo y el puerto abierto.</div></div>`}
+          <div class="flex gap-8" style="flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" data-action="node-edit" data-id="${nodo.id}">${icon('settings')} Editar</button>
+            <button class="btn btn-ghost btn-sm" data-action="node-stop" data-id="${nodo.id}">${icon('square')} Parar carriles</button>
+            <button class="btn btn-ghost btn-sm danger" data-action="node-delete" data-id="${nodo.id}" data-name="${h(nodo.name)}">${icon('trash')} Quitar</button>
+          </div>
+        </div>
+      </div>`
+    }).join('')
+    : '<div class="card"><div class="empty"><div class="empty-icon">' + icon('globe') + '</div><h4>Sin nodos</h4><p>Añade una VPS para usarla como servidor VIP.</p></div></div>'
+  return `<div class="card" style="margin-bottom:16px"><div class="card-head">
+    <div><h3>Nodos remotos</h3><p>VPS que aportan CPU, RAM y disco al panel</p></div>
+    <button class="btn btn-primary btn-sm" data-action="node-create">${icon('plus')} Añadir nodo</button>
+  </div><div class="card-body">
+    <div class="notice">${icon('info')}<div>1) En la VPS ejecuta <span class="mono">NODE_TOKEN=... NODE_PORT=10010 node scripts/node-agent.js</span>. 2) Añade aquí la URL pública y el token. 3) Crea un servidor VIP y elige ese nodo. El panel sincroniza las sesiones y el nodo arranca los bots con su propia CPU/RAM.</div></div>
+  </div></div>
+  ${tarjetas}`
 }
 
 /* ── Roles y permisos ───────────────────────────────────────────────────── */

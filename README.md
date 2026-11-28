@@ -681,6 +681,39 @@ borrado se hace **por oleadas de 5** para no saturar el proceso del bot.
 
 Endpoint: `POST /api/admin/sessions/bulk` con `{ phones: [...], batchSize: 5 }`.
 
+### Nodos remotos (VPS para servidores VIP)
+
+El panel puede usar una VPS aparte como nodo de bots. Cada nodo ejecuta un
+agente pequeño que reporta CPU, RAM, disco, versión de Node y commit, y
+recibe órdenes de arranque/parada del panel.
+
+**En la VPS del nodo:**
+
+```bash
+git clone <repo> pain-bot && cd pain-bot
+npm install
+# ffmpeg debe estar instalado en el sistema
+NODE_TOKEN=un-token-largo NODE_PORT=10010 node scripts/node-agent.js
+```
+
+Deja el agente corriendo con `pm2`, `systemd` o el gestor de tu hosting.
+Abre el puerto `10010` en el firewall y usa una URL accesible por el panel
+(por ejemplo `http://IP:10010` o un subdominio con HTTPS).
+
+**En el panel:**
+
+1. **Administración → Nodos → Añadir nodo**: nombre, URL del agente y token.
+2. El panel mostrará CPU, RAM, disco, versión y commit del nodo.
+3. **Servidores → Crear servidor**: elige tier `premium` o `vip`, selecciona
+   el **Nodo de ejecución** y guarda.
+4. En la fila del servidor pulsa **Arrancar en nodo**. El panel sincroniza las
+   sesiones (creds) al nodo y el agente arranca los carriles con la CPU/RAM de
+   esa VPS.
+
+Los servidores con nodo **no se ejecutan en la VPS del panel**. El supervisor
+local los ignora y el agente remoto es el dueño de esos procesos. Los datos
+de esos bots quedan en la DB aislada del nodo (`PAIN_DB_MODE=isolated`).
+
 ### Variables de entorno
 
 | Variable | Por defecto | Para qu├® |

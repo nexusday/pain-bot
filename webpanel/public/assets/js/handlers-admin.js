@@ -769,11 +769,82 @@ export async function handleSettingsLimitsSave(form) {
   }
 }
 
+/* ── Nodos remotos ──────────────────────────────────────────────────────── */
+export function openNodeModal(nodo = null) {
+  const editando = Boolean(nodo?.id)
+  openModal({
+    title: editando ? `Editar nodo ${nodo.name}` : 'Añadir nodo remoto',
+    subtitle: 'Una VPS con el agente de Pain-Bot',
+    body: `<form id="node-form" data-id="${editando ? nodo.id : ''}">
+      <div class="form-error">${icon('alert')}<span></span></div>
+      <div class="field">
+        <label class="label" for="node-name">Nombre</label>
+        <input id="node-name" name="name" class="input" maxlength="60" placeholder="vip-1" value="${h(nodo?.name || '')}" required />
+      </div>
+      <div class="field">
+        <label class="label" for="node-url">URL pública del agente</label>
+        <input id="node-url" name="url" class="input mono" placeholder="http://IP:10010" value="${h(nodo?.url || '')}" required />
+        <div class="hint">La IP o dominio de la VPS y el puerto donde corre <span class="mono">scripts/node-agent.js</span>.</div>
+      </div>
+      <div class="field">
+        <label class="label" for="node-token">Token</label>
+        <input id="node-token" name="token" class="input mono" type="password" placeholder="el mismo NODE_TOKEN de la VPS" value="" ${editando ? '' : 'required'} />
+        <div class="hint">${editando ? 'Déjalo vacío para conservar el token actual.' : 'Mínimo 16 caracteres. Debe coincidir con NODE_TOKEN en la VPS.'}</div>
+      </div>
+      ${editando ? `<label class="check"><input type="checkbox" name="enabled" ${nodo.enabled ? 'checked' : ''} /><span>Nodo activo</span></label>` : ''}
+    </form>`,
+    footer: `<button class="btn btn-ghost" data-action="modal-close">Cancelar</button>
+      <button class="btn btn-primary" id="node-submit" type="submit" form="node-form">${icon('check')} ${editando ? 'Guardar' : 'Añadir nodo'}</button>`,
+  })
+}
+
+export async function handleNodeSave(form) {
+  const submit = document.getElementById('node-submit')
+  const id = String(form.dataset.id || '').trim()
+  const body = {
+    name: String(form.querySelector('[name="name"]')?.value || '').trim(),
+    url: String(form.querySelector('[name="url"]')?.value || '').trim(),
+    token: String(form.querySelector('[name="token"]')?.value || '').trim(),
+  }
+  if (id) body.enabled = form.querySelector('[name="enabled"]')?.checked ? true : false
+  hideFormError(form)
+  setLoading(submit, true, 'Guardando…')
+  try {
+    if (id) await api.patch(`/api/admin/nodes/${id}`, body)
+    else await api.post('/api/admin/nodes', body)
+    closeModal()
+    showToast(id ? 'Nodo actualizado.' : 'Nodo añadido.', 'success')
+    const { renderAdmin } = await import('./pages-admin.js')
+    await renderAdmin('nodes')
+  } catch (error) {
+    showFormError(form, error.message || 'No se pudo guardar el nodo.')
+    setLoading(submit, false)
+  }
+}
+
+export async function arrancarServidorEnNodo(nodeId, serverId) {
+  try {
+    const data = await api.post(`/api/admin/nodes/${nodeId}/start`, { serverId })
+    showToast(`Servidor arrancado en el nodo (${data.sessions} sesión(es)).`, 'success')
+    const { renderAdmin } = await import('./pages-admin.js')
+    await renderAdmin('servers')
+  } catch (error) {
+    showToast(error.message || 'No se pudo arrancar en el nodo.', 'error')
+  }
+}
+
 /* ── Servidores (carriles) ──────────────────────────────────────────────── */
-export function openServerModal(server = null) {
+export async function openServerModal(server = null) {
   const editando = Boolean(server?.id)
   const tier = server?.tier || 'free'
   const dbMode = server?.db_mode || 'shared'
+  let nodos = []
+  try {
+    const datos = await api.get('/api/admin/nodes')
+    nodos = Array.isArray(datos.nodes) ? datos.nodes : []
+  } catch {}
+  const nodeId = server?.node_id === null || server?.node_id === undefined ? '' : String(server.node_id)
+  const opcionesNodo = `<option value="">Este servidor (local)</option>${nodos.map((n) => `<option value="${n.id}" ${String(n.id) === nodeId ? 'selected' : ''}>${h(n.name)}${n.online ? '' : ' (sin conexión)'}</option>`).join('')}`
   openModal({
     title: editando ? `Editar ${server.name}` : 'Crear servidor',
     subtitle: editando
@@ -822,6 +893,11 @@ export function openServerModal(server = null) {
         </div>
       </div>
       <div class="field">
+        <label class="label" for="server-node">Nodo de ejecución</label>
+        <select id="server-node" name="nodeId" class="input">${opcionesNodo}</select>
+        <div class="hint">Local = esta misma VPS. Un nodo remoto usa la CPU/RAM/disco de esa VPS. Para VIP conviene un nodo dedicado.</div>
+      </div>
+      <div class="field">
         <label class="label" for="server-heap">Heap por carril (MB)</label>
         <input id="server-heap" name="heapMb" class="input" type="number" min="256" max="8192" value="${Number(server?.heap_mb) || 512}" required />
         <div class="hint">Memoria máxima que puede usar cada proceso. Vacío = automático.</div>
@@ -845,6 +921,7 @@ export async function handleServerSave(form) {
     lanes: Number(value('lanes')?.value) || 3,
     maxSessions: Number(value('maxSessions')?.value) || 30,
     heapMb: Number(value('heapMb')?.value) || 1024,
+    nodeId: value('nodeId')?.value ? Number(value('nodeId').value) : null,
   }
   if (id) body.status = value('status')?.checked ? 'active' : 'inactive'
   hideFormError(form)

@@ -410,6 +410,46 @@ export async function onClick(event) {
       await eliminarSesionesSeleccionadas()
       return
     }
+    if (action === 'node-create') {
+      const { openNodeModal } = await import('./handlers-admin.js')
+      await openNodeModal()
+      return
+    }
+    if (action === 'node-edit') {
+      const { openNodeModal } = await import('./handlers-admin.js')
+      const id = Number(actionEl.dataset.id)
+      const nodo = (state.adminNodes || []).find((n) => Number(n.id) === id)
+      if (nodo) await openNodeModal(nodo)
+      return
+    }
+    if (action === 'node-delete') {
+      const id = Number(actionEl.dataset.id)
+      const name = actionEl.dataset.name || ''
+      if (!window.confirm(`¿Quitar el nodo "${name}"? Los servidores asignados pasarán a local.`)) return
+      try {
+        await api.del(`/api/admin/nodes/${id}`)
+        showToast('Nodo eliminado.', 'success')
+        await renderAdmin('nodes')
+      } catch (error) {
+        showToast(error.message || 'No se pudo eliminar el nodo.', 'error')
+      }
+      return
+    }
+    if (action === 'node-stop') {
+      const id = Number(actionEl.dataset.id)
+      try {
+        await api.post(`/api/admin/nodes/${id}/stop`, {})
+        showToast('Carriles del nodo detenidos.', 'success')
+      } catch (error) {
+        showToast(error.message || 'No se pudo detener el nodo.', 'error')
+      }
+      return
+    }
+    if (action === 'server-node-start') {
+      const { arrancarServidorEnNodo } = await import('./handlers-admin.js')
+      await arrancarServidorEnNodo(Number(actionEl.dataset.node), Number(actionEl.dataset.id))
+      return
+    }
     if (action === 'settings-tab') {
       state.settingsTab = actionEl.dataset.tab || 'limits'
       await renderAdmin('settings')
@@ -451,14 +491,14 @@ export async function onClick(event) {
     }
     if (action === 'server-create') {
       const { openServerModal } = await import('./handlers-admin.js')
-      openServerModal()
+      await openServerModal()
       return
     }
     if (action === 'server-edit') {
       const { openServerModal } = await import('./handlers-admin.js')
       const id = Number(actionEl.dataset.id)
       const servidor = (state.adminServers || []).find((s) => Number(s.id) === id)
-      if (servidor) openServerModal(servidor)
+      if (servidor) await openServerModal(servidor)
       return
     }
     if (action === 'bot-owner-remove') {
@@ -523,6 +563,12 @@ export async function onSubmit(event) {
     event.preventDefault()
     const { handleServerSave } = await import('./handlers-admin.js')
     await handleServerSave(form)
+    return
+  }
+  if (id === 'node-form') {
+    event.preventDefault()
+    const { handleNodeSave } = await import('./handlers-admin.js')
+    await handleNodeSave(form)
     return
   }
   if (id === 'shared-publish-form') {
