@@ -216,7 +216,20 @@ async function manejarComando(mensaje) {
       await escribirSesion(mensaje.folder, mensaje.files)
       resultado.ok = true
     } else if (type === 'start') {
-      const lanes = Math.max(1, Math.min(Number(mensaje.lanes) || 1, 16))
+      // El nodo también respeta su propio presupuesto: no abrir más carriles
+      // de los que entran en la RAM/CPU del contenedor.
+      const limites = limitesContenedor()
+      const ramMB = limites.memoriaMB || Math.round(os.totalmem() / 1048576)
+      const cpu = limites.cpuNucleos || os.cpus().length
+      const presupuesto = Math.max(1024, Math.floor(ramMB * 0.6))
+      const heapLane = Math.max(512, Number(mensaje.heapMb) || 2048)
+      const maxPorRam = Math.max(1, Math.floor(presupuesto / heapLane))
+      const maxPorCpu = Math.max(1, Math.floor(cpu * 1.5))
+      const lanes = Math.max(1, Math.min(Number(mensaje.lanes) || 1, maxPorRam, maxPorCpu, 8))
+      console.log(
+        `[node-agent] start: ${ramMB} MB / ${cpu} CPU · heap ${heapLane} MB · carriles ${lanes} ` +
+        `(pedidos ${mensaje.lanes || 1})`
+      )
       const sesiones = Array.isArray(mensaje.sessions) ? mensaje.sessions : []
       for (let i = 0; i < lanes; i++) {
         const parte = sesiones.filter((_, indice) => indice % lanes === i)
