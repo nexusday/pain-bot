@@ -39,3 +39,4 @@ storage/logs/
 storage/metrics/
 storage/servers.json
 storage/assignments.json
+storage/*.lock
