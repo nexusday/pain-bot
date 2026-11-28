@@ -793,7 +793,7 @@ export function openNodeModal(nodo = null) {
   })
 }
 
-export function mostrarComandoNodo(command) {
+export function mostrarComandoNodo(command, startUrl = '') {
   openModal({
     title: 'Conecta la VPS a este nodo',
     subtitle: 'Un solo comando: descarga el agente y el código, instala y conecta',
@@ -803,7 +803,8 @@ export function mostrarComandoNodo(command) {
         <textarea class="input mono" rows="3" readonly>${h(command)}</textarea>
       </div>
       <div class="hint">El script descarga el código actual del panel, instala dependencias la primera vez y arranca el agente. Para dejarlo fijo usa pm2 o systemd.</div>`,
-    footer: `<button class="btn btn-ghost" data-action="modal-close">Cerrar</button>
+    footer: `${startUrl ? `<a class="btn btn-secondary" href="${h(startUrl)}" download="start.sh">${icon('download')} Descargar start.sh</a>` : ''}
+      <button class="btn btn-ghost" data-action="modal-close">Cerrar</button>
       <button class="btn btn-primary" data-action="node-copy-command" data-command="${h(command)}">${icon('copy')} Copiar comando</button>`,
   })
 }
@@ -824,7 +825,7 @@ export async function handleNodeSave(form) {
       : await api.post('/api/admin/nodes', body)
     closeModal()
     if (!id && data?.node?.command) {
-      mostrarComandoNodo(data.node.command)
+      mostrarComandoNodo(data.node.command, data.node.startUrl)
     } else {
       showToast('Nodo actualizado.', 'success')
     }

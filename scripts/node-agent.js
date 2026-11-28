@@ -47,14 +47,56 @@ async function leerCommit() {
   commit = await ejecutar('git', ['rev-parse', '--short', 'HEAD'])
 }
 
+/**
+ * Límites reales del contenedor (Pterodactyl usa cgroups). Sin esto, dentro
+ * de un contenedor `os.totalmem()` devuelve la RAM del host, no la del plan.
+ */
+function limitesContenedor() {
+  let memoriaMB = null
+  let cpuNucleos = null
+  try {
+    const max = fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim()
+    if (max !== 'max') memoriaMB = Math.round(Number(max) / 1048576) || null
+  } catch {}
+  if (!memoriaMB) {
+    try {
+      const max = Number(fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf8').trim())
+      if (Number.isFinite(max) && max > 0 && max < 1e15) memoriaMB = Math.round(max / 1048576)
+    } catch {}
+  }
+  try {
+    const texto = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim()
+    const [quota, period] = texto.split(/\s+/)
+    if (quota !== 'max') cpuNucleos = Math.round((Number(quota) / Number(period)) * 100) / 100
+  } catch {}
+  if (!cpuNucleos) {
+    try {
+      const quota = Number(fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'utf8').trim())
+      const period = Number(fs.readFileSync('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'utf8').trim())
+      if (quota > 0 && period > 0) cpuNucleos = Math.round((quota / period) * 100) / 100
+    } catch {}
+  }
+  return { memoriaMB, cpuNucleos }
+}
+
 function memoria() {
-  const total = os.totalmem()
-  const libre = os.freemem()
+  const limites = limitesContenedor()
+  const total = limites.memoriaMB ? limites.memoriaMB * 1048576 : os.totalmem()
+  let usada = null
+  try {
+    usada = Number(fs.readFileSync('/sys/fs/cgroup/memory.current', 'utf8').trim())
+  } catch {
+    try {
+      usada = Number(fs.readFileSync('/sys/fs/cgroup/memory/memory.usage_in_bytes', 'utf8').trim())
+    } catch {}
+  }
+  if (!Number.isFinite(usada) || usada < 0) usada = total - os.freemem()
+  const libre = Math.max(0, total - usada)
   return {
     totalMB: Math.round(total / 1048576),
     libreMB: Math.round(libre / 1048576),
-    usadaMB: Math.round((total - libre) / 1048576),
-    porcentaje: total ? Math.round(((total - libre) / total) * 100) : 0,
+    usadaMB: Math.round(usada / 1048576),
+    porcentaje: total ? Math.round((usada / total) * 100) : 0,
   }
 }
 
@@ -97,6 +139,7 @@ function enviar(mensaje) {
 }
 
 function recursos() {
+  const limites = limitesContenedor()
   return {
     type: 'stats',
     name: NODE_NAME,
@@ -106,7 +149,12 @@ function recursos() {
     arquitectura: os.arch(),
     hostname: os.hostname(),
     uptimeSegundos: Math.round(os.uptime()),
-    cpu: { nucleos: os.cpus().length, modelo: os.cpus()[0]?.model || '', uso: os.loadavg()[0] },
+    cpu: {
+      nucleos: limites.cpuNucleos || os.cpus().length,
+      modelo: os.cpus()[0]?.model || '',
+      uso: os.loadavg()[0],
+    },
+    limites,
     memoria: memoria(),
     disco: disco(),
     carriles: estadoCarriles(),
@@ -225,10 +273,12 @@ function conectar() {
 
 function programarReconexion() {
   if (reconectando) return
+  // 5-8 s: si el panel se reinicia, el nodo vuelve solo sin intervención.
+  const espera = 5_000 + Math.floor(Math.random() * 3_000)
   reconectando = setTimeout(() => {
     reconectando = null
     conectar()
-  }, 10_000)
+  }, espera)
 }
 
 await leerCommit()

@@ -1128,6 +1128,7 @@ export function adminNodesHTML(data) {
           </div>
           <div class="flex gap-8" style="flex-wrap:wrap;margin-top:10px">
             <button class="btn btn-ghost btn-sm" data-action="node-copy-command" data-command="${h(nodo.command || '')}">${icon('copy')} Copiar comando</button>
+            ${nodo.startUrl ? `<a class="btn btn-ghost btn-sm" href="${h(nodo.startUrl)}" download="start.sh">${icon('download')} start.sh</a>` : ''}
             <button class="btn btn-ghost btn-sm" data-action="node-edit" data-id="${nodo.id}">${icon('settings')} Editar</button>
             <button class="btn btn-ghost btn-sm" data-action="node-stop" data-id="${nodo.id}">${icon('square')} Parar carriles</button>
             <button class="btn btn-ghost btn-sm danger" data-action="node-delete" data-id="${nodo.id}" data-name="${h(nodo.name)}">${icon('trash')} Quitar</button>

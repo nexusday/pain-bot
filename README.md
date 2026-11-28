@@ -703,7 +703,20 @@ dependencias la primera vez y arranca el agente. **No hay que clonar el repo
 ni abrir puertos**. Para dejarlo fijo usa `pm2` o `systemd`.
 
 El agente abre la conexión, reporta CPU/RAM/disco/versión/commit y aparece
-**en línea** en el panel. Si se cae la red, reintenta solo cada 10 s.
+**en línea** en el panel. Si se cae la red, reintenta solo cada 5-8 s.
+
+**Si el nodo es otro servidor de Pterodactyl/Nexcodea** (no una VPS pelada):
+
+1. Crea el servidor con el egg de Node.js y los recursos que quieras.
+2. Descarga `start.sh` desde el panel (botón en la tarjeta del nodo) y súbelo
+   al servidor con el gestor de archivos.
+3. En **Startup**, pon como comando de arranque: `bash start.sh`.
+4. Arranca el servidor. El agente descarga el código, instala dependencias y
+   se conecta al panel. No abras puertos: la conexión es saliente.
+
+El panel lee los **cgroups** del contenedor, así que muestra la RAM/CPU del
+plan de Pterodactyl, no la del host. Si reinicias el panel, los agentes se
+reconectan solos y los bots del nodo siguen corriendo mientras dura el corte.
 
 **Crear un servidor en el nodo:**
 
