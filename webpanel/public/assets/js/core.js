@@ -405,6 +405,10 @@ export function stopTimers() {
 /* ── Toasts / modales ───────────────────────────────────────────────────── */
 export function openModal({ title, subtitle = '', body, footer = '', wide = false, dismissible = true, onMount }) {
   if (!modalRoot || modalRoot.dataset.dismissible === 'false') return
+  if (typeof modalRoot.__onClose === 'function') {
+    try { modalRoot.__onClose() } catch {}
+    modalRoot.__onClose = null
+  }
   modalRoot.dataset.dismissible = String(dismissible)
   if (!dismissible && app) app.inert = true
   modalRoot.innerHTML = `
@@ -423,6 +427,10 @@ export function openModal({ title, subtitle = '', body, footer = '', wide = fals
 
 export function closeModal() {
   if (!modalRoot || modalRoot.dataset.dismissible === 'false') return
+  if (typeof modalRoot.__onClose === 'function') {
+    try { modalRoot.__onClose() } catch {}
+    modalRoot.__onClose = null
+  }
   modalRoot.classList.remove('open')
   modalRoot.innerHTML = ''
   state.turnstileToken = ''

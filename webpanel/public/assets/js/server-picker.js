@@ -208,17 +208,50 @@ export function abrirSelectorServidor({
   onSelect,
 } = {}) {
   const lista = Array.isArray(servers) ? servers : []
+  const totalOpciones = lista.length + (includeAuto ? 1 : 0)
+  const subtitulo = totalOpciones
+    ? `${subtitle} · ${totalOpciones} ${totalOpciones === 1 ? 'opción' : 'opciones'}`
+    : subtitle
   openModal({
     title,
-    subtitle,
+    subtitle: subtitulo,
     wide: true,
-    body: `<div class="server-option-list" role="listbox" aria-label="Servidores disponibles">
-      ${opcionAutoHTML(includeAuto, !selectedId)}
-      ${gruposHTML(lista, selectedId)}
-      ${!lista.length && !includeAuto ? '<div class="server-option-empty">No hay servidores disponibles.</div>' : ''}
+    body: `<div class="server-option-shell" data-server-option-shell>
+      <div class="server-option-list" data-server-option-list role="listbox" aria-label="Servidores disponibles">
+        ${opcionAutoHTML(includeAuto, !selectedId)}
+        ${gruposHTML(lista, selectedId)}
+        ${!lista.length && !includeAuto ? '<div class="server-option-empty">No hay servidores disponibles.</div>' : ''}
+      </div>
+      <div class="server-option-more" data-server-option-more aria-hidden="true">
+        <span class="server-option-more-pill">${icon('chevronDown')} Desliza para ver más</span>
+      </div>
     </div>`,
     footer: '<button class="btn btn-ghost" data-action="modal-close">Cancelar</button>',
     onMount(root) {
+      const listaEl = root.querySelector('[data-server-option-list]')
+      const shell = root.querySelector('[data-server-option-shell]')
+      const pista = root.querySelector('[data-server-option-more]')
+      if (listaEl && shell && pista) {
+        const actualizarPista = () => {
+          const hayMas = listaEl.scrollHeight - listaEl.scrollTop - listaEl.clientHeight > 8
+          shell.classList.toggle('has-more', hayMas)
+          pista.setAttribute('aria-hidden', String(!hayMas))
+        }
+        const alDesplazar = () => actualizarPista()
+        listaEl.addEventListener('scroll', alDesplazar, { passive: true })
+        window.addEventListener('resize', actualizarPista)
+        const observador = typeof ResizeObserver === 'function'
+          ? new ResizeObserver(actualizarPista)
+          : null
+        observador?.observe(listaEl)
+        actualizarPista()
+        requestAnimationFrame(actualizarPista)
+        root.__onClose = () => {
+          listaEl.removeEventListener('scroll', alDesplazar)
+          window.removeEventListener('resize', actualizarPista)
+          observador?.disconnect()
+        }
+      }
       root.querySelectorAll('.server-option').forEach((boton) => {
         boton.addEventListener('click', () => {
           if (boton.disabled) return

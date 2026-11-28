@@ -346,3 +346,70 @@
     display: none;
   }
 }
+
+/* Pista animada: indica que hay más servidores abajo. */
+.server-option-shell {
+  position: relative;
+}
+
+.server-option-more {
+  position: absolute;
+  left: -20px;
+  right: -20px;
+  bottom: -1px;
+  height: 64px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--surface) 30%, rgba(20, 22, 28, 0));
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.server-option-shell.has-more .server-option-more {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.server-option-more-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+}
+
+.server-option-more-pill svg {
+  width: 12px;
+  height: 12px;
+  color: var(--accent);
+  animation: serverPickerNudge 1.6s ease-in-out infinite;
+}
+
+@keyframes serverPickerNudge {
+  0%, 100% { transform: translateY(0); opacity: .75; }
+  50% { transform: translateY(3px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-option-more-pill svg {
+    animation: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .server-option-more {
+    left: -20px;
+    right: -20px;
+  }
+}
