@@ -899,7 +899,7 @@ export async function openServerModal(server = null) {
         <div class="field">
           <label class="label" for="server-lanes">Carriles</label>
           <input id="server-lanes" name="lanes" class="input" type="number" min="1" max="16" value="${Number(server?.lanes) || 3}" required />
-          <div class="hint">Procesos que se abrirán para este servidor.</div>
+          <div class="hint">Máximo de procesos para este servidor. El supervisor reparte un presupuesto global según RAM/CPU y bots, así que puede abrir menos para no saturar la VPS.</div>
         </div>
         <div class="field">
           <label class="label" for="server-max">Máx. sesiones</label>
